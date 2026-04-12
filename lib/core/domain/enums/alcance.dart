@@ -1,4 +1,4 @@
-enum AlcanceDiagnosis {
+enum Alcance {
   puntual,
   diente,
   arcada,
@@ -6,13 +6,13 @@ enum AlcanceDiagnosis {
 
   String get name {
     switch (this) {
-      case AlcanceDiagnosis.puntual:
+      case Alcance.puntual:
         return 'Puntual';
-      case AlcanceDiagnosis.diente:
+      case Alcance.diente:
         return 'Diente';
-      case AlcanceDiagnosis.arcada:
+      case Alcance.arcada:
         return 'Arcada';
-      case AlcanceDiagnosis.global:
+      case Alcance.global:
         return 'Global';
     }
   }

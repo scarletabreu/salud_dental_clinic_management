@@ -82,9 +82,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
           ),
         ],
       ),
@@ -111,151 +114,137 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Medicinas'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(context),
+            _buildSearchBar(context),
+            _buildStatsBar(context),
+            Expanded(child: _buildBody()),
+          ],
+        ),
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      color: colorScheme.surface,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar medicina...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: _searchController.clear,
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Medicinas',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
                 ),
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                const SizedBox(height: 2),
+                Text(
+                  'Gestión de base de datos de medicamentos y protocolos de seguridad.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          FilledButton.icon(
+            onPressed: () => _openForm(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Agregar Medicina'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
-          Expanded(child: _buildBody()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(),
-        tooltip: 'Agregar medicina',
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      color: colorScheme.surface,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar medicina por nombre...',
+          prefixIcon: Icon(Icons.search,
+              color: colorScheme.onSurfaceVariant, size: 20),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear,
+                      color: colorScheme.onSurfaceVariant, size: 18),
+                  onPressed: _searchController.clear,
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
-            TextButton(onPressed: _load, child: const Text('Reintentar')),
-          ],
-        ),
-      );
-    }
-
-    if (_filtered.isEmpty) {
-      return Center(
-        child: Text(
-          _searchController.text.isEmpty
-              ? 'No hay medicinas registradas.\nPresiona + para agregar una.'
-              : 'Sin resultados para "${_searchController.text}".',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: _filtered.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, index) {
-        final medicina = _filtered[index];
-        return _MedicinaListTile(
-          medicina: medicina,
-          onEdit: () => _openForm(medicina: medicina),
-          onDelete: () => _confirmDelete(medicina),
-        );
-      },
-    );
-  }
-}
-
-class _MedicinaListTile extends StatelessWidget {
-  final Medicina medicina;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _MedicinaListTile({
-    required this.medicina,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStatsBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.primaryContainer,
-          child: Text(
-            medicina.nombre[0].toUpperCase(),
-            style: TextStyle(
-              color: colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          medicina.nombre,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: _buildBadges(context),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: onEdit,
-              tooltip: 'Editar',
-            ),
-            IconButton(
-              icon: Icon(Icons.delete_outline, color: colorScheme.error),
-              onPressed: onDelete,
-              tooltip: 'Eliminar',
-            ),
-            const Icon(Icons.expand_more),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Column(
+          Text(
+            'TOTAL DE MEDICINAS',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  letterSpacing: 0.5,
+                ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                EfectosSecundariosCard(
-                    efectos: medicina.efectosSecundarios),
-                const SizedBox(height: 8),
-                ContraindicacionesCard(
-                    contraindicaciones: medicina.contraindicaciones),
+                Text(
+                  '${_medicinas.length}',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.check_circle,
+                    color: colorScheme.primary, size: 14),
               ],
             ),
           ),
@@ -264,18 +253,361 @@ class _MedicinaListTile extends StatelessWidget {
     );
   }
 
-  Widget? _buildBadges(BuildContext context) {
-    final efectos = medicina.efectosSecundarios.length;
-    final contra = medicina.contraindicaciones.length;
-    if (efectos == 0 && contra == 0) return null;
-    return Wrap(
-      spacing: 4,
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline,
+                size: 48, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.error)),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.medication_outlined,
+              size: 56,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant
+                  .withAlpha(100),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _searchController.text.isEmpty
+                  ? 'No hay medicinas registradas.\nPresiona "Agregar Medicina" para comenzar.'
+                  : 'Sin resultados para "${_searchController.text}".',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
       children: [
-        if (efectos > 0)
-          Text('$efectos efecto${efectos == 1 ? '' : 's'}'),
-        if (contra > 0)
-          Text('$contra contraindicación${contra == 1 ? '' : 'es'}'),
+        _buildTableHeader(),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            itemCount: _filtered.length,
+            separatorBuilder: (context2, index2) => const SizedBox(height: 4),
+            itemBuilder: (_, index) => _MedicinaRow(
+              medicina: _filtered[index],
+              onEdit: () => _openForm(medicina: _filtered[index]),
+              onDelete: () => _confirmDelete(_filtered[index]),
+            ),
+          ),
+        ),
+        _buildFooter(context),
       ],
+    );
+  }
+
+  Widget _buildTableHeader() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: _headerLabel(context, 'NOMBRE DEL FÁRMACO'),
+          ),
+          Expanded(
+            flex: 3,
+            child: _headerLabel(context, 'EFECTOS COMUNES'),
+          ),
+          Expanded(
+            flex: 3,
+            child: _headerLabel(context, 'CONTRAINDICACIONES CRÍTICAS'),
+          ),
+          const SizedBox(width: 88),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerLabel(BuildContext context, String text) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+    );
+  }
+
+  Widget _buildFooter(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final shown = _filtered.length;
+    final total = _medicinas.length;
+    return Container(
+      color: colorScheme.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Text(
+        'Mostrando $shown–$shown de $total medicina${total == 1 ? '' : 's'}',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+class _MedicinaRow extends StatefulWidget {
+  final Medicina medicina;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _MedicinaRow({
+    required this.medicina,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  State<_MedicinaRow> createState() => _MedicinaRowState();
+}
+
+class _MedicinaRowState extends State<_MedicinaRow> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final efectos = widget.medicina.efectosSecundarios;
+    final contras = widget.medicina.contraindicaciones;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _expanded
+              ? colorScheme.primary.withAlpha(80)
+              : colorScheme.outlineVariant,
+        ),
+        boxShadow: _expanded
+            ? [
+                BoxShadow(
+                  color: colorScheme.shadow.withAlpha(18),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                )
+              ]
+            : null,
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nombre
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      widget.medicina.nombre,
+                      style:
+                          Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                    ),
+                  ),
+                  // Efectos comunes
+                  Expanded(
+                    flex: 3,
+                    child: efectos.isEmpty
+                        ? Text(
+                            'Sin efectos registrados',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                          )
+                        : Text(
+                            efectos.take(3).map((e) => e.nombre).join(', '),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                  ),
+                  // Contraindicaciones críticas
+                  Expanded(
+                    flex: 3,
+                    child: contras.isEmpty
+                        ? Text(
+                            'Sin contraindicaciones críticas',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: contras.take(2).map((c) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        size: 14, color: colorScheme.error),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        c.descripcion,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: colorScheme.error,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                  ),
+                  // Acciones
+                  SizedBox(
+                    width: 88,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _ActionIcon(
+                          icon: _expanded
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          tooltip:
+                              _expanded ? 'Ocultar detalle' : 'Ver detalle',
+                          color: colorScheme.primary,
+                          onTap: () =>
+                              setState(() => _expanded = !_expanded),
+                        ),
+                        _ActionIcon(
+                          icon: Icons.edit_outlined,
+                          tooltip: 'Editar',
+                          color: colorScheme.onSurfaceVariant,
+                          onTap: widget.onEdit,
+                        ),
+                        _ActionIcon(
+                          icon: Icons.delete_outline,
+                          tooltip: 'Eliminar',
+                          color: colorScheme.error,
+                          onTap: widget.onDelete,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLowest,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                children: [
+                  Divider(color: colorScheme.outlineVariant, height: 20),
+                  EfectosSecundariosCard(
+                      efectos: widget.medicina.efectosSecundarios),
+                  const SizedBox(height: 8),
+                  ContraindicacionesCard(
+                      contraindicaciones: widget.medicina.contraindicaciones),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionIcon extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      ),
     );
   }
 }

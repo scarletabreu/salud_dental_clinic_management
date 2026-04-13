@@ -76,109 +76,365 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Editar medicina' : 'Nueva medicina'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildNombreField(context),
-            const SizedBox(height: 24),
-            _buildEfectosSection(context),
-            const SizedBox(height: 32),
-            _buildSaveButton(context),
-          ],
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: _buildFormBody(context),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNombreField(BuildContext context) {
-    return TextFormField(
-      controller: _nombreController,
-      textCapitalization: TextCapitalization.sentences,
-      decoration: InputDecoration(
-        labelText: 'Nombre *',
-        hintText: 'Ej. Ibuprofeno',
-        prefixIcon: const Icon(Icons.medication_outlined),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      color: colorScheme.surface,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Breadcrumb
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Text(
+                  'Inventario',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 16, color: colorScheme.onSurfaceVariant),
+              Text(
+                _isEditing ? 'Editar Medicina' : 'Nueva Medicina',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isEditing
+                          ? 'Editar Medicamento'
+                          : 'Registro de Medicamento',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    Text(
+                      _isEditing
+                          ? 'Modifica los datos del fármaco.'
+                          : 'Complete los detalles para agregar un nuevo fármaco.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: _saving ? null : () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Cancelar'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(_isEditing ? 'Guardar Cambios' : 'Guardar Medicina'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-      validator: (v) {
-        if (v == null || v.trim().isEmpty) {
-          return 'El nombre no puede estar vacío';
+    );
+  }
+
+  Widget _buildFormBody(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600;
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: _buildInfoPanel(context),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 4,
+                child: _buildEfectosPanel(context),
+              ),
+            ],
+          );
         }
-        return null;
+        return Column(
+          children: [
+            _buildInfoPanel(context),
+            const SizedBox(height: 16),
+            _buildEfectosPanel(context),
+          ],
+        );
       },
     );
   }
 
-  Widget _buildEfectosSection(BuildContext context) {
+  Widget _buildInfoPanel(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.info_outline,
+                    size: 16, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Información General',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _nombreController,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Nombre de Medicina *',
+              hintText: 'Ej. Ibuprofeno 400mg',
+              helperText: 'Este nombre aparecerá en las recetas médicas.',
+              prefixIcon:
+                  const Icon(Icons.medication_outlined, size: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) {
+                return 'El nombre no puede estar vacío';
+              }
+              return null;
+            },
+          ),
+          if (_isEditing && widget.medicina!.contraindicaciones.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildContraindicacionesSection(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContraindicacionesSection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final contras = widget.medicina!.contraindicaciones;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Efectos secundarios',
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Selecciona los efectos que puede producir esta medicina.',
-          style: Theme.of(context).textTheme.bodySmall,
+        Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                size: 16, color: colorScheme.error),
+            const SizedBox(width: 6),
+            Text(
+              'Contraindicaciones',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.error,
+                  ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: EfectoSecundario.values.map((efecto) {
-            final selected = _efectosSeleccionados.contains(efecto);
-            return FilterChip(
-              label: Text(efecto.nombre),
-              selected: selected,
-              onSelected: (v) => setState(() {
-                v
-                    ? _efectosSeleccionados.add(efecto)
-                    : _efectosSeleccionados.remove(efecto);
-              }),
-            );
-          }).toList(),
-        ),
-        if (_efectosSeleccionados.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            '${_efectosSeleccionados.length} seleccionado${_efectosSeleccionados.length == 1 ? '' : 's'}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w500,
+        ...contras.map(
+          (c) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer.withAlpha(60),
+              borderRadius: BorderRadius.circular(8),
+              border:
+                  Border.all(color: colorScheme.error.withAlpha(60)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.block,
+                    size: 14, color: colorScheme.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    c.descripcion,
+                    style:
+                        Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                            ),
+                  ),
                 ),
+              ],
+            ),
           ),
-        ],
+        ),
       ],
     );
   }
 
-  Widget _buildSaveButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: _saving ? null : _save,
-        style: ElevatedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: _saving
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(_isEditing ? 'Guardar cambios' : 'Crear medicina'),
+  Widget _buildEfectosPanel(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.warning_amber_outlined,
+                    size: 16, color: colorScheme.secondary),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Efectos Secundarios',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Selecciona los efectos secundarios más comunes reportados.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: EfectoSecundario.values.map((efecto) {
+              final selected = _efectosSeleccionados.contains(efecto);
+              return FilterChip(
+                label: Text(
+                  efecto.nombre,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                selected: selected,
+                onSelected: (v) => setState(() {
+                  v
+                      ? _efectosSeleccionados.add(efecto)
+                      : _efectosSeleccionados.remove(efecto);
+                }),
+                selectedColor:
+                    colorScheme.secondaryContainer,
+                checkmarkColor: colorScheme.secondary,
+                side: BorderSide(
+                  color: selected
+                      ? colorScheme.secondary
+                      : colorScheme.outlineVariant,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 4, vertical: 0),
+              );
+            }).toList(),
+          ),
+          if (_efectosSeleccionados.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer.withAlpha(80),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_efectosSeleccionados.length} efecto${_efectosSeleccionados.length == 1 ? '' : 's'} seleccionado${_efectosSeleccionados.length == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

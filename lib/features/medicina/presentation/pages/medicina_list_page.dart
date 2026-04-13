@@ -4,6 +4,8 @@ import 'package:salud_dental_clinic_management/features/medicina/domain/reposito
 import 'package:salud_dental_clinic_management/features/medicina/domain/usecases/delete_medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/usecases/get_medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_form_page.dart';
+import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/contraindicaciones_card.dart';
+import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/efectos_secundarios_card.dart';
 
 class MedicinaListPage extends StatefulWidget {
   final IMedicinaRepository repository;
@@ -211,9 +213,8 @@ class _MedicinaListTile extends StatelessWidget {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: colorScheme.primaryContainer,
           child: Text(
@@ -228,7 +229,7 @@ class _MedicinaListTile extends StatelessWidget {
           medicina.nombre,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: _buildSubtitle(context),
+        subtitle: _buildBadges(context),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -242,21 +243,36 @@ class _MedicinaListTile extends StatelessWidget {
               onPressed: onDelete,
               tooltip: 'Eliminar',
             ),
+            const Icon(Icons.expand_more),
           ],
         ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Column(
+              children: [
+                EfectosSecundariosCard(
+                    efectos: medicina.efectosSecundarios),
+                const SizedBox(height: 8),
+                ContraindicacionesCard(
+                    contraindicaciones: medicina.contraindicaciones),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget? _buildSubtitle(BuildContext context) {
+  Widget? _buildBadges(BuildContext context) {
     final efectos = medicina.efectosSecundarios.length;
     final contra = medicina.contraindicaciones.length;
     if (efectos == 0 && contra == 0) return null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 4,
       children: [
         if (efectos > 0)
-          Text('$efectos efecto${efectos == 1 ? '' : 's'} secundario${efectos == 1 ? '' : 's'}'),
+          Text('$efectos efecto${efectos == 1 ? '' : 's'}'),
         if (contra > 0)
           Text('$contra contraindicación${contra == 1 ? '' : 'es'}'),
       ],

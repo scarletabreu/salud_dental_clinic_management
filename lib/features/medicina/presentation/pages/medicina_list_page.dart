@@ -161,14 +161,17 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
             ),
           ),
           const SizedBox(width: 16),
-          FilledButton.icon(
-            onPressed: () => _openForm(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Agregar Medicina'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Flexible(
+            child: FilledButton.icon(
+              onPressed: () => _openForm(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Agregar Medicina'),
+              style: FilledButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
@@ -351,7 +354,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
             flex: 3,
             child: _headerLabel(context, 'CONTRAINDICACIONES CRÍTICAS'),
           ),
-          const SizedBox(width: 88),
+          const SizedBox(width: 90),
         ],
       ),
     );
@@ -523,7 +526,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                   ),
                   // Acciones
                   SizedBox(
-                    width: 88,
+                    width: 90,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [

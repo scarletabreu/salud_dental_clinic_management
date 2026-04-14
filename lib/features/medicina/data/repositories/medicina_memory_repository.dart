@@ -1,10 +1,161 @@
 import 'package:dartz/dartz.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
+import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 
 class MedicinaMemoryRepository implements IMedicinaRepository {
-  final List<Medicina> _medicinas = [];
+  final List<Medicina> _medicinas = [
+    Medicina(
+      id: 'med-001',
+      nombre: 'Amoxicilina 500mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-001',
+          condicionId: 'cond-alergia-penicilina',
+          medicinaId: 'med-001',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Contraindicado en pacientes con alergia a penicilinas o cefalosporinas.',
+          tipoContraindicacion: TipoContraindicacion.absoluta,
+          efectosAdversos: [EfectoAdverso.reaccion_alergica, EfectoAdverso.diarrea],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.nausea,
+        EfectoSecundario.diarrea,
+        EfectoSecundario.reaccionesAlergicas,
+      ],
+    ),
+    Medicina(
+      id: 'med-002',
+      nombre: 'Ibuprofeno 400mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-002',
+          condicionId: 'cond-ulcera-peptica',
+          medicinaId: 'med-002',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Contraindicado en pacientes con úlcera péptica activa o insuficiencia renal grave.',
+          tipoContraindicacion: TipoContraindicacion.absoluta,
+          efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.dolor_cabeza],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.nausea,
+        EfectoSecundario.dolorCabeza,
+        EfectoSecundario.mareos,
+      ],
+    ),
+    Medicina(
+      id: 'med-003',
+      nombre: 'Lidocaína 2% (Anestésico)',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-003',
+          condicionId: 'cond-arritmia',
+          medicinaId: 'med-003',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Usar con precaución en pacientes con arritmias cardíacas o hipotensión.',
+          tipoContraindicacion: TipoContraindicacion.relativa,
+          efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.adormecimientoProlongado,
+        EfectoSecundario.mareos,
+        EfectoSecundario.somnolencia,
+      ],
+    ),
+    Medicina(
+      id: 'med-004',
+      nombre: 'Metronidazol 500mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-004',
+          condicionId: 'cond-embarazo-primer-trimestre',
+          medicinaId: 'med-004',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Contraindicado en el primer trimestre del embarazo.',
+          tipoContraindicacion: TipoContraindicacion.absoluta,
+          efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.vomitos],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.nausea,
+        EfectoSecundario.vomitos,
+        EfectoSecundario.bocaSeca,
+      ],
+    ),
+    Medicina(
+      id: 'med-005',
+      nombre: 'Clindamicina 300mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-005',
+          condicionId: 'cond-colitis',
+          medicinaId: 'med-005',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Contraindicado en pacientes con historial de colitis pseudomembranosa.',
+          tipoContraindicacion: TipoContraindicacion.absoluta,
+          efectosAdversos: [EfectoAdverso.diarrea, EfectoAdverso.nauseas],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.diarrea,
+        EfectoSecundario.nausea,
+        EfectoSecundario.reaccionesAlergicas,
+      ],
+    ),
+    Medicina(
+      id: 'med-006',
+      nombre: 'Paracetamol 500mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-006',
+          condicionId: 'cond-hepatopatia',
+          medicinaId: 'med-006',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Usar con precaución en pacientes con enfermedad hepática.',
+          tipoContraindicacion: TipoContraindicacion.relativa,
+          efectosAdversos: [EfectoAdverso.fatiga],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.nausea,
+        EfectoSecundario.fatiga,
+      ],
+    ),
+    Medicina(
+      id: 'med-007',
+      nombre: 'Dexametasona 4mg',
+      contraindicaciones: [
+        Contraindicacion(
+          id: 'cont-007',
+          condicionId: 'cond-diabetes',
+          medicinaId: 'med-007',
+          contraindicacionId: '',
+          tratamientoId: '',
+          descripcion: 'Precaución en diabéticos; puede elevar los niveles de glucosa.',
+          tipoContraindicacion: TipoContraindicacion.relativa,
+          efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
+        ),
+      ],
+      efectosSecundarios: [
+        EfectoSecundario.insomnio,
+        EfectoSecundario.cambiosAnimo,
+        EfectoSecundario.inflamacion,
+      ],
+    ),
+  ];
 
   @override
   Future<Either<Failure, List<Medicina>>> getMedicinas() async {

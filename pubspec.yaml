@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dartz: ^0.10.1
   equatable: ^2.0.8
+  supabase_flutter: ^2.12.2
 
 dev_dependencies:
   flutter_test:

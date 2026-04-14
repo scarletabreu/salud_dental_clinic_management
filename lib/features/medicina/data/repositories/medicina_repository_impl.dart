@@ -1,8 +1,9 @@
 import 'package:dartz/dartz.dart';
-import 'package:salud_dental_clinic_management/core/errors/failures.dart';
-import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
-import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
-import 'package:salud_dental_clinic_management/features/medicina/data/datasources/medicine_remote_datasource.dart';
+import '../../../../core/errors/failures.dart';
+import '../../domain/entities/medicina.dart';
+import '../../domain/repositories/i_medicina_repository.dart';
+import '../datasources/medicine_remote_datasource.dart';
+import '../models/medicina_model.dart';
 
 class MedicinaRepositoryImpl implements IMedicinaRepository {
   final MedicineRemoteDatasource remoteDataSource;
@@ -15,9 +16,7 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
       final remoteMedicinas = await remoteDataSource.getMedicinas();
       return Right(remoteMedicinas);
     } catch (e) {
-      return Left(
-        ServerFailure('Error al cargar el catálogo de medicinas: $e'),
-      );
+      return Left(ServerFailure('Error al cargar medicinas: $e'));
     }
   }
 
@@ -28,7 +27,7 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
       await remoteDataSource.addMedicina(medicinaModel);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure('No se pudo registrar la medicina: $e'));
+      return Left(ServerFailure('Error al agregar: $e'));
     }
   }
 
@@ -39,7 +38,7 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
       await remoteDataSource.updateMedicina(medicinaModel);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure('Error al actualizar la medicina: $e'));
+      return Left(ServerFailure('Error al actualizar: $e'));
     }
   }
 
@@ -49,9 +48,7 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
       await remoteDataSource.deleteMedicina(id);
       return const Right(null);
     } catch (e) {
-      return Left(
-        ServerFailure('No se pudo eliminar la medicina del sistema: $e'),
-      );
+      return Left(ServerFailure('Error al eliminar: $e'));
     }
   }
 }

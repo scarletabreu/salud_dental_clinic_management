@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
@@ -15,7 +16,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-001',
-          condicionId: 'cond-alergia-penicilina',
+          condicion: CondicionMedica.alergiaAntibioticos,
           medicinaId: 'med-001',
           contraindicacionId: '',
           tratamientoId: '',
@@ -36,7 +37,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-002',
-          condicionId: 'cond-ulcera-peptica',
+          condicion: CondicionMedica.ulceraPeptica,
           medicinaId: 'med-002',
           contraindicacionId: '',
           tratamientoId: '',
@@ -57,7 +58,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-003',
-          condicionId: 'cond-arritmia',
+          condicion: CondicionMedica.arritmia,
           medicinaId: 'med-003',
           contraindicacionId: '',
           tratamientoId: '',
@@ -78,7 +79,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-004',
-          condicionId: 'cond-embarazo-primer-trimestre',
+          condicion: CondicionMedica.embarazo,
           medicinaId: 'med-004',
           contraindicacionId: '',
           tratamientoId: '',
@@ -99,7 +100,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-005',
-          condicionId: 'cond-colitis',
+          condicion: CondicionMedica.colitis,
           medicinaId: 'med-005',
           contraindicacionId: '',
           tratamientoId: '',
@@ -120,7 +121,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-006',
-          condicionId: 'cond-hepatopatia',
+          condicion: CondicionMedica.hepatopatia,
           medicinaId: 'med-006',
           contraindicacionId: '',
           tratamientoId: '',
@@ -140,7 +141,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-007',
-          condicionId: 'cond-diabetes',
+          condicion: CondicionMedica.diabetes,
           medicinaId: 'med-007',
           contraindicacionId: '',
           tratamientoId: '',

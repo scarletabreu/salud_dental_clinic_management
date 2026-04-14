@@ -1,4 +1,5 @@
 import '../../domain/entities/contraindicacion.dart';
+import '../../domain/enums/condicion_medica.dart';
 import '../../domain/enums/efecto_adverso.dart';
 import '../../domain/enums/tipo_contraindicacion.dart';
 
@@ -22,10 +23,30 @@ EfectoAdverso _parseEfectoAdverso(String value) {
   throw ArgumentError('Unknown EfectoAdverso: $value');
 }
 
+// Parses enum name or legacy hyphenated IDs (e.g. "cond-diabetes" → diabetes).
+CondicionMedica? _parseCondicion(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final normalized = value
+      .toLowerCase()
+      .replaceAll('cond-', '')
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_');
+  for (final e in CondicionMedica.values) {
+    final name = e.toString().split('.').last.toLowerCase();
+    if (name == normalized) return e;
+  }
+  // Partial match for legacy IDs like "cond-alergia-penicilina"
+  for (final e in CondicionMedica.values) {
+    final name = e.toString().split('.').last.toLowerCase();
+    if (normalized.contains(name) || name.contains(normalized)) return e;
+  }
+  return null;
+}
+
 class ContraindicacionModel extends Contraindicacion {
   ContraindicacionModel({
     required super.id,
-    required super.condicionId,
+    super.condicion,
     required super.medicinaId,
     required super.contraindicacionId,
     required super.tratamientoId,
@@ -37,10 +58,10 @@ class ContraindicacionModel extends Contraindicacion {
   factory ContraindicacionModel.fromJson(Map<String, dynamic> json) {
     return ContraindicacionModel(
       id: json['id'] as String,
-      condicionId: json['condicion_id'] as String,
-      medicinaId: json['medicina_id'] as String,
-      contraindicacionId: json['contraindicacion_id'] as String,
-      tratamientoId: json['tratamiento_id'] as String,
+      condicion: _parseCondicion(json['condicion_id'] as String?),
+      medicinaId: json['medicina_id'] as String? ?? '',
+      contraindicacionId: json['contraindicacion_id'] as String? ?? '',
+      tratamientoId: json['tratamiento_id'] as String? ?? '',
       descripcion: json['descripcion'] as String? ?? '',
       tipoContraindicacion: _parseTipo(json['tipo_contraindicacion'] as String),
       efectosAdversos:
@@ -54,7 +75,7 @@ class ContraindicacionModel extends Contraindicacion {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'condicion_id': condicionId,
+      'condicion_id': condicion?.toString().split('.').last,
       'medicina_id': medicinaId,
       'contraindicacion_id': contraindicacionId,
       'tratamiento_id': tratamientoId,
@@ -68,7 +89,7 @@ class ContraindicacionModel extends Contraindicacion {
   factory ContraindicacionModel.fromEntity(Contraindicacion contraindicacion) {
     return ContraindicacionModel(
       id: contraindicacion.id,
-      condicionId: contraindicacion.condicionId,
+      condicion: contraindicacion.condicion,
       medicinaId: contraindicacion.medicinaId,
       contraindicacionId: contraindicacion.contraindicacionId,
       tratamientoId: contraindicacion.tratamientoId,

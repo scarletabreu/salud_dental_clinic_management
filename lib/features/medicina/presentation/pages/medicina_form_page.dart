@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
@@ -621,6 +622,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   late final TextEditingController _descripcionController;
   late TipoContraindicacion _tipo;
   late Set<EfectoAdverso> _efectosAdversos;
+  CondicionMedica? _condicion;
 
   @override
   void initState() {
@@ -629,6 +631,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
         TextEditingController(text: widget.existing?.descripcion ?? '');
     _tipo = widget.existing?.tipoContraindicacion ?? TipoContraindicacion.relativa;
     _efectosAdversos = Set.from(widget.existing?.efectosAdversos ?? []);
+    _condicion = widget.existing?.condicion;
   }
 
   @override
@@ -642,7 +645,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
     final result = Contraindicacion(
       id: widget.existing?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      condicionId: widget.existing?.condicionId ?? '',
+      condicion: _condicion,
       medicinaId: widget.existing?.medicinaId ?? '',
       contraindicacionId: widget.existing?.contraindicacionId ?? '',
       tratamientoId: widget.existing?.tratamientoId ?? '',
@@ -711,6 +714,29 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<CondicionMedica?>(
+                  value: _condicion,
+                  decoration: InputDecoration(
+                    labelText: 'Condición médica',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem<CondicionMedica?>(
+                      value: null,
+                      child: Text('Sin condición específica'),
+                    ),
+                    ...CondicionMedica.values.map(
+                      (c) => DropdownMenuItem<CondicionMedica?>(
+                        value: c,
+                        child: Text(c.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _condicion = v),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TipoContraindicacion>(

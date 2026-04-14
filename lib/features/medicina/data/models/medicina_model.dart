@@ -1,0 +1,49 @@
+import '../../domain/entities/medicina.dart';
+import '../../../contraindicacion/data/models/contraindicacion_model.dart';
+import '../../domain/enums/efecto_secundario.dart';
+
+class MedicinaModel extends Medicina {
+  MedicinaModel({
+    required super.id,
+    required super.nombre,
+    required super.contraindicaciones,
+    super.efectosSecundarios = const [],
+  });
+
+  factory MedicinaModel.fromJson(Map<String, dynamic> json) {
+    return MedicinaModel(
+      id: json['id'],
+      nombre: json['nombre'],
+      contraindicaciones:
+          (json['contraindicaciones'] as List?)
+              ?.map((c) => ContraindicacionModel.fromJson(c))
+              .toList() ??
+          [],
+      efectosSecundarios:
+          (json['efectos_secundarios'] as List?)
+              ?.map((e) => EfectoSecundario.values.byName(e))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'contraindicaciones': contraindicaciones
+          .map((c) => ContraindicacionModel.fromEntity(c).toJson())
+          .toList(),
+      'efectos_secundarios': efectosSecundarios.map((e) => e.name).toList(),
+    };
+  }
+
+  factory MedicinaModel.fromEntity(Medicina medicina) {
+    return MedicinaModel(
+      id: medicina.id,
+      nombre: medicina.nombre,
+      contraindicaciones: medicina.contraindicaciones,
+      efectosSecundarios: medicina.efectosSecundarios,
+    );
+  }
+}

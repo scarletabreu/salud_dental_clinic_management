@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../models/medicina_model.dart';
+import '../models/medicina_model.dart';
 
 class MedicineRemoteDatasource {
   final SupabaseClient client;
@@ -7,31 +7,14 @@ class MedicineRemoteDatasource {
   MedicineRemoteDatasource(this.client);
 
   Future<List<MedicinaModel>> getMedicinas() async {
-    final response = await client
-        .from('medicinas')
-        .select();
-
-    final data = response as List<dynamic>;
-
-    return data
+    final response = await client.from('medicinas').select();
+    return (response as List)
         .map((json) => MedicinaModel.fromJson(json))
         .toList();
   }
 
-  Future<MedicinaModel> getMedicinaById(String id) async {
-    final response = await client
-        .from('medicinas')
-        .select()
-        .eq('id', id)
-        .single();
-
-    return MedicinaModel.fromJson(response);
-  }
-
-  Future<void> createMedicina(MedicinaModel medicina) async {
-    await client
-        .from('medicinas')
-        .insert(medicina.toJson());
+  Future<void> addMedicina(MedicinaModel medicina) async {
+    await client.from('medicinas').insert(medicina.toJson());
   }
 
   Future<void> updateMedicina(MedicinaModel medicina) async {
@@ -42,9 +25,6 @@ class MedicineRemoteDatasource {
   }
 
   Future<void> deleteMedicina(String id) async {
-    await client
-        .from('medicinas')
-        .delete()
-        .eq('id', id);
+    await client.from('medicinas').delete().eq('id', id);
   }
 }

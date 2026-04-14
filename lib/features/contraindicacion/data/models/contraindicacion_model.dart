@@ -2,6 +2,26 @@ import '../../domain/entities/contraindicacion.dart';
 import '../../domain/enums/efecto_adverso.dart';
 import '../../domain/enums/tipo_contraindicacion.dart';
 
+// Parses either the Dart identifier ("absoluta") or the legacy display name ("Absoluta").
+TipoContraindicacion _parseTipo(String value) {
+  final lower = value.toLowerCase();
+  for (final e in TipoContraindicacion.values) {
+    if (e.toString().split('.').last == lower) return e;
+    if (e.name.toLowerCase() == lower) return e;
+  }
+  throw ArgumentError('Unknown TipoContraindicacion: $value');
+}
+
+// Parses either identifier ("nauseas") or legacy display name ("Náuseas").
+EfectoAdverso _parseEfectoAdverso(String value) {
+  final lower = value.toLowerCase();
+  for (final e in EfectoAdverso.values) {
+    if (e.toString().split('.').last == lower) return e;
+    if (e.name.toLowerCase() == lower) return e;
+  }
+  throw ArgumentError('Unknown EfectoAdverso: $value');
+}
+
 class ContraindicacionModel extends Contraindicacion {
   ContraindicacionModel({
     required super.id,
@@ -22,12 +42,10 @@ class ContraindicacionModel extends Contraindicacion {
       contraindicacionId: json['contraindicacion_id'] as String,
       tratamientoId: json['tratamiento_id'] as String,
       descripcion: json['descripcion'] as String? ?? '',
-      tipoContraindicacion: TipoContraindicacion.values.byName(
-        json['tipo_contraindicacion'] as String,
-      ),
+      tipoContraindicacion: _parseTipo(json['tipo_contraindicacion'] as String),
       efectosAdversos:
           (json['efectos_adversos'] as List<dynamic>?)
-              ?.map((e) => EfectoAdverso.values.byName(e.toString()))
+              ?.map((e) => _parseEfectoAdverso(e.toString()))
               .toList() ??
           const [],
     );
@@ -41,8 +59,9 @@ class ContraindicacionModel extends Contraindicacion {
       'contraindicacion_id': contraindicacionId,
       'tratamiento_id': tratamientoId,
       'descripcion': descripcion,
-      'tipo_contraindicacion': tipoContraindicacion.name,
-      'efectos_adversos': efectosAdversos.map((e) => e.name).toList(),
+      'tipo_contraindicacion': tipoContraindicacion.toString().split('.').last,
+      'efectos_adversos':
+          efectosAdversos.map((e) => e.toString().split('.').last).toList(),
     };
   }
 

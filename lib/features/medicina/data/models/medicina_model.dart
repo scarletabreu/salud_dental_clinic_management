@@ -29,7 +29,7 @@ class MedicinaModel extends Medicina {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      if (id.contains('-')) 'id': id,
       'nombre': nombre,
       'contraindicaciones': contraindicaciones
           .map((c) => ContraindicacionModel.fromEntity(c).toJson())

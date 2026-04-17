@@ -1,4 +1,4 @@
-import 'package:salud_dental_clinic_management/features/consumible/domain/enums/consumible_estado.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/enums/estado_consumible.dart';
 
 class Consumible {
   final String id;
@@ -6,7 +6,7 @@ class Consumible {
   final String descripcion;
   final int stockActual;
   final int stockMinimo;
-  final ConsumibleEstado estado;
+  final EstadoConsumible estado;
 
   Consumible({
     required this.id,
@@ -20,7 +20,7 @@ class Consumible {
   bool get estaBajoStock => stockActual <= stockMinimo;
   bool get estaAgotado => stockActual <= 0;
 
-  Consumible copyWith({int? stockActual, ConsumibleEstado? estado}) {
+  Consumible copyWith({int? stockActual, EstadoConsumible? estado}) {
     return Consumible(
       id: id,
       nombre: nombre,

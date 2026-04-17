@@ -1,6 +1,6 @@
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/persona_estatus.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 
 class Doctor extends Usuario {
   final String specialty;
@@ -26,7 +26,7 @@ class Doctor extends Usuario {
     String? specialty,
     List<Asistente>? assistants,
     bool? isAvailable,
-    PersonaEstatus? estatus,
+    EstatusPersona? estatus,
   }) {
     return Doctor(
       id: id,

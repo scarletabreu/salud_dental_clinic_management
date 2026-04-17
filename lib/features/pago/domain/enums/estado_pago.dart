@@ -1,19 +1,21 @@
 enum EstadoPago {
   pendiente,
-  cancelada,
-  recibido,
-  errado;
+  parcial,
+  completado,
+  fallido,
+  cancelado,
+  reembolsado,
+  vencido;
 
-  String get name {
-    switch (this) {
-      case EstadoPago.pendiente:
-        return 'Pendiente';
-      case EstadoPago.cancelada:
-        return 'Cancelada';
-      case EstadoPago.recibido:
-        return 'Recibido';
-      case EstadoPago.errado:
-        return 'Errado';
-    }
+  String get label {
+    return switch (this) {
+      EstadoPago.pendiente => 'Pendiente de cobro',
+      EstadoPago.parcial => 'Pago parcial / A cuenta',
+      EstadoPago.completado => 'Completado',
+      EstadoPago.fallido => 'Error en el proceso',
+      EstadoPago.cancelado => 'Transacción cancelada',
+      EstadoPago.reembolsado => 'Reembolsado / Devuelto',
+      EstadoPago.vencido => 'Pago fuera de plazo',
+    };
   }
 }

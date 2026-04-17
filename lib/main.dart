@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Importa Supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/medicina/data/repositories/medicina_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/medicina/data/datasources/medicine_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';

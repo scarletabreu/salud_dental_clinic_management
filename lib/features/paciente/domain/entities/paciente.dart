@@ -1,5 +1,5 @@
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/persona_estatus.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
@@ -31,7 +31,7 @@ class Paciente extends Persona {
 
   Paciente copyWith({
     String? govID,
-    PersonaEstatus? estatus,
+    EstatusPersona? estatus,
     Genero? genero,
     Record? record,
     String? trabajo,

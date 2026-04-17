@@ -20,9 +20,13 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-001',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Contraindicado en pacientes con alergia a penicilinas o cefalosporinas.',
+          descripcion:
+              'Contraindicado en pacientes con alergia a penicilinas o cefalosporinas.',
           tipoContraindicacion: TipoContraindicacion.absoluta,
-          efectosAdversos: [EfectoAdverso.reaccion_alergica, EfectoAdverso.diarrea],
+          efectosAdversos: [
+            EfectoAdverso.reaccionAlergica,
+            EfectoAdverso.diarrea,
+          ],
         ),
       ],
       efectosSecundarios: [
@@ -41,9 +45,10 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-002',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Contraindicado en pacientes con úlcera péptica activa o insuficiencia renal grave.',
+          descripcion:
+              'Contraindicado en pacientes con úlcera péptica activa o insuficiencia renal grave.',
           tipoContraindicacion: TipoContraindicacion.absoluta,
-          efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.dolor_cabeza],
+          efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.dolorCabeza],
         ),
       ],
       efectosSecundarios: [
@@ -62,7 +67,8 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-003',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Usar con precaución en pacientes con arritmias cardíacas o hipotensión.',
+          descripcion:
+              'Usar con precaución en pacientes con arritmias cardíacas o hipotensión.',
           tipoContraindicacion: TipoContraindicacion.relativa,
           efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
         ),
@@ -104,7 +110,8 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-005',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Contraindicado en pacientes con historial de colitis pseudomembranosa.',
+          descripcion:
+              'Contraindicado en pacientes con historial de colitis pseudomembranosa.',
           tipoContraindicacion: TipoContraindicacion.absoluta,
           efectosAdversos: [EfectoAdverso.diarrea, EfectoAdverso.nauseas],
         ),
@@ -121,19 +128,17 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-006',
-          condicion: CondicionMedica.hepatopatia,
+          condicion: CondicionMedica.hepatitis,
           medicinaId: 'med-006',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Usar con precaución en pacientes con enfermedad hepática.',
+          descripcion:
+              'Usar con precaución en pacientes con enfermedad hepática.',
           tipoContraindicacion: TipoContraindicacion.relativa,
           efectosAdversos: [EfectoAdverso.fatiga],
         ),
       ],
-      efectosSecundarios: [
-        EfectoSecundario.nausea,
-        EfectoSecundario.fatiga,
-      ],
+      efectosSecundarios: [EfectoSecundario.nausea, EfectoSecundario.fatiga],
     ),
     Medicina(
       id: 'med-007',
@@ -145,7 +150,8 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-007',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion: 'Precaución en diabéticos; puede elevar los niveles de glucosa.',
+          descripcion:
+              'Precaución en diabéticos; puede elevar los niveles de glucosa.',
           tipoContraindicacion: TipoContraindicacion.relativa,
           efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
         ),

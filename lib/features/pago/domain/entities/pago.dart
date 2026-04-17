@@ -18,7 +18,7 @@ class Pago {
     required this.metodoPago,
   });
 
-  bool get fueExitoso => estado == EstadoPago.recibido;
+  bool get fueExitoso => estado == EstadoPago.completado;
 
   Pago copyWith({
     String? cuentaId,

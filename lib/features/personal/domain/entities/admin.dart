@@ -1,4 +1,4 @@
-import 'package:salud_dental_clinic_management/core/domain/enums/persona_estatus.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 
 class Admin extends Usuario {
@@ -17,7 +17,7 @@ class Admin extends Usuario {
     required this.departamento,
   });
 
-  Admin copyWith({PersonaEstatus? estatus, String? departamento}) {
+  Admin copyWith({EstatusPersona? estatus, String? departamento}) {
     return Admin(
       id: id,
       nombre: nombre,

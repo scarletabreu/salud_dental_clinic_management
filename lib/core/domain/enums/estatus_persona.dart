@@ -1,4 +1,4 @@
-enum PersonaEstatus {
+enum EstatusPersona {
   activo,
   inactivo;
 
@@ -6,9 +6,9 @@ enum PersonaEstatus {
 
   String get displayName {
     switch (this) {
-      case PersonaEstatus.activo:
+      case EstatusPersona.activo:
         return 'Activo';
-      case PersonaEstatus.inactivo:
+      case EstatusPersona.inactivo:
         return 'Inactivo';
     }
   }

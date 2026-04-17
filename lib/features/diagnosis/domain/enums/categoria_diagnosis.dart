@@ -1,10 +1,14 @@
 enum CategoriaDiagnosis {
+  preventiva,
   caries,
-  periodontitis,
   endodoncia,
+  periodoncia,
   ortodoncia,
-  proteses,
-  cirurgiaOral;
+  protesis,
+  implantes,
+  cirugiaOral,
+  estetica,
+  patologiaATM;
 
-  CategoriaDiagnosis get categoria => this;
+  String get nombre => name[0].toUpperCase() + name.substring(1);
 }

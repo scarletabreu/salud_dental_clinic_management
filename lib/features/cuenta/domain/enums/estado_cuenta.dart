@@ -1,4 +1,4 @@
-enum CuentaEstado {
+enum EstadoCuenta {
   abierta,
   pendiente,
   saldada,

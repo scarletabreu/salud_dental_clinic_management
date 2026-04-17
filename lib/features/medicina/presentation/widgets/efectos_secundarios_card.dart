@@ -26,15 +26,17 @@ class EfectosSecundariosCard extends StatelessWidget {
                 Text(
                   'Efectos secundarios',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSecondaryContainer,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
                 ),
                 const Spacer(),
                 if (efectos.isNotEmpty)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.secondary,
                       borderRadius: BorderRadius.circular(12),
@@ -67,20 +69,18 @@ class EfectosSecundariosCard extends StatelessWidget {
                     .map(
                       (e) => Chip(
                         label: Text(
-                          e.nombre,
+                          e.label,
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.onSecondaryContainer,
                           ),
                         ),
-                        backgroundColor:
-                            colorScheme.secondary.withAlpha(38),
+                        backgroundColor: colorScheme.secondary.withAlpha(38),
                         side: BorderSide(
                           color: colorScheme.secondary.withAlpha(77),
                         ),
                         padding: EdgeInsets.zero,
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     )
                     .toList(),

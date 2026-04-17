@@ -5,14 +5,14 @@ class Suplidor {
   final String id;
   final String nombre;
   final TipoSuplidor tipoSuplidor;
-  final Contacto contacto;
+  final List<Contacto> contactos;
   final String summary;
 
   Suplidor({
     required this.id,
     required this.nombre,
     required this.tipoSuplidor,
-    required this.contacto,
+    required this.contactos,
     required this.summary,
   });
 
@@ -20,14 +20,14 @@ class Suplidor {
     String? id,
     String? nombre,
     TipoSuplidor? tipoSuplidor,
-    Contacto? contacto,
+    List<Contacto>? contactos,
     String? summary,
   }) {
     return Suplidor(
       id: id ?? this.id,
       nombre: nombre ?? this.nombre,
       tipoSuplidor: tipoSuplidor ?? this.tipoSuplidor,
-      contacto: contacto ?? this.contacto,
+      contactos: contactos ?? this.contactos,
       summary: summary ?? this.summary,
     );
   }

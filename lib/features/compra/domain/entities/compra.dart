@@ -1,11 +1,11 @@
-import 'package:salud_dental_clinic_management/features/compra/domain/enums/compra_estado.dart';
+import 'package:salud_dental_clinic_management/features/compra/domain/enums/estado_compra.dart';
 import 'package:salud_dental_clinic_management/features/consumible_compra/domain/entities/consumible_compra.dart';
 
 class Compra {
   final String id;
   final DateTime fecha;
   final List<ConsumibleCompra> items;
-  final CompraEstado estado;
+  final EstadoCompra estado;
 
   Compra({
     required this.id,
@@ -20,7 +20,7 @@ class Compra {
   Compra copyWith({
     DateTime? fecha,
     List<ConsumibleCompra>? items,
-    CompraEstado? estado,
+    EstadoCompra? estado,
   }) {
     return Compra(
       id: id,

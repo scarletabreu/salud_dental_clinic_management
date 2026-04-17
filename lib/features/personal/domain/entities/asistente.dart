@@ -1,4 +1,4 @@
-import 'package:salud_dental_clinic_management/core/domain/enums/persona_estatus.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 
 class Asistente extends Usuario {
@@ -17,7 +17,7 @@ class Asistente extends Usuario {
     required this.shift,
   });
 
-  Asistente copyWith({PersonaEstatus? estatus, String? shift}) {
+  Asistente copyWith({EstatusPersona? estatus, String? shift}) {
     return Asistente(
       id: id,
       nombre: nombre,

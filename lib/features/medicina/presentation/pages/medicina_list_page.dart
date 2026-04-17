@@ -67,8 +67,8 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
     _filtered = query.isEmpty
         ? List.from(_medicinas)
         : _medicinas
-            .where((m) => m.nombre.toLowerCase().contains(query))
-            .toList();
+              .where((m) => m.nombre.toLowerCase().contains(query))
+              .toList();
   }
 
   Future<void> _confirmDelete(Medicina medicina) async {
@@ -95,8 +95,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
     if (confirmed != true || !mounted) return;
     final result = await _deleteMedicina(medicina.id);
     result.fold(
-      (f) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(f.message))),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) => _load(),
     );
   }
@@ -146,29 +147,34 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 Text(
                   'Medicinas',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Gestión de base de datos de medicamentos y protocolos de seguridad.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          FilledButton.icon(
-            onPressed: () => _openForm(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Agregar Medicina'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Flexible(
+            child: FilledButton.icon(
+              onPressed: () => _openForm(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Agregar Medicina'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
@@ -186,12 +192,18 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'Buscar medicina por nombre...',
-          prefixIcon: Icon(Icons.search,
-              color: colorScheme.onSurfaceVariant, size: 20),
+          prefixIcon: Icon(
+            Icons.search,
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear,
-                      color: colorScheme.onSurfaceVariant, size: 18),
+                  icon: Icon(
+                    Icons.clear,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                  ),
                   onPressed: _searchController.clear,
                 )
               : null,
@@ -205,8 +217,10 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none,
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -221,9 +235,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           Text(
             'TOTAL DE MEDICINAS',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  letterSpacing: 0.5,
-                ),
+              color: colorScheme.onSurfaceVariant,
+              letterSpacing: 0.5,
+            ),
           ),
           const SizedBox(width: 8),
           Container(
@@ -238,13 +252,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 Text(
                   '${_medicinas.length}',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.check_circle,
-                    color: colorScheme.primary, size: 14),
+                Icon(Icons.check_circle, color: colorScheme.primary, size: 14),
               ],
             ),
           ),
@@ -263,12 +276,16 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline,
-                size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.error)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: _load,
@@ -288,10 +305,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
             Icon(
               Icons.medication_outlined,
               size: 56,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurfaceVariant
-                  .withAlpha(100),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withAlpha(100),
             ),
             const SizedBox(height: 12),
             Text(
@@ -300,8 +316,8 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                   : 'Sin resultados para "${_searchController.text}".',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -339,19 +355,13 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
       ),
       child: Row(
         children: [
-          Expanded(
-            flex: 3,
-            child: _headerLabel(context, 'NOMBRE DEL FÁRMACO'),
-          ),
-          Expanded(
-            flex: 3,
-            child: _headerLabel(context, 'EFECTOS COMUNES'),
-          ),
+          Expanded(flex: 3, child: _headerLabel(context, 'NOMBRE DEL FÁRMACO')),
+          Expanded(flex: 3, child: _headerLabel(context, 'EFECTOS COMUNES')),
           Expanded(
             flex: 3,
             child: _headerLabel(context, 'CONTRAINDICACIONES CRÍTICAS'),
           ),
-          const SizedBox(width: 88),
+          const SizedBox(width: 90),
         ],
       ),
     );
@@ -361,10 +371,10 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5,
+      ),
     );
   }
 
@@ -377,9 +387,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Text(
         'Mostrando $shown–$shown de $total medicina${total == 1 ? '' : 's'}',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -427,7 +437,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                   color: colorScheme.shadow.withAlpha(18),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
-                )
+                ),
               ]
             : null,
       ),
@@ -437,8 +447,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -447,10 +456,9 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                     flex: 3,
                     child: Text(
                       widget.medicina.nombre,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   // Efectos comunes
@@ -459,22 +467,16 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                     child: efectos.isEmpty
                         ? Text(
                             'Sin efectos registrados',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontStyle: FontStyle.italic,
                                 ),
                           )
                         : Text(
-                            efectos.take(3).map((e) => e.nombre).join(', '),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                            efectos.take(3).map((e) => e.label).join(', '),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
                   ),
                   // Contraindicaciones críticas
@@ -483,9 +485,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                     child: contras.isEmpty
                         ? Text(
                             'Sin contraindicaciones críticas',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontStyle: FontStyle.italic,
@@ -497,11 +497,13 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.warning_amber_rounded,
-                                        size: 14, color: colorScheme.error),
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      size: 14,
+                                      color: colorScheme.error,
+                                    ),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
@@ -523,7 +525,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                   ),
                   // Acciones
                   SizedBox(
-                    width: 88,
+                    width: 90,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -531,11 +533,11 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                           icon: _expanded
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          tooltip:
-                              _expanded ? 'Ocultar detalle' : 'Ver detalle',
+                          tooltip: _expanded
+                              ? 'Ocultar detalle'
+                              : 'Ver detalle',
                           color: colorScheme.primary,
-                          onTap: () =>
-                              setState(() => _expanded = !_expanded),
+                          onTap: () => setState(() => _expanded = !_expanded),
                         ),
                         _ActionIcon(
                           icon: Icons.edit_outlined,
@@ -570,10 +572,12 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                 children: [
                   Divider(color: colorScheme.outlineVariant, height: 20),
                   EfectosSecundariosCard(
-                      efectos: widget.medicina.efectosSecundarios),
+                    efectos: widget.medicina.efectosSecundarios,
+                  ),
                   const SizedBox(height: 8),
                   ContraindicacionesCard(
-                      contraindicaciones: widget.medicina.contraindicaciones),
+                    contraindicaciones: widget.medicina.contraindicaciones,
+                  ),
                 ],
               ),
             ),

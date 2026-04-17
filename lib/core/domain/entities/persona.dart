@@ -1,5 +1,5 @@
 import 'contacto.dart';
-import '../enums/persona_estatus.dart';
+import '../enums/estatus_persona.dart';
 
 class Persona {
   final String id;
@@ -8,7 +8,7 @@ class Persona {
   final DateTime birthDate;
   final String govID;
   final Contacto contacto;
-  final PersonaEstatus estatus;
+  final EstatusPersona estatus;
 
   Persona({
     required this.id,

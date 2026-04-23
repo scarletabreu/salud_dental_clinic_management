@@ -6,7 +6,8 @@ enum TipoSangre {
   abPositivo('AB+'),
   abNegativo('AB-'),
   oPositivo('O+'),
-  oNegativo('O-');
+  oNegativo('O-'),
+  desconocido('-');
 
   final String valor;
   const TipoSangre(this.valor);

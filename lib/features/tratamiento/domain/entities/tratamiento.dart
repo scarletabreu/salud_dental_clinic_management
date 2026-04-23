@@ -34,4 +34,19 @@ class Tratamiento {
       alcance: alcance ?? this.alcance,
     );
   }
+
+  factory Tratamiento.fromJson(Map<String, dynamic> json) {
+  return Tratamiento(
+    id: json['id'] as String,
+    nombre: json['nombre'] as String,
+    descripcion: json['descripcion'] as String,
+    costo: (json['costo'] as num).toDouble(),
+
+    contraindicaciones: (json['contraindicaciones'] as List<dynamic>? ?? [])
+        .map((e) => Contraindicacion.fromJson(e as Map<String, dynamic>))
+        .toList(),
+
+    alcance: Alcance.values.byName(json['alcance'] as String),
+  );
+}
 }

@@ -636,7 +636,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   late final TextEditingController _descripcionController;
   late TipoContraindicacion _tipo;
   late Set<EfectoAdverso> _efectosAdversos;
-  CondicionMedica? _condicion;
+  //CondicionMedica _condicion;
 
   @override
   void initState() {
@@ -647,7 +647,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
     _tipo =
         widget.existing?.tipoContraindicacion ?? TipoContraindicacion.relativa;
     _efectosAdversos = Set.from(widget.existing?.efectosAdversos ?? []);
-    _condicion = widget.existing?.condicion;
+    //_condicion = widget.existing?.condicion;
   }
 
   @override
@@ -662,7 +662,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
       id:
           widget.existing?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      condicion: _condicion,
+      condicionId: 'TODO'/*_condicion*/,
       medicinaId: widget.existing?.medicinaId ?? '',
       contraindicacionId: widget.existing?.contraindicacionId ?? '',
       tratamientoId: widget.existing?.tratamientoId ?? '',
@@ -737,7 +737,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<CondicionMedica?>(
-                  initialValue: _condicion,
+                  initialValue: CondicionMedica.alergiaAines/*_condicion*/,
                   decoration: InputDecoration(
                     labelText: 'Condición médica',
                     border: OutlineInputBorder(
@@ -756,7 +756,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       ),
                     ),
                   ],
-                  onChanged: (v) => setState(() => _condicion = v),
+                  onChanged: (v) => print('TODO [SD-28]')/*setState(() => Condicion = v)*/,
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TipoContraindicacion>(

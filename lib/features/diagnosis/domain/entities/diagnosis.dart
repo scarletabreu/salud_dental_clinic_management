@@ -35,4 +35,21 @@ class Diagnosis {
       categoria: categoria ?? this.categoria,
     );
   }
+
+  factory Diagnosis.fromJson(Map<String, dynamic> json) {
+  return Diagnosis(
+    id: json['id'] as String,
+    nombre: json['nombre'] as String,
+    descripcion: json['descripcion'] as String,
+
+    severidadDefault: SeveridadDiagnosis.values
+        .byName(json['severidadDefault'] as String),
+
+    alcance: Alcance.values
+        .byName(json['alcance'] as String),
+
+    categoria: CategoriaDiagnosis.values
+        .byName(json['categoria'] as String),
+  );
+}
 }

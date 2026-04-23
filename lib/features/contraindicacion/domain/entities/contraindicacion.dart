@@ -4,17 +4,17 @@ import 'package:salud_dental_clinic_management/features/contraindicacion/domain/
 
 class Contraindicacion {
   final String id;
-  final CondicionMedica? condicion;
-  final String medicinaId;
-  final String contraindicacionId;
-  final String tratamientoId;
+  final String condicionId;
+  final String? medicinaId;
+  final String? contraindicacionId;
+  final String? tratamientoId;
   final String descripcion;
   final TipoContraindicacion tipoContraindicacion;
   final List<EfectoAdverso> efectosAdversos;
 
-  Contraindicacion({
+  Contraindicacion._({
     required this.id,
-    this.condicion,
+    required this.condicionId,
     required this.medicinaId,
     required this.contraindicacionId,
     required this.tratamientoId,
@@ -23,9 +23,40 @@ class Contraindicacion {
     required this.efectosAdversos,
   });
 
+  factory Contraindicacion({
+    required String id,
+    required String condicionId,
+    String? medicinaId,
+    String? contraindicacionId,
+    String? tratamientoId,
+    required String descripcion,
+    required TipoContraindicacion tipoContraindicacion,
+    required List<EfectoAdverso> efectosAdversos,
+  }) {
+    final count = [medicinaId, contraindicacionId, tratamientoId]
+        .where((e) => e != null)
+        .length;
+
+    if (count != 1) {
+      throw ArgumentError(
+        'Debe existir exactamente uno entre medicinaId, contraindicacionId o tratamientoId',
+      );
+    }
+
+    return Contraindicacion._(
+      id: id,
+      condicionId: condicionId,
+      medicinaId: medicinaId,
+      contraindicacionId: contraindicacionId,
+      tratamientoId: tratamientoId,
+      descripcion: descripcion,
+      tipoContraindicacion: tipoContraindicacion,
+      efectosAdversos: efectosAdversos,
+    );
+  }
+
   Contraindicacion copyWith({
-    CondicionMedica? condicion,
-    bool clearCondicion = false,
+    String? condicionId,
     String? medicinaId,
     String? contraindicacionId,
     String? tratamientoId,
@@ -33,15 +64,48 @@ class Contraindicacion {
     TipoContraindicacion? tipoContraindicacion,
     List<EfectoAdverso>? efectosAdversos,
   }) {
-    return Contraindicacion(
+    final newMedicinaId = medicinaId ?? this.medicinaId;
+    final newContraindicacionId = contraindicacionId ?? this.contraindicacionId;
+    final newTratamientoId = tratamientoId ?? this.tratamientoId;
+
+    final count = [
+      newMedicinaId,
+      newContraindicacionId,
+      newTratamientoId
+    ].where((e) => e != null).length;
+
+    if (count != 1) {
+      throw ArgumentError(
+        'Debe existir exactamente uno entre medicinaId, contraindicacionId o tratamientoId',
+      );
+    }
+
+    return Contraindicacion._(
       id: id,
-      condicion: clearCondicion ? null : (condicion ?? this.condicion),
-      medicinaId: medicinaId ?? this.medicinaId,
-      contraindicacionId: contraindicacionId ?? this.contraindicacionId,
-      tratamientoId: tratamientoId ?? this.tratamientoId,
+      condicionId: condicionId ?? this.condicionId,
+      medicinaId: newMedicinaId,
+      contraindicacionId: newContraindicacionId,
+      tratamientoId: newTratamientoId,
       descripcion: descripcion ?? this.descripcion,
-      tipoContraindicacion: tipoContraindicacion ?? this.tipoContraindicacion,
+      tipoContraindicacion:
+          tipoContraindicacion ?? this.tipoContraindicacion,
       efectosAdversos: efectosAdversos ?? this.efectosAdversos,
+    );
+  }
+
+  factory Contraindicacion.fromJson(Map<String, dynamic> json) {
+    return Contraindicacion(
+      id: json['id'] as String,
+      condicionId: json['condicionId'] as String,
+      medicinaId: json['medicinaId'] as String?,
+      contraindicacionId: json['contraindicacionId'] as String?,
+      tratamientoId: json['tratamientoId'] as String?,
+      descripcion: json['descripcion'] as String,
+      tipoContraindicacion: TipoContraindicacion.values
+          .byName(json['tipoContraindicacion'] as String),
+      efectosAdversos: (json['efectosAdversos'] as List<dynamic>? ?? [])
+          .map((e) => EfectoAdverso.values.byName(e as String))
+          .toList(),
     );
   }
 }

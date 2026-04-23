@@ -116,7 +116,6 @@ class _ContraindicacionItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (contraindicacion.condicion != null) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 2),
@@ -125,7 +124,7 @@ class _ContraindicacionItem extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      contraindicacion.condicion!.label,
+                      contraindicacion.condicionId,
                       style: TextStyle(
                         color: colorScheme.onSecondaryContainer,
                         fontSize: 10,
@@ -133,8 +132,8 @@ class _ContraindicacionItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                ],
+                  const SizedBox(height: 4)
+                ,
                 Text(
                   contraindicacion.descripcion,
                   style: TextStyle(

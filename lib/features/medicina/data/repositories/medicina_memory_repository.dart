@@ -16,7 +16,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-001',
-          condicion: CondicionMedica.alergiaAntibioticos,
+          condicionId: 'con-001',
           medicinaId: 'med-001',
           contraindicacionId: '',
           tratamientoId: '',
@@ -41,7 +41,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-002',
-          condicion: CondicionMedica.ulceraPeptica,
+          condicionId: 'con-001',
           medicinaId: 'med-002',
           contraindicacionId: '',
           tratamientoId: '',
@@ -63,7 +63,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-003',
-          condicion: CondicionMedica.arritmia,
+          condicionId: 'con-001',
           medicinaId: 'med-003',
           contraindicacionId: '',
           tratamientoId: '',
@@ -85,7 +85,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-004',
-          condicion: CondicionMedica.embarazo,
+          condicionId: 'con-001',
           medicinaId: 'med-004',
           contraindicacionId: '',
           tratamientoId: '',
@@ -106,7 +106,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-005',
-          condicion: CondicionMedica.colitis,
+          condicionId: 'con-001',
           medicinaId: 'med-005',
           contraindicacionId: '',
           tratamientoId: '',
@@ -128,7 +128,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-006',
-          condicion: CondicionMedica.hepatitis,
+          condicionId: 'con-001',
           medicinaId: 'med-006',
           contraindicacionId: '',
           tratamientoId: '',
@@ -146,7 +146,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       contraindicaciones: [
         Contraindicacion(
           id: 'cont-007',
-          condicion: CondicionMedica.diabetes,
+          condicionId: 'con-001',
           medicinaId: 'med-007',
           contraindicacionId: '',
           tratamientoId: '',

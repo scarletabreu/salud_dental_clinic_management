@@ -39,4 +39,26 @@ class Diente {
       observaciones: observaciones ?? this.observaciones,
     );
   }
+
+  factory Diente.fromJson(Map<String, dynamic> json) {
+  return Diente(
+    id: json['id'] as String,
+    odontogramaId: json['odontogramaId'] as String,
+
+    superficies: (json['superficies'] as List<dynamic>? ?? [])
+        .map((e) => Superficie.fromJson(e as Map<String, dynamic>))
+        .toList(),
+
+    tratamientos: (json['tratamientos'] as List<dynamic>? ?? [])
+        .map((e) => Tratamiento.fromJson(e as Map<String, dynamic>))
+        .toList(),
+
+    diagnosis: json['diagnosis'] != null
+        ? Diagnosis.fromJson(json['diagnosis'] as Map<String, dynamic>)
+        : null,
+
+    fdiCode: json['fdiCode'] as String,
+    observaciones: json['observaciones'] as String?,
+  );
+}
 }

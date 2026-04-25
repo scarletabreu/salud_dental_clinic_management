@@ -1,5 +1,4 @@
 import '../../domain/entities/contraindicacion.dart';
-import '../../domain/enums/condicion_medica.dart';
 import '../../domain/enums/efecto_adverso.dart';
 import '../../domain/enums/tipo_contraindicacion.dart';
 
@@ -23,79 +22,81 @@ EfectoAdverso _parseEfectoAdverso(String value) {
   throw ArgumentError('Unknown EfectoAdverso: $value');
 }
 
-// Parses enum name or legacy hyphenated IDs (e.g. "cond-diabetes" → diabetes).
-CondicionMedica? _parseCondicion(String? value) {
-  if (value == null || value.isEmpty) return null;
-  final normalized = value
-      .toLowerCase()
-      .replaceAll('cond-', '')
-      .replaceAll('-', '_')
-      .replaceAll(' ', '_');
-  for (final e in CondicionMedica.values) {
-    final name = e.toString().split('.').last.toLowerCase();
-    if (name == normalized) return e;
-  }
-  // Partial match for legacy IDs like "cond-alergia-penicilina"
-  for (final e in CondicionMedica.values) {
-    final name = e.toString().split('.').last.toLowerCase();
-    if (normalized.contains(name) || name.contains(normalized)) return e;
-  }
-  return null;
-}
+class ContraindicacionModel {
+  final String id;
+  final String condicionId;
+  final String? medicinaId;
+  final String? contraindicacionId;
+  final String? tratamientoId;
+  final String descripcion;
+  final TipoContraindicacion tipoContraindicacion;
+  final List<EfectoAdverso> efectosAdversos;
 
-class ContraindicacionModel extends Contraindicacion {
   ContraindicacionModel({
-    required super.id,
-    super.condicion,
-    required super.medicinaId,
-    required super.contraindicacionId,
-    required super.tratamientoId,
-    required super.descripcion,
-    required super.tipoContraindicacion,
-    required super.efectosAdversos,
+    required this.id,
+    required this.condicionId,
+    this.medicinaId,
+    this.contraindicacionId,
+    this.tratamientoId,
+    required this.descripcion,
+    required this.tipoContraindicacion,
+    required this.efectosAdversos,
   });
 
   factory ContraindicacionModel.fromJson(Map<String, dynamic> json) {
     return ContraindicacionModel(
-      id: json['id'] as String,
-      condicion: _parseCondicion(json['condicion_id'] as String?),
-      medicinaId: json['medicina_id'] as String? ?? '',
-      contraindicacionId: json['contraindicacion_id'] as String? ?? '',
-      tratamientoId: json['tratamiento_id'] as String? ?? '',
-      descripcion: json['descripcion'] as String? ?? '',
-      tipoContraindicacion: _parseTipo(json['tipo_contraindicacion'] as String),
-      efectosAdversos:
-          (json['efectos_adversos'] as List<dynamic>?)
-              ?.map((e) => _parseEfectoAdverso(e.toString()))
-              .toList() ??
-          const [],
+      id: json['id'],
+      condicionId: json['condicion_id'],
+      medicinaId: json['medicina_id'],
+      contraindicacionId: json['contraindicacion_id'],
+      tratamientoId: json['tratamiento_id'],
+      descripcion: json['descripcion'],
+      tipoContraindicacion:
+          TipoContraindicacion.values.byName(json['tipo_contraindicacion']),
+      efectosAdversos: (json['efectos_adversos'] as List<dynamic>? ?? [])
+          .map((e) => EfectoAdverso.values.byName(e))
+          .toList(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'condicion_id': condicion?.toString().split('.').last,
+      'condicion_id': condicionId,
       'medicina_id': medicinaId,
       'contraindicacion_id': contraindicacionId,
       'tratamiento_id': tratamientoId,
       'descripcion': descripcion,
-      'tipo_contraindicacion': tipoContraindicacion.toString().split('.').last,
-      'efectos_adversos':
-          efectosAdversos.map((e) => e.toString().split('.').last).toList(),
+      'tipo_contraindicacion': tipoContraindicacion.name,
+      'efectos_adversos': efectosAdversos.map((e) => e.name).toList(),
     };
   }
 
-  factory ContraindicacionModel.fromEntity(Contraindicacion contraindicacion) {
-    return ContraindicacionModel(
-      id: contraindicacion.id,
-      condicion: contraindicacion.condicion,
-      medicinaId: contraindicacion.medicinaId,
-      contraindicacionId: contraindicacion.contraindicacionId,
-      tratamientoId: contraindicacion.tratamientoId,
-      descripcion: contraindicacion.descripcion,
-      tipoContraindicacion: contraindicacion.tipoContraindicacion,
-      efectosAdversos: contraindicacion.efectosAdversos,
+  factory ContraindicacionModel.fromEntity(
+  Contraindicacion contraindicacion,
+) {
+  return ContraindicacionModel(
+    id: contraindicacion.id,
+    condicionId: contraindicacion.condicionId,
+    medicinaId: contraindicacion.medicinaId,
+    contraindicacionId: contraindicacion.contraindicacionId,
+    tratamientoId: contraindicacion.tratamientoId,
+    descripcion: contraindicacion.descripcion,
+    tipoContraindicacion: contraindicacion.tipoContraindicacion,
+    efectosAdversos: contraindicacion.efectosAdversos,
+  );
+}
+
+  Contraindicacion toEntity() {
+    return Contraindicacion(
+      id: id,
+      condicionId: condicionId,
+      medicinaId: medicinaId,
+      contraindicacionId: contraindicacionId,
+      tratamientoId: tratamientoId,
+      descripcion: descripcion,
+      tipoContraindicacion: tipoContraindicacion,
+      efectosAdversos: efectosAdversos,
     );
   }
 }

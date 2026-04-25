@@ -116,18 +116,16 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            _buildSearchBar(context),
-            _buildStatsBar(context),
-            Expanded(child: _buildBody()),
-          ],
-        ),
+    return ColoredBox(
+      color: colorScheme.surfaceContainerLowest,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(context),
+          _buildSearchBar(context),
+          _buildStatsBar(context),
+          Expanded(child: _buildBody()),
+        ],
       ),
     );
   }

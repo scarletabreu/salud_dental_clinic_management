@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/medicina/data/repositories/medicina_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/medicina/data/datasources/medicine_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
+import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      home: MedicinaListPage(repository: repository),
+      home: DashboardShell(medicinaRepository: repository),
     );
   }
 }

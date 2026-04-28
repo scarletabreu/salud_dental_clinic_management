@@ -2,8 +2,8 @@ import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
-import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
+import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 
 class PacienteModel extends Paciente {
   PacienteModel({
@@ -37,8 +37,8 @@ class PacienteModel extends Paciente {
       referencia: json['referencia'] as String? ?? '',
 
       record: json['record'] != null
-          ? Record.fromJson(json['record'] as Map<String, dynamic>)
-          : Record.empty(),
+          ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
+          : RecordModel.empty(),
 
       citas: const [],
     );
@@ -66,7 +66,6 @@ class PacienteModel extends Paciente {
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
   }
-
 
   factory PacienteModel.fromEntity(Paciente paciente) {
     return PacienteModel(

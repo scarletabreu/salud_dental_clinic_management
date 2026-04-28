@@ -31,23 +31,4 @@ class Odontograma {
       diagnosis: diagnosis ?? List.from(this.diagnosis),
     );
   }
-
-  factory Odontograma.fromJson(Map<String, dynamic> json) {
-  return Odontograma(
-    id: json['id'] as String,
-    consultaId: json['consultaId'] as String,
-
-    dientes: (json['dientes'] as List<dynamic>? ?? [])
-        .map((e) => Diente.fromJson(e as Map<String, dynamic>))
-        .toList(),
-
-    tratamientos: (json['tratamientos'] as List<dynamic>? ?? [])
-        .map((e) => Tratamiento.fromJson(e as Map<String, dynamic>))
-        .toList(),
-
-    diagnosis: (json['diagnosis'] as List<dynamic>? ?? [])
-        .map((e) => Diagnosis.fromJson(e as Map<String, dynamic>))
-        .toList(),
-  );
-}
 }

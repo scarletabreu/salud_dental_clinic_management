@@ -1,12 +1,9 @@
-import 'package:dartz/dartz.dart';
-import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
+import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
-import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
-import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 
 class MedicinaMemoryRepository implements IMedicinaRepository {
   final List<Medicina> _medicinas = [
@@ -20,8 +17,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-001',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion:
-              'Contraindicado en pacientes con alergia a penicilinas o cefalosporinas.',
+          descripcion: 'Contraindicado en pacientes con alergia a penicilinas.',
           tipoContraindicacion: TipoContraindicacion.absoluta,
           efectosAdversos: [
             EfectoAdverso.reaccionAlergica,
@@ -29,11 +25,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           ],
         ),
       ],
-      efectosSecundarios: [
-        EfectoSecundario.nausea,
-        EfectoSecundario.diarrea,
-        EfectoSecundario.reaccionesAlergicas,
-      ],
+      efectosSecundarios: [EfectoSecundario.nausea, EfectoSecundario.diarrea],
     ),
     Medicina(
       id: 'med-002',
@@ -45,8 +37,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           medicinaId: 'med-002',
           contraindicacionId: '',
           tratamientoId: '',
-          descripcion:
-              'Contraindicado en pacientes con úlcera péptica activa o insuficiencia renal grave.',
+          descripcion: 'Contraindicado en pacientes con úlcera péptica activa.',
           tipoContraindicacion: TipoContraindicacion.absoluta,
           efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.dolorCabeza],
         ),
@@ -54,137 +45,52 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
       efectosSecundarios: [
         EfectoSecundario.nausea,
         EfectoSecundario.dolorCabeza,
-        EfectoSecundario.mareos,
-      ],
-    ),
-    Medicina(
-      id: 'med-003',
-      nombre: 'Lidocaína 2% (Anestésico)',
-      contraindicaciones: [
-        Contraindicacion(
-          id: 'cont-003',
-          condicionId: 'con-001',
-          medicinaId: 'med-003',
-          contraindicacionId: '',
-          tratamientoId: '',
-          descripcion:
-              'Usar con precaución en pacientes con arritmias cardíacas o hipotensión.',
-          tipoContraindicacion: TipoContraindicacion.relativa,
-          efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
-        ),
-      ],
-      efectosSecundarios: [
-        EfectoSecundario.adormecimientoProlongado,
-        EfectoSecundario.mareos,
-        EfectoSecundario.somnolencia,
-      ],
-    ),
-    Medicina(
-      id: 'med-004',
-      nombre: 'Metronidazol 500mg',
-      contraindicaciones: [
-        Contraindicacion(
-          id: 'cont-004',
-          condicionId: 'con-001',
-          medicinaId: 'med-004',
-          contraindicacionId: '',
-          tratamientoId: '',
-          descripcion: 'Contraindicado en el primer trimestre del embarazo.',
-          tipoContraindicacion: TipoContraindicacion.absoluta,
-          efectosAdversos: [EfectoAdverso.nauseas, EfectoAdverso.vomitos],
-        ),
-      ],
-      efectosSecundarios: [
-        EfectoSecundario.nausea,
-        EfectoSecundario.vomitos,
-        EfectoSecundario.bocaSeca,
-      ],
-    ),
-    Medicina(
-      id: 'med-005',
-      nombre: 'Clindamicina 300mg',
-      contraindicaciones: [
-        Contraindicacion(
-          id: 'cont-005',
-          condicionId: 'con-001',
-          medicinaId: 'med-005',
-          contraindicacionId: '',
-          tratamientoId: '',
-          descripcion:
-              'Contraindicado en pacientes con historial de colitis pseudomembranosa.',
-          tipoContraindicacion: TipoContraindicacion.absoluta,
-          efectosAdversos: [EfectoAdverso.diarrea, EfectoAdverso.nauseas],
-        ),
-      ],
-      efectosSecundarios: [
-        EfectoSecundario.diarrea,
-        EfectoSecundario.nausea,
-        EfectoSecundario.reaccionesAlergicas,
-      ],
-    ),
-    Medicina(
-      id: 'med-006',
-      nombre: 'Paracetamol 500mg',
-      contraindicaciones: [
-        Contraindicacion(
-          id: 'cont-006',
-          condicionId: 'con-001',
-          medicinaId: 'med-006',
-          contraindicacionId: '',
-          tratamientoId: '',
-          descripcion:
-              'Usar con precaución en pacientes con enfermedad hepática.',
-          tipoContraindicacion: TipoContraindicacion.relativa,
-          efectosAdversos: [EfectoAdverso.fatiga],
-        ),
-      ],
-      efectosSecundarios: [EfectoSecundario.nausea, EfectoSecundario.fatiga],
-    ),
-    Medicina(
-      id: 'med-007',
-      nombre: 'Dexametasona 4mg',
-      contraindicaciones: [
-        Contraindicacion(
-          id: 'cont-007',
-          condicionId: 'con-001',
-          medicinaId: 'med-007',
-          contraindicacionId: '',
-          tratamientoId: '',
-          descripcion:
-              'Precaución en diabéticos; puede elevar los niveles de glucosa.',
-          tipoContraindicacion: TipoContraindicacion.relativa,
-          efectosAdversos: [EfectoAdverso.fatiga, EfectoAdverso.nauseas],
-        ),
-      ],
-      efectosSecundarios: [
-        EfectoSecundario.insomnio,
-        EfectoSecundario.cambiosAnimo,
-        EfectoSecundario.inflamacion,
       ],
     ),
   ];
 
+  final Set<String> _deletedIds = {};
+
   @override
-  Future<Either<Failure, List<Medicina>>> getMedicinas() async {
-    return Right(List.from(_medicinas));
+  Future<List<Medicina>> getCatalogoMedicinas() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    return _medicinas.where((m) => !_deletedIds.contains(m.id)).toList();
   }
 
   @override
-  Future<Either<Failure, void>> addMedicina(Medicina medicina) async {
-    _medicinas.add(medicina);
-    return const Right(null);
-  }
+  Future<void> guardarMedicina(Medicina medicina) async {
+    await Future.delayed(const Duration(milliseconds: 300));
 
-  @override
-  Future<Either<Failure, void>> updateMedicina(Medicina medicina) async {
     final index = _medicinas.indexWhere((m) => m.id == medicina.id);
-    if (index >= 0) _medicinas[index] = medicina;
-    return const Right(null);
+
+    if (index >= 0) {
+      _medicinas[index] = medicina;
+      _deletedIds.remove(medicina.id);
+    } else {
+      _medicinas.add(medicina);
+    }
   }
 
   @override
-  Future<Either<Failure, void>> deleteMedicina(String id) async {
-    _medicinas.removeWhere((m) => m.id == id);
-    return const Right(null);
+  Future<void> eliminarMedicina(String id) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (_medicinas.any((m) => m.id == id)) {
+      _deletedIds.add(id);
+    } else {
+      throw Exception('Medicina no encontrada para eliminar');
+    }
+  }
+
+  @override
+  Future<void> agregarMedicina(Medicina medicina) async {
+    if (_deletedIds.contains(medicina.id)) {
+      _deletedIds.remove(medicina.id);
+      final index = _medicinas.indexWhere((m) => m.id == medicina.id);
+      if (index >= 0) _medicinas[index] = medicina;
+    } else {
+      _medicinas.add(medicina);
+    }
   }
 }

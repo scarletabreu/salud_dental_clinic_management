@@ -1,4 +1,5 @@
 class EquipoMantenimiento {
+  final String id;
   final String equipoId;
   final String consumibleId;
   final String descripcion;
@@ -6,6 +7,7 @@ class EquipoMantenimiento {
   final double costo;
 
   EquipoMantenimiento({
+    required this.id,
     required this.equipoId,
     required this.consumibleId,
     required this.descripcion,
@@ -21,6 +23,7 @@ class EquipoMantenimiento {
     double? costo,
   }) {
     return EquipoMantenimiento(
+      id: id,
       equipoId: equipoId ?? this.equipoId,
       consumibleId: consumibleId ?? this.consumibleId,
       descripcion: descripcion ?? this.descripcion,

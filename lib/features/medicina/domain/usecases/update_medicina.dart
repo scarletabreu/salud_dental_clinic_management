@@ -9,6 +9,11 @@ class UpdateMedicina {
   UpdateMedicina(this.repository);
 
   Future<Either<Failure, void>> call(Medicina medicina) async {
-    return await repository.updateMedicina(medicina);
+    try {
+      await repository.guardarMedicina(medicina);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure());
+    }
   }
 }

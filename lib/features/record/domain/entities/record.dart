@@ -43,34 +43,4 @@ class Record {
       historialFamiliar: historialFamiliar ?? this.historialFamiliar,
     );
   }
-
-factory Record.empty() {
-  return Record(
-    id: '',
-    pacienteId: '',
-    tipoSangre: TipoSangre.desconocido,
-    consultas: const [],
-    condiciones: '',
-    cantHijos: 0,
-    cirugiasPrevias: const [],
-    historialFamiliar: '',
-  );
-}
-
-  factory Record.fromJson(Map<String, dynamic> json) {
-  return Record(
-    id: json['id'] as String,
-    pacienteId: json['pacienteId'] as String,
-    tipoSangre: TipoSangre.values.byName(json['tipoSangre'] as String),
-    consultas: (json['consultas'] as List<dynamic>? ?? [])
-        .map((e) => Consulta.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    condiciones: json['condiciones'] as String,
-    cantHijos: json['cantHijos'] as int? ?? 0,
-    cirugiasPrevias: (json['cirugiasPrevias'] as List<dynamic>? ?? [])
-        .map((e) => e as String)
-        .toList(),
-    historialFamiliar: json['historialFamiliar'] as String,
-  );
-}
 }

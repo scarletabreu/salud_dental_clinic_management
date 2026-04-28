@@ -7,24 +7,34 @@ class PacienteRemoteDatasource {
   PacienteRemoteDatasource(this.client);
 
   Future<List<PacienteModel>> getPacientes() async {
-    final response = await client.from('pacientes').select();
+    final response = await client
+        .from('pacientes')
+        .select()
+        .isFilter('deleted_at', null)
+        .order('nombre', ascending: true);
+
     return (response as List)
         .map((json) => PacienteModel.fromJson(json))
         .toList();
   }
 
   Future<void> addPaciente(PacienteModel paciente) async {
-    await client.from('pacientes').insert(paciente.toJson());
+    final data = paciente.toJson();
+    data['deleted_at'] = null;
+    await client.from('pacientes').insert(data);
   }
 
   Future<void> updatePaciente(PacienteModel paciente) async {
-    await client
-        .from('pacientes')
-        .update(paciente.toJson())
-        .eq('id', paciente.id);
+    final data = paciente.toJson();
+    data['updated_at'] = DateTime.now().toIso8601String();
+
+    await client.from('pacientes').update(data).eq('id', paciente.id);
   }
 
   Future<void> deletePaciente(String id) async {
-    await client.from('pacientes').delete().eq('id', id);
+    await client
+        .from('pacientes')
+        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .eq('id', id);
   }
 }

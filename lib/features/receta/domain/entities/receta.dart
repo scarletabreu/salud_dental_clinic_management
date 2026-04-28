@@ -43,18 +43,4 @@ class Receta {
       notas: notas ?? this.notas,
     );
   }
-
-  factory Receta.fromJson(Map<String, dynamic> json) {
-  return Receta(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    medicinaId: json['medicinaId'] as String,
-    dosis: json['dosis'] as String,
-    frecuencia: json['frecuencia'] as String,
-    indicaciones: json['indicaciones'] as String,
-    duracion: json['duracion'] as String,
-    notas: json['notas'] as String?,
-  );
-}
 }

@@ -1,5 +1,4 @@
 enum EfectoSecundario {
-  // Efectos Locales
   inflamacion('Inflamación / Edema'),
   sangradoLeve('Sangrado leve'),
   sensibilidadTermica('Sensibilidad térmica (frío/calor)'),
@@ -10,11 +9,10 @@ enum EfectoSecundario {
   alteracionGusto('Alteración del gusto / Sabor metálico'),
   alveolitis('Alveolitis post-extracción'),
 
-  // Efectos Sistémicos
   dolorCabeza('Dolor de cabeza'),
   mareos('Mareos / Vértigo'),
   fatiga('Fatiga'),
-  nausea('Náusea'),
+  nauseas('Náusea'),
   vomitos('Vómitos'),
   diarrea('Diarrea'),
   reaccionesAlergicas('Reacciones alérgicas'),

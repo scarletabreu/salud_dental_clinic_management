@@ -17,18 +17,23 @@ class ContraindicacionModel extends Contraindicacion {
   factory ContraindicacionModel.fromJson(Map<String, dynamic> json) {
     return ContraindicacionModel(
       id: json['id'] as String,
-      condicionId: json['condicion_id'] as String,
+      condicionId: json['condicion_id'] as String? ?? '',
       medicinaId: json['medicina_id'] as String?,
       contraindicacionId: json['contraindicacion_id'] as String?,
       tratamientoId: json['tratamiento_id'] as String?,
-      descripcion: json['descripcion'] as String,
+      descripcion: json['descripcion'] as String? ?? '',
       tipoContraindicacion: TipoContraindicacion.values.firstWhere(
         (e) => e.name == json['tipo_contraindicacion'],
         orElse: () => TipoContraindicacion.relativa,
       ),
       efectosAdversos:
           (json['efectos_adversos'] as List?)
-              ?.map((e) => EfectoAdverso.values.firstWhere((v) => v.name == e))
+              ?.map(
+                (e) => EfectoAdverso.values.firstWhere(
+                  (v) => v.name == e,
+                  orElse: () => EfectoAdverso.fatiga,
+                ),
+              )
               .toList() ??
           [],
     );

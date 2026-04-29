@@ -8,13 +8,18 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchMedicinas() async {
-    final response = await supabaseClient
-        .from('medicinas')
-        .select('*, contraindicaciones(*)')
-        .isFilter('deleted_at', null)
-        .order('nombre', ascending: true);
+    try {
+      final response = await supabaseClient
+          .from('medicinas')
+          .select('*')
+          .filter('deleted_at', 'is', null);
 
-    return List<Map<String, dynamic>>.from(response);
+      print("Respuesta exitosa (filtrada): $response");
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print("ERROR EN FETCH: $e");
+      rethrow;
+    }
   }
 
   @override

@@ -1,11 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-abstract class PagoRemoteDatasource {
-  Future<void> registrarPago(Map<String, dynamic> data);
-  Future<void> actualizarPago(Map<String, dynamic> data);
-  Future<void> anularPago(String id);
-  Future<List<Map<String, dynamic>>> fetchPagosPorCuenta(String cuentaId);
-}
+import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource.dart';
 
 class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
   final SupabaseClient supabaseClient;

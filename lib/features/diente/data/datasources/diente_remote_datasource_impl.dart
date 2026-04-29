@@ -14,7 +14,7 @@ class DienteRemoteDatasourceImpl implements DienteRemoteDatasource {
         .from('dientes')
         .select('*')
         .eq('odontograma_id', odontogramaId)
-        .isFilter('deleted_at', null);
+        .filter('deleted_at', 'is', null);
 
     return List<Map<String, dynamic>>.from(response);
   }

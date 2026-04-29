@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
@@ -12,9 +13,7 @@ import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart'
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 
 class DashboardShell extends StatefulWidget {
-  final IMedicinaRepository medicinaRepository;
-
-  const DashboardShell({super.key, required this.medicinaRepository});
+  const DashboardShell({super.key});
 
   @override
   State<DashboardShell> createState() => _DashboardShellState();
@@ -53,8 +52,7 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.medication_outlined,
       selectedIcon: Icons.medication_rounded,
       label: 'Medicinas',
-      builder: (_) =>
-          MedicinaListPage(repository: widget.medicinaRepository),
+      builder: (_) => MedicinaListPage(repository: sl<IMedicinaRepository>()),
     ),
     ShellDestination(
       icon: Icons.settings_outlined,
@@ -77,9 +75,7 @@ class _DashboardShellState extends State<DashboardShell> {
 
     final content = IndexedStack(
       index: _selectedIndex,
-      children: [
-        for (final d in _destinations) Builder(builder: d.builder),
-      ],
+      children: [for (final d in _destinations) Builder(builder: d.builder)],
     );
 
     return Scaffold(
@@ -220,9 +216,7 @@ class _RailItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final bg = selected
-        ? colorScheme.primaryContainer
-        : Colors.transparent;
+    final bg = selected ? colorScheme.primaryContainer : Colors.transparent;
     final fg = selected
         ? colorScheme.onPrimaryContainer
         : colorScheme.onSurfaceVariant;

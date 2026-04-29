@@ -25,7 +25,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
           ],
         ),
       ],
-      efectosSecundarios: [EfectoSecundario.nausea, EfectoSecundario.diarrea],
+      efectosSecundarios: [EfectoSecundario.nauseas, EfectoSecundario.diarrea],
     ),
     Medicina(
       id: 'med-002',
@@ -43,7 +43,7 @@ class MedicinaMemoryRepository implements IMedicinaRepository {
         ),
       ],
       efectosSecundarios: [
-        EfectoSecundario.nausea,
+        EfectoSecundario.nauseas,
         EfectoSecundario.dolorCabeza,
       ],
     ),

@@ -11,13 +11,17 @@ class ContraindicacionRemoteDatasourceImpl
   Future<List<Map<String, dynamic>>> fetchContraindicacionesByCondicion(
     String condicionId,
   ) async {
-    final response = await supabaseClient
-        .from('contraindicaciones')
-        .select()
-        .eq('condicion_id', condicionId)
-        .isFilter('deleted_at', null);
-
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('medicinas')
+          .select('*, contraindicaciones(*)')
+          .filter('deleted_at', 'is', null);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('--- ERROR CRÍTICO ---');
+      print(e); // <--- ESTO ES LO QUE NECESITO QUE ME PASES
+      rethrow;
+    }
   }
 
   @override

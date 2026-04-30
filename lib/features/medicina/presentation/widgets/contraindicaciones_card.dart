@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
 
 class ContraindicacionesCard extends StatelessWidget {
   final List<Contraindicacion> contraindicaciones;

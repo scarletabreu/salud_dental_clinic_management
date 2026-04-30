@@ -14,10 +14,8 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
           .select('*')
           .filter('deleted_at', 'is', null);
 
-      print("Respuesta exitosa (filtrada): $response");
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print("ERROR EN FETCH: $e");
       rethrow;
     }
   }

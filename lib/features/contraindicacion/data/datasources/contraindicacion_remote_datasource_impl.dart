@@ -18,8 +18,6 @@ class ContraindicacionRemoteDatasourceImpl
           .filter('deleted_at', 'is', null);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('--- ERROR CRÍTICO ---');
-      print(e); // <--- ESTO ES LO QUE NECESITO QUE ME PASES
       rethrow;
     }
   }

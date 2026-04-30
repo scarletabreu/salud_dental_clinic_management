@@ -11,35 +11,57 @@ class TratamientoAplicadoRepositoryImpl
 
   @override
   Future<void> realizarTratamiento(TratamientoAplicado tratamiento) async {
-    final model = TratamientoAplicadoModel(
-      id: tratamiento.id,
-      tratamientoId: tratamiento.tratamientoId,
-      tratamientoPadreId: tratamiento.tratamientoPadreId,
-      esContinuo: tratamiento.esContinuo,
-      estaTerminado: tratamiento.estaTerminado,
-    );
+    try {
+      final model = TratamientoAplicadoModel(
+        id: tratamiento.id,
+        tratamientoId: tratamiento.tratamientoId,
+        tratamientoPadreId: tratamiento.tratamientoPadreId,
+        esContinuo: tratamiento.esContinuo,
+        estaTerminado: tratamiento.estaTerminado,
+      );
 
-    final data = model.toJson();
-    data['deleted_at'] = null;
+      final data = model.toJson();
+      data['deleted_at'] = null;
 
-    await remoteDataSource.registrarTratamiento(data);
+      await remoteDataSource.registrarTratamiento(data);
+    } catch (e) {
+      throw Exception('Error en el repositorio al realizar tratamiento: $e');
+    }
   }
 
   @override
   Future<List<TratamientoAplicado>> getHistorialClinico(
     String pacienteId,
   ) async {
-    final data = await remoteDataSource.fetchPorPaciente(pacienteId);
-    return data.map((json) => TratamientoAplicadoModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchPorPaciente(pacienteId);
+      return data
+          .map((json) => TratamientoAplicadoModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener historial clínico: $e',
+      );
+    }
   }
 
   @override
   Future<void> finalizarTratamiento(String id) async {
-    await remoteDataSource.marcarComoTerminado(id);
+    try {
+      await remoteDataSource.marcarComoTerminado(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al finalizar tratamiento: $e');
+    }
   }
 
   @override
   Future<void> eliminarTratamientoAplicado(String id) async {
-    await remoteDataSource.eliminarTratamiento(id);
+    try {
+      await remoteDataSource.eliminarTratamiento(id);
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al eliminar tratamiento aplicado: $e',
+      );
+    }
   }
 }

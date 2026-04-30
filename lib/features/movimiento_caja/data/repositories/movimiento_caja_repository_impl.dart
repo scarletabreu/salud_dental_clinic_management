@@ -10,13 +10,21 @@ class MovimientoCajaRepositoryImpl implements MovimientoCajaRepository {
 
   @override
   Future<void> crearMovimiento(MovimientoCaja movimiento) async {
-    final model = MovimientoCajaModel.fromEntity(movimiento);
-    await remoteDataSource.registrarMovimiento(model.toJson());
+    try {
+      final model = MovimientoCajaModel.fromEntity(movimiento);
+      await remoteDataSource.registrarMovimiento(model.toJson());
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear movimiento: $e');
+    }
   }
 
   @override
   Future<List<MovimientoCaja>> getMovimientosDeHoy(String cajaDiariaId) async {
-    final data = await remoteDataSource.fetchMovimientosPorCaja(cajaDiariaId);
-    return data.map((json) => MovimientoCajaModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchMovimientosPorCaja(cajaDiariaId);
+      return data.map((json) => MovimientoCajaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener movimientos: $e');
+    }
   }
 }

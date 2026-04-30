@@ -7,34 +7,51 @@ class PacienteRemoteDatasource {
   PacienteRemoteDatasource(this.client);
 
   Future<List<PacienteModel>> getPacientes() async {
-    final response = await client
-        .from('pacientes')
-        .select()
-        .isFilter('deleted_at', null)
-        .order('nombre', ascending: true);
+    try {
+      final response = await client
+          .from('pacientes')
+          .select()
+          .filter('deleted_at', 'is', null)
+          .order('nombre', ascending: true);
 
-    return (response as List)
-        .map((json) => PacienteModel.fromJson(json))
-        .toList();
+      return (response as List)
+          .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener lista de pacientes: ${e.message}');
+    }
   }
 
   Future<void> addPaciente(PacienteModel paciente) async {
-    final data = paciente.toJson();
-    data['deleted_at'] = null;
-    await client.from('pacientes').insert(data);
+    try {
+      final data = paciente.toJson();
+      data['deleted_at'] = null;
+      data['created_at'] = DateTime.now().toIso8601String();
+      await client.from('pacientes').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al registrar nuevo paciente: ${e.message}');
+    }
   }
 
   Future<void> updatePaciente(PacienteModel paciente) async {
-    final data = paciente.toJson();
-    data['updated_at'] = DateTime.now().toIso8601String();
+    try {
+      final data = paciente.toJson();
+      data['updated_at'] = DateTime.now().toIso8601String();
 
-    await client.from('pacientes').update(data).eq('id', paciente.id);
+      await client.from('pacientes').update(data).eq('id', paciente.id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar paciente: ${e.message}');
+    }
   }
 
   Future<void> deletePaciente(String id) async {
-    await client
-        .from('pacientes')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await client
+          .from('pacientes')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar paciente: ${e.message}');
+    }
   }
 }

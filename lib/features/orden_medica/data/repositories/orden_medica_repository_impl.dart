@@ -10,28 +10,46 @@ class OrdenMedicaRepositoryImpl implements OrdenMedicaRepository {
 
   @override
   Future<void> emitirOrden(OrdenMedica orden) async {
-    final model = OrdenMedicaModel.fromEntity(orden);
-    final data = model.toJson();
-    data['deleted_at'] = null;
-    await remoteDataSource.insertarOrden(data);
+    try {
+      final model = OrdenMedicaModel.fromEntity(orden);
+      final data = model.toJson();
+      data['deleted_at'] = null;
+      await remoteDataSource.insertarOrden(data);
+    } catch (e) {
+      throw Exception('Error en el repositorio al emitir orden médica: $e');
+    }
   }
 
   @override
   Future<void> editarOrden(OrdenMedica orden) async {
-    final model = OrdenMedicaModel.fromEntity(orden);
-    final data = model.toJson();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await remoteDataSource.actualizarOrden(data);
+    try {
+      final model = OrdenMedicaModel.fromEntity(orden);
+      final data = model.toJson();
+      data['updated_at'] = DateTime.now().toIso8601String();
+      await remoteDataSource.actualizarOrden(data);
+    } catch (e) {
+      throw Exception('Error en el repositorio al editar orden médica: $e');
+    }
   }
 
   @override
   Future<void> anularOrden(String id) async {
-    await remoteDataSource.eliminarOrden(id);
+    try {
+      await remoteDataSource.eliminarOrden(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al anular orden médica: $e');
+    }
   }
 
   @override
   Future<List<OrdenMedica>> getHistorialDeOrdenes(String pacienteId) async {
-    final data = await remoteDataSource.fetchOrdenesPorPaciente(pacienteId);
-    return data.map((json) => OrdenMedicaModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchOrdenesPorPaciente(pacienteId);
+      return data.map((json) => OrdenMedicaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener historial de órdenes: $e',
+      );
+    }
   }
 }

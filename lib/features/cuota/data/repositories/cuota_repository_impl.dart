@@ -11,35 +11,51 @@ class CuotaRepositoryImpl implements CuotaRepository {
 
   @override
   Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async {
-    final data = await remoteDataSource.fetchCuotasByCuenta(cuentaId);
-    return data.map((json) => CuotaModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchCuotasByCuenta(cuentaId);
+      return data.map((json) => CuotaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener cuotas: $e');
+    }
   }
 
   @override
   Future<void> pagarCuota(String cuotaId) async {
-    await remoteDataSource.actualizarEstadoCuota(
-      cuotaId,
-      EstadoCuota.pagada.name,
-    );
+    try {
+      await remoteDataSource.actualizarEstadoCuota(
+        cuotaId,
+        EstadoCuota.pagada.name,
+      );
+    } catch (e) {
+      throw Exception('Error en el repositorio al registrar pago de cuota: $e');
+    }
   }
 
   @override
   Future<void> generarPlanDePagos(List<Cuota> cuotas) async {
-    final cuotasData = cuotas.map((c) {
-      return CuotaModel(
-        id: c.id,
-        cuentaId: c.cuentaId,
-        monto: c.monto,
-        fechaVencimiento: c.fechaVencimiento,
-        estado: c.estado,
-      ).toJson();
-    }).toList();
+    try {
+      final cuotasData = cuotas.map((c) {
+        return CuotaModel(
+          id: c.id,
+          cuentaId: c.cuentaId,
+          monto: c.monto,
+          fechaVencimiento: c.fechaVencimiento,
+          estado: c.estado,
+        ).toJson();
+      }).toList();
 
-    await remoteDataSource.crearCuotas(cuotasData);
+      await remoteDataSource.crearCuotas(cuotasData);
+    } catch (e) {
+      throw Exception('Error en el repositorio al generar plan de pagos: $e');
+    }
   }
 
   @override
   Future<void> eliminarCuota(String id) async {
-    await remoteDataSource.deleteCuota(id);
+    try {
+      await remoteDataSource.deleteCuota(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar cuota: $e');
+    }
   }
 }

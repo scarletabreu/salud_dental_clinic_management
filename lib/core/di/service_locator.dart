@@ -15,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/data/datasou
 import 'package:salud_dental_clinic_management/features/orden_medica/data/datasources/orden_medica_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/repositories/pago_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/record/data/datasources/record_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/superficie/data/datasources/superficie_remote_datasource_impl.dart';

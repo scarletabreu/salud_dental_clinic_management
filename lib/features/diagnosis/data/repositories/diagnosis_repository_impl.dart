@@ -11,22 +11,38 @@ class DiagnosisRepositoryImpl implements DiagnosisRepository {
 
   @override
   Future<List<Diagnosis>> getCatalogoCompleto() async {
-    final data = await remoteDataSource.fetchCatalogoDiagnosis();
-    return data.map((json) => DiagnosisModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchCatalogoDiagnosis();
+      return data.map((json) => DiagnosisModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener catálogo de diagnósticos: $e',
+      );
+    }
   }
 
   @override
   Future<List<Diagnosis>> getDiagnosisPorCategoria(
     CategoriaDiagnosis categoria,
   ) async {
-    final data = await remoteDataSource.fetchDiagnosisByCategoria(
-      categoria.name,
-    );
-    return data.map((json) => DiagnosisModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchDiagnosisByCategoria(
+        categoria.name,
+      );
+      return data.map((json) => DiagnosisModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al filtrar diagnósticos por categoría: $e',
+      );
+    }
   }
 
   @override
   Future<void> eliminarDiagnosisDelCatalogo(String id) async {
-    await remoteDataSource.deleteDiagnosis(id);
+    try {
+      await remoteDataSource.deleteDiagnosis(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar diagnóstico: $e');
+    }
   }
 }

@@ -11,26 +11,44 @@ class DiagnosticoAplicadoRepositoryImpl
 
   @override
   Future<void> aplicarDiagnostico(DiagnosticoAplicado diagnostico) async {
-    final model = DiagnosticoAplicadoModel(
-      id: diagnostico.id,
-      diagnosisId: diagnostico.diagnosisId,
-      severidad: diagnostico.severidad,
-      fechaAplicacion: diagnostico.fechaAplicacion,
-      notas: diagnostico.notas,
-    );
-    await remoteDataSource.insertDiagnostico(model.toJson());
+    try {
+      final model = DiagnosticoAplicadoModel(
+        id: diagnostico.id,
+        diagnosisId: diagnostico.diagnosisId,
+        severidad: diagnostico.severidad,
+        fechaAplicacion: diagnostico.fechaAplicacion,
+        notas: diagnostico.notas,
+      );
+      await remoteDataSource.insertDiagnostico(model.toJson());
+    } catch (e) {
+      throw Exception('Error en el repositorio al aplicar diagnóstico: $e');
+    }
   }
 
   @override
   Future<List<DiagnosticoAplicado>> getDiagnosticosDeConsulta(
     String consultaId,
   ) async {
-    final data = await remoteDataSource.fetchByConsulta(consultaId);
-    return data.map((json) => DiagnosticoAplicadoModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchByConsulta(consultaId);
+      return data
+          .map((json) => DiagnosticoAplicadoModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener diagnósticos de la consulta: $e',
+      );
+    }
   }
 
   @override
   Future<void> eliminarDiagnostico(String id) async {
-    await remoteDataSource.deleteDiagnostico(id);
+    try {
+      await remoteDataSource.deleteDiagnostico(id);
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al eliminar diagnóstico aplicado: $e',
+      );
+    }
   }
 }

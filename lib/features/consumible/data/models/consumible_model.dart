@@ -26,13 +26,17 @@ class ConsumibleModel extends Consumible {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> json = {
       'nombre': nombre,
       'descripcion': descripcion,
       'stock_actual': stockActual,
       'stock_minimo': stockMinimo,
       'estado': estado.name,
     };
+
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 }

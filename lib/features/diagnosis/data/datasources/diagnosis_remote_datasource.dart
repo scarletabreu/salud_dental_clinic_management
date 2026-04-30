@@ -4,4 +4,5 @@ abstract class DiagnosisRemoteDatasource {
     String categoria,
   );
   Future<void> deleteDiagnosis(String id);
+  Future<void> createDiagnosis(Map<String, dynamic> data);
 }

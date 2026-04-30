@@ -12,7 +12,7 @@ class ContactoModel extends Contacto {
     return ContactoModel(
       id: json['id'],
       email: json['email'],
-      numeroTelefono: json['numeroTelefono'],
+      numeroTelefono: json['numero_telefono'],
       direccion: json['direccion'],
     );
   }
@@ -21,7 +21,7 @@ class ContactoModel extends Contacto {
     return {
       'id': id,
       'email': email,
-      'numeroTelefono': numeroTelefono,
+      'numero_telefono': numeroTelefono,
       'direccion': direccion,
     };
   }

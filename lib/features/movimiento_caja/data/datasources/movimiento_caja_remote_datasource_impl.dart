@@ -9,35 +9,49 @@ class MovimientoCajaRemoteDatasourceImpl
 
   @override
   Future<void> registrarMovimiento(Map<String, dynamic> data) async {
-    await supabaseClient.from('movimientos_caja').insert(data);
+    try {
+      await supabaseClient.from('movimientos_caja').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al registrar el movimiento de caja: ${e.message}');
+    }
   }
 
   @override
   Future<void> actualizarMovimiento(Map<String, dynamic> data) async {
-    await supabaseClient.from('movimientos_caja').upsert(data);
+    try {
+      await supabaseClient.from('movimientos_caja').upsert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar el movimiento: ${e.message}');
+    }
   }
 
   @override
   Future<void> eliminarMovimiento(String id) async {
-    await supabaseClient
-        .from('movimientos_caja')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('movimientos_caja')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al anular movimiento de caja: ${e.message}');
+    }
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchMovimientosPorCaja(
     String cajaDiariaId,
   ) async {
-    final response = await supabaseClient
-        .from('movimientos_caja')
-        .select()
-        .eq('caja_diaria_id', cajaDiariaId)
-        .isFilter(
-          'deleted_at',
-          null,
-        ) // <--- CRÍTICO: No mostrar movimientos anulados
-        .order('fecha', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('movimientos_caja')
+          .select()
+          .eq('caja_diaria_id', cajaDiariaId)
+          .filter('deleted_at', 'is', null)
+          .order('fecha', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener movimientos de la caja: ${e.message}');
+    }
   }
 }

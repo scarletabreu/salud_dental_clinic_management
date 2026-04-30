@@ -1,6 +1,6 @@
-import 'package:salud_dental_clinic_management/core/data/datasources/contacto_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/contacto_repository.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/contacto_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 
 class ContactoRepositoryImpl implements ContactoRepository {
@@ -10,24 +10,40 @@ class ContactoRepositoryImpl implements ContactoRepository {
 
   @override
   Future<Contacto?> getContactoByPersonaId(String personaId) async {
-    return await remoteDataSource.fetchContactoByPersonaId(personaId);
+    try {
+      return await remoteDataSource.fetchContactoByPersonaId(personaId);
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener contacto: $e');
+    }
   }
 
   @override
   Future<void> createContacto(String personaId, Contacto contacto) async {
-    final model = _toModel(contacto);
-    await remoteDataSource.createContacto(personaId, model);
+    try {
+      final model = _toModel(contacto);
+      await remoteDataSource.createContacto(personaId, model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear contacto: $e');
+    }
   }
 
   @override
   Future<void> updateContacto(Contacto contacto) async {
-    final model = _toModel(contacto);
-    await remoteDataSource.updateContacto(model);
+    try {
+      final model = _toModel(contacto);
+      await remoteDataSource.updateContacto(model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar contacto: $e');
+    }
   }
 
   @override
   Future<void> deleteContacto(String id) async {
-    await remoteDataSource.deleteContacto(id);
+    try {
+      await remoteDataSource.deleteContacto(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar contacto: $e');
+    }
   }
 
   ContactoModel _toModel(Contacto contacto) {

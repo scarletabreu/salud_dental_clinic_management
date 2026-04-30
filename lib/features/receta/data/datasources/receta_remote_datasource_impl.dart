@@ -8,32 +8,57 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
 
   @override
   Future<void> crearReceta(Map<String, dynamic> data) async {
-    await supabaseClient.from('recetas').insert(data);
+    try {
+      await supabaseClient.from('recetas').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al registrar receta médica: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al crear receta: $e');
+    }
   }
 
   @override
   Future<void> actualizarReceta(Map<String, dynamic> data) async {
-    await supabaseClient.from('recetas').upsert(data);
+    try {
+      await supabaseClient.from('recetas').upsert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar receta: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al actualizar receta: $e');
+    }
   }
 
   @override
   Future<void> anularReceta(String id) async {
-    await supabaseClient
-        .from('recetas')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('recetas')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al anular receta: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al anular receta: $e');
+    }
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchRecetasByPaciente(
     String pacienteId,
   ) async {
-    final response = await supabaseClient
-        .from('recetas')
-        .select('*, medicina:medicinas(nombre)')
-        .eq('paciente_id', pacienteId)
-        .isFilter('deleted_at', null)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('recetas')
+          .select('*, medicina:medicinas(nombre)')
+          .eq('paciente_id', pacienteId)
+          .filter('deleted_at', 'is', null)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al recuperar recetas del paciente: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al buscar recetas: $e');
+    }
   }
 }

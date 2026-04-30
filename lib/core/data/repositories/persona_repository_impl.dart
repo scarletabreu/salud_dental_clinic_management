@@ -10,29 +10,49 @@ class PersonaRepositoryImpl implements PersonaRepository {
 
   @override
   Future<List<Persona>> getPersonas() async {
-    return await remoteDataSource.fetchActivePersonas();
+    try {
+      return await remoteDataSource.fetchActivePersonas();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener personas: $e');
+    }
   }
 
   @override
   Future<Persona> getPersonaById(String id) async {
-    return await remoteDataSource.fetchPersonaById(id);
+    try {
+      return await remoteDataSource.fetchPersonaById(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener persona por ID: $e');
+    }
   }
 
   @override
   Future<void> createPersona(Persona persona) async {
-    final model = _toModel(persona);
-    await remoteDataSource.createPersona(model);
+    try {
+      final model = _toModel(persona);
+      await remoteDataSource.createPersona(model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear persona: $e');
+    }
   }
 
   @override
   Future<void> updatePersona(Persona persona) async {
-    final model = _toModel(persona);
-    await remoteDataSource.updatePersona(model);
+    try {
+      final model = _toModel(persona);
+      await remoteDataSource.updatePersona(model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar persona: $e');
+    }
   }
 
   @override
   Future<void> deletePersona(String id) async {
-    await remoteDataSource.deactivatePersona(id);
+    try {
+      await remoteDataSource.deactivatePersona(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar persona: $e');
+    }
   }
 
   PersonaModel _toModel(Persona persona) {

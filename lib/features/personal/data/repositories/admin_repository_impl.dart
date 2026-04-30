@@ -10,25 +10,38 @@ class AdminRepositoryImpl implements AdminRepository {
 
   @override
   Future<Admin?> getAdminByUserId(String userId) async {
-    final data = await remoteDataSource.fetchAdminById(userId);
-
-    if (data == null) return null;
-
-    return AdminModel.fromJson(data);
+    try {
+      final data = await remoteDataSource.fetchAdminById(userId);
+      return data == null ? null : AdminModel.fromJson(data);
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener admin: $e');
+    }
   }
 
   @override
   Future<void> createAdmin(String userId) async {
-    await remoteDataSource.createAdmin(userId);
+    try {
+      await remoteDataSource.createAdmin(userId);
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear admin: $e');
+    }
   }
 
   @override
   Future<void> updateAdmin(String userId, String newUserId) async {
-    await remoteDataSource.updateAdmin(userId, newUserId);
+    try {
+      await remoteDataSource.updateAdmin(userId, newUserId);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar admin: $e');
+    }
   }
 
   @override
   Future<void> deleteAdmin(String userId) async {
-    await remoteDataSource.deactivateAdmin(userId);
+    try {
+      await remoteDataSource.deactivateAdmin(userId);
+    } catch (e) {
+      throw Exception('Error en el repositorio al desactivar admin: $e');
+    }
   }
 }

@@ -10,31 +10,47 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
 
   @override
   Future<List<Consumible>> getInventario() async {
-    final data = await remoteDataSource.fetchConsumibles();
-    return data.map((json) => ConsumibleModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchConsumibles();
+      return data.map((json) => ConsumibleModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener inventario: $e');
+    }
   }
 
   @override
   Future<void> actualizarExistencia(String id, int nuevoStock) async {
-    await remoteDataSource.updateStock(id, nuevoStock);
+    try {
+      await remoteDataSource.updateStock(id, nuevoStock);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar existencia: $e');
+    }
   }
 
   @override
   Future<void> guardarConsumible(Consumible consumible) async {
-    final model = ConsumibleModel(
-      id: consumible.id,
-      nombre: consumible.nombre,
-      descripcion: consumible.descripcion,
-      stockActual: consumible.stockActual,
-      stockMinimo: consumible.stockMinimo,
-      estado: consumible.estado,
-    );
+    try {
+      final model = ConsumibleModel(
+        id: consumible.id,
+        nombre: consumible.nombre,
+        descripcion: consumible.descripcion,
+        stockActual: consumible.stockActual,
+        stockMinimo: consumible.stockMinimo,
+        estado: consumible.estado,
+      );
 
-    await remoteDataSource.upsertConsumible(model.toJson());
+      await remoteDataSource.upsertConsumible(model.toJson());
+    } catch (e) {
+      throw Exception('Error en el repositorio al guardar consumible: $e');
+    }
   }
 
   @override
   Future<void> eliminarConsumible(String id) async {
-    await remoteDataSource.deleteConsumible(id);
+    try {
+      await remoteDataSource.deleteConsumible(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar consumible: $e');
+    }
   }
 }

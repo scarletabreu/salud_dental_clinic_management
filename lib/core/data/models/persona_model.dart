@@ -14,13 +14,19 @@ class PersonaModel extends Persona {
   });
 
   factory PersonaModel.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> relaciones = json['persona_contacto'] ?? [];
+
+    final contactoJson = relaciones.isNotEmpty
+        ? relaciones.first['contactos']
+        : {};
+
     return PersonaModel(
       id: json['id'],
       nombre: json['nombre'],
       apellido: json['apellido'],
       birthDate: DateTime.parse(json['fecha_nacimiento']),
       govID: json['cedula'],
-      contacto: ContactoModel.fromJson(json),
+      contacto: ContactoModel.fromJson(contactoJson),
       estatus: EstatusPersona.values.firstWhere(
         (e) => e.name == json['estatus'],
         orElse: () => EstatusPersona.activo,

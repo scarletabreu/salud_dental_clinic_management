@@ -9,35 +9,61 @@ class ConsumibleCompraRemoteDatasourceImpl
 
   @override
   Future<List<Map<String, dynamic>>> fetchItemsByCompra(String compraId) async {
-    final response = await supabaseClient
-        .from('consumibles_compra')
-        .select()
-        .eq('compra_id', compraId)
-        .isFilter('deleted_at', null);
+    try {
+      final response = await supabaseClient
+          .from('consumibles_compra')
+          .select()
+          .eq('compra_id', compraId)
+          .filter('deleted_at', 'is', null);
 
-    return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener items de la compra: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al cargar items: $e');
+    }
   }
 
   @override
   Future<Map<String, dynamic>?> fetchConsumibleById(String id) async {
-    return await supabaseClient
-        .from('consumibles_compra')
-        .select()
-        .eq('id', id)
-        .isFilter('deleted_at', null)
-        .maybeSingle();
+    try {
+      return await supabaseClient
+          .from('consumibles_compra')
+          .select()
+          .eq('id', id)
+          .filter('deleted_at', 'is', null)
+          .maybeSingle();
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener consumible específico: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al buscar consumible: $e');
+    }
   }
 
   @override
   Future<void> updateConsumible(Map<String, dynamic> consumibleData) async {
-    await supabaseClient.from('consumibles_compra').upsert(consumibleData);
+    try {
+      await supabaseClient.from('consumibles_compra').upsert(consumibleData);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al actualizar consumible de la compra: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Error inesperado al actualizar: $e');
+    }
   }
 
   @override
   Future<void> deleteConsumible(String id) async {
-    await supabaseClient
-        .from('consumibles_compra')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('consumibles_compra')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar consumible: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al eliminar: $e');
+    }
   }
 }

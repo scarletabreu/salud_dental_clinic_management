@@ -10,33 +10,52 @@ class CitaRepositoryImpl implements CitaRepository {
 
   @override
   Future<List<Cita>> getCitas() async {
-    return await remoteDataSource.fetchCitas();
+    try {
+      return await remoteDataSource.fetchCitas();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener citas: $e');
+    }
   }
 
   @override
   Future<void> createCita(Cita cita) async {
-    if (cita.date.isBefore(DateTime.now())) {
-      throw Exception("No se puede programar una cita en el pasado");
+    try {
+      if (cita.date.isBefore(DateTime.now())) {
+        throw Exception("No se puede programar una cita en el pasado");
+      }
+
+      final model = CitaModel(
+        id: cita.id,
+        doctor: cita.doctor,
+        persona: cita.persona,
+        date: cita.date,
+        esEmergencia: cita.esEmergencia,
+        estado: cita.estado,
+      );
+
+      await remoteDataSource.addCita(model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear cita: $e');
     }
-
-    final model = CitaModel(
-      doctor: cita.doctor,
-      persona: cita.persona,
-      date: cita.date,
-      esEmergencia: cita.esEmergencia,
-      estado: cita.estado,
-    );
-
-    await remoteDataSource.addCita(model);
   }
 
   @override
-  Future<List<Cita>> getCitasByPaciente(String pacienteId) {
-    return remoteDataSource.fetchCitasByPaciente(pacienteId);
+  Future<List<Cita>> getCitasByPaciente(String pacienteId) async {
+    try {
+      return await remoteDataSource.fetchCitasByPaciente(pacienteId);
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener citas del paciente: $e',
+      );
+    }
   }
 
   @override
   Future<void> deleteCita(String id) async {
-    await remoteDataSource.deleteCita(id);
+    try {
+      await remoteDataSource.deleteCita(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar cita: $e');
+    }
   }
 }

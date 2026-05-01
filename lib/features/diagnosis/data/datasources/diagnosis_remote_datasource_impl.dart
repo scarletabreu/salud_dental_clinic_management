@@ -8,31 +8,54 @@ class DiagnosisRemoteDatasourceImpl implements DiagnosisRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchCatalogoDiagnosis() async {
-    final response = await supabaseClient
-        .from('diagnosticos')
-        .select()
-        .isFilter('deleted_at', null)
-        .order('nombre', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('diagnosticos')
+          .select()
+          .filter('deleted_at', 'is', null)
+          .order('nombre', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al cargar catálogo de diagnósticos: ${e.message}');
+    }
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchDiagnosisByCategoria(
     String categoria,
   ) async {
-    final response = await supabaseClient
-        .from('diagnosticos')
-        .select()
-        .eq('categoria', categoria)
-        .isFilter('deleted_at', null);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('diagnosticos')
+          .select()
+          .eq('categoria', categoria)
+          .filter('deleted_at', 'is', null);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al filtrar diagnósticos por categoría: ${e.message}',
+      );
+    }
+  }
+
+  @override
+  Future<void> createDiagnosis(Map<String, dynamic> data) async {
+    try {
+      await supabaseClient.from('diagnosticos').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al registrar nuevo diagnóstico: ${e.message}');
+    }
   }
 
   @override
   Future<void> deleteDiagnosis(String id) async {
-    await supabaseClient
-        .from('diagnosticos')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('diagnosticos')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar diagnóstico: ${e.message}');
+    }
   }
 }

@@ -10,8 +10,14 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
 
   @override
   Future<List<Medicina>> getCatalogoMedicinas() async {
-    final data = await remoteDataSource.fetchMedicinas();
-    return data.map((json) => MedicinaModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchMedicinas();
+      return data.map((json) => MedicinaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener catálogo de medicinas: $e',
+      );
+    }
   }
 
   @override
@@ -21,17 +27,25 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
 
   @override
   Future<void> guardarMedicina(Medicina medicina) async {
-    final model = MedicinaModel.fromEntity(medicina);
-    final data = model.toJson();
+    try {
+      final model = MedicinaModel.fromEntity(medicina);
+      final data = model.toJson();
 
-    data['deleted_at'] = null;
-    data['updated_at'] = DateTime.now().toIso8601String();
+      data['deleted_at'] = null;
+      data['updated_at'] = DateTime.now().toIso8601String();
 
-    await remoteDataSource.upsertMedicina(data);
+      await remoteDataSource.upsertMedicina(data);
+    } catch (e) {
+      throw Exception('Error en el repositorio al guardar medicina: $e');
+    }
   }
 
   @override
   Future<void> eliminarMedicina(String id) async {
-    await remoteDataSource.softDeleteMedicina(id);
+    try {
+      await remoteDataSource.softDeleteMedicina(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar medicina: $e');
+    }
   }
 }

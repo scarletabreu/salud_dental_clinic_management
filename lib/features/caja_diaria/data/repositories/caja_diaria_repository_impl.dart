@@ -10,23 +10,27 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
 
   @override
   Future<CajaDiaria?> getCajaActual() async {
-    final data = await remoteDataSource.fetchCajaAbierta();
-
-    if (data == null) return null;
-
-    return CajaDiariaModel.fromJson(data);
+    try {
+      final data = await remoteDataSource.fetchCajaAbierta();
+      return data == null ? null : CajaDiariaModel.fromJson(data);
+    } catch (e) {
+      throw Exception('Error al obtener la caja actual: $e');
+    }
   }
 
   @override
   Future<void> abrirCaja(double montoApertura) async {
-    final estaAbierta = await remoteDataSource.isCajaAbierta();
-    if (estaAbierta) {
-      throw Exception(
-        'Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.',
-      );
+    try {
+      final estaAbierta = await remoteDataSource.isCajaAbierta();
+      if (estaAbierta) {
+        throw Exception(
+          'Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.',
+        );
+      }
+      await remoteDataSource.abrirCaja(montoApertura);
+    } catch (e) {
+      throw Exception('Error al abrir la caja: $e');
     }
-
-    await remoteDataSource.abrirCaja(montoApertura);
   }
 
   @override
@@ -35,25 +39,35 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
     required double montoCierre,
     String? observaciones,
   }) async {
-    final montoEsperado = await remoteDataSource.getBalanceActual();
-
-    final datosCierre = {
-      'monto_real': montoReal,
-      'monto_cierre': montoCierre,
-      'monto_esperado': montoEsperado,
-      'observaciones': observaciones ?? 'Cierre sin observaciones',
-    };
-
-    await remoteDataSource.cerrarCaja(datosCierre);
+    try {
+      final montoEsperado = await remoteDataSource.getBalanceActual();
+      final datosCierre = {
+        'monto_real': montoReal,
+        'monto_cierre': montoCierre,
+        'monto_esperado': montoEsperado,
+        'observaciones': observaciones ?? 'Cierre sin observaciones',
+      };
+      await remoteDataSource.cerrarCaja(datosCierre);
+    } catch (e) {
+      throw Exception('Error al cerrar la caja: $e');
+    }
   }
 
   @override
   Future<bool> isCajaAbierta() async {
-    return await remoteDataSource.isCajaAbierta();
+    try {
+      return await remoteDataSource.isCajaAbierta();
+    } catch (e) {
+      return false;
+    }
   }
 
   @override
   Future<double> getMontoEsperado() async {
-    return await remoteDataSource.getBalanceActual();
+    try {
+      return await remoteDataSource.getBalanceActual();
+    } catch (e) {
+      throw Exception('Error al calcular el balance esperado: $e');
+    }
   }
 }

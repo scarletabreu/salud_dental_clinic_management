@@ -13,7 +13,15 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   String? getCurrentUserId() => supabase.auth.currentUser?.id;
 
   @override
-  Future<void> signOut() async => await supabase.auth.signOut();
+  Future<void> signOut() async {
+    try {
+      await supabase.auth.signOut();
+    } on AuthException catch (e) {
+      throw Exception('Error al cerrar sesión: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al cerrar sesión: $e');
+    }
+  }
 
   @override
   bool isSessionActive() => supabase.auth.currentSession != null;

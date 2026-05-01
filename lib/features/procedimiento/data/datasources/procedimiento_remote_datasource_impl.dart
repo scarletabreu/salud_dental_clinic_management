@@ -9,24 +9,47 @@ class ProcedimientoRemoteDatasourceImpl
 
   @override
   Future<List<Map<String, dynamic>>> fetchProcedimientos() async {
-    final response = await supabaseClient
-        .from('procedimientos')
-        .select('*, contraindicaciones(*)')
-        .isFilter('deleted_at', null)
-        .order('nombre', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await supabaseClient
+          .from('procedimientos')
+          .select('*, contraindicaciones(*)')
+          .filter('deleted_at', 'is', null)
+          .order('nombre', ascending: true);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al recuperar catálogo de procedimientos: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Error inesperado al cargar procedimientos: $e');
+    }
   }
 
   @override
   Future<void> upsertProcedimiento(Map<String, dynamic> data) async {
-    await supabaseClient.from('procedimientos').upsert(data);
+    try {
+      await supabaseClient.from('procedimientos').upsert(data);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al guardar/actualizar procedimiento: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Error inesperado al persistir procedimiento: $e');
+    }
   }
 
   @override
   Future<void> softDeleteProcedimiento(String id) async {
-    await supabaseClient
-        .from('procedimientos')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('procedimientos')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar procedimiento: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al eliminar: $e');
+    }
   }
 }

@@ -11,29 +11,47 @@ class CondicionRepositoryImpl implements CondicionRepository {
 
   @override
   Future<List<Condicion>> getCondiciones() async {
-    final data = await remoteDataSource.fetchCondiciones();
-    return data.map((json) => CondicionModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchCondiciones();
+      return data.map((json) => CondicionModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener condiciones: $e');
+    }
   }
 
   @override
   Future<List<Condicion>> getCondicionesByTipo(TipoCondicion tipo) async {
-    final data = await remoteDataSource.fetchCondicionesByTipo(tipo.name);
-    return data.map((json) => CondicionModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchCondicionesByTipo(tipo.name);
+      return data.map((json) => CondicionModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al filtrar condiciones por tipo: $e',
+      );
+    }
   }
 
   @override
   Future<void> registrarNuevaCondicion(Condicion condicion) async {
-    final model = CondicionModel(
-      id: condicion.id,
-      nombre: condicion.nombre,
-      tipo: condicion.tipo,
-      categoria: condicion.categoria,
-    );
-    await remoteDataSource.createCondicion(model.toJson());
+    try {
+      final model = CondicionModel(
+        id: condicion.id,
+        nombre: condicion.nombre,
+        tipo: condicion.tipo,
+        categoria: condicion.categoria,
+      );
+      await remoteDataSource.createCondicion(model.toJson());
+    } catch (e) {
+      throw Exception('Error en el repositorio al registrar condición: $e');
+    }
   }
 
   @override
   Future<void> eliminarCondicion(String id) async {
-    await remoteDataSource.deleteCondicion(id);
+    try {
+      await remoteDataSource.deleteCondicion(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar condición: $e');
+    }
   }
 }

@@ -10,28 +10,46 @@ class DocumentoClinicoRepositoryImpl implements DocumentoClinicoRepository {
 
   @override
   Future<void> registrarDocumento(DocumentoClinico documento) async {
-    final model = DocumentoClinicoModel(
-      id: documento.id,
-      consultaId: documento.consultaId,
-      pacienteId: documento.pacienteId,
-      descripcion: documento.descripcion,
-      tipoDocumento: documento.tipoDocumento,
-      fechaCreacion: documento.fechaCreacion,
-      urlArchivo: documento.urlArchivo,
-    );
-    await remoteDataSource.subirDocumento(model.toJson());
+    try {
+      final model = DocumentoClinicoModel(
+        id: documento.id,
+        consultaId: documento.consultaId,
+        pacienteId: documento.pacienteId,
+        descripcion: documento.descripcion,
+        tipoDocumento: documento.tipoDocumento,
+        fechaCreacion: documento.fechaCreacion,
+        urlArchivo: documento.urlArchivo,
+      );
+      await remoteDataSource.subirDocumento(model.toJson());
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al registrar documento clínico: $e',
+      );
+    }
   }
 
   @override
   Future<List<DocumentoClinico>> getDocumentosPaciente(
     String pacienteId,
   ) async {
-    final data = await remoteDataSource.fetchDocumentosPaciente(pacienteId);
-    return data.map((json) => DocumentoClinicoModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchDocumentosPaciente(pacienteId);
+      return data.map((json) => DocumentoClinicoModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener documentos del paciente: $e',
+      );
+    }
   }
 
   @override
   Future<void> borrarDocumento(String id) async {
-    await remoteDataSource.eliminarDocumento(id);
+    try {
+      await remoteDataSource.eliminarDocumento(id);
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al borrar documento clínico: $e',
+      );
+    }
   }
 }

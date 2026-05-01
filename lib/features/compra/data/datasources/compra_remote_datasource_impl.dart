@@ -1,4 +1,6 @@
 import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/compra/data/models/compra_model.dart';
+import 'package:salud_dental_clinic_management/features/consumible_compra/data/models/consumible_compra_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
@@ -11,7 +13,7 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
     final response = await supabaseClient
         .from('compras')
         .select('*, items:consumibles_compra(*)')
-        .isFilter('deleted_at', null)
+        .filter('deleted_at', 'is', null)
         .order('fecha', ascending: false);
 
     return List<Map<String, dynamic>>.from(response);
@@ -23,13 +25,35 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
         .from('compras')
         .select('*, items:consumibles_compra(*)')
         .eq('id', id)
-        .isFilter('deleted_at', null)
+        .filter('deleted_at', 'is', null)
         .maybeSingle();
   }
 
   @override
-  Future<void> createCompra(Map<String, dynamic> compraData) async {
-    await supabaseClient.from('compras').insert(compraData);
+  Future<void> createCompra(CompraModel compra) async {
+    try {
+      final compraResponse = await supabaseClient
+          .from('compras')
+          .insert({
+            'fecha': compra.fecha.toIso8601String(),
+            'estado': compra.estado.name,
+          })
+          .select('id')
+          .single();
+
+      final String compraId = compraResponse['id'];
+
+      final itemsData = compra.items.map((item) {
+        final model = item as ConsumibleCompraModel;
+        final json = model.toJson();
+        json['compra_id'] = compraId;
+        return json;
+      }).toList();
+
+      await supabaseClient.from('consumibles_compra').insert(itemsData);
+    } catch (e) {
+      throw Exception('Error al registrar la compra: $e');
+    }
   }
 
   @override

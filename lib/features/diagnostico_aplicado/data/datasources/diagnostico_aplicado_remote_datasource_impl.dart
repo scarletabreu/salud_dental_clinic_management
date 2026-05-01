@@ -9,25 +9,39 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
 
   @override
   Future<void> insertDiagnostico(Map<String, dynamic> data) async {
-    await supabaseClient.from('diagnosticos_aplicados').insert(data);
+    try {
+      await supabaseClient.from('diagnosticos_aplicados').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al aplicar el diagnóstico: ${e.message}');
+    }
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchByConsulta(String consultaId) async {
-    final response = await supabaseClient
-        .from('diagnosticos_aplicados')
-        .select('*, diagnosis:diagnosticos(*)')
-        .eq('consulta_id', consultaId)
-        .isFilter('deleted_at', null);
+    try {
+      final response = await supabaseClient
+          .from('diagnosticos_aplicados')
+          .select('*, diagnosis:diagnosticos(*)')
+          .eq('consulta_id', consultaId)
+          .filter('deleted_at', 'is', null);
 
-    return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al recuperar diagnósticos de la consulta: ${e.message}',
+      );
+    }
   }
 
   @override
   Future<void> deleteDiagnostico(String id) async {
-    await supabaseClient
-        .from('diagnosticos_aplicados')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('diagnosticos_aplicados')
+          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar diagnóstico aplicado: ${e.message}');
+    }
   }
 }

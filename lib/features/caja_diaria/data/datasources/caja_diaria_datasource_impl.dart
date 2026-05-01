@@ -8,26 +8,33 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
 
   @override
   Future<void> abrirCaja(double montoInicial) async {
-    await supabase.from('cajas').insert({
-      'monto_apertura': montoInicial,
-      'cerrada': false,
-      'fecha': DateTime.now().toIso8601String(),
-      'abierta_por': supabase.auth.currentUser?.id,
-      'monto_esperado': montoInicial,
-      'monto_real': 0,
-      'monto_cierre': 0,
-    });
+    try {
+      await supabase.from('cajas').insert({
+        'monto_apertura': montoInicial,
+        'cerrada': false,
+        'fecha': DateTime.now().toIso8601String(),
+        'abierta_por': supabase.auth.currentUser?.id,
+        'monto_esperado': montoInicial,
+        'monto_real': 0,
+        'monto_cierre': 0,
+      });
+    } on PostgrestException catch (e) {
+      throw Exception('Error al abrir caja: ${e.message}');
+    }
   }
 
   @override
   Future<void> registrarMovimiento(Map<String, dynamic> movimientoData) async {
-    final caja = await _getCajaAbiertaActual();
+    try {
+      final caja = await _getCajaAbiertaActual();
+      if (caja == null) {
+        throw Exception('No hay una caja abierta para registrar movimientos.');
+      }
 
-    if (caja != null) {
       movimientoData['caja_id'] = caja['id'];
       await supabase.from('movimientos_caja').insert(movimientoData);
-    } else {
-      throw Exception('No hay una caja abierta para registrar movimientos.');
+    } catch (e) {
+      throw Exception('Error al registrar movimiento: $e');
     }
   }
 
@@ -36,38 +43,46 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     final caja = await _getCajaAbiertaActual();
     if (caja == null) return [];
 
-    final response = await supabase
-        .from('movimientos_caja')
-        .select()
-        .eq('caja_id', caja['id'])
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('movimientos_caja')
+          .select()
+          .eq('caja_id', caja['id'])
+          .order('created_at', ascending: false);
 
-    return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      throw Exception('Error al obtener movimientos: $e');
+    }
   }
 
   @override
   Future<void> cerrarCaja(Map<String, dynamic> datosCierre) async {
-    final caja = await _getCajaAbiertaActual();
-    if (caja == null) {
-      throw Exception('No se encontró una caja abierta para cerrar.');
+    try {
+      final caja = await _getCajaAbiertaActual();
+      if (caja == null) throw Exception('No hay caja abierta para cerrar.');
+
+      final balanceCalculado = await getBalanceActual();
+      if ((datosCierre['monto_esperado'] as num).toDouble() !=
+          balanceCalculado) {
+        throw Exception(
+          'INCONSISTENCIA: El monto esperado no coincide con el balance calculado.',
+        );
+      }
+
+      await supabase
+          .from('cajas')
+          .update({
+            'monto_cierre': datosCierre['monto_cierre'],
+            'monto_real': datosCierre['monto_real'],
+            'monto_esperado': datosCierre['monto_esperado'],
+            'cerrada': true,
+            'cerrada_por': supabase.auth.currentUser?.id,
+          })
+          .eq('id', caja['id']);
+    } catch (e) {
+      throw Exception('Error al cerrar caja: $e');
     }
-
-    await supabase
-        .from('cajas')
-        .update({
-          'monto_cierre': datosCierre['monto_cierre'],
-          'monto_real': datosCierre['monto_real'],
-          'monto_esperado': datosCierre['monto_esperado'],
-          'cerrada': true,
-          'cerrada_por': supabase.auth.currentUser?.id,
-        })
-        .eq('id', caja['id']);
-  }
-
-  @override
-  Future<bool> isCajaAbierta() async {
-    final caja = await _getCajaAbiertaActual();
-    return caja != null;
   }
 
   @override
@@ -90,16 +105,21 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
   }
 
   @override
-  Future<Map<String, dynamic>?> fetchCajaAbierta() async {
-    return await _getCajaAbiertaActual();
-  }
+  Future<bool> isCajaAbierta() async => (await _getCajaAbiertaActual()) != null;
+
+  @override
+  Future<Map<String, dynamic>?> fetchCajaAbierta() async =>
+      await _getCajaAbiertaActual();
 
   Future<Map<String, dynamic>?> _getCajaAbiertaActual() async {
-    final response = await supabase
-        .from('cajas')
-        .select()
-        .eq('cerrada', false)
-        .maybeSingle();
-    return response;
+    try {
+      return await supabase
+          .from('cajas')
+          .select()
+          .eq('cerrada', false)
+          .maybeSingle();
+    } catch (e) {
+      return null;
+    }
   }
 }

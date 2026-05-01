@@ -10,25 +10,39 @@ class CuentaRepositoryImpl implements CuentaRepository {
 
   @override
   Future<List<Cuenta>> getHistorialFinanciero(String pacienteId) async {
-    final data = await remoteDataSource.fetchCuentasByPaciente(pacienteId);
-    return data.map((json) => CuentaModel.fromJson(json)).toList();
+    try {
+      final data = await remoteDataSource.fetchCuentasByPaciente(pacienteId);
+      return data.map((json) => CuentaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener historial financiero: $e',
+      );
+    }
   }
 
   @override
   Future<void> crearFactura(Cuenta cuenta) async {
-    final model = CuentaModel(
-      id: cuenta.id,
-      consultaId: cuenta.consultaId,
-      fechaCreacion: cuenta.fechaCreacion,
-      metodoPago: cuenta.metodoPago,
-      itemCuentas: cuenta.itemCuentas,
-      nota: cuenta.nota,
-    );
-    await remoteDataSource.registrarCuenta(model.toJson());
+    try {
+      final model = CuentaModel(
+        id: cuenta.id,
+        consultaId: cuenta.consultaId,
+        fechaCreacion: cuenta.fechaCreacion,
+        metodoPago: cuenta.metodoPago,
+        itemCuentas: cuenta.itemCuentas,
+        nota: cuenta.nota,
+      );
+      await remoteDataSource.registrarCuenta(model.toJson());
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear factura: $e');
+    }
   }
 
   @override
   Future<void> eliminarCuenta(String id) async {
-    await remoteDataSource.deleteCuenta(id);
+    try {
+      await remoteDataSource.deleteCuenta(id);
+    } catch (e) {
+      throw Exception('Error en el repositorio al eliminar cuenta: $e');
+    }
   }
 }

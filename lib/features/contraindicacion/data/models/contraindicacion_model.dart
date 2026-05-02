@@ -1,6 +1,6 @@
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
 
 class ContraindicacionModel extends Contraindicacion {
   ContraindicacionModel({
@@ -22,9 +22,8 @@ class ContraindicacionModel extends Contraindicacion {
       contraindicacionId: json['contraindicacion_id'] as String?,
       tratamientoId: json['tratamiento_id'] as String?,
       descripcion: json['descripcion'] as String? ?? '',
-      tipoContraindicacion: TipoContraindicacion.values.firstWhere(
-        (e) => e.name == json['tipo_contraindicacion'],
-        orElse: () => TipoContraindicacion.relativa,
+      tipoContraindicacion: TipoContraindicacion.fromKey(
+        json['tipo_contraindicacion'] as String,
       ),
       efectosAdversos:
           (json['efectos_adversos'] as List?)
@@ -47,7 +46,7 @@ class ContraindicacionModel extends Contraindicacion {
       'contraindicacion_id': contraindicacionId,
       'tratamiento_id': tratamientoId,
       'descripcion': descripcion,
-      'tipo_contraindicacion': tipoContraindicacion.name,
+      'tipo_contraindicacion': tipoContraindicacion.key,
       'efectos_adversos': efectosAdversos.map((e) => e.name).toList(),
     };
   }

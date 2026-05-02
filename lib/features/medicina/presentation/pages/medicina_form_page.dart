@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
@@ -756,7 +756,18 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       ),
                     ),
                   ],
-                  onChanged: (v) => print('TODO [SD-28]')/*setState(() => Condicion = v)*/,
+                  
+                  // TODO: Programar lógica para cambiar la condición médica
+                  // Por ahora, este campo es solo decorativo.
+                  onChanged: (v) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Próximamente se podrá asociar una condición médica'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+    
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TipoContraindicacion>(

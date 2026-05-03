@@ -56,9 +56,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     setState(() => _saving = true);
 
     final medicina = Medicina(
-      id:
-          widget.medicina?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.medicina?.id,
       nombre: _nombreController.text.trim(),
       contraindicaciones: _contraindicaciones,
       efectosSecundarios: _efectosSeleccionados.toList(),
@@ -659,10 +657,8 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   void _confirm() {
     if (!_formKey.currentState!.validate()) return;
     final result = Contraindicacion(
-      id:
-          widget.existing?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      condicionId: 'TODO' /*_condicion*/,
+      id: widget.existing?.id,
+      condicionId: 'TODO',
       medicinaId: widget.existing?.medicinaId ?? '',
       contraindicacionId: widget.existing?.contraindicacionId ?? '',
       tratamientoId: widget.existing?.tratamientoId ?? '',

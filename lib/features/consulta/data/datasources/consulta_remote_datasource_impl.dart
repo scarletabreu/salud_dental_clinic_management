@@ -12,15 +12,15 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   @override
   Future<void> crearConsulta(ConsultaModel consulta) async {
     try {
+      final Map<String, dynamic> consultaData = consulta.toJson();
+
+      final now = DateTime.now().toIso8601String();
+      consultaData['created_at'] = now;
+      consultaData['updated_at'] = now;
+
       final response = await supabaseClient
           .from('consultas')
-          .insert({
-            'paciente_id': consulta.pacienteId,
-            'doctor_id': consulta.doctorId,
-            'cita_id': consulta.citaId,
-            'fecha': consulta.fecha.toUtc().toIso8601String(),
-            'motivo_consulta': consulta.motivoConsulta,
-          })
+          .insert(consultaData)
           .select('id')
           .single();
 
@@ -29,12 +29,14 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       if (consulta.odontograma != null) {
         final odontoJson = (consulta.odontograma as OdontogramaModel).toJson();
         odontoJson['consulta_id'] = consultaId;
+        odontoJson.remove('id');
         await supabaseClient.from('odontograma').insert(odontoJson);
       }
 
       for (var receta in consulta.recetas) {
         final recetaJson = (receta as RecetaModel).toJson();
         recetaJson['consulta_id'] = consultaId;
+        recetaJson.remove('id');
         await supabaseClient.from('recetas').insert(recetaJson);
       }
     } on PostgrestException catch (e) {
@@ -82,6 +84,8 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     Map<String, dynamic> consultaData,
   ) async {
     try {
+      consultaData.remove('id');
+      consultaData['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('consultas').update(consultaData).eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar consulta: ${e.message}');
@@ -93,7 +97,10 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     try {
       await supabaseClient
           .from('consultas')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar consulta: ${e.message}');

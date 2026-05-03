@@ -3,4 +3,5 @@ abstract class TratamientoAplicadoDatasource {
   Future<List<Map<String, dynamic>>> fetchPorPaciente(String pacienteId);
   Future<void> marcarComoTerminado(String id);
   Future<void> eliminarTratamiento(String id);
+  Future<void> updateTratamientoAplicado(String id, Map<String, dynamic> data);
 }

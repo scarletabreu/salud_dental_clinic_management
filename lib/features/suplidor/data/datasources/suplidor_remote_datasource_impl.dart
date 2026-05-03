@@ -28,11 +28,44 @@ class SuplidorRemoteDatasourceImpl implements SuplidorRemoteDatasource {
   @override
   Future<void> upsertSuplidor(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('suplidores').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al guardar/actualizar suplidor: ${e.message}');
     } catch (e) {
       throw Exception('Error inesperado al persistir suplidor: $e');
+    }
+  }
+
+  @override
+  Future<void> createSuplidor(Map<String, dynamic> data) async {
+    try {
+      data.remove('id');
+
+      final now = DateTime.now().toIso8601String();
+      data['created_at'] = now;
+      data['updated_at'] = now;
+
+      await supabaseClient.from('suplidores').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al registrar nuevo suplidor: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al registrar suplidor: $e');
+    }
+  }
+
+  @override
+  Future<void> updateSuplidor(String id, Map<String, dynamic> data) async {
+    try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
+
+      await supabaseClient.from('suplidores').update(data).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar datos del suplidor: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al actualizar suplidor: $e');
     }
   }
 

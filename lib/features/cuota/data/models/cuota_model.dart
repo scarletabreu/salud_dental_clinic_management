@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estad
 
 class CuotaModel extends Cuota {
   CuotaModel({
-    required super.id,
+    super.id,
     required super.cuentaId,
     required super.monto,
     required super.fechaVencimiento,
@@ -12,12 +12,10 @@ class CuotaModel extends Cuota {
 
   factory CuotaModel.fromJson(Map<String, dynamic> json) {
     return CuotaModel(
-      id: json['id'] as String,
-      cuentaId: json['cuenta_id'] ?? json['cuentaId'],
+      id: json['id'] as String?,
+      cuentaId: json['cuenta_id'] as String,
       monto: (json['monto'] as num).toDouble(),
-      fechaVencimiento: DateTime.parse(
-        json['fecha_vencimiento'] ?? json['fechaVencimiento'],
-      ),
+      fechaVencimiento: DateTime.parse(json['fecha_vencimiento'] as String),
       estado: EstadoCuota.values.firstWhere(
         (e) => e.name == json['estado'],
         orElse: () => EstadoCuota.pendiente,
@@ -26,12 +24,17 @@ class CuotaModel extends Cuota {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'cuenta_id': cuentaId,
       'monto': monto,
       'fecha_vencimiento': fechaVencimiento.toIso8601String(),
       'estado': estado.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

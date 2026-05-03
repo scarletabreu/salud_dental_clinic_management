@@ -10,6 +10,9 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
   @override
   Future<void> insertDiagnostico(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('diagnosticos_aplicados').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al aplicar el diagnóstico: ${e.message}');
@@ -30,6 +33,8 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
       throw Exception(
         'Error al recuperar diagnósticos de la consulta: ${e.message}',
       );
+    } catch (e) {
+      throw Exception('Error inesperado al cargar diagnósticos: $e');
     }
   }
 
@@ -38,10 +43,15 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
     try {
       await supabaseClient
           .from('diagnosticos_aplicados')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar diagnóstico aplicado: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al eliminar: $e');
     }
   }
 }

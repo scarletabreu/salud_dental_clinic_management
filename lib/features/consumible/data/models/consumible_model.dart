@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/enums/
 
 class ConsumibleModel extends Consumible {
   ConsumibleModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.descripcion,
     required super.stockActual,
@@ -13,7 +13,7 @@ class ConsumibleModel extends Consumible {
 
   factory ConsumibleModel.fromJson(Map<String, dynamic> json) {
     return ConsumibleModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] ?? '',
       stockActual: (json['stock_actual'] ?? json['stockActual'] as num).toInt(),
@@ -26,7 +26,7 @@ class ConsumibleModel extends Consumible {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> json = {
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
       'stock_actual': stockActual,
@@ -34,9 +34,10 @@ class ConsumibleModel extends Consumible {
       'estado': estado.name,
     };
 
-    if (id.isNotEmpty) {
-      json['id'] = id;
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
     }
-    return json;
+
+    return data;
   }
 }

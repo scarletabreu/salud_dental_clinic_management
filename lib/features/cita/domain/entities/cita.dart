@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
 
 class Cita {
-  final String id;
+  final String? id;
   final Doctor doctor;
   final Persona persona;
   final DateTime date;
@@ -11,7 +11,7 @@ class Cita {
   final EstadoCita estado;
 
   Cita({
-    required this.id,
+    this.id,
     required this.doctor,
     required this.persona,
     required this.date,

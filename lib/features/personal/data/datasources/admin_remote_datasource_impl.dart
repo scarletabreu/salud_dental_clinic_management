@@ -75,6 +75,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           .update({
             'estatus': 'inactivo',
             'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('user_id', userId);
     } on PostgrestException catch (e) {

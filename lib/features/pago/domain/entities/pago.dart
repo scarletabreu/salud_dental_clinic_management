@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/meto
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
 
 class Pago {
-  final String id;
+  final String? id;
   final String cuentaId;
   final double monto;
   final DateTime fecha;
@@ -10,7 +10,7 @@ class Pago {
   final MetodoPago metodoPago;
 
   Pago({
-    required this.id,
+    this.id,
     required this.cuentaId,
     required this.monto,
     required this.fecha,

@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
 
 class MovimientoCaja {
-  final String id;
+  final String? id;
   final String cajaDiariaId;
   final TipoMovimiento tipo;
   final double monto;
@@ -10,7 +10,7 @@ class MovimientoCaja {
   final String referenciaId;
 
   MovimientoCaja({
-    required this.id,
+    this.id,
     required this.cajaDiariaId,
     required this.tipo,
     required this.monto,

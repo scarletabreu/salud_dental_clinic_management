@@ -1,5 +1,5 @@
 class CajaDiaria {
-  final String id;
+  final String? id;
   final DateTime fecha;
   final double montoApertura;
   final double montoCierre;
@@ -8,7 +8,7 @@ class CajaDiaria {
   final bool cerrada;
 
   CajaDiaria({
-    required this.id,
+    this.id,
     required this.fecha,
     required this.montoApertura,
     required this.montoCierre,

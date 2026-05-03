@@ -1,5 +1,5 @@
 class EquipoMantenimiento {
-  final String id;
+  final String? id;
   final String equipoId;
   final String consumibleId;
   final String descripcion;
@@ -7,7 +7,7 @@ class EquipoMantenimiento {
   final double costo;
 
   EquipoMantenimiento({
-    required this.id,
+    this.id,
     required this.equipoId,
     required this.consumibleId,
     required this.descripcion,

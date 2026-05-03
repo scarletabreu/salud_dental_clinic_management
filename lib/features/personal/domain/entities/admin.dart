@@ -5,7 +5,7 @@ class Admin extends Usuario {
   final String departamento;
 
   Admin({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,

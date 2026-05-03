@@ -9,6 +9,9 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
   @override
   Future<void> crearReceta(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('recetas').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar receta médica: ${e.message}');
@@ -20,6 +23,8 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
   @override
   Future<void> actualizarReceta(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('recetas').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar receta: ${e.message}');
@@ -33,7 +38,10 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
     try {
       await supabaseClient
           .from('recetas')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al anular receta: ${e.message}');

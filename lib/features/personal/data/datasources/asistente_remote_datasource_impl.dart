@@ -13,6 +13,7 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
         'user_id': userId,
         'estatus': 'activo',
         'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
       });
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar asistente: ${e.message}');
@@ -72,6 +73,7 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
           .update({
             'estatus': 'inactivo',
             'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('user_id', userId);
     } on PostgrestException catch (e) {

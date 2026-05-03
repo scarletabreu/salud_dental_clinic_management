@@ -32,12 +32,14 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
   @override
   Future<void> createCompra(CompraModel compra) async {
     try {
+      final Map<String, dynamic> compraData = compra.toJson();
+
+      compraData['created_at'] = DateTime.now().toIso8601String();
+      compraData['updated_at'] = DateTime.now().toIso8601String();
+
       final compraResponse = await supabaseClient
           .from('compras')
-          .insert({
-            'fecha': compra.fecha.toIso8601String(),
-            'estado': compra.estado.name,
-          })
+          .insert(compraData)
           .select('id')
           .single();
 
@@ -47,6 +49,7 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
         final model = item as ConsumibleCompraModel;
         final json = model.toJson();
         json['compra_id'] = compraId;
+        json.remove('id');
         return json;
       }).toList();
 
@@ -58,10 +61,21 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
 
   @override
   Future<void> updateCompraEstado(String id, String nuevoEstado) async {
-    await supabaseClient
-        .from('compras')
-        .update({'estado': nuevoEstado})
-        .eq('id', id);
+    try {
+      await supabaseClient
+          .from('compras')
+          .update({
+            'estado': nuevoEstado,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al actualizar el estado de la compra: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Error inesperado: $e');
+    }
   }
 
   @override

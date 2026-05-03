@@ -28,6 +28,9 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   @override
   Future<void> registrarCuenta(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('cuentas').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar nueva cuenta: ${e.message}');
@@ -43,6 +46,9 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   ) async {
     try {
       pagoData['cuenta_id'] = cuentaId;
+      pagoData.remove('id');
+      pagoData['created_at'] = DateTime.now().toIso8601String();
+      pagoData['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('pagos').insert(pagoData);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar pago: ${e.message}');
@@ -56,7 +62,10 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
     try {
       await supabaseClient
           .from('cuentas')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar cuenta: ${e.message}');

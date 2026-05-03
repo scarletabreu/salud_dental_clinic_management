@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/equipo/domain/entities/e
 
 class EquipoModel extends Equipo {
   EquipoModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.descripcion,
     required super.ultimoMantenimiento,
@@ -11,7 +11,7 @@ class EquipoModel extends Equipo {
 
   factory EquipoModel.fromJson(Map<String, dynamic> json) {
     return EquipoModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] ?? '',
       ultimoMantenimiento: DateTime.parse(
@@ -25,12 +25,17 @@ class EquipoModel extends Equipo {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
       'ultimo_mantenimiento': ultimoMantenimiento.toIso8601String(),
       'tiempo_para_mantenimiento': tiempoParaMantenimiento,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

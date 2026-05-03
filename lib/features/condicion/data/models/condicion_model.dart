@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/condicion/domain/enums/t
 
 class CondicionModel extends Condicion {
   CondicionModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.tipo,
     required super.categoria,
@@ -12,7 +12,7 @@ class CondicionModel extends Condicion {
 
   factory CondicionModel.fromJson(Map<String, dynamic> json) {
     return CondicionModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       tipo: TipoCondicion.values.firstWhere(
         (e) => e.name == json['tipo'],
@@ -26,11 +26,16 @@ class CondicionModel extends Condicion {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'tipo': tipo.name,
       'categoria': categoria.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

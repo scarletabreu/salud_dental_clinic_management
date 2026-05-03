@@ -9,6 +9,9 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
   @override
   Future<void> crearDocumento(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('documentos_clinicos').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar el documento clínico: ${e.message}');
@@ -49,7 +52,10 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
     try {
       await supabaseClient
           .from('documentos_clinicos')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar el documento: ${e.message}');

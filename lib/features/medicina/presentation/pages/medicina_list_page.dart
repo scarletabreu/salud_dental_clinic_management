@@ -93,7 +93,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final result = await _deleteMedicina(medicina.id);
+    final result = await _deleteMedicina(medicina.id!);
     result.fold(
       (f) => ScaffoldMessenger.of(
         context,

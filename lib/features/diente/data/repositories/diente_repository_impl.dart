@@ -33,7 +33,7 @@ class DienteRepositoryImpl implements DienteRepository {
         observaciones: diente.observaciones,
       );
 
-      await remoteDataSource.updateDiente(diente.id, model.toJson());
+      await remoteDataSource.updateDiente(diente.id!, model.toJson());
     } catch (e) {
       throw Exception(
         'Error en el repositorio al guardar estado del diente: $e',

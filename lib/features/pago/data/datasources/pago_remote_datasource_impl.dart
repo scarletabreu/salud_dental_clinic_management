@@ -9,6 +9,9 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
   @override
   Future<void> registrarPago(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('pagos').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar pago: ${e.message}');
@@ -20,6 +23,8 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
   @override
   Future<void> actualizarPago(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('pagos').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar pago: ${e.message}');
@@ -33,7 +38,10 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
     try {
       await supabaseClient
           .from('pagos')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al anular el pago: ${e.message}');

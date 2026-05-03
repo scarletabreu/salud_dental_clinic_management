@@ -1,14 +1,14 @@
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 
 class DiagnosticoAplicado {
-  final String id;
+  final String? id;
   final String diagnosisId;
   final SeveridadDiagnosis severidad;
   final DateTime fechaAplicacion;
   final String notas;
 
   DiagnosticoAplicado({
-    required this.id,
+    this.id,
     required this.diagnosisId,
     required this.severidad,
     required this.fechaAplicacion,

@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/meto
 
 class PagoModel extends Pago {
   PagoModel({
-    required super.id,
+    super.id,
     required super.cuentaId,
     required super.monto,
     required super.fecha,
@@ -14,7 +14,7 @@ class PagoModel extends Pago {
 
   factory PagoModel.fromJson(Map<String, dynamic> json) {
     return PagoModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       cuentaId: json['cuenta_id'] ?? json['cuentaId'] as String,
       monto: (json['monto'] as num).toDouble(),
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
@@ -30,14 +30,19 @@ class PagoModel extends Pago {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'cuenta_id': cuentaId,
       'monto': monto,
       'fecha': fecha.toUtc().toIso8601String(),
       'estado': estado.name,
       'metodo_pago': metodoPago.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory PagoModel.fromEntity(Pago pago) {

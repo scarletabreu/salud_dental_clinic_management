@@ -1,5 +1,5 @@
 class Receta {
-  final String id;
+  final String? id;
   final String title;
   final DateTime createdAt;
   final String medicinaId;
@@ -10,7 +10,7 @@ class Receta {
   final String? notas;
 
   Receta({
-    required this.id,
+    this.id,
     required this.title,
     required this.createdAt,
     required this.medicinaId,

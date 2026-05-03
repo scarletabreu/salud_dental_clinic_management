@@ -25,6 +25,10 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
   @override
   Future<void> insertMedicina(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('medicinas').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar medicina: ${e.message}');
@@ -34,10 +38,18 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
   @override
   Future<void> upsertMedicina(Map<String, dynamic> data) async {
     try {
+      if (!(_isValidUuid(data['id']))) {
+        data.remove('id');
+      }
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('medicinas').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar medicina: ${e.message}');
     }
+  }
+
+  bool _isValidUuid(dynamic id) {
+    return id != null && id is String && id.length == 36 && id.contains('-');
   }
 
   @override
@@ -45,10 +57,15 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
     try {
       await supabaseClient
           .from('medicinas')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar medicina: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al eliminar medicina: $e');
     }
   }
 }

@@ -5,7 +5,7 @@ import 'package:salud_dental_clinic_management/features/pago/data/models/pago_mo
 
 class CuentaModel extends Cuenta {
   CuentaModel({
-    required super.id,
+    super.id,
     required super.consultaId,
     required super.fechaCreacion,
     super.fechaPago,
@@ -17,42 +17,35 @@ class CuentaModel extends Cuenta {
 
   factory CuentaModel.fromJson(Map<String, dynamic> json) {
     return CuentaModel(
-      id: json['id'],
-      consultaId: json['consulta_id'] ?? json['consultaId'],
-      fechaCreacion: DateTime.parse(
-        json['fecha_creacion'] ?? json['fechaCreacion'],
-      ),
-      fechaPago: json['fecha_pago'] != null || json['fechaPago'] != null
-          ? DateTime.parse(json['fecha_pago'] ?? json['fechaPago'])
+      id: json['id'] as String?,
+      consultaId: json['consulta_id'] as String,
+      fechaCreacion: DateTime.parse(json['fecha_creacion'] as String),
+      fechaPago: json['fecha_pago'] != null
+          ? DateTime.parse(json['fecha_pago'])
           : null,
       metodoPago: MetodoPago.values.firstWhere(
-        (e) => e.name == json['metodo_pago'] || e.name == json['metodoPago'],
+        (e) => e.name == json['metodo_pago'],
         orElse: () => MetodoPago.contado,
       ),
-      pagos: json['pagos'] != null
-          ? (json['pagos'] as List).map((p) => PagoModel.fromJson(p)).toList()
-          : [],
+      pagos: [],
+      itemCuentas: [],
       nota: json['nota'],
-      itemCuentas: json['item_cuentas'] != null || json['itemCuentas'] != null
-          ? (json['item_cuentas'] ?? json['itemCuentas'] as List)
-                .map((i) => ItemCuentaModel.fromJson(i))
-                .toList()
-          : [],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'consulta_id': consultaId,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_pago': fechaPago?.toIso8601String(),
       'metodo_pago': metodoPago.name,
-      'pagos': pagos.map((p) => (p as PagoModel).toJson()).toList(),
       'nota': nota,
-      'item_cuentas': itemCuentas
-          .map((i) => (i as ItemCuentaModel).toJson())
-          .toList(),
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

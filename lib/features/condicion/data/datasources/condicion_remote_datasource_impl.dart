@@ -40,6 +40,9 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
   @override
   Future<void> createCondicion(Map<String, dynamic> condicionData) async {
     try {
+      condicionData.remove('id');
+      condicionData['created_at'] = DateTime.now().toIso8601String();
+      condicionData['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('condiciones').insert(condicionData);
     } on PostgrestException catch (e) {
       throw Exception('Error al crear condición: ${e.message}');
@@ -51,10 +54,15 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
     try {
       await supabaseClient
           .from('condiciones')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al borrar condición: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al borrar: $e');
     }
   }
 }

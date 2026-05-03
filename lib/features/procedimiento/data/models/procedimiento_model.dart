@@ -3,14 +3,14 @@ import 'package:salud_dental_clinic_management/features/contraindicacion/data/mo
 
 class ProcedimientoModel extends Procedimiento {
   ProcedimientoModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.contraindicaciones,
   });
 
   factory ProcedimientoModel.fromJson(Map<String, dynamic> json) {
     return ProcedimientoModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       contraindicaciones: json['contraindicaciones'] != null
           ? (json['contraindicaciones'] as List)
@@ -21,7 +21,13 @@ class ProcedimientoModel extends Procedimiento {
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'nombre': nombre};
+    final Map<String, dynamic> data = {'nombre': nombre};
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory ProcedimientoModel.fromEntity(Procedimiento entidad) {

@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/domain/entit
 
 class TratamientoModel extends Tratamiento {
   TratamientoModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.descripcion,
     required super.costo,
@@ -14,7 +14,7 @@ class TratamientoModel extends Tratamiento {
 
   factory TratamientoModel.fromJson(Map<String, dynamic> json) {
     return TratamientoModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] ?? '',
       costo: (json['costo'] as num).toDouble(),
@@ -31,12 +31,17 @@ class TratamientoModel extends Tratamiento {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
       'costo': costo,
       'alcance': alcance.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

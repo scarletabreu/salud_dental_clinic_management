@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/receta/domain/entities/r
 
 class RecetaModel extends Receta {
   RecetaModel({
-    required super.id,
+    super.id,
     required super.title,
     required super.createdAt,
     required super.medicinaId,
@@ -15,7 +15,7 @@ class RecetaModel extends Receta {
 
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
     return RecetaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       title: json['title'] as String,
       createdAt: DateTime.parse(
         json['created_at'] ?? json['createdAt'],
@@ -30,17 +30,21 @@ class RecetaModel extends Receta {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'title': title,
-      'created_at': createdAt.toUtc().toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
       'medicina_id': medicinaId,
       'dosis': dosis,
       'frecuencia': frecuencia,
       'indicaciones': indicaciones,
       'duracion': duracion,
-      'notas': notas,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory RecetaModel.fromEntity(Receta receta) {

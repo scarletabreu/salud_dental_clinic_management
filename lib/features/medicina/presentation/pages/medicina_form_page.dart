@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
@@ -56,9 +56,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     setState(() => _saving = true);
 
     final medicina = Medicina(
-      id:
-          widget.medicina?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.medicina?.id,
       nombre: _nombreController.text.trim(),
       contraindicaciones: _contraindicaciones,
       efectosSecundarios: _efectosSeleccionados.toList(),
@@ -659,10 +657,8 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   void _confirm() {
     if (!_formKey.currentState!.validate()) return;
     final result = Contraindicacion(
-      id:
-          widget.existing?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      condicionId: 'TODO'/*_condicion*/,
+      id: widget.existing?.id,
+      condicionId: 'TODO',
       medicinaId: widget.existing?.medicinaId ?? '',
       contraindicacionId: widget.existing?.contraindicacionId ?? '',
       tratamientoId: widget.existing?.tratamientoId ?? '',
@@ -737,7 +733,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<CondicionMedica?>(
-                  initialValue: CondicionMedica.alergiaAines/*_condicion*/,
+                  initialValue: CondicionMedica.alergiaAines /*_condicion*/,
                   decoration: InputDecoration(
                     labelText: 'Condición médica',
                     border: OutlineInputBorder(
@@ -756,18 +752,19 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       ),
                     ),
                   ],
-                  
+
                   // TODO: Programar lógica para cambiar la condición médica
                   // Por ahora, este campo es solo decorativo.
                   onChanged: (v) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Próximamente se podrá asociar una condición médica'),
+                        content: Text(
+                          'Próximamente se podrá asociar una condición médica',
+                        ),
                         duration: Duration(seconds: 2),
                       ),
                     );
                   },
-    
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TipoContraindicacion>(

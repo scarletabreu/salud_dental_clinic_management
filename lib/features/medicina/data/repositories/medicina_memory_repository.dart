@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/medicina/domain/entities
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 
 class MedicinaMemoryRepository implements IMedicinaRepository {

@@ -1,11 +1,11 @@
 class OrdenMedica {
-  final String id;
+  final String? id;
   final DateTime fecha;
   final String procedimientoId;
   final String? notas;
 
   OrdenMedica({
-    required this.id,
+    this.id,
     required this.fecha,
     required this.procedimientoId,
     this.notas,

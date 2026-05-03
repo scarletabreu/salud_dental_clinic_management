@@ -1,14 +1,14 @@
 import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
 
 class Cuota {
-  final String id;
+  final String? id;
   final String cuentaId;
   final double monto;
   final DateTime fechaVencimiento;
   final EstadoCuota estado;
 
   Cuota({
-    required this.id,
+    this.id,
     required this.cuentaId,
     required this.monto,
     required this.fechaVencimiento,

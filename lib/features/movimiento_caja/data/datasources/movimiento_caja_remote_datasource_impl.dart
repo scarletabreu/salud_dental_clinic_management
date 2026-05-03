@@ -10,6 +10,8 @@ class MovimientoCajaRemoteDatasourceImpl
   @override
   Future<void> registrarMovimiento(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('movimientos_caja').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar el movimiento de caja: ${e.message}');
@@ -19,6 +21,8 @@ class MovimientoCajaRemoteDatasourceImpl
   @override
   Future<void> actualizarMovimiento(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('movimientos_caja').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar el movimiento: ${e.message}');
@@ -30,7 +34,10 @@ class MovimientoCajaRemoteDatasourceImpl
     try {
       await supabaseClient
           .from('movimientos_caja')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al anular movimiento de caja: ${e.message}');

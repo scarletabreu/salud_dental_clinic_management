@@ -29,6 +29,9 @@ class ContraindicacionRemoteDatasourceImpl
   @override
   Future<void> registrarContraindicacion(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('contraindicaciones').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar contraindicación: ${e.message}');
@@ -40,7 +43,10 @@ class ContraindicacionRemoteDatasourceImpl
     try {
       await supabaseClient
           .from('contraindicaciones')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar contraindicación: ${e.message}');

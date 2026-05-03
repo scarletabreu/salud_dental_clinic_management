@@ -34,6 +34,9 @@ class EquipoMantenimientoRemoteDatasourceImpl
   @override
   Future<void> insertMantenimiento(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('equipos_mantenimientos').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar nuevo mantenimiento: ${e.message}');
@@ -43,11 +46,32 @@ class EquipoMantenimientoRemoteDatasourceImpl
   }
 
   @override
+  Future<void> updateMantenimiento(String id, Map<String, dynamic> data) async {
+    try {
+      data.remove('id');
+
+      data['updated_at'] = DateTime.now().toIso8601String();
+
+      await supabaseClient
+          .from('equipos_mantenimientos')
+          .update(data)
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar mantenimiento: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al actualizar mantenimiento: $e');
+    }
+  }
+
+  @override
   Future<void> softDeleteMantenimiento(String id) async {
     try {
       await supabaseClient
           .from('equipos_mantenimientos')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al anular mantenimiento: ${e.message}');

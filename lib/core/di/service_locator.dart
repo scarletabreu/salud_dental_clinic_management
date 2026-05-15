@@ -1,4 +1,8 @@
 import 'package:get_it/get_it.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/datasources/paciente_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/repositories/paciente_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/data/datasources/diagnosis_remote_datasource_impl.dart';
@@ -206,5 +210,15 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<SuplidorRepository>(
     () => SuplidorRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  sl.registerLazySingleton<PacienteRemoteDatasource>(
+    () => PacienteRemoteDatasource(sl()),
+  );
+  sl.registerLazySingleton<IPacienteRepository>(
+    () => PacienteRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<PacienteCubit>(
+    () => PacienteCubit(sl()),
   );
 }

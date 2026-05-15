@@ -10,7 +10,7 @@ class PacienteRemoteDatasource {
     try {
       final response = await client
           .from('pacientes')
-          .select()
+          .select('*, contactos(*)')
           .filter('deleted_at', 'is', null)
           .order('nombre', ascending: true);
 

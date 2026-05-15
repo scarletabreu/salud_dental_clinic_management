@@ -1,8 +1,8 @@
+import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
-import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 
 class PacienteModel extends Paciente {
@@ -29,7 +29,7 @@ class PacienteModel extends Paciente {
       apellido: json['apellido'] as String,
       birthDate: DateTime.parse(json['birth_date'] as String),
       govID: json['gov_id'] as String,
-      contacto: json['contacto'] as Contacto,
+      contacto: _parseContacto(json),
       estatus: EstatusPersona.values.byName(json['estatus'] as String),
       genero: Genero.values.byName(json['genero'] as String),
       tipoPaciente: TipoPaciente.values.byName(json['tipo_paciente'] as String),
@@ -65,6 +65,17 @@ class PacienteModel extends Paciente {
     final m = date.month.toString().padLeft(2, '0');
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
+  }
+
+  static ContactoModel _parseContacto(Map<String, dynamic> json) {
+    final raw = json['contactos'];
+    if (raw is List && raw.isNotEmpty) {
+      return ContactoModel.fromJson(raw.first as Map<String, dynamic>);
+    }
+    if (raw is Map<String, dynamic>) {
+      return ContactoModel.fromJson(raw);
+    }
+    return ContactoModel.empty();
   }
 
   factory PacienteModel.fromEntity(Paciente paciente) {

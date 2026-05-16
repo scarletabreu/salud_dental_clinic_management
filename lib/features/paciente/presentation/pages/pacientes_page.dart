@@ -93,19 +93,17 @@ class _PacientesPageState extends State<PacientesPage> {
             ),
           ),
           const SizedBox(width: 16),
-          Flexible(
-            child: FilledButton.icon(
-              onPressed: () => _openForm(),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Nuevo Paciente'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+          FilledButton.icon(
+            onPressed: () => _openForm(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Nuevo Paciente'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
@@ -236,50 +234,52 @@ class _PacientesPageState extends State<PacientesPage> {
     }
 
     if (state is PacienteLoaded) {
-      if (state.filtrados.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.people_alt_outlined,
-                size: 56,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withAlpha(100),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _searchController.text.isEmpty
-                    ? 'No hay pacientes registrados.\nPresiona "Nuevo Paciente" para comenzar.'
-                    : 'Sin resultados para "${_searchController.text}".',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-
       return Column(
         children: [
           _buildTableHeader(context),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              itemCount: state.filtrados.length,
-              separatorBuilder: (context2, index2) => const SizedBox(height: 4),
-              itemBuilder: (_, i) => _PacienteRow(
-                paciente: state.filtrados[i],
-                onEdit: () => _openForm(paciente: state.filtrados[i]),
+          if (state.filtrados.isEmpty)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.people_alt_outlined,
+                      size: 56,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withAlpha(100),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _searchController.text.isEmpty
+                          ? 'No hay pacientes registrados.\nPresiona "Nuevo Paciente" para comenzar.'
+                          : 'Sin resultados para "${_searchController.text}".',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                itemCount: state.filtrados.length,
+                separatorBuilder: (context2, index2) =>
+                    const SizedBox(height: 4),
+                itemBuilder: (_, i) => _PacienteRow(
+                  paciente: state.filtrados[i],
+                  onEdit: () => _openForm(paciente: state.filtrados[i]),
+                ),
               ),
             ),
-          ),
-          _buildFooter(context, state),
+            _buildFooter(context, state),
+          ],
         ],
       );
     }

@@ -23,23 +23,22 @@ class PacienteModel extends Paciente {
   });
 
   factory PacienteModel.fromJson(Map<String, dynamic> json) {
+    final persona = json['personas'] as Map<String, dynamic>? ?? {};
     return PacienteModel(
       id: json['id'] as String,
-      nombre: json['nombre'] as String,
-      apellido: json['apellido'] as String,
-      birthDate: DateTime.parse(json['birth_date'] as String),
-      govID: json['gov_id'] as String,
+      nombre: persona['nombre'] as String,
+      apellido: persona['apellido'] as String,
+      birthDate: DateTime.parse(persona['fecha_nacimiento'] as String),
+      govID: persona['cedula'] as String,
       contacto: _parseContacto(json),
-      estatus: EstatusPersona.values.byName(json['estatus'] as String),
+      estatus: EstatusPersona.values.byName(persona['estatus'] as String),
       genero: Genero.values.byName(json['genero'] as String),
       tipoPaciente: TipoPaciente.values.byName(json['tipo_paciente'] as String),
       trabajo: json['trabajo'] as String? ?? '',
       referencia: json['referencia'] as String? ?? '',
-
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),
-
       citas: const [],
     );
   }

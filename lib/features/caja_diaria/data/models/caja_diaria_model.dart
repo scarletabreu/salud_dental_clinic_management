@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entit
 
 class CajaDiariaModel extends CajaDiaria {
   CajaDiariaModel({
-    required super.id,
+    super.id,
     required super.fecha,
     required super.montoApertura,
     required super.montoCierre,
@@ -13,7 +13,7 @@ class CajaDiariaModel extends CajaDiaria {
 
   factory CajaDiariaModel.fromJson(Map<String, dynamic> json) {
     return CajaDiariaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       fecha: DateTime.parse(json['fecha'] as String),
       montoApertura: (json['montoApertura'] as num).toDouble(),
       montoCierre: (json['montoCierre'] as num).toDouble(),
@@ -24,8 +24,7 @@ class CajaDiariaModel extends CajaDiaria {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'fecha': fecha.toIso8601String(),
       'montoApertura': montoApertura,
       'montoCierre': montoCierre,
@@ -33,5 +32,11 @@ class CajaDiariaModel extends CajaDiaria {
       'montoReal': montoReal,
       'cerrada': cerrada,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

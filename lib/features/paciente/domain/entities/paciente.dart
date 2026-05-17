@@ -14,7 +14,7 @@ class Paciente extends Persona {
   final TipoPaciente tipoPaciente;
 
   Paciente({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,

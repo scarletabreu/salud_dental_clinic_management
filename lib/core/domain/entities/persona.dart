@@ -2,7 +2,7 @@ import 'contacto.dart';
 import '../enums/estatus_persona.dart';
 
 class Persona {
-  final String id;
+  final String? id;
   final String nombre;
   final String apellido;
   final DateTime birthDate;
@@ -11,7 +11,7 @@ class Persona {
   final EstatusPersona estatus;
 
   Persona({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.apellido,
     required this.birthDate,

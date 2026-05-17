@@ -8,7 +8,7 @@ class Doctor extends Usuario {
   final bool isAvailable;
 
   Doctor({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,

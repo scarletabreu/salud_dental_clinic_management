@@ -1,12 +1,12 @@
 class TratamientoAplicado {
-  final String id;
+  final String? id;
   final String tratamientoId;
   final String? tratamientoPadreId;
   final bool esContinuo;
   final bool estaTerminado;
 
   TratamientoAplicado({
-    required this.id,
+    this.id,
     required this.tratamientoId,
     this.tratamientoPadreId,
     required this.esContinuo,

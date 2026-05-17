@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 
 class Tratamiento {
-  final String id;
+  final String? id;
   final String nombre;
   final String descripcion;
   final double costo;
@@ -10,7 +10,7 @@ class Tratamiento {
   final Alcance alcance;
 
   Tratamiento({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.descripcion,
     required this.costo,
@@ -19,6 +19,7 @@ class Tratamiento {
   });
 
   Tratamiento copyWith({
+    String? id,
     String? nombre,
     String? descripcion,
     double? costo,
@@ -26,7 +27,7 @@ class Tratamiento {
     Alcance? alcance,
   }) {
     return Tratamiento(
-      id: id,
+      id: id ?? this.id,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       costo: costo ?? this.costo,

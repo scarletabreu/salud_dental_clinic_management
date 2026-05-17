@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 
 class ContraindicacionesCard extends StatelessWidget {
   final List<Contraindicacion> contraindicaciones;
@@ -27,15 +27,17 @@ class ContraindicacionesCard extends StatelessWidget {
                 Text(
                   'Contraindicaciones',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onErrorContainer,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onErrorContainer,
+                  ),
                 ),
                 const Spacer(),
                 if (contraindicaciones.isNotEmpty)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.error,
                       borderRadius: BorderRadius.circular(12),
@@ -116,24 +118,25 @@ class _ContraindicacionItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      contraindicacion.condicionId,
-                      style: TextStyle(
-                        color: colorScheme.onSecondaryContainer,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    contraindicacion.condicionId,
+                    style: TextStyle(
+                      color: colorScheme.onSecondaryContainer,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4)
-                ,
+                ),
+                const SizedBox(height: 4),
                 Text(
                   contraindicacion.descripcion,
                   style: TextStyle(
@@ -150,12 +153,15 @@ class _ContraindicacionItem extends StatelessWidget {
                         .map(
                           (e) => Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: colorScheme.error.withAlpha(26),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                  color: colorScheme.error.withAlpha(77)),
+                                color: colorScheme.error.withAlpha(77),
+                              ),
                             ),
                             child: Text(
                               e.name,

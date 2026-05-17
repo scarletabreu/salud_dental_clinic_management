@@ -5,7 +5,7 @@ class Usuario extends Persona {
   final String passwordHash;
 
   Usuario({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,

@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/entities/usu
 
 class UsuarioModel extends Usuario {
   UsuarioModel({
-    required super.id,
+    super.id,
     required super.username,
     required super.passwordHash,
     required super.nombre,
@@ -28,8 +28,7 @@ class UsuarioModel extends Usuario {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'username': username,
       'passwordHash': passwordHash,
       'nombre': nombre,
@@ -39,5 +38,11 @@ class UsuarioModel extends Usuario {
       'contacto': contacto,
       'estatus': estatus,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

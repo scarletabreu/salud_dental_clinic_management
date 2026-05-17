@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/c
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 
 class Diagnosis {
-  final String id;
+  final String? id;
   final String nombre;
   final String descripcion;
   final SeveridadDiagnosis severidadDefault;
@@ -11,7 +11,7 @@ class Diagnosis {
   final CategoriaDiagnosis categoria;
 
   Diagnosis({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.descripcion,
     required this.severidadDefault,
@@ -37,19 +37,18 @@ class Diagnosis {
   }
 
   factory Diagnosis.fromJson(Map<String, dynamic> json) {
-  return Diagnosis(
-    id: json['id'] as String,
-    nombre: json['nombre'] as String,
-    descripcion: json['descripcion'] as String,
+    return Diagnosis(
+      id: json['id'] as String,
+      nombre: json['nombre'] as String,
+      descripcion: json['descripcion'] as String,
 
-    severidadDefault: SeveridadDiagnosis.values
-        .byName(json['severidadDefault'] as String),
+      severidadDefault: SeveridadDiagnosis.values.byName(
+        json['severidadDefault'] as String,
+      ),
 
-    alcance: Alcance.values
-        .byName(json['alcance'] as String),
+      alcance: Alcance.values.byName(json['alcance'] as String),
 
-    categoria: CategoriaDiagnosis.values
-        .byName(json['categoria'] as String),
-  );
-}
+      categoria: CategoriaDiagnosis.values.byName(json['categoria'] as String),
+    );
+  }
 }

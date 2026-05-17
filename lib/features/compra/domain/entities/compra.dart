@@ -2,13 +2,13 @@ import 'package:salud_dental_clinic_management/features/compra/domain/enums/esta
 import 'package:salud_dental_clinic_management/features/consumible_compra/domain/entities/consumible_compra.dart';
 
 class Compra {
-  final String id;
+  final String? id;
   final DateTime fecha;
   final List<ConsumibleCompra> items;
   final EstadoCompra estado;
 
   Compra({
-    required this.id,
+    this.id,
     required this.fecha,
     required this.items,
     required this.estado,

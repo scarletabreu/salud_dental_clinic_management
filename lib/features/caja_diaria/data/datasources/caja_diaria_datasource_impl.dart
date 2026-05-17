@@ -9,17 +9,22 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
   @override
   Future<void> abrirCaja(double montoInicial) async {
     try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado.');
+
       await supabase.from('cajas').insert({
         'monto_apertura': montoInicial,
         'cerrada': false,
         'fecha': DateTime.now().toIso8601String(),
-        'abierta_por': supabase.auth.currentUser?.id,
+        'abierta_por': userId, // Integración de campo
         'monto_esperado': montoInicial,
         'monto_real': 0,
         'monto_cierre': 0,
       });
     } on PostgrestException catch (e) {
       throw Exception('Error al abrir caja: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al abrir caja: $e');
     }
   }
 
@@ -32,6 +37,8 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
       }
 
       movimientoData['caja_id'] = caja['id'];
+      movimientoData.remove('id');
+
       await supabase.from('movimientos_caja').insert(movimientoData);
     } catch (e) {
       throw Exception('Error al registrar movimiento: $e');
@@ -62,11 +69,14 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
       final caja = await _getCajaAbiertaActual();
       if (caja == null) throw Exception('No hay caja abierta para cerrar.');
 
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado.');
+
       final balanceCalculado = await getBalanceActual();
       if ((datosCierre['monto_esperado'] as num).toDouble() !=
           balanceCalculado) {
         throw Exception(
-          'INCONSISTENCIA: El monto esperado no coincide con el balance calculado.',
+          'INCONSISTENCIA: El monto esperado ($balanceCalculado) no coincide con el balance calculado.',
         );
       }
 
@@ -77,7 +87,8 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
             'monto_real': datosCierre['monto_real'],
             'monto_esperado': datosCierre['monto_esperado'],
             'cerrada': true,
-            'cerrada_por': supabase.auth.currentUser?.id,
+            'cerrada_por': userId,
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', caja['id']);
     } catch (e) {

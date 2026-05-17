@@ -32,6 +32,7 @@ class ContactoRemoteDataSourceImpl implements ContactoRemoteDataSource {
       final data = contacto.toJson();
       data['persona_id'] = personaId;
       data['created_at'] = DateTime.now().toIso8601String();
+
       await supabase.from('contactos').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar contacto: ${e.message}');
@@ -42,11 +43,17 @@ class ContactoRemoteDataSourceImpl implements ContactoRemoteDataSource {
 
   @override
   Future<void> updateContacto(ContactoModel contacto) async {
+    if (contacto.id == null) {
+      throw Exception('No se puede actualizar un contacto sin un ID válido.');
+    }
+
     try {
       final data = contacto.toJson();
       data['updated_at'] = DateTime.now().toIso8601String();
 
-      await supabase.from('contactos').update(data).eq('id', contacto.id);
+      data.remove('id');
+
+      await supabase.from('contactos').update(data).eq('id', contacto.id!);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar contacto: ${e.message}');
     } catch (e) {

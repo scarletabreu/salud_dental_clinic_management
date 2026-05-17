@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/documento_clinico/domain
 
 class DocumentoClinicoModel extends DocumentoClinico {
   DocumentoClinicoModel({
-    required super.id,
+    super.id,
     required super.consultaId,
     required super.pacienteId,
     required super.descripcion,
@@ -14,7 +14,7 @@ class DocumentoClinicoModel extends DocumentoClinico {
 
   factory DocumentoClinicoModel.fromJson(Map<String, dynamic> json) {
     return DocumentoClinicoModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       pacienteId: json['paciente_id'] ?? json['pacienteId'],
       consultaId: json['consulta_id'] ?? json['consultaId'],
       descripcion: json['descripcion'] as String,
@@ -29,8 +29,7 @@ class DocumentoClinicoModel extends DocumentoClinico {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'paciente_id': pacienteId,
       'consulta_id': consultaId,
       'descripcion': descripcion,
@@ -38,5 +37,11 @@ class DocumentoClinicoModel extends DocumentoClinico {
       'fecha_creacion': fechaCreacion.toUtc().toIso8601String(),
       'url_archivo': urlArchivo,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

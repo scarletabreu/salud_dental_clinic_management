@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/orden_medica/domain/enti
 
 class OrdenMedicaModel extends OrdenMedica {
   OrdenMedicaModel({
-    required super.id,
+    super.id,
     required super.fecha,
     required super.procedimientoId,
     super.notas,
@@ -10,7 +10,7 @@ class OrdenMedicaModel extends OrdenMedica {
 
   factory OrdenMedicaModel.fromJson(Map<String, dynamic> json) {
     return OrdenMedicaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       procedimientoId:
           json['procedimiento_id'] ?? json['procedimientoId'] as String,
@@ -19,12 +19,17 @@ class OrdenMedicaModel extends OrdenMedica {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'fecha': fecha.toUtc().toIso8601String(),
       'procedimiento_id': procedimientoId,
       'notas': notas,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory OrdenMedicaModel.fromEntity(OrdenMedica entidad) {

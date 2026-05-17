@@ -1,8 +1,8 @@
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 
 class Contraindicacion {
-  final String id;
+  final String? id;
   final String condicionId;
   final String? medicinaId;
   final String? contraindicacionId;
@@ -12,7 +12,7 @@ class Contraindicacion {
   final List<EfectoAdverso> efectosAdversos;
 
   Contraindicacion({
-    required this.id,
+    this.id,
     required this.condicionId,
     this.medicinaId,
     this.contraindicacionId,

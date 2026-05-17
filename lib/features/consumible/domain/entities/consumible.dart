@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/estado_consumible.dart';
 
 class Consumible {
-  final String id;
+  final String? id;
   final String nombre;
   final String descripcion;
   final int stockActual;
@@ -9,7 +9,7 @@ class Consumible {
   final EstadoConsumible estado;
 
   Consumible({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.descripcion,
     required this.stockActual,

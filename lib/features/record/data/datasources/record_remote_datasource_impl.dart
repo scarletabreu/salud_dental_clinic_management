@@ -25,8 +25,29 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
   }
 
   @override
+  Future<void> createRecord(Map<String, dynamic> data) async {
+    try {
+      data.remove('id');
+
+      final now = DateTime.now().toIso8601String();
+      data['created_at'] = now;
+      data['updated_at'] = now;
+
+      await supabaseClient.from('records').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al inicializar el expediente clínico: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Error inesperado al crear el expediente: $e');
+    }
+  }
+
+  @override
   Future<void> upsertRecord(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('records').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception(
@@ -42,7 +63,10 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
     try {
       await supabaseClient
           .from('records')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al anular el expediente: ${e.message}');

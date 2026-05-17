@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 
 class ItemCuenta {
-  final String id;
+  final String? id;
   final String cuentaId;
   final String descripcion;
   final double precioUnitario;
@@ -9,7 +9,7 @@ class ItemCuenta {
   final List<Tratamiento> tratamientosAplicados;
 
   ItemCuenta({
-    required this.id,
+    this.id,
     required this.cuentaId,
     required this.descripcion,
     required this.precioUnitario,

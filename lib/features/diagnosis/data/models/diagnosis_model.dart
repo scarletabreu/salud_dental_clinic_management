@@ -5,7 +5,7 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/s
 
 class DiagnosisModel extends Diagnosis {
   DiagnosisModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.descripcion,
     required super.severidadDefault,
@@ -15,7 +15,7 @@ class DiagnosisModel extends Diagnosis {
 
   factory DiagnosisModel.fromJson(Map<String, dynamic> json) {
     return DiagnosisModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] as String,
       severidadDefault: SeveridadDiagnosis.values.byName(
@@ -27,13 +27,18 @@ class DiagnosisModel extends Diagnosis {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
       'severidad_default': severidadDefault.name,
       'alcance': alcance.name,
       'categoria': categoria.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

@@ -1,12 +1,12 @@
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 
 class Procedimiento {
-  final String id;
+  final String? id;
   final String nombre;
   final List<Contraindicacion> contraindicaciones;
 
   Procedimiento({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.contraindicaciones,
   });

@@ -5,7 +5,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/data/models/
 
 class OdontogramaModel extends Odontograma {
   OdontogramaModel({
-    required super.id,
+    super.id,
     required super.consultaId,
     required super.dientes,
     super.tratamientos = const [],
@@ -14,7 +14,7 @@ class OdontogramaModel extends Odontograma {
 
   factory OdontogramaModel.fromJson(Map<String, dynamic> json) {
     return OdontogramaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       consultaId: json['consulta_id'] ?? json['consultaId'],
       dientes: json['dientes'] != null
           ? (json['dientes'] as List)
@@ -35,6 +35,12 @@ class OdontogramaModel extends Odontograma {
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'consulta_id': consultaId};
+    final Map<String, dynamic> data = {'consulta_id': consultaId};
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

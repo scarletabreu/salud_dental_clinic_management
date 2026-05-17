@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dar
 
 class ContactoModel extends Contacto {
   ContactoModel({
-    required super.id,
+    super.id,
     required super.email,
     required super.numeroTelefono,
     required super.direccion,
@@ -18,11 +18,16 @@ class ContactoModel extends Contacto {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'email': email,
       'numero_telefono': numeroTelefono,
       'direccion': direccion,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

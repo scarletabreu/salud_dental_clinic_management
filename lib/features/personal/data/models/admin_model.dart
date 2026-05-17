@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 
 class AdminModel extends Admin {
   AdminModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.contacto,
@@ -17,31 +17,36 @@ class AdminModel extends Admin {
 
   factory AdminModel.fromJson(Map<String, dynamic> json) {
     return AdminModel(
-      id: json['id'],
+      id: json['id'] as String?,
       nombre: json['nombre'],
       apellido: json['apellido'],
       contacto: ContactoModel.fromJson(json['contacto']),
-      birthDate: DateTime.parse(json['birthDate']),
-      govID: json['govID'],
+      birthDate: DateTime.parse(json['fecha_nacimiento']),
+      govID: json['cedula'],
       estatus: json['estatus'],
       username: json['username'],
-      passwordHash: json['passwordHash'],
+      passwordHash: json['password_hash'],
       departamento: json['departamento'],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'apellido': apellido,
       'contacto': (contacto as ContactoModel).toJson(),
-      'birthDate': birthDate.toIso8601String(),
-      'govID': govID,
+      'fecha_nacimiento': birthDate.toIso8601String(),
+      'cedula': govID,
       'estatus': estatus,
       'username': username,
-      'passwordHash': passwordHash,
+      'password_hash': passwordHash,
       'departamento': departamento,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

@@ -2,14 +2,14 @@ import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dar
 import 'package:salud_dental_clinic_management/features/suplidor/domain/enums/tipo_suplidor.dart';
 
 class Suplidor {
-  final String id;
+  final String? id;
   final String nombre;
   final TipoSuplidor tipoSuplidor;
   final List<Contacto> contactos;
   final String summary;
 
   Suplidor({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.tipoSuplidor,
     required this.contactos,

@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/suplidor/domain/enums/ti
 
 class SuplidorModel extends Suplidor {
   SuplidorModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.tipoSuplidor,
     required super.contactos,
@@ -13,30 +13,29 @@ class SuplidorModel extends Suplidor {
 
   factory SuplidorModel.fromJson(Map<String, dynamic> json) {
     return SuplidorModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       nombre: json['nombre'] as String,
       tipoSuplidor: TipoSuplidor.values.firstWhere(
-        (e) =>
-            e.name == json['tipo_suplidor'] || e.name == json['tipoSuplidor'],
+        (e) => e.name == (json['tipo_suplidor'] ?? json['tipoSuplidor']),
         orElse: () => TipoSuplidor.consumible,
       ),
-      contactos: json['contactos'] != null
-          ? (json['contactos'] as List)
-                .map((e) => ContactoModel.fromJson(e))
-                .toList()
-          : [],
+      contactos: [],
       summary: json['summary'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'tipo_suplidor': tipoSuplidor.name,
-      'contactos': contactos.map((e) => (e as ContactoModel).toJson()).toList(),
       'summary': summary,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory SuplidorModel.fromEntity(Suplidor entidad) {

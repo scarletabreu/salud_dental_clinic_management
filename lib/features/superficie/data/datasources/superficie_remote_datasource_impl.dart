@@ -9,6 +9,8 @@ class SuperficieRemoteDatasourceImpl implements SuperficieRemoteDatasource {
   @override
   Future<void> actualizarSuperficie(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('superficies').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al guardar/actualizar superficie: ${e.message}');
@@ -22,7 +24,10 @@ class SuperficieRemoteDatasourceImpl implements SuperficieRemoteDatasource {
     try {
       await supabaseClient
           .from('superficies')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar superficie: ${e.message}');

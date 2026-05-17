@@ -33,11 +33,15 @@ class MedicinaModel extends Medicina {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      if (id.contains('-')) 'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'efectos_secundarios': efectosSecundarios.map((e) => e.name).toList(),
     };
+    if (id != null && id!.length == 36 && id!.contains('-')) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory MedicinaModel.fromEntity(Medicina medicina) {

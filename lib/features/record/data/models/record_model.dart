@@ -1,10 +1,9 @@
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
-import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 
 class RecordModel extends Record {
   RecordModel({
-    required super.id,
+    super.id,
     required super.pacienteId,
     required super.tipoSangre,
     super.consultas = const [],
@@ -16,17 +15,12 @@ class RecordModel extends Record {
 
   factory RecordModel.fromJson(Map<String, dynamic> json) {
     return RecordModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       pacienteId: json['paciente_id'] ?? json['pacienteId'],
       tipoSangre: TipoSangre.values.firstWhere(
-        (e) => e.name == json['tipo_sangre'] || e.name == json['tipoSangre'],
+        (e) => e.name == (json['tipo_sangre'] ?? json['tipoSangre']),
         orElse: () => TipoSangre.desconocido,
       ),
-      consultas: json['consultas'] != null
-          ? (json['consultas'] as List)
-                .map((e) => ConsultaModel.fromJson(e))
-                .toList()
-          : [],
       condiciones: json['condiciones'] as String? ?? '',
       cantHijos:
           (json['cant_hijos'] ?? json['cantHijos'] as num?)?.toInt() ?? 0,
@@ -35,12 +29,12 @@ class RecordModel extends Record {
       ),
       historialFamiliar:
           json['historial_familiar'] ?? json['historialFamiliar'] ?? '',
+      consultas: [],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'paciente_id': pacienteId,
       'tipo_sangre': tipoSangre.name,
       'condiciones': condiciones,
@@ -48,6 +42,12 @@ class RecordModel extends Record {
       'cirugias_previas': cirugiasPrevias,
       'historial_familiar': historialFamiliar,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory RecordModel.fromEntity(Record record) {

@@ -43,6 +43,11 @@ class ConsumibleCompraRemoteDatasourceImpl
   @override
   Future<void> updateConsumible(Map<String, dynamic> consumibleData) async {
     try {
+      if (!(_isValidUuid(consumibleData['id']))) {
+        consumibleData.remove('id');
+      }
+
+      consumibleData['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('consumibles_compra').upsert(consumibleData);
     } on PostgrestException catch (e) {
       throw Exception(
@@ -58,12 +63,19 @@ class ConsumibleCompraRemoteDatasourceImpl
     try {
       await supabaseClient
           .from('consumibles_compra')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar consumible: ${e.message}');
     } catch (e) {
       throw Exception('Error inesperado al eliminar: $e');
     }
+  }
+
+  bool _isValidUuid(dynamic id) {
+    return id != null && id is String && id.length == 36 && id.contains('-');
   }
 }

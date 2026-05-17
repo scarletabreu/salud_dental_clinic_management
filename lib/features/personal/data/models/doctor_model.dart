@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 
 class DoctorModel extends Doctor {
   DoctorModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.contacto,
@@ -20,41 +20,46 @@ class DoctorModel extends Doctor {
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
     return DoctorModel(
-      id: json['id'],
+      id: json['id'] as String?,
       nombre: json['nombre'],
       apellido: json['apellido'],
       contacto: ContactoModel.fromJson(json['contacto']),
-      birthDate: DateTime.parse(json['birthDate']),
-      govID: json['govID'],
+      birthDate: DateTime.parse(json['fecha_nacimiento']),
+      govID: json['cedula'],
       estatus: json['estatus'],
       username: json['username'],
-      passwordHash: json['passwordHash'],
-      specialty: json['specialty'],
+      passwordHash: json['password_hash'],
+      specialty: json['especialidad'],
       assistants:
           (json['assistants'] as List?)
               ?.map((e) => AsistenteModel.fromJson(e))
               .toList() ??
           [],
-      isAvailable: json['isAvailable'] ?? true,
+      isAvailable: json['esta_disponible'] ?? true,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'apellido': apellido,
       'contacto': (contacto as ContactoModel).toJson(),
-      'birthDate': birthDate.toIso8601String(),
-      'govID': govID,
+      'fecha_nacimiento': birthDate.toIso8601String(),
+      'cedula': govID,
       'estatus': estatus,
       'username': username,
-      'passwordHash': passwordHash,
-      'specialty': specialty,
-      'isAvailable': isAvailable,
+      'password_hash': passwordHash,
+      'especialidad': specialty,
+      'esta_disponible': isAvailable,
       'assistants': assistants
           .map((e) => (e as AsistenteModel).toJson())
           .toList(),
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

@@ -7,7 +7,7 @@ import 'package:salud_dental_clinic_management/features/record/data/models/recor
 
 class PacienteModel extends Paciente {
   PacienteModel({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,
@@ -44,8 +44,7 @@ class PacienteModel extends Paciente {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
       'apellido': apellido,
       'birth_date': _formatDate(birthDate),
@@ -57,13 +56,16 @@ class PacienteModel extends Paciente {
       'trabajo': trabajo,
       'referencia': referencia,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   String _formatDate(DateTime date) {
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   static ContactoModel _parseContacto(Map<String, dynamic> json) {

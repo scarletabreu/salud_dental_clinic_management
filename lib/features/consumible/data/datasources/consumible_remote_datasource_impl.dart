@@ -36,6 +36,8 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   @override
   Future<void> upsertConsumible(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('consumibles').upsert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al guardar consumible: ${e.message}');
@@ -45,6 +47,9 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   @override
   Future<void> createConsumible(Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('consumibles').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al crear nuevo consumible: ${e.message}');
@@ -54,6 +59,8 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   @override
   Future<void> updateConsumible(String id, Map<String, dynamic> data) async {
     try {
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
       await supabaseClient.from('consumibles').update(data).eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar consumible: ${e.message}');
@@ -65,7 +72,10 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
     try {
       await supabaseClient
           .from('consumibles')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar consumible: ${e.message}');

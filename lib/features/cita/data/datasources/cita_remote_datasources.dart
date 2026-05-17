@@ -43,9 +43,33 @@ class CitaRemoteDataSource {
 
   Future<void> addCita(CitaModel cita) async {
     try {
-      await supabase.from('citas').insert(cita.toCreateJson());
+      final data = cita.toJson();
+
+      if (!(_isValidUuid(data['id']))) {
+        data.remove('id');
+      }
+      data['created_at'] = DateTime.now().toIso8601String();
+      await supabase.from('citas').insert(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al agregar cita: ${e.message}');
     } catch (e) {
-      throw Exception('Error al agregar cita: $e');
+      throw Exception('Error inesperado al agregar cita: $e');
+    }
+  }
+
+  Future<void> updateCita(CitaModel cita) async {
+    if (cita.id == null) {
+      throw Exception('No se puede actualizar una cita sin un ID.');
+    }
+    try {
+      final data = cita.toJson();
+      data.remove('id');
+      data['updated_at'] = DateTime.now().toIso8601String();
+      await supabase.from('citas').update(data).eq('id', cita.id!);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar cita: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al actualizar cita: $e');
     }
   }
 
@@ -58,5 +82,9 @@ class CitaRemoteDataSource {
     } catch (e) {
       throw Exception('Error al borrar cita: $e');
     }
+  }
+
+  bool _isValidUuid(dynamic id) {
+    return id != null && id is String && id.length == 36 && id.contains('-');
   }
 }

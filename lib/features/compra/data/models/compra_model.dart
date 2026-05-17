@@ -4,7 +4,7 @@ import 'package:salud_dental_clinic_management/features/compra/domain/enums/esta
 
 class CompraModel extends Compra {
   CompraModel({
-    required super.id,
+    super.id,
     required super.fecha,
     required super.items,
     required super.estado,
@@ -12,8 +12,8 @@ class CompraModel extends Compra {
 
   factory CompraModel.fromJson(Map<String, dynamic> json) {
     return CompraModel(
-      id: json['id'],
-      fecha: DateTime.parse(json['fecha']),
+      id: json['id'] as String?,
+      fecha: DateTime.parse(json['fecha'] as String),
       items: (json['items'] as List)
           .map((e) => ConsumibleCompraModel.fromJson(e))
           .toList(),
@@ -25,11 +25,15 @@ class CompraModel extends Compra {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'fecha': fecha.toIso8601String(),
-      'items': items.map((e) => (e as ConsumibleCompraModel).toJson()).toList(),
       'estado': estado.name,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

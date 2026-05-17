@@ -1,10 +1,10 @@
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
-import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/tipo_contraindicacion.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
 
 class ContraindicacionModel extends Contraindicacion {
   ContraindicacionModel({
-    required super.id,
+    super.id,
     required super.condicionId,
     super.medicinaId,
     super.contraindicacionId,
@@ -16,7 +16,7 @@ class ContraindicacionModel extends Contraindicacion {
 
   factory ContraindicacionModel.fromJson(Map<String, dynamic> json) {
     return ContraindicacionModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       condicionId: json['condicion_id'] as String? ?? '',
       medicinaId: json['medicina_id'] as String?,
       contraindicacionId: json['contraindicacion_id'] as String?,
@@ -39,8 +39,7 @@ class ContraindicacionModel extends Contraindicacion {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'condicion_id': condicionId,
       'medicina_id': medicinaId,
       'contraindicacion_id': contraindicacionId,
@@ -49,5 +48,11 @@ class ContraindicacionModel extends Contraindicacion {
       'tipo_contraindicacion': tipoContraindicacion.key,
       'efectos_adversos': efectosAdversos.map((e) => e.name).toList(),
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

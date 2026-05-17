@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 class Consulta {
-  final String id;
+  final String? id;
   final String pacienteId;
   final String doctorId;
   final String citaId;
@@ -15,7 +15,7 @@ class Consulta {
   final String? motivoConsulta;
 
   Consulta({
-    required this.id,
+    this.id,
     required this.pacienteId,
     required this.doctorId,
     required this.citaId,

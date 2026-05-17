@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/enums/
 
 class SuperficieModel extends Superficie {
   SuperficieModel({
-    required super.id,
+    super.id,
     required super.dienteId,
     required super.tipoSuperficie,
     super.diagnosisId,
@@ -12,7 +12,7 @@ class SuperficieModel extends Superficie {
 
   factory SuperficieModel.fromJson(Map<String, dynamic> json) {
     return SuperficieModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       dienteId: json['diente_id'] ?? json['dienteId'] as String,
       tipoSuperficie: TipoSuperficie.values.firstWhere(
         (e) =>
@@ -25,13 +25,17 @@ class SuperficieModel extends Superficie {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'diente_id': dienteId,
       'tipo_superficie': tipoSuperficie.name,
       'diagnosis_id': diagnosisId,
       'tratamientos': tratamientos,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+    return data;
   }
 
   factory SuperficieModel.fromEntity(Superficie entidad) {

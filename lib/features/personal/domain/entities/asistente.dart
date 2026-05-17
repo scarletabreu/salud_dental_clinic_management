@@ -5,7 +5,7 @@ class Asistente extends Usuario {
   final String shift;
 
   Asistente({
-    required super.id,
+    super.id,
     required super.nombre,
     required super.apellido,
     required super.birthDate,

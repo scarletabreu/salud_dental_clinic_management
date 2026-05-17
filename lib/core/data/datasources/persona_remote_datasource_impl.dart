@@ -47,6 +47,8 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
   @override
   Future<void> createPersona(PersonaModel persona) async {
     String? contactoId;
+    String? personaId;
+
     try {
       final contactoResponse = await supabase
           .from('contactos')
@@ -62,7 +64,7 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
           .select('id')
           .single();
 
-      final personaId = personaResponse['id'] as String;
+      personaId = personaResponse['id'] as String;
 
       await supabase.from('persona_contacto').insert({
         'persona_id': personaId,
@@ -81,11 +83,15 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
 
   @override
   Future<void> updatePersona(PersonaModel persona) async {
+    if (persona.id == null) {
+      throw Exception('No se puede actualizar una persona sin un ID válido.');
+    }
+
     try {
-      await supabase
-          .from('personas')
-          .update(persona.toJson())
-          .eq('id', persona.id);
+      final data = persona.toJson();
+      data.remove('id');
+
+      await supabase.from('personas').update(data).eq('id', persona.id!);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar persona: ${e.message}');
     } catch (e) {

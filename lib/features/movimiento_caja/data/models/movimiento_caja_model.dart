@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/e
 
 class MovimientoCajaModel extends MovimientoCaja {
   MovimientoCajaModel({
-    required super.id,
+    super.id,
     required super.cajaDiariaId,
     required super.tipo,
     required super.monto,
@@ -14,7 +14,7 @@ class MovimientoCajaModel extends MovimientoCaja {
 
   factory MovimientoCajaModel.fromJson(Map<String, dynamic> json) {
     return MovimientoCajaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       cajaDiariaId: json['caja_diaria_id'] ?? json['cajaDiariaId'],
       tipo: TipoMovimiento.values.firstWhere(
         (e) => e.name == json['tipo'],
@@ -28,8 +28,7 @@ class MovimientoCajaModel extends MovimientoCaja {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'caja_diaria_id': cajaDiariaId,
       'tipo': tipo.name,
       'monto': monto,
@@ -37,6 +36,12 @@ class MovimientoCajaModel extends MovimientoCaja {
       'fecha': fecha.toUtc().toIso8601String(),
       'referencia_id': referenciaId,
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory MovimientoCajaModel.fromEntity(MovimientoCaja entidad) {

@@ -13,6 +13,7 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
         'user_id': userId,
         'estatus': 'activo',
         'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
       });
     } on PostgrestException catch (e) {
       throw Exception('Error al registrar doctor: ${e.message}');
@@ -75,6 +76,7 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
           .update({
             'estatus': 'inactivo',
             'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('user_id', userId);
     } on PostgrestException catch (e) {

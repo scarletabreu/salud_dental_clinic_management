@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/data/models/
 
 class ItemCuentaModel extends ItemCuenta {
   ItemCuentaModel({
-    required super.id,
+    super.id,
     required super.cuentaId,
     required super.descripcion,
     required super.precioUnitario,
@@ -13,36 +13,28 @@ class ItemCuentaModel extends ItemCuenta {
 
   factory ItemCuentaModel.fromJson(Map<String, dynamic> json) {
     return ItemCuentaModel(
-      id: json['id'] as String,
+      id: json['id'] as String?,
       cuentaId: json['cuenta_id'] ?? json['cuentaId'],
       descripcion: json['descripcion'] as String,
       precioUnitario: (json['precio_unitario'] ?? json['precioUnitario'] as num)
           .toDouble(),
       cantidad: (json['cantidad'] as num).toInt(),
-
-      tratamientosAplicados:
-          json['tratamientos_aplicados'] != null ||
-              json['tratamientosAplicados'] != null
-          ? (json['tratamientos_aplicados'] ??
-                    json['tratamientosAplicados'] as List)
-                .map(
-                  (t) => TratamientoModel.fromJson(t as Map<String, dynamic>),
-                )
-                .toList()
-          : [],
+      tratamientosAplicados: [],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'cuenta_id': cuentaId,
       'descripcion': descripcion,
       'precio_unitario': precioUnitario,
       'cantidad': cantidad,
-      'tratamientos_aplicados': tratamientosAplicados
-          .map((t) => (t as TratamientoModel).toJson())
-          .toList(),
     };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

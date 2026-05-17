@@ -5,7 +5,7 @@ import 'package:salud_dental_clinic_management/features/personal/data/models/doc
 
 class CitaModel extends Cita {
   CitaModel({
-    required super.id,
+    super.id,
     required super.doctor,
     required super.persona,
     required super.date,
@@ -15,7 +15,7 @@ class CitaModel extends Cita {
 
   factory CitaModel.fromJson(Map<String, dynamic> json) {
     return CitaModel(
-      id: json['id'] ?? '',
+      id: json['id'] as String?,
       doctor: DoctorModel.fromJson(json['doctor']),
       persona: PersonaModel.fromJson(json['persona']),
       date: DateTime.parse(json['fecha_hora']).toLocal(),
@@ -28,23 +28,18 @@ class CitaModel extends Cita {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final Map<String, dynamic> data = {
       'doctor_id': doctor.id,
       'persona_id': persona.id,
       'fecha_hora': date.toUtc().toIso8601String(),
       'es_emergencia': esEmergencia,
       'estado': estado.name,
     };
-  }
 
-  Map<String, dynamic> toCreateJson() {
-    return {
-      'persona_id': persona.id,
-      'doctor_id': doctor.id,
-      'fecha_hora': date.toUtc().toIso8601String(),
-      'es_emergencia': esEmergencia,
-      'estado': estado.name,
-    };
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 }

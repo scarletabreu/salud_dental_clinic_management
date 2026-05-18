@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
@@ -46,7 +48,10 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
-      builder: (_) => const PacientesPage(),
+      builder: (_) => BlocProvider(
+        create: (_) => sl<PacienteCubit>()..load(),
+        child: const PacientesPage(),
+      ),
     ),
     ShellDestination(
       icon: Icons.medication_outlined,

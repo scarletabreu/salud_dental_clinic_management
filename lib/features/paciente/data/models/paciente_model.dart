@@ -1,8 +1,8 @@
+import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
-import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 
 class PacienteModel extends Paciente {
@@ -23,23 +23,22 @@ class PacienteModel extends Paciente {
   });
 
   factory PacienteModel.fromJson(Map<String, dynamic> json) {
+    final persona = json['personas'] as Map<String, dynamic>? ?? {};
     return PacienteModel(
-      id: json['id'] as String?,
-      nombre: json['nombre'] as String,
-      apellido: json['apellido'] as String,
-      birthDate: DateTime.parse(json['birth_date'] as String),
-      govID: json['gov_id'] as String,
-      contacto: json['contacto'] as Contacto,
-      estatus: EstatusPersona.values.byName(json['estatus'] as String),
+      id: json['id'] as String,
+      nombre: persona['nombre'] as String,
+      apellido: persona['apellido'] as String,
+      birthDate: DateTime.parse(persona['fecha_nacimiento'] as String),
+      govID: persona['cedula'] as String,
+      contacto: _parseContacto(json),
+      estatus: EstatusPersona.values.byName(persona['estatus'] as String),
       genero: Genero.values.byName(json['genero'] as String),
       tipoPaciente: TipoPaciente.values.byName(json['tipo_paciente'] as String),
       trabajo: json['trabajo'] as String? ?? '',
       referencia: json['referencia'] as String? ?? '',
-
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),
-
       citas: const [],
     );
   }
@@ -67,6 +66,17 @@ class PacienteModel extends Paciente {
 
   String _formatDate(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  static ContactoModel _parseContacto(Map<String, dynamic> json) {
+    final raw = json['contactos'];
+    if (raw is List && raw.isNotEmpty) {
+      return ContactoModel.fromJson(raw.first as Map<String, dynamic>);
+    }
+    if (raw is Map<String, dynamic>) {
+      return ContactoModel.fromJson(raw);
+    }
+    return ContactoModel.empty();
   }
 
   factory PacienteModel.fromEntity(Paciente paciente) {

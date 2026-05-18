@@ -30,4 +30,13 @@ class ContactoModel extends Contacto {
 
     return data;
   }
+
+  factory ContactoModel.empty() {
+    return ContactoModel(
+      id: '',
+      email: '',
+      numeroTelefono: '',
+      direccion: '',
+    );
+  }
 }

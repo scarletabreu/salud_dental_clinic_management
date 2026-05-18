@@ -38,6 +38,7 @@ dependencies:
   equatable: ^2.0.8
   supabase_flutter: ^2.12.2
   get_it: ^9.2.1
+  flutter_bloc: ^9.0.0
 
 dev_dependencies:
   flutter_test:

@@ -152,7 +152,6 @@ class PacienteRemoteDatasource {
   }
 
   Future<PacienteModel> getPacienteById(String id) async {
-    // Si el id no es un UUID válido, buscar en los datos de prueba locales
     if (!_isValidUuid(id)) {
       final local = _pacientesPrueba.where((p) => p.id == id).firstOrNull;
       if (local != null) return local;

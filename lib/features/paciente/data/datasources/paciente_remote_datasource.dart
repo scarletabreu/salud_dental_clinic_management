@@ -15,7 +15,9 @@ class PacienteRemoteDatasource {
     try {
       final pacientesRes = await client
           .from('pacientes')
-          .select('*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus)')
+          .select(
+            '*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus)',
+          )
           .filter('deleted_at', 'is', null);
 
       final contactosRes = await client
@@ -146,6 +148,29 @@ class PacienteRemoteDatasource {
           .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception('Error al eliminar paciente: ${e.message}');
+    }
+  }
+
+  Future<PacienteModel> getPacienteById(String id) async {
+    if (!_isValidUuid(id)) {
+      final local = _pacientesPrueba.where((p) => p.id == id).firstOrNull;
+      if (local != null) return local;
+      throw Exception('Paciente de prueba con id "$id" no encontrado.');
+    }
+
+    try {
+      final res = await client
+          .from('pacientes')
+          .select(
+            '*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus)',
+          )
+          .eq('id', id)
+          .single();
+
+      final map = Map<String, dynamic>.from(res as Map);
+      return PacienteModel.fromJson(map);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener paciente: ${e.message}');
     }
   }
 

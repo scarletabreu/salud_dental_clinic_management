@@ -22,6 +22,19 @@ class PacienteLoaded extends PacienteState {
   List<Object?> get props => [todos, filtrados];
 }
 
+class PacienteDetailLoading extends PacienteState {
+  const PacienteDetailLoading();
+}
+
+class PacienteDetailLoaded extends PacienteState {
+  final Paciente paciente;
+
+  const PacienteDetailLoaded(this.paciente);
+
+  @override
+  List<Object?> get props => [paciente];
+}
+
 class PacienteError extends PacienteState {
   final String message;
 

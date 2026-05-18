@@ -1,10 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 
 class PacientesPage extends StatefulWidget {
@@ -37,8 +37,19 @@ class _PacientesPageState extends State<PacientesPage> {
   Future<void> _openForm({Paciente? paciente}) async {
     await Navigator.push(
       context,
+      MaterialPageRoute(builder: (_) => PacienteFormPage(paciente: paciente)),
+    );
+    if (mounted) context.read<PacienteCubit>().load();
+  }
+
+  Future<void> _openDetalle(Paciente paciente) async {
+    await Navigator.push(
+      context,
       MaterialPageRoute(
-        builder: (_) => PacienteFormPage(paciente: paciente),
+        builder: (_) => BlocProvider.value(
+          value: context.read<PacienteCubit>(),
+          child: PacienteDetailPage(pacienteId: paciente.id!),
+        ),
       ),
     );
     if (mounted) context.read<PacienteCubit>().load();
@@ -98,10 +109,7 @@ class _PacientesPageState extends State<PacientesPage> {
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Nuevo Paciente'),
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -190,8 +198,11 @@ class _PacientesPageState extends State<PacientesPage> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.people_alt_rounded,
-                    color: colorScheme.primary, size: 14),
+                Icon(
+                  Icons.people_alt_rounded,
+                  color: colorScheme.primary,
+                  size: 14,
+                ),
               ],
             ),
           ),
@@ -218,8 +229,7 @@ class _PacientesPageState extends State<PacientesPage> {
             const SizedBox(height: 8),
             Text(
               state.message,
-              style:
-                  TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -246,10 +256,9 @@ class _PacientesPageState extends State<PacientesPage> {
                     Icon(
                       Icons.people_alt_outlined,
                       size: 56,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withAlpha(100),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withAlpha(100),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -270,11 +279,11 @@ class _PacientesPageState extends State<PacientesPage> {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
                 itemCount: state.filtrados.length,
-                separatorBuilder: (context2, index2) =>
-                    const SizedBox(height: 4),
+                separatorBuilder: (_, __) => const SizedBox(height: 4),
                 itemBuilder: (_, i) => _PacienteRow(
                   paciente: state.filtrados[i],
                   onEdit: () => _openForm(paciente: state.filtrados[i]),
+                  onVerDetalle: () => _openDetalle(state.filtrados[i]),
                 ),
               ),
             ),
@@ -328,21 +337,24 @@ class _PacientesPageState extends State<PacientesPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Text(
         'Mostrando $shown de $total paciente${total == 1 ? '' : 's'}',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-
 class _PacienteRow extends StatefulWidget {
   final Paciente paciente;
   final VoidCallback onEdit;
+  final VoidCallback onVerDetalle;
 
-  const _PacienteRow({required this.paciente, required this.onEdit});
+  const _PacienteRow({
+    required this.paciente,
+    required this.onEdit,
+    required this.onVerDetalle,
+  });
 
   @override
   State<_PacienteRow> createState() => _PacienteRowState();
@@ -382,10 +394,7 @@ class _PacienteRowState extends State<_PacienteRow> {
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -393,20 +402,18 @@ class _PacienteRowState extends State<_PacienteRow> {
                     flex: 3,
                     child: Text(
                       p.fullName,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   Expanded(
                     flex: 2,
                     child: Text(
                       p.govID,
-                      style:
-                          Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -415,20 +422,18 @@ class _PacienteRowState extends State<_PacienteRow> {
                       p.contacto.numeroTelefono.isEmpty
                           ? '—'
                           : p.contacto.numeroTelefono,
-                      style:
-                          Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   Expanded(
                     flex: 1,
                     child: Text(
                       '${p.age}',
-                      style:
-                          Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -437,13 +442,10 @@ class _PacienteRowState extends State<_PacienteRow> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         _ActionIcon(
-                          icon: _expanded
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          tooltip: _expanded ? 'Ocultar' : 'Ver detalle',
+                          icon: Icons.open_in_new_outlined,
+                          tooltip: 'Ver expediente',
                           color: colorScheme.primary,
-                          onTap: () =>
-                              setState(() => _expanded = !_expanded),
+                          onTap: widget.onVerDetalle,
                         ),
                         _ActionIcon(
                           icon: Icons.edit_outlined,
@@ -483,10 +485,7 @@ class _PacienteRowState extends State<_PacienteRow> {
             spacing: 32,
             runSpacing: 12,
             children: [
-              _DetailItem(
-                label: 'Género',
-                value: _generoLabel(p.genero.name),
-              ),
+              _DetailItem(label: 'Género', value: _generoLabel(p.genero.name)),
               _DetailItem(
                 label: 'Tipo',
                 value: _capitalize(p.tipoPaciente.name),

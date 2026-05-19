@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
-import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/pages/inicio_page.dart';
@@ -36,7 +37,10 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.today_outlined,
       selectedIcon: Icons.today_rounded,
       label: 'Mis Citas del Día',
-      builder: (_) => const MisCitasDelDiaPage(),
+      builder: (_) => BlocProvider(
+        create: (_) => sl<CitaCubit>()..load(),
+        child: const MisCitasDelDiaPage(),
+      ),
     ),
     ShellDestination(
       icon: Icons.medical_information_outlined,

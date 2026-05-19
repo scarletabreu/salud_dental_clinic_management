@@ -19,9 +19,7 @@ class CitaRemoteDataSource {
           .select('*')
           .filter('deleted_at', 'is', null);
       real = await _assembleCitas(citasRes as List);
-    } catch (_) {
-      // If DB unavailable, fall through to test data only
-    }
+    } catch (_) {}
     return [...real, ..._citasPrueba];
   }
 
@@ -71,7 +69,9 @@ class CitaRemoteDataSource {
     if (personaIds.isNotEmpty) {
       final res = await supabase
           .from('pacientes')
-          .select('*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)')
+          .select(
+            '*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)',
+          )
           .inFilter('id', personaIds);
       for (final row in res as List) {
         final m = row as Map<String, dynamic>;
@@ -98,7 +98,6 @@ class CitaRemoteDataSource {
     return rawCitas.map((c) {
       final json = Map<String, dynamic>.from(c as Map);
 
-      // Build doctor sub-object
       final dp = doctorPersonas[json['doctor_id'] as String?] ?? {};
       json['doctor'] = {
         'id': json['doctor_id'],
@@ -112,17 +111,11 @@ class CitaRemoteDataSource {
         'especialidad': dp['especialidad'] ?? '',
         'esta_disponible': dp['esta_disponible'] ?? true,
         'assistants': <dynamic>[],
-        'contacto': const {
-          'email': '',
-          'numero_telefono': '',
-          'direccion': '',
-        },
+        'contacto': const {'email': '', 'numero_telefono': '', 'direccion': ''},
       };
 
-      // Build persona sub-object from paciente row (which has nested personas)
       final pac = pacientes[json['persona_id'] as String?] ?? {};
-      final personaData =
-          pac['personas'] as Map<String, dynamic>? ?? pac;
+      final personaData = pac['personas'] as Map<String, dynamic>? ?? pac;
       json['persona'] = {
         'id': pac['id'] ?? json['persona_id'],
         'nombre': personaData['nombre'] ?? '',
@@ -143,7 +136,11 @@ class CitaRemoteDataSource {
       if (!(_isValidUuid(data['id']))) {
         data.remove('id');
       }
-      data['created_at'] = DateTime.now().toIso8601String();
+
+      final now = DateTime.now().toIso8601String();
+      data['created_at'] = now;
+      data['updated_at'] = now;
+
       await supabase.from('citas').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Error al agregar cita: ${e.message}');
@@ -159,7 +156,9 @@ class CitaRemoteDataSource {
     try {
       final data = cita.toJson();
       data.remove('id');
+
       data['updated_at'] = DateTime.now().toIso8601String();
+
       await supabase.from('citas').update(data).eq('id', cita.id!);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar cita: ${e.message}');
@@ -172,7 +171,10 @@ class CitaRemoteDataSource {
     try {
       await supabase
           .from('citas')
-          .update({'deleted_at': DateTime.now().toIso8601String()})
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', id);
     } catch (e) {
       throw Exception('Error al borrar cita: $e');
@@ -181,6 +183,29 @@ class CitaRemoteDataSource {
 
   bool _isValidUuid(dynamic id) {
     return id != null && id is String && id.length == 36 && id.contains('-');
+  }
+
+  Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
+    try {
+      final Map<String, dynamic> updateData = {
+        'estado': nuevoEstado.name,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (nuevoEstado == EstadoCita.completada) {
+        updateData['fecha_fin'] = DateTime.now().toIso8601String();
+      }
+
+      await supabase.from('citas').update(updateData).eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al actualizar el estado en Supabase: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception(
+        'Error inesperado al actualizar el estado de la cita: $e',
+      );
+    }
   }
 
   // ── Test data ── remove before production ──────────────────────────────────
@@ -248,35 +273,91 @@ class CitaRemoteDataSource {
 
   static final List<CitaModel> _citasPrueba = [
     // Mayo 5
-    _cita('t01', _docFernandez, _pacAlonso,   5,  5,  9,  0, EstadoCita.atendida),
+    _cita('t01', _docFernandez, _pacAlonso, 5, 5, 9, 0, EstadoCita.completada),
     // Mayo 12
-    _cita('t02', _docRodriguez, _pacSantos,   5, 12, 10, 30, EstadoCita.atendida),
-    _cita('t03', _docLopez,     _pacMendez,   5, 12, 14,  0, EstadoCita.atendida),
+    _cita(
+      't02',
+      _docRodriguez,
+      _pacSantos,
+      5,
+      12,
+      10,
+      30,
+      EstadoCita.completada,
+    ),
+    _cita('t03', _docLopez, _pacMendez, 5, 12, 14, 0, EstadoCita.completada),
     // Mayo 13
-    _cita('t04', _docFernandez, _pacCastillo, 5, 13, 11,  0, EstadoCita.cancelada),
+    _cita(
+      't04',
+      _docFernandez,
+      _pacCastillo,
+      5,
+      13,
+      11,
+      0,
+      EstadoCita.cancelada,
+    ),
     // Mayo 18 (today)
-    _cita('t05', _docFernandez, _pacAlonso,   5, 18,  8,  0, EstadoCita.confirmada),
-    _cita('t06', _docRodriguez, _pacGarcia,   5, 18, 10,  0, EstadoCita.pendiente, urgente: true),
-    _cita('t07', _docLopez,     _pacHerrera,  5, 18, 15, 30, EstadoCita.pendiente),
+    _cita('t05', _docFernandez, _pacAlonso, 5, 18, 8, 0, EstadoCita.completada),
+    _cita(
+      't06',
+      _docRodriguez,
+      _pacGarcia,
+      5,
+      18,
+      10,
+      0,
+      EstadoCita.pendiente,
+      urgente: true,
+    ),
+    _cita('t07', _docLopez, _pacHerrera, 5, 18, 15, 30, EstadoCita.pendiente),
     // Mayo 19
-    _cita('t08', _docFernandez, _pacSantos,   5, 19,  9,  0, EstadoCita.confirmada),
-    _cita('t09', _docRodriguez, _pacMendez,   5, 19, 14,  0, EstadoCita.confirmada),
+    _cita('t08', _docFernandez, _pacSantos, 5, 19, 9, 0, EstadoCita.completada),
+    _cita(
+      't09',
+      _docRodriguez,
+      _pacMendez,
+      5,
+      19,
+      14,
+      0,
+      EstadoCita.completada,
+    ),
     // Mayo 20
-    _cita('t10', _docLopez,     _pacCastillo, 5, 20, 10, 30, EstadoCita.confirmada),
+    _cita('t10', _docLopez, _pacCastillo, 5, 20, 10, 30, EstadoCita.completada),
     // Mayo 21
-    _cita('t11', _docFernandez, _pacAlonso,   5, 21,  9,  0, EstadoCita.confirmada, urgente: true),
-    _cita('t12', _docRodriguez, _pacGarcia,   5, 21, 16,  0, EstadoCita.pendiente),
+    _cita(
+      't11',
+      _docFernandez,
+      _pacAlonso,
+      5,
+      21,
+      9,
+      0,
+      EstadoCita.completada,
+      urgente: true,
+    ),
+    _cita('t12', _docRodriguez, _pacGarcia, 5, 21, 16, 0, EstadoCita.pendiente),
     // Mayo 22
-    _cita('t13', _docLopez,     _pacHerrera,  5, 22, 11,  0, EstadoCita.cancelada),
+    _cita('t13', _docLopez, _pacHerrera, 5, 22, 11, 0, EstadoCita.cancelada),
     // Mayo 25 (4 citas → shows overflow dot)
-    _cita('t14', _docFernandez, _pacSantos,   5, 25,  8, 30, EstadoCita.pendiente),
-    _cita('t15', _docRodriguez, _pacMendez,   5, 25, 11,  0, EstadoCita.pendiente),
-    _cita('t16', _docLopez,     _pacCastillo, 5, 25, 14, 30, EstadoCita.pendiente),
-    _cita('t17', _docFernandez, _pacAlonso,   5, 25, 17,  0, EstadoCita.pendiente),
+    _cita('t14', _docFernandez, _pacSantos, 5, 25, 8, 30, EstadoCita.pendiente),
+    _cita('t15', _docRodriguez, _pacMendez, 5, 25, 11, 0, EstadoCita.pendiente),
+    _cita('t16', _docLopez, _pacCastillo, 5, 25, 14, 30, EstadoCita.pendiente),
+    _cita('t17', _docFernandez, _pacAlonso, 5, 25, 17, 0, EstadoCita.pendiente),
     // Mayo 27
-    _cita('t18', _docRodriguez, _pacGarcia,   5, 27,  9,  0, EstadoCita.pendiente),
-    _cita('t19', _docLopez,     _pacHerrera,  5, 27, 13,  0, EstadoCita.noAsistida),
+    _cita('t18', _docRodriguez, _pacGarcia, 5, 27, 9, 0, EstadoCita.pendiente),
+    _cita('t19', _docLopez, _pacHerrera, 5, 27, 13, 0, EstadoCita.completada),
     // Mayo 28
-    _cita('t20', _docFernandez, _pacSantos,   5, 28, 10,  0, EstadoCita.noAsistida),
+    _cita(
+      't20',
+      _docFernandez,
+      _pacSantos,
+      5,
+      28,
+      10,
+      0,
+      EstadoCita.completada,
+    ),
   ];
 }

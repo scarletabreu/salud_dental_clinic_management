@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'paciente_state.dart';
 
@@ -32,5 +33,31 @@ class PacienteCubit extends Cubit<PacienteState> {
     }).toList();
 
     emit(PacienteLoaded(todos: current.todos, filtrados: filtrados));
+  }
+
+  // --- MÉTODOS DE CONCILIACIÓN PARA EL FORMULARIO ---
+
+  Future<void> addPaciente(Paciente paciente) async {
+    emit(const PacienteLoading());
+    final result = await _repository.addPaciente(paciente);
+    result.fold(
+      (failure) => emit(PacienteError(failure.message)),
+      (_) {
+        emit(const PacienteOperationSuccess());
+        load();
+      },
+    );
+  }
+
+  Future<void> updatePaciente(Paciente paciente) async {
+    emit(const PacienteLoading());
+    final result = await _repository.updatePaciente(paciente);
+    result.fold(
+      (failure) => emit(PacienteError(failure.message)),
+      (_) {
+        emit(const PacienteOperationSuccess());
+        load();
+      },
+    );
   }
 }

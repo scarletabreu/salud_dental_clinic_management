@@ -30,3 +30,7 @@ class PacienteError extends PacienteState {
   @override
   List<Object?> get props => [message];
 }
+
+class PacienteOperationSuccess extends PacienteState {
+  const PacienteOperationSuccess();
+}

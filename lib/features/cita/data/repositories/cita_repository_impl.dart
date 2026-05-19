@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 
 class CitaRepositoryImpl implements CitaRepository {
@@ -47,6 +48,15 @@ class CitaRepositoryImpl implements CitaRepository {
       throw Exception(
         'Error en el repositorio al obtener citas del paciente: $e',
       );
+    }
+  }
+
+  @override
+  Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
+    try {
+      await remoteDataSource.updateCitaEstado(id, nuevoEstado);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar el estado de la cita: $e');
     }
   }
 

@@ -18,4 +18,22 @@ class Cita {
     required this.esEmergencia,
     required this.estado,
   });
+
+  Cita copyWith({
+    String? id,
+    Doctor? doctor,
+    Persona? persona,
+    DateTime? date,
+    bool? esEmergencia,
+    EstadoCita? estado,
+  }) {
+    return Cita(
+      id: id ?? this.id,
+      doctor: doctor ?? this.doctor,
+      persona: persona ?? this.persona,
+      date: date ?? this.date,
+      esEmergencia: esEmergencia ?? this.esEmergencia,
+      estado: estado ?? this.estado,
+    );
+  }
 }

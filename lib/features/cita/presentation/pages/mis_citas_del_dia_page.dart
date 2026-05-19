@@ -1,28 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import '../cubit/cita_cubit.dart';
 import '../cubit/cita_state.dart';
-import '../utils/estado_cita_color.dart';
 
 const _kMonths = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 const _kMonthsShort = [
-  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
 ];
 
 const _kWeekdays = [
-  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
 ];
 
 const _kWeekdaysShort = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-// ─── Root page ────────────────────────────────────────────────────────────────
 
 class MisCitasDelDiaPage extends StatelessWidget {
   const MisCitasDelDiaPage({super.key});
@@ -50,8 +74,6 @@ class MisCitasDelDiaPage extends StatelessWidget {
   }
 }
 
-// ─── Main loaded view ─────────────────────────────────────────────────────────
-
 class _CalendarioView extends StatelessWidget {
   final CitaLoaded state;
   const _CalendarioView({required this.state});
@@ -69,8 +91,6 @@ class _CalendarioView extends StatelessWidget {
     );
   }
 }
-
-// ─── Control bar ─────────────────────────────────────────────────────────────
 
 class _ControlBar extends StatelessWidget {
   final CitaLoaded state;
@@ -165,8 +185,6 @@ class _ControlBar extends StatelessWidget {
   }
 }
 
-// ─── Body (responsive) ────────────────────────────────────────────────────────
-
 class _CalendarioBody extends StatelessWidget {
   final CitaLoaded state;
   const _CalendarioBody({required this.state});
@@ -204,10 +222,7 @@ class _CalendarioBody extends StatelessWidget {
             children: [
               _CalendarSection(state: state),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 380,
-                child: _DetailPanel(state: state),
-              ),
+              SizedBox(height: 380, child: _DetailPanel(state: state)),
               const SizedBox(height: 16),
             ],
           ),
@@ -216,8 +231,6 @@ class _CalendarioBody extends StatelessWidget {
     );
   }
 }
-
-// ─── Calendar grid ────────────────────────────────────────────────────────────
 
 class _CalendarSection extends StatelessWidget {
   final CitaLoaded state;
@@ -298,8 +311,6 @@ class _CalendarSection extends StatelessWidget {
   }
 }
 
-// ─── Day-of-week header cell ──────────────────────────────────────────────────
-
 class _DowCell extends StatelessWidget {
   final DateTime day;
   final ColorScheme colorScheme;
@@ -331,8 +342,6 @@ class _DowCell extends StatelessWidget {
     );
   }
 }
-
-// ─── Individual day cell ──────────────────────────────────────────────────────
 
 enum _DayCellType { normal, today, selected }
 
@@ -402,19 +411,21 @@ class _DayCell extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ...events.take(3).map(
-                  (c) => Container(
-                    width: 5,
-                    height: 5,
-                    margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? colorScheme.onPrimary.withValues(alpha: 0.75)
-                          : c.estado.color,
+                ...events
+                    .take(3)
+                    .map(
+                      (c) => Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? colorScheme.onPrimary.withValues(alpha: 0.75)
+                              : c.estado.color,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
                 if (events.length > 3)
                   Padding(
                     padding: const EdgeInsets.only(left: 2),
@@ -437,8 +448,6 @@ class _DayCell extends StatelessWidget {
     );
   }
 }
-
-// ─── Detail panel ─────────────────────────────────────────────────────────────
 
 class _DetailPanel extends StatelessWidget {
   final CitaLoaded state;
@@ -487,8 +496,7 @@ class _DetailPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              if (citas.isNotEmpty)
-                _StatusLegend(colorScheme: colorScheme),
+              if (citas.isNotEmpty) _StatusLegend(colorScheme: colorScheme),
             ],
           ),
         ),
@@ -514,48 +522,85 @@ class _StatusLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mini color legend for the 5 estados
-    const entries = [
-      (Color(0xFF009688), 'Conf'),
-      (Color(0xFF2196F3), 'Pend'),
-      (Color(0xFF4CAF50), 'Aten'),
-    ];
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: entries.map((e) => Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: e.$1,
+      children: EstadoCita.values.map((e) {
+        return Padding(
+          padding: const EdgeInsets.only(left: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: e.color,
+                ),
               ),
-            ),
-            const SizedBox(width: 3),
-            Text(
-              e.$2,
-              style: TextStyle(
-                fontSize: 10,
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
+              const SizedBox(width: 4),
+              Text(
+                e.name,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
-        ),
-      )).toList(),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
 
-// ─── Appointment card ─────────────────────────────────────────────────────────
-
 class _CitaCard extends StatelessWidget {
   final Cita cita;
   const _CitaCard({required this.cita});
+
+  void _mostrarDialogoCancelacion(BuildContext context, String citaId) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('¿Cancelar Cita?'),
+            ],
+          ),
+          content: const Text(
+            'Esta acción liberará el espacio en el calendario del odontólogo. ¿Desea continuar con la cancelación?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Atrás',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
+              onPressed: () {
+                // Dispara el evento en el Cubit global de la página
+                context.read<CitaCubit>().cambiarEstadoCita(
+                  citaId,
+                  EstadoCita.cancelada,
+                );
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Confirmar Cancelación'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -569,9 +614,7 @@ class _CitaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: statusColor, width: 3),
-        ),
+        border: Border(left: BorderSide(color: statusColor, width: 3)),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.05),
@@ -686,21 +729,78 @@ class _CitaCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Status chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(100),
+            PopupMenuButton<EstadoCita>(
+              initialValue: cita.estado,
+              tooltip: 'Cambiar estado de la cita',
+              onSelected: (EstadoCita nuevoEstado) {
+                if (nuevoEstado == cita.estado) return;
+
+                if (nuevoEstado == EstadoCita.cancelada) {
+                  _mostrarDialogoCancelacion(context, cita.id!);
+                } else {
+                  context.read<CitaCubit>().cambiarEstadoCita(
+                    cita.id!,
+                    nuevoEstado,
+                  );
+                }
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                cita.estado.name,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      cita.estado.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.arrow_drop_down, size: 14, color: statusColor),
+                  ],
                 ),
               ),
+              itemBuilder: (BuildContext context) {
+                return EstadoCita.values.map((EstadoCita e) {
+                  return PopupMenuItem<EstadoCita>(
+                    value: e,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: e.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          e.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: e == cita.estado
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList();
+              },
             ),
           ],
         ),
@@ -708,8 +808,6 @@ class _CitaCard extends StatelessWidget {
     );
   }
 }
-
-// ─── Empty / error states ─────────────────────────────────────────────────────
 
 class _EmptyDay extends StatelessWidget {
   const _EmptyDay();
@@ -746,9 +844,7 @@ class _EmptyDay extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Selecciona otro día para ver citas',
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.outline,
-            ),
+            style: textTheme.bodySmall?.copyWith(color: colorScheme.outline),
           ),
         ],
       ),

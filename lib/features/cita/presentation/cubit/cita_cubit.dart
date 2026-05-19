@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'cita_state.dart';
 
@@ -23,6 +24,26 @@ class CitaCubit extends Cubit<CitaState> {
       );
     } catch (e) {
       emit(CitaError(e.toString()));
+    }
+  }
+
+  Future<void> cambiarEstadoCita(String id, EstadoCita nuevoEstado) async {
+    final current = state;
+    if (current is! CitaLoaded) return;
+
+    try {
+      await _repository.updateCitaEstado(id, nuevoEstado);
+
+      final citasActualizadas = current.citas.map((cita) {
+        if (cita.id == id) {
+          return cita.copyWith(estado: nuevoEstado);
+        }
+        return cita;
+      }).toList();
+
+      emit(current.copyWith(citas: citasActualizadas));
+    } catch (e) {
+      emit(CitaError('No se pudo actualizar el estado de la cita: $e'));
     }
   }
 

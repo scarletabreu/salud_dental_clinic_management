@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
+import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
@@ -31,7 +32,14 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.dashboard_outlined,
       selectedIcon: Icons.dashboard_rounded,
       label: 'Inicio',
-      builder: (_) => const InicioPage(),
+      builder: (_) => BlocProvider(
+        create: (_) => sl<DashboardCubit>()..load(),
+        child: InicioPage(
+          onNavigateToCitas: () => _onDestinationSelected(1),
+          onNavigateToPacientes: () => _onDestinationSelected(3),
+          onNavigateToMedicinas: () => _onDestinationSelected(4),
+        ),
+      ),
     ),
     ShellDestination(
       icon: Icons.today_outlined,

@@ -1,5 +1,5 @@
-import 'package:salud_dental_clinic_management/features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
 
 class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   final SupabaseClient supabaseClient;
@@ -28,7 +28,17 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   @override
   Future<void> createTratamiento(Map<String, dynamic> data) async {
     try {
+      // 1. Limpiamos campos que Supabase autogenera o que pertenecen a relaciones
       data.remove('id');
+      data.remove(
+        'contraindicaciones',
+      ); // Evita que explote si va la lista vacía de la UI
+
+      // 2. Forzamos que la propiedad costo use el valor numérico correcto
+      // Si en tu toJson() guardaste la propiedad como 'precio_base', la recuperamos aquí:
+      if (data.containsKey('precio_base') && !data.containsKey('costo')) {
+        data['costo'] = data.remove('precio_base');
+      }
 
       final now = DateTime.now().toIso8601String();
       data['created_at'] = now;
@@ -46,6 +56,11 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   Future<void> updateTratamiento(String id, Map<String, dynamic> data) async {
     try {
       data.remove('id');
+      data.remove('contraindicaciones');
+
+      if (data.containsKey('precio_base') && !data.containsKey('costo')) {
+        data['costo'] = data.remove('precio_base');
+      }
 
       data['updated_at'] = DateTime.now().toIso8601String();
 

@@ -32,10 +32,13 @@ class TratamientoRepositoryImpl implements TratamientoRepository {
 
       final Map<String, dynamic> data = model.toJson();
 
-      data['deleted_at'] = null;
-      data['updated_at'] = DateTime.now().toIso8601String();
-
-      await remoteDataSource.upsertTratamiento(data);
+      if (tratamiento.id == null || tratamiento.id!.isEmpty) {
+        data['deleted_at'] = null;
+        await remoteDataSource.createTratamiento(data);
+      } else {
+        data['updated_at'] = DateTime.now().toIso8601String();
+        await remoteDataSource.updateTratamiento(tratamiento.id!, data);
+      }
     } catch (e) {
       throw Exception('Error en el repositorio al guardar tratamiento: $e');
     }

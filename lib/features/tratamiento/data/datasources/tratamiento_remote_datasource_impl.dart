@@ -28,14 +28,9 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   @override
   Future<void> createTratamiento(Map<String, dynamic> data) async {
     try {
-      // 1. Limpiamos campos que Supabase autogenera o que pertenecen a relaciones
       data.remove('id');
-      data.remove(
-        'contraindicaciones',
-      ); // Evita que explote si va la lista vacía de la UI
+      data.remove('contraindicaciones');
 
-      // 2. Forzamos que la propiedad costo use el valor numérico correcto
-      // Si en tu toJson() guardaste la propiedad como 'precio_base', la recuperamos aquí:
       if (data.containsKey('precio_base') && !data.containsKey('costo')) {
         data['costo'] = data.remove('precio_base');
       }

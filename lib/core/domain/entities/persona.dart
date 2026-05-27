@@ -7,7 +7,7 @@ class Persona {
   final String apellido;
   final DateTime birthDate;
   final String govID;
-  final Contacto contacto;
+  final List<Contacto> contactos;
   final EstatusPersona estatus;
 
   Persona({
@@ -16,7 +16,7 @@ class Persona {
     required this.apellido,
     required this.birthDate,
     required this.govID,
-    required this.contacto,
+    required this.contactos,
     required this.estatus,
   });
 

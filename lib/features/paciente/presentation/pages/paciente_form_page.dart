@@ -413,7 +413,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<Genero>(
-            value: _genero,
+            initialValue: _genero,
             decoration: InputDecoration(
               labelText: 'Género',
               prefixIcon: const Icon(Icons.wc_outlined, size: 20),
@@ -486,7 +486,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       child: Column(
         children: [
           DropdownButtonFormField<TipoPaciente>(
-            value: _tipoPaciente,
+            initialValue: _tipoPaciente,
             decoration: InputDecoration(
               labelText: 'Tipo de Paciente',
               prefixIcon: const Icon(Icons.category_outlined, size: 20),

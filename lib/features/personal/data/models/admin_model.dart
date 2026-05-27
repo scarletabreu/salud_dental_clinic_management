@@ -6,7 +6,7 @@ class AdminModel extends Admin {
     super.id,
     required super.nombre,
     required super.apellido,
-    required super.contacto,
+    required super.contactos,
     required super.birthDate,
     required super.govID,
     required super.estatus,
@@ -20,7 +20,7 @@ class AdminModel extends Admin {
       id: json['id'] as String?,
       nombre: json['nombre'],
       apellido: json['apellido'],
-      contacto: ContactoModel.fromJson(json['contacto']),
+      contactos: _parseContactos(json),
       birthDate: DateTime.parse(json['fecha_nacimiento']),
       govID: json['cedula'],
       estatus: json['estatus'],
@@ -30,16 +30,28 @@ class AdminModel extends Admin {
     );
   }
 
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
+    final raw = json['contactos'];
+
+    // Caso 1: Si viene como una Lista (lo ideal)
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>() // Filtra y asegura que cada item sea un Map
+          .map((item) => ContactoModel.fromJson(item))
+          .toList();
+    }
+
+    // Caso 2: Por si acaso el backend viejo o un fallback envía un solo objeto Map
+    if (raw is Map<String, dynamic>) {
+      return [ContactoModel.fromJson(raw)];
+    }
+
+    // Caso 3: Si es nulo o no es un formato válido, devolvemos una lista vacía
+    return [];
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'nombre': nombre,
-      'apellido': apellido,
-      'contacto': (contacto as ContactoModel).toJson(),
-      'fecha_nacimiento': birthDate.toIso8601String(),
-      'cedula': govID,
-      'estatus': estatus,
-      'username': username,
-      'password_hash': passwordHash,
       'departamento': departamento,
     };
 

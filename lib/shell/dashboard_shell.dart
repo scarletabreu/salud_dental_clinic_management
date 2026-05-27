@@ -14,14 +14,26 @@ import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 
-class DashboardShell extends StatefulWidget {
+class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
   @override
-  State<DashboardShell> createState() => _DashboardShellState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<PacienteCubit>()..load(),
+      child: const _DashboardShellView(),
+    );
+  }
 }
 
-class _DashboardShellState extends State<DashboardShell> {
+class _DashboardShellView extends StatefulWidget {
+  const _DashboardShellView();
+
+  @override
+  State<_DashboardShellView> createState() => _DashboardShellViewState();
+}
+
+class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
   DoctorAvailability _availability = DoctorAvailability.disponible;
 
@@ -48,10 +60,7 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<PacienteCubit>()..load(),
-        child: const PacientesPage(),
-      ),
+      builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
       icon: Icons.medication_outlined,

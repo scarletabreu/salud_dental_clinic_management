@@ -17,6 +17,15 @@ class PersonaRepositoryImpl implements PersonaRepository {
     }
   }
 
+    @override
+  Future<List<Persona>> searchPersonas(String query) async {
+    try {
+      return await remoteDataSource.searchPersonas(query);
+    } catch (e) {
+      throw Exception('Error en el repositorio al buscar personas: $e');
+    }
+  }
+
   @override
   Future<Persona> getPersonaById(String id) async {
     try {
@@ -62,7 +71,7 @@ class PersonaRepositoryImpl implements PersonaRepository {
       apellido: persona.apellido,
       birthDate: persona.birthDate,
       govID: persona.govID,
-      contacto: persona.contacto,
+      contactos: persona.contactos,
       estatus: persona.estatus,
     );
   }

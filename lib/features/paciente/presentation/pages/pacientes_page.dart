@@ -34,15 +34,21 @@ class _PacientesPageState extends State<PacientesPage> {
     });
   }
 
-  Future<void> _openForm({Paciente? paciente}) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PacienteFormPage(paciente: paciente),
+Future<void> _openForm({Paciente? paciente}) async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BlocProvider.value(
+        value: context.read<PacienteCubit>(),
+        child: PacienteFormPage(paciente: paciente),
       ),
-    );
-    if (mounted) context.read<PacienteCubit>().load();
+    ),
+  );
+
+  if (mounted) {
+    context.read<PacienteCubit>().load();
   }
+}
 
   @override
   Widget build(BuildContext context) {

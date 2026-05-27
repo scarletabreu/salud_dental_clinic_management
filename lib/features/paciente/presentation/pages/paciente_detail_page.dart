@@ -22,18 +22,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     context.read<PacienteCubit>().loadById(widget.pacienteId);
   }
 
-  String _calcularEdadExacta(DateTime fechaNacimiento) {
-    final ahora = DateTime.now();
-    int anos = ahora.year - fechaNacimiento.year;
-    int meses = ahora.month - fechaNacimiento.month;
-    if (ahora.day < fechaNacimiento.day) meses--;
-    if (meses < 0) {
-      anos--;
-      meses += 12;
-    }
-    return '$anos años, $meses meses';
-  }
-
   String _generoLabel(String name) {
     switch (name) {
       case 'masculino':

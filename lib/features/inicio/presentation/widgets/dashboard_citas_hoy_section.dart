@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
 class DashboardCitasHoySection extends StatelessWidget {
   final List<Cita> citas;
+  final void Function(String citaId, EstadoCita nuevoEstado)? onCambiarEstado;
 
-  const DashboardCitasHoySection({super.key, required this.citas});
+  const DashboardCitasHoySection({
+    super.key,
+    required this.citas,
+    this.onCambiarEstado,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -28,22 +30,16 @@ class DashboardCitasHoySection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header de la sección
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Citas de Hoy',
-                  style: textTheme.titleSmall?.copyWith(
+                  style: TextStyle(
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
+                    color: Color(0xFF111827),
                   ),
                 ),
                 const Spacer(),
@@ -53,14 +49,15 @@ class DashboardCitasHoySection extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
-                    '${citas.length}',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w700,
+                    '${citas.length} total',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6B7280),
                     ),
                   ),
                 ),
@@ -68,41 +65,43 @@ class DashboardCitasHoySection extends StatelessWidget {
             ),
           ),
 
-          Divider(height: 1, color: colorScheme.outlineVariant),
+          const Divider(height: 1, color: Color(0xFFF3F4F6)),
 
           if (citas.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.event_available_rounded,
-                    color: colorScheme.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Sin citas programadas para hoy',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_available_rounded,
+                      size: 32,
+                      color: Color(0xFFD1D5DB),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 8),
+                    Text(
+                      'Sin citas programadas para hoy',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
           else
-            // Column en lugar de ListView.separated(shrinkWrap) — evita conflictos
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (int i = 0; i < citas.length; i++) ...[
-                  _CitaRow(cita: citas[i]),
+                  _CitaRow(cita: citas[i], onCambiarEstado: onCambiarEstado),
                   if (i < citas.length - 1)
-                    Divider(
+                    const Divider(
                       height: 1,
-                      color: colorScheme.outlineVariant,
-                      indent: 20,
+                      color: Color(0xFFF9FAFB),
+                      indent: 76,
                       endIndent: 20,
                     ),
                 ],
@@ -116,102 +115,200 @@ class DashboardCitasHoySection extends StatelessWidget {
 
 class _CitaRow extends StatelessWidget {
   final Cita cita;
+  final void Function(String citaId, EstadoCita nuevoEstado)? onCambiarEstado;
 
-  const _CitaRow({required this.cita});
+  const _CitaRow({required this.cita, this.onCambiarEstado});
+
+  String? _waitLabel() {
+    if (cita.estado != EstadoCita.enEspera) return null;
+    final diff = DateTime.now().difference(cita.date);
+    if (diff.isNegative) return null;
+    final mins = diff.inMinutes;
+    if (mins == 0) return 'Acaba de llegar';
+    if (mins < 60) return '$mins min esperando';
+    return '${diff.inHours}h ${mins % 60}min';
+  }
+
+  Color _waitColor() {
+    final mins = DateTime.now().difference(cita.date).inMinutes;
+    if (mins >= 30) return const Color(0xFFDC2626);
+    if (mins >= 15) return const Color(0xFFD97706);
+    return const Color(0xFF059669);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final h = cita.date.hour.toString().padLeft(2, '0');
     final m = cita.date.minute.toString().padLeft(2, '0');
+    final waitLabel = _waitLabel();
+    final canChange = onCambiarEstado != null && cita.id != null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
+          // Time column — fixed width, right-aligned
+          SizedBox(
             width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.person_outline_rounded,
-              size: 20,
-              color: colorScheme.onSecondaryContainer,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cita.persona.fullName,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      size: 12,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$h:$m',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (cita.esEmergencia) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Emergencia',
-                          style: textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onErrorContainer,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: cita.estado.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
             child: Text(
-              cita.estado.label,
-              style: textTheme.labelSmall?.copyWith(
-                color: cita.estado.color,
-                fontWeight: FontWeight.w600,
+              '$h:$m',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF9CA3AF),
               ),
             ),
           ),
+          const SizedBox(width: 12),
+          // Estado dot
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: cita.estado.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Name + secondary info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cita.persona.fullName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (cita.esEmergencia)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: const Text(
+                          'Emergencia',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (waitLabel != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    waitLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: _waitColor(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Status pill — tappable popup when changes available
+          if (canChange)
+            PopupMenuButton<EstadoCita>(
+              onSelected: (nuevoEstado) =>
+                  onCambiarEstado!(cita.id!, nuevoEstado),
+              itemBuilder: (context) => EstadoCita.values
+                  .where((e) => e != cita.estado)
+                  .map(
+                    (e) => PopupMenuItem<EstadoCita>(
+                      value: e,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: e.color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            e.label,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              tooltip: 'Cambiar estado',
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _StatusPill(
+                estado: cita.estado,
+                showArrow: true,
+              ),
+            )
+          else
+            _StatusPill(estado: cita.estado, showArrow: false),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final EstadoCita estado;
+  final bool showArrow;
+
+  const _StatusPill({required this.estado, required this.showArrow});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: estado.color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            estado.label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: estado.color,
+            ),
+          ),
+          if (showArrow) ...[
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 13,
+              color: estado.color,
+            ),
+          ],
         ],
       ),
     );

@@ -22,6 +22,12 @@ class Record {
     required this.historialFamiliar,
   });
 
+  String get bloodType => tipoSangre.name.toUpperCase();
+  String get conditions => condiciones;
+  String get history => historialFamiliar;
+  int get childrenCount => cantHijos;
+  List<String> get surgeries => cirugiasPrevias;
+
   Record copyWith({
     String? id,
     String? pacienteId,

@@ -17,6 +17,15 @@ class PacienteCubit extends Cubit<PacienteState> {
     );
   }
 
+  Future<void> loadById(String id) async {
+    emit(const PacienteDetailLoading());
+    final result = await _repository.getPacienteById(id);
+    result.fold(
+      (failure) => emit(PacienteError(failure.message)),
+      (paciente) => emit(PacienteDetailLoaded(paciente)),
+    );
+  }
+
   void search(String query) {
     final current = state;
     if (current is! PacienteLoaded) return;

@@ -1,4 +1,8 @@
 import 'package:get_it/get_it.dart';
+import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
+import 'package:salud_dental_clinic_management/features/cita/data/repositories/cita_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/datasources/paciente_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/repositories/paciente_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
@@ -220,5 +224,15 @@ Future<void> init() async {
   );
   sl.registerFactory<PacienteCubit>(
     () => PacienteCubit(sl()),
+  );
+
+  sl.registerLazySingleton<CitaRemoteDataSource>(
+    () => CitaRemoteDataSource(sl()),
+  );
+  sl.registerLazySingleton<CitaRepository>(
+    () => CitaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<CitaCubit>(
+    () => CitaCubit(sl()),
   );
 }

@@ -38,6 +38,8 @@ class DashboardCubit extends Cubit<DashboardState> {
           .toList()
         ..sort((a, b) => a.date.compareTo(b.date));
 
+      final citasPendientes =
+          citasDeHoy.where((c) => c.estado == EstadoCita.pendiente).length;
       final citasEnEspera =
           citasDeHoy.where((c) => c.estado == EstadoCita.enEspera).length;
       final citasCompletadas =
@@ -46,16 +48,55 @@ class DashboardCubit extends Cubit<DashboardState> {
       final totalPacientes =
           pacientesResult.fold((_) => 0, (list) => list.length);
 
+      // Pull doctor name from today's citas, falling back to any cita
+      final sourceCita =
+          citasDeHoy.isNotEmpty ? citasDeHoy.first : citas.isNotEmpty ? citas.first : null;
+      final nombreDoctor =
+          sourceCita != null ? 'Dr. ${sourceCita.doctor.apellido}' : null;
+
       emit(DashboardLoaded(
         citasHoy: citasDeHoy.length,
+        citasPendientes: citasPendientes,
         citasEnEspera: citasEnEspera,
         citasCompletadas: citasCompletadas,
         totalPacientes: totalPacientes,
         totalMedicinas: medicinas.length,
         citasDeHoy: citasDeHoy,
+        nombreDoctor: nombreDoctor,
       ));
     } catch (e) {
       emit(DashboardError(e.toString()));
+    }
+  }
+
+  Future<void> updateEstado(String citaId, EstadoCita nuevoEstado) async {
+    final current = state;
+    if (current is! DashboardLoaded) return;
+
+    // Optimistic update so UI responds immediately
+    final updatedCitas = current.citasDeHoy.map((c) {
+      return c.id == citaId ? c.copyWith(estado: nuevoEstado) : c;
+    }).toList();
+
+    final pendientes =
+        updatedCitas.where((c) => c.estado == EstadoCita.pendiente).length;
+    final enEspera =
+        updatedCitas.where((c) => c.estado == EstadoCita.enEspera).length;
+    final completadas =
+        updatedCitas.where((c) => c.estado == EstadoCita.completada).length;
+
+    emit(current.copyWith(
+      citasDeHoy: updatedCitas,
+      citasPendientes: pendientes,
+      citasEnEspera: enEspera,
+      citasCompletadas: completadas,
+    ));
+
+    try {
+      await _citaRepository.updateCitaEstado(citaId, nuevoEstado);
+    } catch (_) {
+      // Revert to server state on failure
+      await load();
     }
   }
 }

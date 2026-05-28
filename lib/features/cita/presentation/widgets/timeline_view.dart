@@ -606,7 +606,7 @@ class _CitaBlock extends StatelessWidget {
       onTap: () => _showStatusMenu(context),
       child: Container(
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
           boxShadow: const [kCardShadow],
         ),

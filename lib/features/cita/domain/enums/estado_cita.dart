@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
 
 enum EstadoCita {
   pendiente,
@@ -9,13 +10,13 @@ enum EstadoCita {
   Color get color {
     switch (this) {
       case EstadoCita.pendiente:
-        return Colors.blue.shade600;
+        return kIndigo;
       case EstadoCita.enEspera:
-        return Colors.amber.shade700;
+        return kAmber;
       case EstadoCita.completada:
-        return Colors.green.shade600;
+        return kGreen;
       case EstadoCita.cancelada:
-        return Colors.red.shade600;
+        return kRed;
     }
   }
 

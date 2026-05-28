@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import '../cubit/cita_cubit.dart';
 import '../cubit/cita_state.dart';
+import '../widgets/timeline_view.dart';
+
+const _kAccentCalendar = Color(0xFF0066FF);
 
 const _kMonths = [
   'Enero',
@@ -53,24 +57,30 @@ class MisCitasDelDiaPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: colorScheme.surfaceContainerLowest,
+    return const ColoredBox(
+      color: kBgPage,
       child: BlocBuilder<CitaCubit, CitaState>(
-        builder: (context, state) {
-          if (state is CitaLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is CitaError) {
-            return _ErrorView(message: state.message);
-          }
-          if (state is CitaLoaded) {
-            return _CalendarioView(state: state);
-          }
-          return const SizedBox.shrink();
-        },
+        builder: _buildState,
       ),
     );
+  }
+
+  static Widget _buildState(BuildContext context, CitaState state) {
+    if (state is CitaLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: kTeal,
+          strokeWidth: 2,
+        ),
+      );
+    }
+    if (state is CitaError) {
+      return _ErrorView(message: state.message);
+    }
+    if (state is CitaLoaded) {
+      return _CalendarioView(state: state);
+    }
+    return const SizedBox.shrink();
   }
 }
 
@@ -80,12 +90,11 @@ class _CalendarioView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ControlBar(state: state),
-        Divider(height: 1, color: colorScheme.outlineVariant),
+        const Divider(height: 1, color: kDivider),
         Expanded(child: _CalendarioBody(state: state)),
       ],
     );
@@ -99,11 +108,9 @@ class _ControlBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<CitaCubit>();
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      color: colorScheme.surface,
+      color: kCardBg,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
@@ -129,16 +136,29 @@ class _ControlBar extends StatelessWidget {
             onSelectionChanged: (s) => cubit.changeViewMode(s.first),
             style: ButtonStyle(
               visualDensity: VisualDensity.compact,
-              textStyle: WidgetStatePropertyAll(textTheme.labelSmall),
+              textStyle: const WidgetStatePropertyAll(
+                TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) return Colors.white;
+                return kTextMuted;
+              }),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return _kAccentCalendar;
+                }
+                return Colors.transparent;
+              }),
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
               _currentLabel(),
-              style: textTheme.titleMedium?.copyWith(
+              style: const TextStyle(
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
+                color: kTextPrimary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -148,17 +168,19 @@ class _ControlBar extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
             tooltip: 'Anterior',
             visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              foregroundColor: colorScheme.onSurfaceVariant,
-            ),
+            style: IconButton.styleFrom(foregroundColor: kTextMuted),
           ),
           OutlinedButton(
             onPressed: cubit.goToToday,
             style: OutlinedButton.styleFrom(
               visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              side: BorderSide(color: colorScheme.outlineVariant),
-              foregroundColor: colorScheme.primary,
+              side: const BorderSide(color: kDivider),
+              foregroundColor: _kAccentCalendar,
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             child: const Text('Hoy'),
           ),
@@ -167,9 +189,7 @@ class _ControlBar extends StatelessWidget {
             icon: const Icon(Icons.chevron_right),
             tooltip: 'Siguiente',
             visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              foregroundColor: colorScheme.onSurfaceVariant,
-            ),
+            style: IconButton.styleFrom(foregroundColor: kTextMuted),
           ),
         ],
       ),
@@ -181,7 +201,19 @@ class _ControlBar extends StatelessWidget {
       final d = state.selectedDay;
       return '${_kWeekdays[d.weekday - 1]}, ${d.day} de ${_kMonths[d.month - 1]} ${d.year}';
     }
+    if (state.viewMode == CalendarioViewMode.semanal) {
+      final weekStart = _weekStartFor(state.focusedDay);
+      final weekEnd = weekStart.add(const Duration(days: 6));
+      if (weekStart.month == weekEnd.month) {
+        return '${weekStart.day} – ${weekEnd.day} de ${_kMonths[weekStart.month - 1]} ${weekStart.year}';
+      }
+      return '${weekStart.day} ${_kMonthsShort[weekStart.month - 1]} – ${weekEnd.day} ${_kMonthsShort[weekEnd.month - 1]} ${weekStart.year}';
+    }
     return '${_kMonths[state.focusedDay.month - 1]} ${state.focusedDay.year}';
+  }
+
+  static DateTime _weekStartFor(DateTime day) {
+    return day.subtract(Duration(days: day.weekday - 1));
   }
 }
 
@@ -189,11 +221,31 @@ class _CalendarioBody extends StatelessWidget {
   final CitaLoaded state;
   const _CalendarioBody({required this.state});
 
+  static DateTime _weekStartFor(DateTime day) {
+    return day.subtract(Duration(days: day.weekday - 1));
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ── Vista Día: timeline de 1 columna ──────────────────────
     if (state.viewMode == CalendarioViewMode.diaria) {
-      return _DetailPanel(state: state);
+      final dayCitas = state.citasForDay(state.selectedDay);
+      return DayTimelineView(citas: dayCitas, day: state.selectedDay);
     }
+
+    // ── Vista Semana: timeline de 7 columnas ──────────────────
+    if (state.viewMode == CalendarioViewMode.semanal) {
+      final weekStart = _weekStartFor(state.focusedDay);
+      final weekEnd = weekStart.add(const Duration(days: 6));
+      final weekCitas = state.citas.where((c) {
+        final d = c.date;
+        return !d.isBefore(DateTime(weekStart.year, weekStart.month, weekStart.day)) &&
+            !d.isAfter(DateTime(weekEnd.year, weekEnd.month, weekEnd.day, 23, 59, 59));
+      }).toList();
+      return WeekTimelineView(citas: weekCitas, weekStart: weekStart);
+    }
+
+    // ── Vista Mes: mes-grid + panel lateral ───────────────────
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 600;
@@ -208,10 +260,7 @@ class _CalendarioBody extends StatelessWidget {
                   child: _CalendarSection(state: state, fillHeight: true),
                 ),
               ),
-              VerticalDivider(
-                width: 1,
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
+              const VerticalDivider(width: 1, color: kDivider),
               Expanded(flex: 45, child: _DetailPanel(state: state)),
             ],
           );
@@ -240,20 +289,13 @@ class _CalendarSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<CitaCubit>();
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: fillHeight ? double.infinity : null,
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: const [kCardShadow],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -276,32 +318,28 @@ class _CalendarSection extends StatelessWidget {
           onFormatChanged: (_) {},
           onPageChanged: cubit.onPageChanged,
           calendarBuilders: CalendarBuilders<Cita>(
-            dowBuilder: (ctx, day) =>
-                _DowCell(day: day, colorScheme: colorScheme),
+            dowBuilder: (ctx, day) => _DowCell(day: day),
             defaultBuilder: (ctx, day, _) => _DayCell(
               day: day,
               events: state.citasForDay(day),
               type: _DayCellType.normal,
-              colorScheme: colorScheme,
             ),
             selectedBuilder: (ctx, day, _) => _DayCell(
               day: day,
               events: state.citasForDay(day),
               type: _DayCellType.selected,
-              colorScheme: colorScheme,
             ),
             todayBuilder: (ctx, day, _) => _DayCell(
               day: day,
               events: state.citasForDay(day),
               type: _DayCellType.today,
-              colorScheme: colorScheme,
             ),
             outsideBuilder: (ctx, day, _) => const SizedBox.shrink(),
             markerBuilder: (ctx, day, events) => const SizedBox.shrink(),
           ),
-          calendarStyle: CalendarStyle(
+          calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
-            cellMargin: const EdgeInsets.all(3),
+            cellMargin: EdgeInsets.all(3),
           ),
           daysOfWeekHeight: 40,
           rowHeight: 64,
@@ -313,8 +351,7 @@ class _CalendarSection extends StatelessWidget {
 
 class _DowCell extends StatelessWidget {
   final DateTime day;
-  final ColorScheme colorScheme;
-  const _DowCell({required this.day, required this.colorScheme});
+  const _DowCell({required this.day});
 
   @override
   Widget build(BuildContext context) {
@@ -322,10 +359,10 @@ class _DowCell extends StatelessWidget {
     final isWeekend = day.weekday >= 6;
     return Container(
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+      decoration: const BoxDecoration(
+        color: kBgPage,
         border: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
+          bottom: BorderSide(color: kDivider, width: 1),
         ),
       ),
       child: Text(
@@ -334,9 +371,7 @@ class _DowCell extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: isWeekend
-              ? colorScheme.error.withValues(alpha: 0.75)
-              : colorScheme.onSurfaceVariant,
+          color: isWeekend ? kRed.withValues(alpha: 0.7) : kTextMuted,
         ),
       ),
     );
@@ -349,13 +384,11 @@ class _DayCell extends StatelessWidget {
   final DateTime day;
   final List<Cita> events;
   final _DayCellType type;
-  final ColorScheme colorScheme;
 
   const _DayCell({
     required this.day,
     required this.events,
     required this.type,
-    required this.colorScheme,
   });
 
   @override
@@ -365,55 +398,53 @@ class _DayCell extends StatelessWidget {
     final hasEvents = events.isNotEmpty;
     final isWeekend = day.weekday >= 6;
 
-    final Color? cellBg;
+    final Color cellBg;
     final Color dayColor;
     final FontWeight dayWeight;
 
     if (isSelected) {
-      cellBg = colorScheme.primary;
-      dayColor = colorScheme.onPrimary;
+      cellBg = _kAccentCalendar;
+      dayColor = Colors.white;
       dayWeight = FontWeight.w700;
     } else if (isToday) {
-      cellBg = colorScheme.primaryContainer;
-      dayColor = colorScheme.onPrimaryContainer;
+      cellBg = _kAccentCalendar.withValues(alpha: 0.12);
+      dayColor = _kAccentCalendar;
       dayWeight = FontWeight.w700;
-    } else if (hasEvents) {
-      cellBg = colorScheme.primaryContainer.withValues(alpha: 0.22);
-      dayColor = isWeekend ? colorScheme.error : colorScheme.onSurface;
-      dayWeight = FontWeight.w600;
     } else {
-      cellBg = null;
-      dayColor = isWeekend
-          ? colorScheme.error.withValues(alpha: 0.75)
-          : colorScheme.onSurface;
-      dayWeight = FontWeight.w400;
+      cellBg = Colors.transparent;
+      dayColor = isWeekend ? kRed.withValues(alpha: 0.7) : kTextSecondary;
+      dayWeight = hasEvents ? FontWeight.w600 : FontWeight.w400;
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cellBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${day.day}',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: dayWeight,
-              color: dayColor,
-              height: 1.1,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: cellBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${day.day}',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: dayWeight,
+                color: dayColor,
+                height: 1,
+              ),
             ),
           ),
           if (hasEvents) ...[
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ...events
-                    .take(3)
-                    .map(
+                ...events.take(3).map(
                       (c) => Container(
                         width: 5,
                         height: 5,
@@ -421,7 +452,7 @@ class _DayCell extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
-                              ? colorScheme.onPrimary.withValues(alpha: 0.75)
+                              ? Colors.white.withValues(alpha: 0.75)
                               : c.estado.color,
                         ),
                       ),
@@ -435,8 +466,8 @@ class _DayCell extends StatelessWidget {
                         fontSize: 8,
                         height: 1,
                         color: isSelected
-                            ? colorScheme.onPrimary.withValues(alpha: 0.65)
-                            : colorScheme.onSurfaceVariant,
+                            ? Colors.white.withValues(alpha: 0.65)
+                            : kTextDisabled,
                       ),
                     ),
                   ),
@@ -455,8 +486,6 @@ class _DetailPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final citas = state.citasForDay(state.selectedDay);
     final d = state.selectedDay;
     final dateLabel =
@@ -466,7 +495,7 @@ class _DetailPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          color: colorScheme.surface,
+          color: kCardBg,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
           child: Row(
             children: [
@@ -476,9 +505,10 @@ class _DetailPanel extends StatelessWidget {
                   children: [
                     Text(
                       dateLabel,
-                      style: textTheme.titleSmall?.copyWith(
+                      style: const TextStyle(
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
+                        color: kTextPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -486,21 +516,20 @@ class _DetailPanel extends StatelessWidget {
                       citas.isEmpty
                           ? 'Sin citas programadas'
                           : '${citas.length} cita${citas.length == 1 ? '' : 's'} agendada${citas.length == 1 ? '' : 's'}',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: citas.isEmpty
-                            ? colorScheme.onSurfaceVariant
-                            : colorScheme.primary,
+                      style: TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
+                        color: citas.isEmpty ? kTextMuted : _kAccentCalendar,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (citas.isNotEmpty) _StatusLegend(colorScheme: colorScheme),
+              if (citas.isNotEmpty) const _StatusLegend(),
             ],
           ),
         ),
-        Divider(height: 1, color: colorScheme.outlineVariant),
+        const Divider(height: 1, color: kDivider),
         Expanded(
           child: citas.isEmpty
               ? const _EmptyDay()
@@ -517,8 +546,7 @@ class _DetailPanel extends StatelessWidget {
 }
 
 class _StatusLegend extends StatelessWidget {
-  final ColorScheme colorScheme;
-  const _StatusLegend({required this.colorScheme});
+  const _StatusLegend();
 
   @override
   Widget build(BuildContext context) {
@@ -535,15 +563,15 @@ class _StatusLegend extends StatelessWidget {
                 height: 6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: e.color,
+                  color: e.color.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(width: 4),
               Text(
-                e.name,
-                style: TextStyle(
+                e.label,
+                style: const TextStyle(
                   fontSize: 10,
-                  color: colorScheme.onSurfaceVariant,
+                  color: kTextMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -560,38 +588,55 @@ class _CitaCard extends StatelessWidget {
   const _CitaCard({required this.cita});
 
   void _mostrarDialogoCancelacion(BuildContext context, String citaId) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              Icon(Icons.warning_amber_rounded, color: kRed),
               SizedBox(width: 8),
-              Text('¿Cancelar Cita?'),
+              Text(
+                '¿Cancelar Cita?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary,
+                ),
+              ),
             ],
           ),
           content: const Text(
             'Esta acción liberará el espacio en el calendario del odontólogo. ¿Desea continuar con la cancelación?',
+            style: TextStyle(fontSize: 13, color: kTextSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
+              child: const Text(
                 'Atrás',
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
+                style: TextStyle(color: kTextMuted),
               ),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
+              style: FilledButton.styleFrom(
+                backgroundColor: kRed,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               onPressed: () {
-                // Dispara el evento en el Cubit global de la página
                 context.read<CitaCubit>().cambiarEstadoCita(
-                  citaId,
-                  EstadoCita.cancelada,
-                );
+                      citaId,
+                      EstadoCita.cancelada,
+                    );
                 Navigator.pop(dialogContext);
               },
               child: const Text('Confirmar Cancelación'),
@@ -604,56 +649,49 @@ class _CitaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final statusColor = cita.estado.color;
     final hour = cita.date.hour.toString().padLeft(2, '0');
     final min = cita.date.minute.toString().padLeft(2, '0');
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: statusColor, width: 3)),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: const [kCardShadow],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Time badge
             Container(
-              width: 48,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              width: 52,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: statusColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     hour,
-                    style: textTheme.titleSmall?.copyWith(
+                    style: TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: statusColor,
                       height: 1,
                     ),
                   ),
+                  const SizedBox(height: 1),
                   Text(
                     min,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: statusColor.withValues(alpha: 0.7),
-                      height: 1.2,
+                      color: statusColor.withValues(alpha: 0.65),
+                      height: 1.1,
                     ),
                   ),
                 ],
@@ -670,9 +708,10 @@ class _CitaCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           cita.persona.fullName,
-                          style: textTheme.bodyMedium?.copyWith(
+                          style: const TextStyle(
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
+                            color: kTextPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -684,7 +723,7 @@ class _CitaCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.12),
+                            color: kRed.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Row(
@@ -693,14 +732,14 @@ class _CitaCard extends StatelessWidget {
                               Icon(
                                 Icons.priority_high_rounded,
                                 size: 10,
-                                color: Colors.red.shade700,
+                                color: kRed,
                               ),
-                              Text(
+                              const Text(
                                 'Urgente',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.red.shade700,
+                                  color: kRed,
                                 ),
                               ),
                             ],
@@ -711,16 +750,17 @@ class _CitaCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.person_outline_rounded,
                         size: 12,
-                        color: colorScheme.onSurfaceVariant,
+                        color: kTextMuted,
                       ),
                       const SizedBox(width: 3),
                       Text(
                         'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: kTextMuted,
                         ),
                       ),
                     ],
@@ -729,38 +769,38 @@ class _CitaCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // Status pill + dropdown
             PopupMenuButton<EstadoCita>(
               initialValue: cita.estado,
               tooltip: 'Cambiar estado de la cita',
               onSelected: (EstadoCita nuevoEstado) {
                 if (nuevoEstado == cita.estado) return;
-
                 if (nuevoEstado == EstadoCita.cancelada) {
                   _mostrarDialogoCancelacion(context, cita.id!);
                 } else {
                   context.read<CitaCubit>().cambiarEstadoCita(
-                    cita.id!,
-                    nuevoEstado,
-                  );
+                        cita.id!,
+                        nuevoEstado,
+                      );
                 }
               },
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 4,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
+                  color: statusColor.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      cita.estado.name,
+                      cita.estado.label,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -774,13 +814,14 @@ class _CitaCard extends StatelessWidget {
               ),
               itemBuilder: (BuildContext context) {
                 return EstadoCita.values.map((EstadoCita e) {
+                  final isActive = e == cita.estado;
                   return PopupMenuItem<EstadoCita>(
                     value: e,
                     child: Row(
                       children: [
                         Container(
-                          width: 10,
-                          height: 10,
+                          width: 8,
+                          height: 8,
                           decoration: BoxDecoration(
                             color: e.color,
                             shape: BoxShape.circle,
@@ -788,12 +829,13 @@ class _CitaCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          e.name,
+                          e.label,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: e == cita.estado
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            fontWeight: isActive
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: isActive ? e.color : kTextSecondary,
                           ),
                         ),
                       ],
@@ -814,37 +856,39 @@ class _EmptyDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 72,
-            height: 72,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLow,
+              color: kChipBg,
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.event_available_outlined,
-              size: 36,
-              color: colorScheme.outlineVariant,
+              size: 28,
+              color: kTextDisabled,
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 14),
+          const Text(
             'Sin citas este día',
-            style: textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            style: TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.w600,
+              color: kTextSecondary,
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Selecciona otro día para ver citas',
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+            style: TextStyle(
+              fontSize: 12,
+              color: kTextMuted,
+            ),
           ),
         ],
       ),
@@ -858,8 +902,6 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final cubit = context.read<CitaCubit>();
     return Center(
       child: Padding(
@@ -867,24 +909,26 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.error_outline_rounded,
               size: 48,
-              color: colorScheme.error,
+              color: kRed,
             ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               'Error al cargar citas',
-              style: textTheme.titleMedium?.copyWith(
+              style: TextStyle(
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
+                color: kTextPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               message,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+              style: const TextStyle(
+                fontSize: 13,
+                color: kTextMuted,
               ),
               textAlign: TextAlign.center,
               maxLines: 3,
@@ -892,6 +936,16 @@ class _ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: kTeal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               onPressed: cubit.load,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Reintentar'),

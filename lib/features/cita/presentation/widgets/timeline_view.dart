@@ -387,7 +387,7 @@ class _PositionedCitaBlock extends StatelessWidget {
 
   double _blockHeight() {
     final h = cita.duracionMinutos / 60 * _kHourHeight;
-    return h.clamp(24.0, double.infinity);
+    return h.clamp(26.0, double.infinity);
   }
 
   @override
@@ -395,7 +395,6 @@ class _PositionedCitaBlock extends StatelessWidget {
     final top = _topOffset();
     final height = _blockHeight();
     final color = cita.estado.color;
-    final isShort = height < 40;
 
     return Positioned(
       top: top + 1,
@@ -405,7 +404,7 @@ class _PositionedCitaBlock extends StatelessWidget {
       child: _CitaBlock(
         cita: cita,
         color: color,
-        isShort: isShort,
+        height: height - 2,
       ),
     );
   }
@@ -414,12 +413,12 @@ class _PositionedCitaBlock extends StatelessWidget {
 class _CitaBlock extends StatelessWidget {
   final Cita cita;
   final Color color;
-  final bool isShort;
+  final double height;
 
   const _CitaBlock({
     required this.cita,
     required this.color,
-    required this.isShort,
+    required this.height,
   });
 
   void _showStatusMenu(BuildContext context) {
@@ -532,6 +531,77 @@ class _CitaBlock extends StatelessWidget {
     final endM = cita.fechaFin.minute.toString().padLeft(2, '0');
     final timeRange = '$startH:$startM – $endH:$endM';
 
+    // 3 niveles según altura disponible para evitar overflow:
+    //  compact (< 44): solo nombre
+    //  medium  (44–55): nombre + hora
+    //  full    (>= 56): nombre + doctor + hora anclada abajo
+    final isCompact = height < 44;
+    final isFull = height >= 56;
+
+    final nombreRow = Row(
+      children: [
+        Expanded(
+          child: Text(
+            cita.persona.fullName,
+            style: TextStyle(
+              fontSize: isCompact ? 10 : 11,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+              height: 1.1,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (cita.esEmergencia)
+          const Icon(Icons.priority_high_rounded, size: 10, color: kRed),
+      ],
+    );
+
+    final horaText = Text(
+      timeRange,
+      style: TextStyle(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        color: color,
+        height: 1,
+      ),
+      overflow: TextOverflow.ellipsis,
+    );
+
+    final Widget content;
+    if (isCompact) {
+      content = nombreRow;
+    } else if (!isFull) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          nombreRow,
+          const SizedBox(height: 2),
+          horaText,
+        ],
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          nombreRow,
+          const SizedBox(height: 3),
+          Text(
+            'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
+            style: const TextStyle(
+              fontSize: 10,
+              color: kTextMuted,
+              height: 1.1,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          horaText,
+        ],
+      );
+    }
+
     return GestureDetector(
       onTap: () => _showStatusMenu(context),
       child: Container(
@@ -548,77 +618,8 @@ class _CitaBlock extends StatelessWidget {
             Container(height: 3, color: color),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(8, isShort ? 3 : 6, 6, 4),
-                child: isShort
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              cita.persona.fullName,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: kTextPrimary,
-                                height: 1,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (cita.esEmergencia)
-                            const Icon(
-                              Icons.priority_high_rounded,
-                              size: 10,
-                              color: kRed,
-                            ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  cita.persona.fullName,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: kTextPrimary,
-                                    height: 1.1,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (cita.esEmergencia)
-                                const Icon(
-                                  Icons.priority_high_rounded,
-                                  size: 10,
-                                  color: kRed,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: kTextMuted,
-                              height: 1.1,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const Spacer(),
-                          Text(
-                            timeRange,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: color,
-                              height: 1,
-                            ),
-                          ),
-                        ],
-                      ),
+                padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
+                child: content,
               ),
             ),
           ],

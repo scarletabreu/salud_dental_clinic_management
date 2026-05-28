@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/cita/data/datasources/ci
 import 'package:salud_dental_clinic_management/features/cita/data/repositories/cita_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/datasources/paciente_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/repositories/paciente_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
@@ -234,5 +235,13 @@ Future<void> init() async {
   );
   sl.registerFactory<CitaCubit>(
     () => CitaCubit(sl()),
+  );
+
+  sl.registerFactory<DashboardCubit>(
+    () => DashboardCubit(
+      citaRepository: sl(),
+      pacienteRepository: sl(),
+      medicinaRepository: sl(),
+    ),
   );
 }

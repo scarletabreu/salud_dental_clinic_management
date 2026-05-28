@@ -7,6 +7,7 @@ class Cita {
   final Doctor doctor;
   final Persona persona;
   final DateTime date;
+  final int duracionMinutos;
   final bool esEmergencia;
   final EstadoCita estado;
 
@@ -15,15 +16,19 @@ class Cita {
     required this.doctor,
     required this.persona,
     required this.date,
+    this.duracionMinutos = 30,
     required this.esEmergencia,
     required this.estado,
   });
+
+  DateTime get fechaFin => date.add(Duration(minutes: duracionMinutos));
 
   Cita copyWith({
     String? id,
     Doctor? doctor,
     Persona? persona,
     DateTime? date,
+    int? duracionMinutos,
     bool? esEmergencia,
     EstadoCita? estado,
   }) {
@@ -32,6 +37,7 @@ class Cita {
       doctor: doctor ?? this.doctor,
       persona: persona ?? this.persona,
       date: date ?? this.date,
+      duracionMinutos: duracionMinutos ?? this.duracionMinutos,
       esEmergencia: esEmergencia ?? this.esEmergencia,
       estado: estado ?? this.estado,
     );

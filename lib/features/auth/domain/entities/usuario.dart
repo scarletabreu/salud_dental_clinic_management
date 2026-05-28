@@ -10,7 +10,7 @@ class Usuario extends Persona {
     required super.apellido,
     required super.birthDate,
     required super.govID,
-    required super.contacto,
+    required super.contactos,
     required super.estatus,
     required this.username,
     required this.passwordHash,

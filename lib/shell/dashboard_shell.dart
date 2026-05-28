@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/bloc/cita_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -16,14 +17,26 @@ import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 
-class DashboardShell extends StatefulWidget {
+class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
   @override
-  State<DashboardShell> createState() => _DashboardShellState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<PacienteCubit>()..load(),
+      child: const _DashboardShellView(),
+    );
+  }
 }
 
-class _DashboardShellState extends State<DashboardShell> {
+class _DashboardShellView extends StatefulWidget {
+  const _DashboardShellView();
+
+  @override
+  State<_DashboardShellView> createState() => _DashboardShellViewState();
+}
+
+class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
   DoctorAvailability _availability = DoctorAvailability.disponible;
 
@@ -45,6 +58,7 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.today_outlined,
       selectedIcon: Icons.today_rounded,
       label: 'Mis Citas del Día',
+      // ✅ Correcto: solo proveer el cubit y renderizar la página
       builder: (_) => BlocProvider(
         create: (_) => sl<CitaCubit>()..load(),
         child: const MisCitasDelDiaPage(),
@@ -60,10 +74,7 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<PacienteCubit>()..load(),
-        child: const PacientesPage(),
-      ),
+      builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
       icon: Icons.medication_outlined,

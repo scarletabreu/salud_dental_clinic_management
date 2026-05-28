@@ -10,4 +10,6 @@ abstract class PersonaRepository {
   Future<void> updatePersona(Persona persona);
 
   Future<void> deletePersona(String id);
+
+  Future<List<Persona>> searchPersonas(String query);
 }

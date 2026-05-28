@@ -35,6 +35,15 @@ class DoctorRepositoryImpl implements DoctorRepository {
     }
   }
 
+    @override
+  Future<List<Doctor>> getDoctores() async {
+    try {
+      return await remoteDataSource.fetchActiveDoctores();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener doctores: $e');
+    }
+  }
+
   @override
   Future<Doctor?> getDoctorByUserId(String userId) async {
     try {

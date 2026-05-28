@@ -41,6 +41,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    
+
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
@@ -355,9 +357,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 child: _InfoItem(
                   icon: Icons.phone_outlined,
                   label: 'Teléfono',
-                  value: p.contacto.numeroTelefono.isEmpty
+                  value: p.contactos.firstOrNull!.numeroTelefono.isEmpty //TODO
                       ? '—'
-                      : p.contacto.numeroTelefono,
+                      : p.contactos.firstOrNull!.numeroTelefono, //TODO
                 ),
               ),
               const SizedBox(width: 12),
@@ -365,17 +367,17 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 child: _InfoItem(
                   icon: Icons.email_outlined,
                   label: 'Correo Electrónico',
-                  value: p.contacto.email.isEmpty ? '—' : p.contacto.email,
+                  value: p.contactos.firstOrNull!.email.isEmpty ? '—' : p.contactos.firstOrNull!.email, //TODO
                 ),
               ),
             ],
           ),
-          if (p.contacto.direccion.isNotEmpty) ...[
+          if (p.contactos.firstOrNull!.direccion.isNotEmpty) ...[ //TODO
             const SizedBox(height: 12),
             _InfoItem(
               icon: Icons.location_on_outlined,
               label: 'Dirección Residencia',
-              value: p.contacto.direccion,
+              value: p.contactos.firstOrNull!.direccion, //TODO
               fullWidth: true,
             ),
           ],

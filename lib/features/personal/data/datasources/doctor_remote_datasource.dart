@@ -1,4 +1,7 @@
+import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
+
 abstract class DoctorRemoteDatasource {
+  Future<List<DoctorModel>> fetchActiveDoctores();
   Future<void> createDoctor(String userId);
   Future<List<String>> fetchDoctorUserIds();
   Future<bool> isDoctor(String userId);

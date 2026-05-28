@@ -27,6 +27,31 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
     }
   }
 
+    @override
+  Future<List<PersonaModel>> searchPersonas(String query) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      // Busca por nombre O apellido usando ilike (case-insensitive).
+      // Supabase no soporta OR entre columnas distintas con un solo .ilike(),
+      // así que usamos el filtro `or` explícito.
+      final response = await supabase
+          .from('personas')
+          .select('*, persona_contacto(*, contactos(*))')
+          .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
+          .eq('estatus', 'activo')
+          .filter('deleted_at', 'is', null)
+          .limit(10);
+ 
+      return (response as List)
+          .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw Exception('Error al buscar personas: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al buscar personas: $e');
+    }
+  }
+
   @override
   Future<PersonaModel> fetchPersonaById(String id) async {
     try {
@@ -52,7 +77,7 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
     try {
       final contactoResponse = await supabase
           .from('contactos')
-          .insert((persona.contacto as ContactoModel).toJson())
+          .insert((persona.contactos as ContactoModel).toJson())
           .select('id')
           .single();
 

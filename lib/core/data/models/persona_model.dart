@@ -9,7 +9,7 @@ class PersonaModel extends Persona {
     required super.apellido,
     required super.birthDate,
     required super.govID,
-    required super.contacto,
+    required super.contactos,
     required super.estatus,
   });
 
@@ -26,14 +26,9 @@ class PersonaModel extends Persona {
       apellido: json['apellido'],
       birthDate: DateTime.parse(json['fecha_nacimiento']),
       govID: json['cedula'],
-      contacto: contactoData != null
-          ? ContactoModel.fromJson(contactoData)
-          : ContactoModel(
-              id: null,
-              email: '',
-              numeroTelefono: '',
-              direccion: '',
-            ),
+      contactos: contactoData != null
+          ? (contactoData as List).map((i) => ContactoModel.fromJson(i)).toList()
+          : [],
       estatus: EstatusPersona.values.firstWhere(
         (e) => e.name == json['estatus'],
         orElse: () => EstatusPersona.activo,

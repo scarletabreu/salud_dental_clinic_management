@@ -1,4 +1,8 @@
 import 'package:get_it/get_it.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
+import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/repositories/cita_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -25,6 +29,10 @@ import 'package:salud_dental_clinic_management/features/orden_medica/data/dataso
 import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/repositories/pago_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/repositories/doctor_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/record/data/datasources/record_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/superficie/data/datasources/superficie_remote_datasource_impl.dart';
@@ -222,6 +230,18 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<IPacienteRepository>(
     () => PacienteRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<DoctorRemoteDatasource>(
+    () => DoctorRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<DoctorRepository>(
+    () => DoctorRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<PersonaRemoteDataSource>(
+    () => PersonaRemoteDataSourceImpl(sl()),
+  );
+  sl.registerLazySingleton<PersonaRepository>(
+    () => PersonaRepositoryImpl(sl()),
   );
   sl.registerFactory<PacienteCubit>(
     () => PacienteCubit(sl()),

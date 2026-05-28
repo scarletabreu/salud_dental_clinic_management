@@ -8,7 +8,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/
 const _kHourStart = 8;
 const _kHourEnd = 20;
 const _kHourHeight = 64.0;
-const _kHeaderHeight = 48.0;
+const _kHeaderHeight = 60.0;
 const _kTimeAxisWidth = 52.0;
 const _kAccentCalendar = Color(0xFF0066FF);
 
@@ -60,48 +60,59 @@ class _TimelineScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columnWidth = days.length == 1
-            ? (constraints.maxWidth - _kTimeAxisWidth)
-            : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [kCardShadow],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final columnWidth = days.length == 1
+                ? (constraints.maxWidth - _kTimeAxisWidth)
+                : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
 
-        return Column(
-          children: [
-            _DayHeaders(days: days, columnWidth: columnWidth),
-            const Divider(height: 1, color: kDivider),
-            Expanded(
-              child: SingleChildScrollView(
-                child: SizedBox(
-                  height: (_kHourEnd - _kHourStart) * _kHourHeight,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HourAxis(),
-                      ...days.map((day) {
-                        final dayCitas = citas
-                            .where(
-                              (c) =>
-                                  c.date.year == day.year &&
-                                  c.date.month == day.month &&
-                                  c.date.day == day.day,
-                            )
-                            .toList();
-                        return _DayColumn(
-                          day: day,
-                          citas: dayCitas,
-                          width: columnWidth,
-                          isLast: day == days.last,
-                        );
-                      }),
-                    ],
+            return Column(
+              children: [
+                _DayHeaders(days: days, columnWidth: columnWidth),
+                const Divider(height: 1, color: kDivider),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SizedBox(
+                      height: (_kHourEnd - _kHourStart) * _kHourHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _HourAxis(),
+                          ...days.map((day) {
+                            final dayCitas = citas
+                                .where(
+                                  (c) =>
+                                      c.date.year == day.year &&
+                                      c.date.month == day.month &&
+                                      c.date.day == day.day,
+                                )
+                                .toList();
+                            return _DayColumn(
+                              day: day,
+                              citas: dayCitas,
+                              width: columnWidth,
+                              isLast: day == days.last,
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        );
-      },
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -140,8 +151,8 @@ class _DayHeaders extends StatelessWidget {
                     _kDayLabels[day.weekday - 1],
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                       color: isToday
                           ? _kAccentCalendar
                           : isWeekend
@@ -149,13 +160,13 @@ class _DayHeaders extends StatelessWidget {
                               : kTextMuted,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Container(
-                    width: 30,
-                    height: 30,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: isToday ? _kAccentCalendar : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -163,9 +174,11 @@ class _DayHeaders extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isToday ? Colors.white : isWeekend
-                            ? kRed.withValues(alpha: 0.7)
-                            : kTextPrimary,
+                        color: isToday
+                            ? Colors.white
+                            : isWeekend
+                                ? kRed.withValues(alpha: 0.7)
+                                : kTextPrimary,
                         height: 1,
                       ),
                     ),
@@ -265,16 +278,16 @@ class _DayColumn extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Líneas de hora
+          // Líneas de hora en punto
           ...List.generate(_kHourEnd - _kHourStart, (i) {
             return Positioned(
               top: i * _kHourHeight,
               left: 0,
               right: 0,
-              child: const Divider(height: 1, color: kRowDivider),
+              child: const Divider(height: 1, color: kDivider),
             );
           }),
-          // Línea media hora (más sutil)
+          // Líneas de media hora (ultra-sutil)
           ...List.generate(_kHourEnd - _kHourStart, (i) {
             return Positioned(
               top: i * _kHourHeight + _kHourHeight / 2,
@@ -523,78 +536,93 @@ class _CitaBlock extends StatelessWidget {
       onTap: () => _showStatusMenu(context),
       child: Container(
         decoration: BoxDecoration(
-          color: color.withAlpha(20),
-          borderRadius: BorderRadius.circular(6),
-          border: Border(
-            top: BorderSide(color: color, width: 2.5),
-          ),
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [kCardShadow],
         ),
         clipBehavior: Clip.antiAlias,
-        padding: EdgeInsets.fromLTRB(6, isShort ? 3 : 5, 4, 3),
-        child: isShort
-            ? Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      cita.persona.fullName,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                        height: 1,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          cita.persona.fullName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: color,
-                            height: 1,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Barra superior de color semántico
+            Container(height: 3, color: color),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(8, isShort ? 3 : 6, 6, 4),
+                child: isShort
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cita.persona.fullName,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: kTextPrimary,
+                                height: 1,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          if (cita.esEmergencia)
+                            const Icon(
+                              Icons.priority_high_rounded,
+                              size: 10,
+                              color: kRed,
+                            ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  cita.persona.fullName,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: kTextPrimary,
+                                    height: 1.1,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (cita.esEmergencia)
+                                const Icon(
+                                  Icons.priority_high_rounded,
+                                  size: 10,
+                                  color: kRed,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: kTextMuted,
+                              height: 1.1,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Spacer(),
+                          Text(
+                            timeRange,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                              height: 1,
+                            ),
+                          ),
+                        ],
                       ),
-                      if (cita.esEmergencia)
-                        Icon(
-                          Icons.priority_high_rounded,
-                          size: 10,
-                          color: kRed,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: kTextMuted,
-                      height: 1,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Text(
-                    timeRange,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: color.withValues(alpha: 0.75),
-                      height: 1,
-                    ),
-                  ),
-                ],
               ),
+            ),
+          ],
+        ),
       ),
     );
   }

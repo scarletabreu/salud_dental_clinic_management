@@ -10,4 +10,16 @@ class Contacto {
     required this.numeroTelefono,
     required this.direccion,
   });
+
+  Contacto copyWith({
+    String? telefono,
+    String? email,
+    String? direccion,
+  }) {
+    return Contacto(
+      numeroTelefono: telefono ?? this.numeroTelefono,
+      email: email ?? this.email,
+      direccion: direccion ?? this.direccion
+    );
+  }
 }

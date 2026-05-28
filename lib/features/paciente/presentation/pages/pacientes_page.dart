@@ -34,13 +34,23 @@ class _PacientesPageState extends State<PacientesPage> {
     });
   }
 
-  Future<void> _openForm({Paciente? paciente}) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => PacienteFormPage(paciente: paciente)),
-    );
-    if (mounted) context.read<PacienteCubit>().load();
+Future<void> _openForm({Paciente? paciente}) async {
+  final pacienteCubit = context.read<PacienteCubit>();
+
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BlocProvider.value(
+        value: pacienteCubit,
+        child: PacienteFormPage(paciente: paciente),
+      ),
+    ),
+  );
+
+  if (mounted) {
+    pacienteCubit.load();
   }
+}
 
   Future<void> _openDetalle(Paciente paciente) async {
     await Navigator.push(

@@ -156,14 +156,19 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             children: [
               OutlinedButton.icon(
                 onPressed: () {
+                  final pacienteCubit = context.read<PacienteCubit>();
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => PacienteFormPage(paciente: p),
+                      builder: (_) => BlocProvider.value(
+                        value: pacienteCubit,
+                        child: PacienteFormPage(paciente: p),
+                      ),
                     ),
                   ).then((_) {
                     if (!mounted) return;
-                    context.read<PacienteCubit>().loadById(p.id!);
+                    pacienteCubit.loadById(p.id!);
                   });
                 },
                 icon: const Icon(Icons.edit_outlined, size: 16),

@@ -7,19 +7,10 @@ import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
-import 'package:salud_dental_clinic_management/features/cita/presentation/bloc/cita_bloc.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Punto de entrada:
-//
-//   await NuevaCitaDialog.show(
-//     context,
-//     personaRepository: ...,
-//     doctorRepository: ...,
-//   );
-// ─────────────────────────────────────────────────────────────────────────────
 
 class NuevaCitaDialog extends StatefulWidget {
   final PersonaRepository personaRepository;
@@ -39,7 +30,7 @@ class NuevaCitaDialog extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       builder: (_) => BlocProvider.value(
-        value: context.read<CitaBloc>(),
+        value: context.read<CitaCubit>(),
         child: NuevaCitaDialog._(
           personaRepository: personaRepository,
           doctorRepository: doctorRepository,
@@ -57,20 +48,17 @@ enum _Step { buscarPersona, formularioCita }
 class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
   _Step _step = _Step.buscarPersona;
 
-  // ── Búsqueda de persona ───────────────────────────────────────────────────
   final _searchController = TextEditingController();
   List<Persona> _resultados = [];
   bool _buscando = false;
   Persona? _personaSeleccionada;
 
-  // ── Nueva persona ─────────────────────────────────────────────────────────
   final _formKeyPersona = GlobalKey<FormState>();
   final _nombreCtrl = TextEditingController();
   final _apellidoCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   bool _esNuevaPersona = false;
 
-  // ── Formulario de cita ────────────────────────────────────────────────────
   final _formKeyCita = GlobalKey<FormState>();
   List<Doctor> _doctores = [];
   bool _cargandoDoctores = false;
@@ -91,7 +79,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     super.dispose();
   }
 
-  // ─── Búsqueda ─────────────────────────────────────────────────────────────
   Future<void> _buscar(String q) async {
     if (q.trim().length < 2) {
       setState(() => _resultados = []);
@@ -140,7 +127,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     }
   }
 
-  // ─── Confirmación ─────────────────────────────────────────────────────────
   Future<void> _confirmar() async {
     if (_esNuevaPersona && !(_formKeyPersona.currentState?.validate() ?? false)) return;
     if (!(_formKeyCita.currentState?.validate() ?? false)) return;
@@ -174,7 +160,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
       try {
         final nueva = _buildNuevaPersona();
         await widget.personaRepository.createPersona(nueva);
-        // Recupera la persona recién creada para obtener su ID de Supabase.
         final resultados = await widget.personaRepository.searchPersonas(
           '${_nombreCtrl.text.trim()} ${_apellidoCtrl.text.trim()}',
         );
@@ -202,24 +187,22 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
 
     if (!mounted) return;
     setState(() => _guardando = true);
-    context.read<CitaBloc>().add(CreateCitaEvent(cita));
+
+    // ✅ Bug 2 corregido: llamada correcta al método del cubit
+    context.read<CitaCubit>().createCita(cita);
   }
 
-  /// Construye una [Persona] mínima con los datos del formulario.
-  /// [contactos] es una lista; se crea un único contacto principal
-  /// con el teléfono capturado.
   Persona _buildNuevaPersona() {
     return Persona(
       nombre: _nombreCtrl.text.trim(),
       apellido: _apellidoCtrl.text.trim(),
-      birthDate: DateTime(2000), // placeholder — agrega campo si lo necesitas
+      birthDate: DateTime(2000),
       govID: '',
       contactos: _buildContactos(),
       estatus: EstatusPersona.activo,
     );
   }
 
-  /// Devuelve la lista de contactos para la nueva persona.
   List<Contacto> _buildContactos() {
     return [
       ContactoModel(
@@ -241,18 +224,18 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return BlocListener<CitaBloc, CitaState>(
+    // ✅ Bug 1 corregido: return agregado
+    return BlocListener<CitaCubit, CitaCubitState>(
       listener: (ctx, state) {
-        if (state is CitaCreated) {
+        if (state is CitaCubitLoaded) {
           setState(() => _guardando = false);
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Cita agendada correctamente.')),
           );
-        } else if (state is CitaError) {
+        } else if (state is CitaCubitError) {
           setState(() => _guardando = false);
           _showError(state.message);
         }
@@ -280,7 +263,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     );
   }
 
-  // ─── Header ───────────────────────────────────────────────────────────────
   Widget _buildDialogHeader(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final titulo = _step == _Step.buscarPersona
@@ -352,7 +334,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     );
   }
 
-  // ─── Paso 1: Búsqueda de persona ──────────────────────────────────────────
   Widget _buildBuscarPersona(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
@@ -385,13 +366,11 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                         },
                       )
                     : null,
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
           onChanged: _buscar,
         ),
         const SizedBox(height: 12),
-
         if (_resultados.isNotEmpty) ...[
           Text('Resultados',
               style: Theme.of(context)
@@ -411,18 +390,15 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
           ),
           const SizedBox(height: 16),
         ],
-
         OutlinedButton.icon(
           onPressed: _usarNuevaPersona,
           icon: const Icon(Icons.person_add_outlined, size: 18),
           label: const Text('No está registrado — Registrar nuevo'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(44),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
-
         if (_esNuevaPersona) ...[
           const SizedBox(height: 20),
           _buildNuevaPersonaForm(context),
@@ -465,8 +441,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
                       labelText: 'Nombre *',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       isDense: true,
                     ),
                     validator: (v) =>
@@ -480,8 +455,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
                       labelText: 'Apellido *',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       isDense: true,
                     ),
                     validator: (v) =>
@@ -497,8 +471,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
               decoration: InputDecoration(
                 labelText: 'Teléfono',
                 prefixIcon: const Icon(Icons.phone_outlined, size: 18),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 isDense: true,
               ),
             ),
@@ -516,7 +489,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     );
   }
 
-  // ─── Paso 2: Formulario de cita ───────────────────────────────────────────
   Widget _buildFormularioCita(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
@@ -526,9 +498,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
-
-          _SectionLabel(
-              icon: Icons.medical_services_outlined, label: 'Odontólogo'),
+          _SectionLabel(icon: Icons.medical_services_outlined, label: 'Odontólogo'),
           const SizedBox(height: 8),
           _cargandoDoctores
               ? const Center(child: CircularProgressIndicator())
@@ -536,8 +506,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                   value: _doctorSeleccionado,
                   decoration: InputDecoration(
                     hintText: 'Seleccionar odontólogo',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   items: _doctores
                       .map((d) => DropdownMenuItem(
@@ -546,23 +515,17 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                           ))
                       .toList(),
                   onChanged: (v) => setState(() => _doctorSeleccionado = v),
-                  validator: (v) =>
-                      v == null ? 'Selecciona un odontólogo' : null,
+                  validator: (v) => v == null ? 'Selecciona un odontólogo' : null,
                 ),
-
           const SizedBox(height: 20),
-
-          _SectionLabel(
-              icon: Icons.schedule_outlined, label: 'Fecha y Hora *'),
+          _SectionLabel(icon: Icons.schedule_outlined, label: 'Fecha y Hora *'),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: _DateTimeButton(
                   icon: Icons.calendar_today_outlined,
-                  label: _fecha == null
-                      ? 'Seleccionar fecha'
-                      : _formatDate(_fecha!),
+                  label: _fecha == null ? 'Seleccionar fecha' : _formatDate(_fecha!),
                   hasValue: _fecha != null,
                   onTap: _pickFecha,
                 ),
@@ -571,9 +534,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
               Expanded(
                 child: _DateTimeButton(
                   icon: Icons.access_time_outlined,
-                  label: _hora == null
-                      ? 'Seleccionar hora'
-                      : _hora!.format(context),
+                  label: _hora == null ? 'Seleccionar hora' : _hora!.format(context),
                   hasValue: _hora != null,
                   onTap: _pickHora,
                 ),
@@ -584,16 +545,10 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
             Padding(
               padding: const EdgeInsets.only(top: 6, left: 12),
               child: Text('Selecciona fecha y hora.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.error)),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error)),
             ),
-
           const SizedBox(height: 20),
-
-          _SectionLabel(
-              icon: Icons.notes_outlined, label: 'Motivo de la consulta'),
+          _SectionLabel(icon: Icons.notes_outlined, label: 'Motivo de la consulta'),
           const SizedBox(height: 8),
           TextFormField(
             controller: _motivoCtrl,
@@ -601,13 +556,10 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'Describe brevemente el motivo de la visita...',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-
           const SizedBox(height: 16),
-
           Container(
             decoration: BoxDecoration(
               color: _esEmergencia
@@ -615,9 +567,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                   : cs.surfaceContainerLow,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _esEmergencia
-                    ? cs.error.withAlpha(120)
-                    : cs.outlineVariant,
+                color: _esEmergencia ? cs.error.withAlpha(120) : cs.outlineVariant,
               ),
             ),
             child: SwitchListTile(
@@ -629,19 +579,15 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
               dense: true,
             ),
           ),
-
           const SizedBox(height: 28),
-
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed:
-                      _guardando ? null : () => Navigator.of(context).pop(),
+                  onPressed: _guardando ? null : () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text('Cancelar'),
                 ),
@@ -655,15 +601,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.check_rounded, size: 18),
                   label: const Text('Confirmar Cita'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -674,7 +618,6 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog> {
     );
   }
 
-  // ─── Pickers ──────────────────────────────────────────────────────────────
   Future<void> _pickFecha() async {
     final hoy = DateTime.now();
     final picked = await showDatePicker(
@@ -801,8 +744,7 @@ class _DateTimeButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon,
-          size: 16, color: hasValue ? cs.primary : cs.onSurfaceVariant),
+      icon: Icon(icon, size: 16, color: hasValue ? cs.primary : cs.onSurfaceVariant),
       label: Text(
         label,
         style: TextStyle(
@@ -814,8 +756,7 @@ class _DateTimeButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         side: BorderSide(color: hasValue ? cs.primary : cs.outlineVariant),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         alignment: Alignment.centerLeft,
       ),
     );

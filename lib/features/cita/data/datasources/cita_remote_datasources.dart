@@ -210,7 +210,7 @@ class CitaRemoteDataSource {
 
   // ── Test data ── remove before production ──────────────────────────────────
 
-  static final _empty = ContactoModel.empty();
+  static final _empty = [ContactoModel.empty()];
 
   static Doctor _doc(
     String id,
@@ -223,7 +223,7 @@ class CitaRemoteDataSource {
     apellido: apellido,
     birthDate: DateTime(1980, 1, 1),
     govID: '001-0000000-0',
-    contacto: _empty,
+    contactos: _empty,
     estatus: EstatusPersona.activo,
     username: '',
     passwordHash: '',
@@ -237,7 +237,7 @@ class CitaRemoteDataSource {
     apellido: apellido,
     birthDate: DateTime(1990, 1, 1),
     govID: '001-0000000-0',
-    contacto: _empty,
+    contactos: _empty,
     estatus: EstatusPersona.activo,
   );
 

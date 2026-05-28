@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/bloc/cita_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
@@ -49,6 +50,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       icon: Icons.today_outlined,
       selectedIcon: Icons.today_rounded,
       label: 'Mis Citas del Día',
+      // ✅ Correcto: solo proveer el cubit y renderizar la página
       builder: (_) => BlocProvider(
         create: (_) => sl<CitaCubit>()..load(),
         child: const MisCitasDelDiaPage(),

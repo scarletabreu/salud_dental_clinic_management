@@ -68,9 +68,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController = TextEditingController(text: p?.govID ?? '');
     
     // Inicialización de datos de Contacto
-    _telefonoController = TextEditingController(text: p?.contacto.numeroTelefono ?? '');
-    _emailController = TextEditingController(text: p?.contacto.email ?? '');
-    _direccionController = TextEditingController(text: p?.contacto.direccion ?? '');
+    _telefonoController = TextEditingController(text: p?.contactos.firstOrNull!.numeroTelefono ?? '');
+    _emailController = TextEditingController(text: p?.contactos.firstOrNull!.email ?? '');
+    _direccionController = TextEditingController(text: p?.contactos.firstOrNull!.direccion ?? '');
     
     _trabajoController = TextEditingController(text: p?.trabajo ?? '');
     _referenciaController = TextEditingController(text: p?.referencia ?? '');
@@ -101,7 +101,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     if (!_formKey.currentState!.validate()) return;
 
     // Se construye o muta el objeto Contacto usando los requerimientos de tu clase
-    final contactoFinal = widget.paciente?.contacto.copyWith(
+    final contactoFinal = widget.paciente?.contactos.firstOrNull!.copyWith( //TODO
           telefono: _telefonoController.text.trim(),
           email: _emailController.text.trim(),
           direccion: _direccionController.text.trim(),
@@ -119,7 +119,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
       govID: _cedulaController.text.trim(),
-      contacto: contactoFinal,
+      contactos: []/*contactoFinal*/, //TODO
       estatus: widget.paciente?.estatus ?? EstatusPersona.activo,
       genero: _genero,
       tipoPaciente: _tipoPaciente,

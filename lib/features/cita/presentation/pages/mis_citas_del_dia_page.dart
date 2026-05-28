@@ -1,51 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import '../../presentation/widgets/nueva_cita_dialog.dart'; 
 import '../cubit/cita_cubit.dart';
-import '../cubit/cita_state.dart';
+import '../cubit/cita_cubit_state.dart';
 
 const _kMonths = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
-
 const _kMonthsShort = [
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
 ];
-
 const _kWeekdays = [
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-  'Domingo',
+  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
 ];
-
 const _kWeekdaysShort = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 class MisCitasDelDiaPage extends StatelessWidget {
@@ -54,20 +28,43 @@ class MisCitasDelDiaPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: colorScheme.surfaceContainerLowest,
-      child: BlocBuilder<CitaCubit, CitaState>(
+
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: BlocBuilder<CitaCubit, CitaCubitState>(
         builder: (context, state) {
-          if (state is CitaLoading) {
+          if (state is CitaCubitLoading) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (state is CitaError) {
+          if (state is CitaCubitError) {
             return _ErrorView(message: state.message);
           }
-          if (state is CitaLoaded) {
+          if (state is CitaCubitLoaded) {
             return _CalendarioView(state: state);
           }
           return const SizedBox.shrink();
+        },
+      ),
+      // SEAMLESS ACCIÓN DE AGREGAR CITA
+      floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
+        builder: (context, state) {
+          if (state is! CitaCubitLoaded) return const SizedBox.shrink();
+          
+          return FloatingActionButton.extended(
+            onPressed: () async {
+              // Obtenemos los repositorios directamente desde GetIt (sl) sin depender del contexto
+              await NuevaCitaDialog.show(
+                context,
+                personaRepository: sl<PersonaRepository>(),
+                doctorRepository: sl<DoctorRepository>(),
+              );
+              
+              // Recarga el listado de citas al cerrar el diálogo
+              context.read<CitaCubit>().load(); 
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Nueva Cita'),
+          );
         },
       ),
     );
@@ -75,7 +72,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
 }
 
 class _CalendarioView extends StatelessWidget {
-  final CitaLoaded state;
+  final CitaCubitLoaded state;
   const _CalendarioView({required this.state});
 
   @override
@@ -93,7 +90,7 @@ class _CalendarioView extends StatelessWidget {
 }
 
 class _ControlBar extends StatelessWidget {
-  final CitaLoaded state;
+  final CitaCubitLoaded state;
   const _ControlBar({required this.state});
 
   @override
@@ -186,17 +183,19 @@ class _ControlBar extends StatelessWidget {
 }
 
 class _CalendarioBody extends StatelessWidget {
-  final CitaLoaded state;
+  final CitaCubitLoaded state;
   const _CalendarioBody({required this.state});
 
   @override
   Widget build(BuildContext context) {
-    if (state.viewMode == CalendarioViewMode.diaria) {
-      return _DetailPanel(state: state);
-    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 600;
+
+        if (state.viewMode == CalendarioViewMode.diaria) {
+          return _DetailPanel(state: state);
+        }
+
         if (isWide) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,6 +215,7 @@ class _CalendarioBody extends StatelessWidget {
             ],
           );
         }
+
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(
@@ -233,7 +233,7 @@ class _CalendarioBody extends StatelessWidget {
 }
 
 class _CalendarSection extends StatelessWidget {
-  final CitaLoaded state;
+  final CitaCubitLoaded state;
   final bool fillHeight;
   const _CalendarSection({required this.state, this.fillHeight = false});
 
@@ -276,8 +276,7 @@ class _CalendarSection extends StatelessWidget {
           onFormatChanged: (_) {},
           onPageChanged: cubit.onPageChanged,
           calendarBuilders: CalendarBuilders<Cita>(
-            dowBuilder: (ctx, day) =>
-                _DowCell(day: day, colorScheme: colorScheme),
+            dowBuilder: (ctx, day) => _DowCell(day: day, colorScheme: colorScheme),
             defaultBuilder: (ctx, day, _) => _DayCell(
               day: day,
               events: state.citasForDay(day),
@@ -299,9 +298,9 @@ class _CalendarSection extends StatelessWidget {
             outsideBuilder: (ctx, day, _) => const SizedBox.shrink(),
             markerBuilder: (ctx, day, events) => const SizedBox.shrink(),
           ),
-          calendarStyle: CalendarStyle(
+          calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
-            cellMargin: const EdgeInsets.all(3),
+            cellMargin: EdgeInsets.all(3),
           ),
           daysOfWeekHeight: 40,
           rowHeight: 64,
@@ -320,6 +319,7 @@ class _DowCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = _kWeekdaysShort[day.weekday - 1];
     final isWeekend = day.weekday >= 6;
+
     return Container(
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -411,9 +411,7 @@ class _DayCell extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ...events
-                    .take(3)
-                    .map(
+                ...events.take(3).map(
                       (c) => Container(
                         width: 5,
                         height: 5,
@@ -450,7 +448,7 @@ class _DayCell extends StatelessWidget {
 }
 
 class _DetailPanel extends StatelessWidget {
-  final CitaLoaded state;
+  final CitaCubitLoaded state;
   const _DetailPanel({required this.state});
 
   @override
@@ -505,7 +503,7 @@ class _DetailPanel extends StatelessWidget {
           child: citas.isEmpty
               ? const _EmptyDay()
               : ListView.separated(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 80), // Padding extra abajo por el FAB
                   itemCount: citas.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (ctx, i) => _CitaCard(cita: citas[i]),
@@ -561,7 +559,6 @@ class _CitaCard extends StatelessWidget {
 
   void _mostrarDialogoCancelacion(BuildContext context, String citaId) {
     final colorScheme = Theme.of(context).colorScheme;
-
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -587,11 +584,10 @@ class _CitaCard extends StatelessWidget {
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
               onPressed: () {
-                // Dispara el evento en el Cubit global de la página
                 context.read<CitaCubit>().cambiarEstadoCita(
-                  citaId,
-                  EstadoCita.cancelada,
-                );
+                      citaId,
+                      EstadoCita.cancelada,
+                    );
                 Navigator.pop(dialogContext);
               },
               child: const Text('Confirmar Cancelación'),
@@ -628,7 +624,6 @@ class _CitaCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Time badge
             Container(
               width: 48,
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -660,7 +655,6 @@ class _CitaCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Patient & doctor info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,14 +728,13 @@ class _CitaCard extends StatelessWidget {
               tooltip: 'Cambiar estado de la cita',
               onSelected: (EstadoCita nuevoEstado) {
                 if (nuevoEstado == cita.estado) return;
-
                 if (nuevoEstado == EstadoCita.cancelada) {
                   _mostrarDialogoCancelacion(context, cita.id!);
                 } else {
                   context.read<CitaCubit>().cambiarEstadoCita(
-                    cita.id!,
-                    nuevoEstado,
-                  );
+                        cita.id!,
+                        nuevoEstado,
+                      );
                 }
               },
               shape: RoundedRectangleBorder(
@@ -861,6 +854,7 @@ class _ErrorView extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final cubit = context.read<CitaCubit>();
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -889,12 +883,6 @@ class _ErrorView extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: cubit.load,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reintentar'),
             ),
           ],
         ),

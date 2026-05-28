@@ -464,9 +464,9 @@ class _PacienteRowState extends State<_PacienteRow> {
                   Expanded(
                     flex: 2,
                     child: Text(
-                      p.contacto.numeroTelefono.isEmpty
+                      p.contactos.firstOrNull!.numeroTelefono.isEmpty //TODO
                           ? '—'
-                          : p.contacto.numeroTelefono,
+                          : p.contactos.firstOrNull!.numeroTelefono, //TODO
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant.withOpacity(0.8),
                         fontSize: 13,
@@ -554,13 +554,13 @@ class _PacienteRowState extends State<_PacienteRow> {
               ),
               _DetailItem(
                 label: 'Email',
-                value: p.contacto.email.isEmpty ? '—' : p.contacto.email,
+                value: p.contactos.firstOrNull!.email.isEmpty ? '—' : p.contactos.firstOrNull!.email, //TODO
               ),
               _DetailItem(
                 label: 'Dirección Residencia',
-                value: p.contacto.direccion.isEmpty
+                value: p.contactos.firstOrNull!.direccion.isEmpty //TODO
                     ? '—'
-                    : p.contacto.direccion,
+                    : p.contactos.firstOrNull!.direccion, //TODO
               ),
             ],
           ),

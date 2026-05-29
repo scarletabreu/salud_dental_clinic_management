@@ -28,7 +28,10 @@ class MyApp extends StatelessWidget {
       title: 'Salud Dental',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF3385FF),
+          brightness: Brightness.light,
+        ).copyWith(surfaceContainerLowest: const Color(0xFFF5F8FA)),
         useMaterial3: true,
       ),
       home: const DashboardShell(),

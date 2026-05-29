@@ -18,15 +18,9 @@ class TratamientoNotifier extends Notifier<TratamientoState> {
     state = TratamientoLoading();
     try {
       final lista = await _repository.getCatalogoTratamientos();
-
-      if (lista.isEmpty) {
-        state = TratamientoLoaded(_obtenerTratamientosPrueba());
-      } else {
-        state = TratamientoLoaded(lista);
-      }
+      state = TratamientoLoaded(lista);
     } catch (e) {
-      print('Cargando tratamientos de prueba por error en la consulta: $e');
-      state = TratamientoLoaded(_obtenerTratamientosPrueba());
+      state = TratamientoError('Error al cargar datos desde el servidor: $e');
     }
   }
 

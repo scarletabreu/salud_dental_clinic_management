@@ -96,9 +96,16 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           _buildIdentityCard(p),
           const SizedBox(height: 16),
           _buildAlertasMedicas(p.record),
-          _buildContactoCard(p),
-          const SizedBox(height: 16),
-          _buildInfoClinicaCard(p.record),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildContactoCard(p)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildInfoClinicaCard(p.record)),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           OdontogramArchWidget(consultas: sorted),
           const SizedBox(height: 16),

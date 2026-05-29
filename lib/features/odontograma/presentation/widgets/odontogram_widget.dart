@@ -829,12 +829,13 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
         final maxW = constraints.maxWidth;
         const sideMin = 300.0;
         const panelMaxW = 360.0;
+        const archMax = 760.0;
         // Side layout only when there's room for the arch + a panel on each side.
         final useSide = _selectedFdi != null && maxW >= 520 + 2 * sideMin;
 
         final archW = useSide
-            ? math.min(560.0, maxW - 2 * sideMin)
-            : math.min(maxW, 560.0);
+            ? math.min(archMax, maxW - 2 * sideMin)
+            : math.min(maxW, archMax);
         final archH = archW * 0.95;
         _canvasSize = Size(archW, archH);
 

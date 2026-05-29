@@ -115,9 +115,9 @@ Map<int, ToothPlacement> archLayout(Size canvas) {
   final rx = canvas.width / 2 - canvas.width * 0.115;
   final ry = canvas.height / 2 - canvas.height * 0.085;
 
-  final baseW = canvas.width * 0.058;
-  final baseH = canvas.height * 0.098;
-  final labelMargin = canvas.width * 0.058;
+  final baseW = canvas.width * 0.061;
+  final baseH = canvas.height * 0.104;
+  final labelMargin = canvas.width * 0.056;
 
   final result = <int, ToothPlacement>{};
 

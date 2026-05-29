@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/core/presentation/design_tokens.d
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'odontogram_sample_data.dart';
 import 'odontogram_widget.dart';
 
 // ─────────────────────────────────────────────
@@ -214,8 +215,12 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
     final withOdo = _withOdo;
     final clampedIdx = _idx.clamp(0, withOdo.isEmpty ? 0 : withOdo.length - 1);
 
-    final Odontograma? currentOdo = withOdo.isEmpty
-        ? null
+    // DEMO: sin odontograma real → mostrar datos de ejemplo. Borrar al
+    // conectar datos reales (junto con odontogram_sample_data.dart).
+    final isSample = withOdo.isEmpty;
+
+    final Odontograma? currentOdo = isSample
+        ? buildSampleOdontograma()
         : _aggregate
             ? _buildAggregateOdontograma(withOdo)
             : withOdo[clampedIdx].odontograma;
@@ -248,6 +253,20 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
                 'Odontograma',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
               ),
+              if (isSample) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: kAmber.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Text(
+                    'Ejemplo',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kAmber),
+                  ),
+                ),
+              ],
               const Spacer(),
               if (withOdo.length > 1)
                 _TogglePill(

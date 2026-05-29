@@ -33,8 +33,17 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       case 'noPrefiereDecir':
         return 'No prefiere decir';
       default:
-        return name[0].toUpperCase() + name.substring(1);
+        return name.isEmpty ? '—' : name[0].toUpperCase() + name.substring(1);
     }
+  }
+
+  String _getInitials(String fullName) {
+    if (fullName.trim().isEmpty) return 'P';
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length > 1) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
   }
 
   @override
@@ -42,7 +51,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
+      backgroundColor: colorScheme
+          .surfaceContainerLowest,
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         elevation: 0,
@@ -50,7 +60,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         foregroundColor: colorScheme.onSurface,
         title: const Text(
           'Expediente Clínico',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
+          ),
         ),
         centerTitle: false,
       ),
@@ -71,7 +85,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 _buildStatsBar(context, p),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                     children: [
                       _buildAlertasMedicas(context, p.record),
                       if (p.record.condiciones.trim().isNotEmpty ||
@@ -96,52 +110,78 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   Widget _buildHeader(BuildContext context, Paciente p) {
     final colorScheme = Theme.of(context).colorScheme;
+    final primaryColor = colorScheme
+        .primary;
+
     return Container(
       color: colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: primaryColor.withAlpha(20),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                _getInitials(p.fullName),
+                style: TextStyle(
+                  color: primaryColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   p.fullName,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
+                    letterSpacing: -0.4,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 8,
+                  spacing: 10,
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(6),
+                      decoration: ShapeDecoration(
+                        color: primaryColor.withAlpha(15),
+                        shape: const StadiumBorder(),
                       ),
                       child: Text(
                         p.tipoPaciente.name.toUpperCase(),
                         style: TextStyle(
-                          color: colorScheme.onSecondaryContainer,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                          color: primaryColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
                     Text(
-                      '•  Cédula: ${p.govID}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      'ID: ${p.govID}',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant.withAlpha(180),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -164,16 +204,20 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     context.read<PacienteCubit>().loadById(p.id!);
                   });
                 },
-                icon: const Icon(Icons.edit_outlined, size: 16),
+                icon: const Icon(Icons.edit_outlined, size: 15),
                 label: const Text('Editar'),
                 style: OutlinedButton.styleFrom(
+                  elevation: 0,
+                  foregroundColor: colorScheme.onSurface,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
                   ),
-                  side: BorderSide(color: colorScheme.outlineVariant),
+                  side: BorderSide(
+                    color: colorScheme.outlineVariant.withAlpha(120),
+                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
@@ -186,15 +230,18 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                icon: const Icon(Icons.calendar_today_outlined, size: 15),
                 label: const Text('Nueva Cita'),
                 style: FilledButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: colorScheme.onPrimary,
+                  elevation: 0,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
@@ -209,24 +256,30 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       color: colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(8),
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant.withAlpha(50)),
         ),
         child: Row(
           children: [
-            _DetailStatItem(label: 'EDAD', value: '${p.age} años'),
+            Expanded(
+              child: _DetailStatItem(label: 'EDAD', value: '${p.age} años'),
+            ),
             _buildStatDivider(colorScheme),
-            _DetailStatItem(
-              label: 'GÉNERO',
-              value: _generoLabel(p.genero.name),
+            Expanded(
+              child: _DetailStatItem(
+                label: 'GÉNERO',
+                value: _generoLabel(p.genero.name),
+              ),
             ),
             if (p.trabajo.isNotEmpty) ...[
               _buildStatDivider(colorScheme),
               Expanded(
+                flex: 2,
                 child: _DetailStatItem(
                   label: 'OCUPACIÓN',
                   value: p.trabajo,
@@ -244,8 +297,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     return Container(
       height: 24,
       width: 1,
-      color: colorScheme.outlineVariant,
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      color: colorScheme.outlineVariant.withAlpha(60),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
     );
   }
 
@@ -265,70 +318,85 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
+                  color: colorScheme.errorContainer.withAlpha(40),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   Icons.warning_amber_rounded,
                   color: colorScheme.error,
-                  size: 18,
+                  size: 16,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 'Alertas Médicas',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.error,
+                  letterSpacing: -0.1,
                 ),
               ),
             ],
           ),
           if (tieneCondiciones) ...[
-            const SizedBox(height: 16),
-            _SubsectionLabel(label: 'Condiciones / Alergias'),
+            const SizedBox(height: 14),
+            const _SubsectionLabel(label: 'Condiciones / Alergias'),
             const SizedBox(height: 6),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colorScheme.errorContainer.withAlpha(60),
+                color: colorScheme.errorContainer.withAlpha(30),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                record.condiciones,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                record.conditions.isEmpty
+                    ? record.condiciones
+                    : record.condiciones,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface,
-                  height: 1.5,
+                  height: 1.4,
                 ),
               ),
             ),
           ],
           if (tieneCirugias) ...[
-            const SizedBox(height: 16),
-            _SubsectionLabel(label: 'Cirugías Previas'),
+            const SizedBox(height: 14),
+            const _SubsectionLabel(label: 'Cirugías Previas'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: record.cirugiasPrevias
                   .map(
-                    (cirugia) => Chip(
-                      avatar: Icon(
-                        Icons.local_hospital_outlined,
-                        size: 14,
-                        color: colorScheme.error,
+                    (cirugia) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
                       ),
-                      label: Text(
-                        cirugia,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurface,
-                        ),
+                      decoration: ShapeDecoration(
+                        color: colorScheme.error.withAlpha(12),
+                        shape: const StadiumBorder(),
                       ),
-                      backgroundColor: colorScheme.error.withAlpha(15),
-                      side: BorderSide(color: colorScheme.error.withAlpha(50)),
-                      visualDensity: VisualDensity.compact,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_hospital_outlined,
+                            size: 12,
+                            color: colorScheme.error,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            cirugia,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                   .toList(),
@@ -344,11 +412,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(
+          const _SectionTitle(
             icon: Icons.contacts_outlined,
             title: 'Datos de Contacto',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
@@ -360,7 +428,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       : p.contacto.numeroTelefono,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: _InfoItem(
                   icon: Icons.email_outlined,
@@ -371,7 +439,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           if (p.contacto.direccion.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            Container(
+              height: 1,
+              color: Theme.of(context).colorScheme.outlineVariant.withAlpha(40),
+            ),
+            const SizedBox(height: 14),
             _InfoItem(
               icon: Icons.location_on_outlined,
               label: 'Dirección Residencia',
@@ -390,18 +463,18 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(
+          const _SectionTitle(
             icon: Icons.medical_information_outlined,
             title: 'Información Clínica',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   icon: Icons.bloodtype_outlined,
                   iconColor: colorScheme.error,
-                  iconBg: colorScheme.errorContainer,
+                  iconBg: colorScheme.errorContainer.withAlpha(40),
                   label: 'Tipo de Sangre',
                   value: record.tipoSangre.name.toUpperCase(),
                 ),
@@ -411,7 +484,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 child: _StatCard(
                   icon: Icons.child_care_outlined,
                   iconColor: colorScheme.tertiary,
-                  iconBg: colorScheme.tertiaryContainer,
+                  iconBg: colorScheme.tertiaryContainer.withAlpha(40),
                   label: 'Cantidad de Hijos',
                   value: '${record.cantHijos}',
                 ),
@@ -420,20 +493,23 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           if (record.historialFamiliar.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
-            _SubsectionLabel(label: 'Historial Familiar'),
+            const _SubsectionLabel(label: 'Historial Familiar'),
             const SizedBox(height: 6),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
+                color: colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withAlpha(40),
+                ),
               ),
               child: Text(
                 record.historialFamiliar,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface,
-                  height: 1.5,
+                  height: 1.4,
                 ),
               ),
             ),
@@ -449,46 +525,48 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(
+          const _SectionTitle(
             icon: Icons.history_edu_outlined,
             title: 'Historial Clínico',
           ),
           const SizedBox(height: 24),
           Center(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh,
-                    shape: BoxShape.circle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerLow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.folder_open_outlined,
+                      size: 32,
+                      color: colorScheme.onSurfaceVariant.withAlpha(120),
+                    ),
                   ),
-                  child: Icon(
-                    Icons.folder_open_outlined,
-                    size: 36,
-                    color: colorScheme.onSurfaceVariant.withAlpha(140),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Sin procedimientos registrados',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Sin procedimientos registrados',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Los procedimientos aparecerán aquí una vez registrados.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant.withAlpha(140),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Los procedimientos aparecerán aquí una vez registrados.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withAlpha(160),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -511,21 +589,24 @@ class _DetailStatItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+          label.toUpperCase(),
+          style: TextStyle(
+            color: colorScheme.onSurfaceVariant.withAlpha(160),
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.6,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          style: TextStyle(
             color: colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
           overflow: isOmissible ? TextOverflow.ellipsis : null,
         ),
@@ -545,8 +626,8 @@ class _SectionCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant.withAlpha(60)),
       ),
       padding: const EdgeInsets.all(20),
       child: child,
@@ -562,22 +643,25 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final primaryColor = colorScheme.primary;
+
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            color: primaryColor.withAlpha(15),
+            borderRadius: BorderRadius.circular(6),
           ),
-          child: Icon(icon, size: 18, color: colorScheme.primary),
+          child: Icon(icon, size: 16, color: primaryColor),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
+          ),
         ),
       ],
     );
@@ -593,10 +677,11 @@ class _SubsectionLabel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Text(
       label.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: colorScheme.onSurfaceVariant,
+      style: TextStyle(
+        color: colorScheme.onSurfaceVariant.withAlpha(160),
+        fontSize: 10,
         fontWeight: FontWeight.bold,
-        letterSpacing: 0.8,
+        letterSpacing: 0.6,
       ),
     );
   }
@@ -621,7 +706,11 @@ class _InfoItem extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: colorScheme.primary),
+        Icon(
+          icon,
+          size: 16,
+          color: colorScheme.onSurfaceVariant.withAlpha(140),
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -629,17 +718,21 @@ class _InfoItem extends StatelessWidget {
             children: [
               Text(
                 label.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant.withAlpha(160),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 value,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
                 overflow: fullWidth ? null : TextOverflow.ellipsis,
               ),
             ],
@@ -669,35 +762,42 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant.withAlpha(40)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: iconBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(icon, size: 18, color: iconColor),
+            child: Icon(icon, size: 16, color: iconColor),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant.withAlpha(160),
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.4,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -723,7 +823,7 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 56, color: colorScheme.error),
+            Icon(Icons.error_outline, size: 48, color: colorScheme.error),
             const SizedBox(height: 16),
             Text(
               'Error al cargar paciente',

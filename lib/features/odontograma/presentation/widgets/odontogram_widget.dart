@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
@@ -54,67 +55,82 @@ class _OdontogramPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Jaw separator
+    final layout = archLayout(size);
+    final labelFontSize = size.width * 0.052 * 0.42;
+
+    // Subtle vertical midline guide
     canvas.drawLine(
-      Offset(size.width * 0.06, size.height * 0.500),
-      Offset(size.width * 0.94, size.height * 0.500),
+      Offset(size.width / 2, size.height * 0.10),
+      Offset(size.width / 2, size.height * 0.90),
       Paint()
-        ..color = const Color(0xFFE2E8F0)
+        ..color = const Color(0xFFEEF2F7)
         ..strokeWidth = 1.0,
     );
 
-    final baseW = size.width * 0.058;
-    final baseH = size.height * 0.088;
-
-    // Collect FDI number label positions to draw after all teeth (always horizontal)
-    final labels = <(int fdi, Offset center)>[];
-
-    for (final entry in kNorm.entries) {
-      final fdi = entry.key;
-      final norm = entry.value;
+    layout.forEach((fdi, p) {
       final type = toothTypeFor(fdi);
-      final sz = toothSizeFor(type, baseW, baseH);
-      final center = Offset(norm.dx * size.width, norm.dy * size.height);
-      final angle = kAngles[fdi] ?? 0.0;
-
+      final upper = isUpperTooth(fdi);
       final d = dientes[fdi];
       final status = statusForDiente(d);
       final isAbsent = d?.estaAusente ?? false;
       final isSelected = fdi == selectedFdi;
       final isHovered = fdi == hoveredFdi && !isSelected;
-
-      final path = buildToothPath(type, sz.width, sz.height);
+      final hasStatus = status != ToothStatus.empty && !isAbsent;
       final statusColor = isAbsent ? const Color(0xFFCBD5E1) : colorForStatus(status);
 
+      final path = buildToothPath(type, p.size);
+      final groove = buildGroovePath(type, p.size, upper: upper);
+
       canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(angle);
+      canvas.translate(p.center.dx, p.center.dy);
+      canvas.rotate(p.angle);
 
-      // Fill
-      final fillAlpha = isSelected
-          ? 70
+      // Fill — white base, tinted by status / interaction
+      final fillColor = isAbsent
+          ? const Color(0xFFF1F5F9)
+          : isSelected
+              ? statusColor.withAlpha(48)
+              : isHovered
+                  ? statusColor.withAlpha(hasStatus ? 42 : 22)
+                  : hasStatus
+                      ? statusColor.withAlpha(30)
+                      : Colors.white;
+      canvas.drawPath(path, Paint()..color = fillColor);
+
+      // Occlusal grooves
+      if (groove != null && !isAbsent) {
+        canvas.drawPath(
+          groove,
+          Paint()
+            ..color = (hasStatus ? statusColor : const Color(0xFFCBD5E1))
+                .withAlpha(hasStatus ? 140 : 255)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round,
+        );
+      }
+
+      // Outline
+      final outlineColor = isAbsent
+          ? const Color(0xFFCBD5E1)
+          : (isSelected || isHovered || hasStatus)
+              ? statusColor
+              : kTextDisabled;
+      final strokeWidth = isSelected
+          ? 2.2
           : isHovered
-              ? 48
-              : (status == ToothStatus.empty ? 22 : 28);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = isAbsent
-              ? const Color(0xFFF1F5F9)
-              : statusColor.withAlpha(fillAlpha),
-      );
-
-      // Stroke
-      final strokeWidth = isSelected ? 2.2 : (isHovered ? 1.9 : 1.4);
+              ? 1.8
+              : (hasStatus ? 1.5 : 1.2);
       final strokeAlpha = isSelected
           ? 255
           : isHovered
-              ? 210
-              : (status == ToothStatus.empty ? 110 : 150);
+              ? 220
+              : (hasStatus ? 200 : 150);
       canvas.drawPath(
         path,
         Paint()
-          ..color = statusColor.withAlpha(strokeAlpha)
+          ..color = outlineColor.withAlpha(strokeAlpha)
           ..style = PaintingStyle.stroke
           ..strokeWidth = strokeWidth
           ..strokeJoin = StrokeJoin.round,
@@ -126,43 +142,35 @@ class _OdontogramPainter extends CustomPainter {
           ..color = const Color(0xFFCBD5E1)
           ..strokeWidth = 1.2
           ..strokeCap = StrokeCap.round;
-        final mx = sz.width * 0.35;
-        final my = sz.height * 0.35;
+        final mx = p.size.width * 0.30;
+        final my = p.size.height * 0.30;
         canvas.drawLine(Offset(-mx, -my), Offset(mx, my), xPaint);
         canvas.drawLine(Offset(mx, -my), Offset(-mx, my), xPaint);
       }
 
-      // Selected indicator: small filled dot at center
-      if (isSelected) {
-        canvas.drawCircle(
-          Offset.zero,
-          3.0,
-          Paint()..color = statusColor,
-        );
-      }
-
       canvas.restore();
+    });
 
-      labels.add((fdi, center));
-    }
-
-    // Draw FDI labels on top (always horizontal, unaffected by tooth rotation)
-    for (final (fdi, center) in labels) {
+    // FDI labels — outside the arch, always horizontal
+    layout.forEach((fdi, p) {
       final d = dientes[fdi];
       final status = statusForDiente(d);
       final isAbsent = d?.estaAusente ?? false;
       final isSelected = fdi == selectedFdi;
+      final hasStatus = status != ToothStatus.empty && !isAbsent;
       final statusColor = isAbsent ? const Color(0xFFCBD5E1) : colorForStatus(status);
 
       final tp = TextPainter(
         text: TextSpan(
           text: fdi.toString(),
           style: TextStyle(
-            fontSize: baseW * 0.38,
+            fontSize: labelFontSize,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: isSelected
                 ? statusColor
-                : statusColor.withAlpha(status == ToothStatus.empty ? 130 : 180),
+                : hasStatus
+                    ? statusColor.withAlpha(200)
+                    : kTextDisabled,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -170,9 +178,9 @@ class _OdontogramPainter extends CustomPainter {
 
       tp.paint(
         canvas,
-        center.translate(-tp.width / 2, baseH * 0.60),
+        p.labelPos.translate(-tp.width / 2, -tp.height / 2),
       );
-    }
+    });
   }
 
   @override
@@ -788,21 +796,15 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
 
   int? _fdiAtPosition(Offset pos, {double hitScale = 1.4}) {
     if (_canvasSize == Size.zero) return null;
-    final baseW = _canvasSize.width * 0.058;
-    final baseH = _canvasSize.height * 0.088;
-
-    for (final entry in kNorm.entries) {
-      final fdi = entry.key;
-      final norm = entry.value;
-      final type = toothTypeFor(fdi);
-      final sz = toothSizeFor(type, baseW, baseH);
-      final center = Offset(norm.dx * _canvasSize.width, norm.dy * _canvasSize.height);
+    final layout = archLayout(_canvasSize);
+    for (final entry in layout.entries) {
+      final p = entry.value;
       final hitRect = Rect.fromCenter(
-        center: center,
-        width: sz.width * hitScale,
-        height: sz.height * hitScale,
+        center: p.center,
+        width: p.size.width * hitScale,
+        height: p.size.height * hitScale,
       );
-      if (hitRect.contains(pos)) return fdi;
+      if (hitRect.contains(pos)) return entry.key;
     }
     return null;
   }
@@ -812,13 +814,17 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Arch canvas — fixed height
-        SizedBox(
-          height: 240,
-          child: LayoutBuilder(
-            builder: (ctx, constraints) {
-              _canvasSize = Size(constraints.maxWidth, 240);
-              return MouseRegion(
+        // Arch canvas — centered, mouth-proportioned, capped width
+        LayoutBuilder(
+          builder: (ctx, constraints) {
+            final w = math.min(constraints.maxWidth, 460.0);
+            final h = w * 0.95;
+            _canvasSize = Size(w, h);
+            return Center(
+              child: SizedBox(
+                width: w,
+                height: h,
+                child: MouseRegion(
                 cursor: _hoveredFdi != null
                     ? SystemMouseCursors.click
                     : SystemMouseCursors.basic,
@@ -849,9 +855,10 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+                ),
+              ),
+            );
+          },
         ),
 
         // Detail panel — animated show/hide

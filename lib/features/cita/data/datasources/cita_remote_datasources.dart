@@ -262,102 +262,48 @@ class CitaRemoteDataSource {
     int min,
     EstadoCita estado, {
     bool urgente = false,
+    int duracion = 30,
   }) => CitaModel(
     id: id,
     doctor: doc,
     persona: pac,
     date: DateTime(2026, month, day, hour, min),
+    duracionMinutos: duracion,
     esEmergencia: urgente,
     estado: estado,
   );
 
   static final List<CitaModel> _citasPrueba = [
     // Mayo 5
-    _cita('t01', _docFernandez, _pacAlonso, 5, 5, 9, 0, EstadoCita.completada),
+    _cita('t01', _docFernandez, _pacAlonso, 5, 5, 9, 0, EstadoCita.completada, duracion: 60),
     // Mayo 12
-    _cita(
-      't02',
-      _docRodriguez,
-      _pacSantos,
-      5,
-      12,
-      10,
-      30,
-      EstadoCita.completada,
-    ),
-    _cita('t03', _docLopez, _pacMendez, 5, 12, 14, 0, EstadoCita.completada),
+    _cita('t02', _docRodriguez, _pacSantos, 5, 12, 10, 30, EstadoCita.completada, duracion: 90),
+    _cita('t03', _docLopez, _pacMendez, 5, 12, 14, 0, EstadoCita.completada, duracion: 45),
     // Mayo 13
-    _cita(
-      't04',
-      _docFernandez,
-      _pacCastillo,
-      5,
-      13,
-      11,
-      0,
-      EstadoCita.cancelada,
-    ),
-    // Mayo 18 (today)
-    _cita('t05', _docFernandez, _pacAlonso, 5, 18, 8, 0, EstadoCita.completada),
-    _cita(
-      't06',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      18,
-      10,
-      0,
-      EstadoCita.pendiente,
-      urgente: true,
-    ),
-    _cita('t07', _docLopez, _pacHerrera, 5, 18, 15, 30, EstadoCita.pendiente),
+    _cita('t04', _docFernandez, _pacCastillo, 5, 13, 11, 0, EstadoCita.cancelada, duracion: 60),
+    // Mayo 18
+    _cita('t05', _docFernandez, _pacAlonso, 5, 18, 8, 0, EstadoCita.completada, duracion: 60),
+    _cita('t06', _docRodriguez, _pacGarcia, 5, 18, 10, 0, EstadoCita.pendiente, urgente: true, duracion: 30),
+    _cita('t07', _docLopez, _pacHerrera, 5, 18, 15, 30, EstadoCita.pendiente, duracion: 90),
     // Mayo 19
-    _cita('t08', _docFernandez, _pacSantos, 5, 19, 9, 0, EstadoCita.completada),
-    _cita(
-      't09',
-      _docRodriguez,
-      _pacMendez,
-      5,
-      19,
-      14,
-      0,
-      EstadoCita.completada,
-    ),
+    _cita('t08', _docFernandez, _pacSantos, 5, 19, 9, 0, EstadoCita.completada, duracion: 60),
+    _cita('t09', _docRodriguez, _pacMendez, 5, 19, 14, 0, EstadoCita.completada, duracion: 120),
     // Mayo 20
-    _cita('t10', _docLopez, _pacCastillo, 5, 20, 10, 30, EstadoCita.completada),
+    _cita('t10', _docLopez, _pacCastillo, 5, 20, 10, 30, EstadoCita.completada, duracion: 60),
     // Mayo 21
-    _cita(
-      't11',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      21,
-      9,
-      0,
-      EstadoCita.completada,
-      urgente: true,
-    ),
-    _cita('t12', _docRodriguez, _pacGarcia, 5, 21, 16, 0, EstadoCita.pendiente),
+    _cita('t11', _docFernandez, _pacAlonso, 5, 21, 9, 0, EstadoCita.completada, urgente: true, duracion: 45),
+    _cita('t12', _docRodriguez, _pacGarcia, 5, 21, 16, 0, EstadoCita.pendiente, duracion: 60),
     // Mayo 22
-    _cita('t13', _docLopez, _pacHerrera, 5, 22, 11, 0, EstadoCita.cancelada),
+    _cita('t13', _docLopez, _pacHerrera, 5, 22, 11, 0, EstadoCita.cancelada, duracion: 30),
     // Mayo 25 (4 citas → shows overflow dot)
-    _cita('t14', _docFernandez, _pacSantos, 5, 25, 8, 30, EstadoCita.pendiente),
-    _cita('t15', _docRodriguez, _pacMendez, 5, 25, 11, 0, EstadoCita.pendiente),
-    _cita('t16', _docLopez, _pacCastillo, 5, 25, 14, 30, EstadoCita.pendiente),
-    _cita('t17', _docFernandez, _pacAlonso, 5, 25, 17, 0, EstadoCita.pendiente),
+    _cita('t14', _docFernandez, _pacSantos, 5, 25, 8, 30, EstadoCita.pendiente, duracion: 60),
+    _cita('t15', _docRodriguez, _pacMendez, 5, 25, 11, 0, EstadoCita.pendiente, duracion: 90),
+    _cita('t16', _docLopez, _pacCastillo, 5, 25, 14, 30, EstadoCita.pendiente, duracion: 60),
+    _cita('t17', _docFernandez, _pacAlonso, 5, 25, 17, 0, EstadoCita.pendiente, duracion: 30),
     // Mayo 27
-    _cita('t18', _docRodriguez, _pacGarcia, 5, 27, 9, 0, EstadoCita.pendiente),
-    _cita('t19', _docLopez, _pacHerrera, 5, 27, 13, 0, EstadoCita.completada),
+    _cita('t18', _docRodriguez, _pacGarcia, 5, 27, 9, 0, EstadoCita.pendiente, duracion: 60),
+    _cita('t19', _docLopez, _pacHerrera, 5, 27, 13, 0, EstadoCita.completada, duracion: 45),
     // Mayo 28
-    _cita(
-      't20',
-      _docFernandez,
-      _pacSantos,
-      5,
-      28,
-      10,
-      0,
-      EstadoCita.completada,
-    ),
+    _cita('t20', _docFernandez, _pacSantos, 5, 28, 10, 0, EstadoCita.completada, duracion: 60),
   ];
 }

@@ -25,6 +25,7 @@ const kPurple = Color(0xFFA855F7);
 const kRed = Color(0xFFDC2626);
 const kOrange = Color(0xFFD97706);
 
+// Sombra estándar para todas las cards
 // Sombra estándar
 const kCardShadow = BoxShadow(
   color: Color(0x0D000000),

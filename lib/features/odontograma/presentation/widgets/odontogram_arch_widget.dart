@@ -396,20 +396,18 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
           ),
 
           if (withOdo.isEmpty) ...[
-            const SizedBox(height: 32),
-            const Center(
-              child: Column(
-                children: [
-                  Icon(Icons.medical_services_outlined, size: 32, color: Color(0xFFD1D5DB)),
-                  SizedBox(height: 8),
-                  Text(
-                    'Sin odontograma registrado',
-                    style: TextStyle(fontSize: 13, color: kTextDisabled, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 14),
+            const Text(
+              'Sin datos registrados',
+              style: TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 14),
+            const _Legend(),
+            const SizedBox(height: 16),
+            AspectRatio(
+              aspectRatio: 1.22,
+              child: CustomPaint(painter: _ArchPainter(const {})),
+            ),
           ] else ...[
             // Navigation row (only if showing specific consulta)
             if (!_aggregate) ...[

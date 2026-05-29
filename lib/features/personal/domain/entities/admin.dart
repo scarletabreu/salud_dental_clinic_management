@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
 class Admin extends Usuario {
   final String departamento;
@@ -16,6 +17,9 @@ class Admin extends Usuario {
     required super.passwordHash,
     required this.departamento,
   });
+
+  @override
+  RolUsuario get rol => RolUsuario.admin;
 
   Admin copyWith({EstatusPersona? estatus, String? departamento}) {
     return Admin(

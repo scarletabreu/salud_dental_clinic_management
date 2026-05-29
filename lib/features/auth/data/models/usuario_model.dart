@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
 class UsuarioModel extends Usuario {
   UsuarioModel({
@@ -13,6 +14,9 @@ class UsuarioModel extends Usuario {
     required super.contactos,
     required super.estatus,
   });
+
+  @override
+  RolUsuario get rol => throw UnimplementedError('El rol debe ser implementado por la clase hija');
 
   factory UsuarioModel.fromJson(Map<String, dynamic> json) {
     return UsuarioModel(

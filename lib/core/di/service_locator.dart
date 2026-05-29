@@ -3,6 +3,11 @@ import 'package:salud_dental_clinic_management/core/data/datasources/persona_rem
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/repositories/usuario_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/repositories/cita_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -255,6 +260,16 @@ Future<void> init() async {
   );
   sl.registerFactory<CitaCubit>(
     () => CitaCubit(sl()),
+  );
+  sl.registerLazySingleton<UsuarioRemoteDataSource>(
+    () => UsuarioRemoteDataSourceImpl(sl()),
+  );
+  sl.registerLazySingleton<UsuarioRepository>(
+    () => UsuarioRepositoryImpl(sl()),
+  );
+
+  sl.registerFactory<AuthCubit>(
+    () => AuthCubit(usuarioRepository: sl()),
   );
 
   sl.registerFactory<DashboardCubit>(

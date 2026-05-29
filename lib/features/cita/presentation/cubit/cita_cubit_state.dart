@@ -20,11 +20,16 @@ class CitaCubitLoaded extends CitaCubitState {
   final DateTime selectedDay;
   final CalendarioViewMode viewMode;
 
+  final bool isSubmitting;
+  final String? errorMessage;
+
   const CitaCubitLoaded({
     required this.citas,
     required this.focusedDay,
     required this.selectedDay,
     required this.viewMode,
+    this.isSubmitting = false,
+    this.errorMessage,
   });
 
   List<Cita> citasForDay(DateTime day) {
@@ -44,12 +49,16 @@ class CitaCubitLoaded extends CitaCubitState {
     DateTime? focusedDay,
     DateTime? selectedDay,
     CalendarioViewMode? viewMode,
+    bool? isSubmitting,
+    String? Function()? errorMessage,
   }) {
     return CitaCubitLoaded(
       citas: citas ?? this.citas,
       focusedDay: focusedDay ?? this.focusedDay,
       selectedDay: selectedDay ?? this.selectedDay,
       viewMode: viewMode ?? this.viewMode,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
     );
   }
 

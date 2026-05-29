@@ -27,17 +27,25 @@ class CitaCubit extends Cubit<CitaCubitState> {
     }
   }
 
-  
 Future<void> createCita(Cita cita) async {
   final current = state;
   if (current is! CitaCubitLoaded) return;
 
   try {
+    emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
+    
+    // 1. AGREGA ESTO PARA INSPECCIONAR EL CONTENIDO:
+    // (Asegúrate de tener un método toMap() o toJson() en tu entidad Cita)
+    print('Datos enviados a Supabase: ${cita}'); 
+    
     await _repository.createCita(cita);
-    // Recarga la lista completa para reflejar la nueva cita
     await load();
   } catch (e) {
-    emit(CitaCubitError('No se pudo crear la cita: $e'));
+    print('Error capturado en Cubit: $e');
+    emit(current.copyWith(
+      isSubmitting: false,
+      errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
+    ));
   }
 }
 
@@ -57,14 +65,20 @@ Future<void> createCita(Cita cita) async {
 
       emit(current.copyWith(citas: citasActualizadas));
     } catch (e) {
-      emit(CitaCubitError('No se pudo actualizar el estado de la cita: $e'));
+      emit(current.copyWith(
+        errorMessage: () => 'No se pudo actualizar el estado de la cita: $e',
+      ));
     }
   }
 
   void selectDay(DateTime selectedDay, DateTime focusedDay) {
     final current = state;
     if (current is! CitaCubitLoaded) return;
-    emit(current.copyWith(selectedDay: selectedDay, focusedDay: focusedDay));
+    emit(current.copyWith(
+      selectedDay: selectedDay, 
+      focusedDay: focusedDay,
+      errorMessage: () => null, // Limpiamos errores al interactuar
+    ));
   }
 
   void onPageChanged(DateTime focusedDay) {

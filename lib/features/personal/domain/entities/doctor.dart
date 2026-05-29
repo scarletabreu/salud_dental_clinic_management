@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
 class Doctor extends Usuario {
   final String specialty;
@@ -21,6 +22,9 @@ class Doctor extends Usuario {
     required this.assistants,
     this.isAvailable = true,
   });
+
+  @override
+  RolUsuario get rol => RolUsuario.doctor;
 
   Doctor copyWith({
     String? specialty,

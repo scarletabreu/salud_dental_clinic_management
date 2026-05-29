@@ -4,7 +4,7 @@ abstract class PersonaRemoteDataSource {
   Future<List<PersonaModel>> fetchActivePersonas();
   Future<PersonaModel> fetchPersonaById(String id);
   Future<List<PersonaModel>> searchPersonas(String query);
-  Future<void> createPersona(PersonaModel persona);
+  Future<PersonaModel> createPersona(PersonaModel persona);
   Future<void> updatePersona(PersonaModel persona);
   Future<void> deactivatePersona(String id);
 }

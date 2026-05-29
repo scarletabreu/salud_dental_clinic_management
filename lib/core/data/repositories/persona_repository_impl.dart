@@ -26,6 +26,7 @@ class PersonaRepositoryImpl implements PersonaRepository {
     }
   }
 
+
   @override
   Future<Persona> getPersonaById(String id) async {
     try {
@@ -36,11 +37,14 @@ class PersonaRepositoryImpl implements PersonaRepository {
   }
 
   @override
-  Future<void> createPersona(Persona persona) async {
+  Future<Persona> createPersona(Persona persona) async {
     try {
       final model = _toModel(persona);
-      await remoteDataSource.createPersona(model);
+      final personaCreada = await remoteDataSource.createPersona(model);
+      return personaCreada; 
+      
     } catch (e) {
+      // Propagamos el error con un mensaje claro hacia el Cubit/UI
       throw Exception('Error en el repositorio al crear persona: $e');
     }
   }
@@ -75,4 +79,5 @@ class PersonaRepositoryImpl implements PersonaRepository {
       estatus: persona.estatus,
     );
   }
+
 }

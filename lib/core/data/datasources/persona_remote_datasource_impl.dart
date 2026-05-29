@@ -69,15 +69,21 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
     }
   }
 
-  @override
-  Future<void> createPersona(PersonaModel persona) async {
+@override
+  Future<PersonaModel> createPersona(PersonaModel persona) async {
     String? contactoId;
     String? personaId;
 
     try {
+      if (persona.contactos.isEmpty) {
+        throw Exception('La persona debe tener al menos un contacto.');
+      }
+
+      final primerContacto = persona.contactos.first as ContactoModel;
+
       final contactoResponse = await supabase
           .from('contactos')
-          .insert((persona.contactos as ContactoModel).toJson())
+          .insert(primerContacto.toJson())
           .select('id')
           .single();
 
@@ -86,21 +92,30 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
       final personaResponse = await supabase
           .from('personas')
           .insert(persona.toJson())
-          .select('id')
+          .select()
           .single();
 
       personaId = personaResponse['id'] as String;
 
-      await supabase.from('persona_contacto').insert({
+      await supabase.from('persona_contactos').insert({
         'persona_id': personaId,
         'contacto_id': contactoId,
         'es_principal': true,
       });
+
+      return PersonaModel.fromJson({
+        ...personaResponse,
+        'contactos': persona.contactos.map((c) => (c as ContactoModel).toJson()).toList(),
+      });
+
     } on PostgrestException catch (e) {
       if (contactoId != null) {
         await supabase.from('contactos').delete().eq('id', contactoId);
       }
-      throw Exception('Error al registrar persona: ${e.message}');
+      if (personaId != null) {
+        await supabase.from('personas').delete().eq('id', personaId);
+      }
+      throw Exception('Error al registrar persona en Supabase: ${e.message}');
     } catch (e) {
       throw Exception('Error inesperado al crear persona: $e');
     }

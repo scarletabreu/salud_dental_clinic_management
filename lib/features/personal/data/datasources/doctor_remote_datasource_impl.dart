@@ -38,19 +38,23 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
     }
   }
 
-    @override
+  @override
   Future<List<DoctorModel>> fetchActiveDoctores() async {
-    try {
-      final response = await supabaseClient
-          .from('doctores')
-          .select()
-          .eq('estatus', 'activo')
-          .filter('deleted_at', 'is', null);
+  try {
+    final response = await supabaseClient
+        .from('doctores')
+        // 🔴 Anidamos personas(*) dentro de usuarios(*)
+        .select('*, usuarios(*, personas(*))') 
+        .isFilter('deleted_at', null);
 
-      return (response as List)
-          .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
-          .toList();
+    print('--- RESPUESTA CRUDA DE SUPABASE ---');
+    print(response);
+
+    return (response as List)
+        .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
+        .toList();
     } on PostgrestException catch (e) {
+      print('🚨 Error Postgrest: ${e.message} | Detalles: ${e.details}');
       throw Exception('Error al recuperar doctores activos: ${e.message}');
     } catch (e) {
       throw Exception('Error inesperado: $e');

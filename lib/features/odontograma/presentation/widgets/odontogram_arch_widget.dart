@@ -2,180 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'odontogram_widget.dart';
 
 // ─────────────────────────────────────────────
-//  Tooth status types
+//  Aggregate helper
 // ─────────────────────────────────────────────
 
-enum _ToothStatus { empty, treated, mild, moderate, critical }
-
-Color _colorFor(_ToothStatus s) => switch (s) {
-      _ToothStatus.empty => const Color(0xFFD1D5DB),
-      _ToothStatus.treated => kTeal,
-      _ToothStatus.mild => kIndigo,
-      _ToothStatus.moderate => kAmber,
-      _ToothStatus.critical => kRed,
-    };
-
-// ─────────────────────────────────────────────
-//  FDI tooth positions (normalized 0–1 in canvas)
-// ─────────────────────────────────────────────
-
-const Map<int, Offset> _kNorm = {
-  // Q1 — upper right
-  18: Offset(0.050, 0.070), 17: Offset(0.135, 0.138),
-  16: Offset(0.216, 0.204), 15: Offset(0.290, 0.266),
-  14: Offset(0.353, 0.320), 13: Offset(0.405, 0.362),
-  12: Offset(0.447, 0.390), 11: Offset(0.480, 0.406),
-  // Q2 — upper left
-  21: Offset(0.520, 0.406), 22: Offset(0.553, 0.390),
-  23: Offset(0.595, 0.362), 24: Offset(0.647, 0.320),
-  25: Offset(0.710, 0.266), 26: Offset(0.784, 0.204),
-  27: Offset(0.865, 0.138), 28: Offset(0.950, 0.070),
-  // Q3 — lower left
-  31: Offset(0.520, 0.594), 32: Offset(0.553, 0.610),
-  33: Offset(0.595, 0.638), 34: Offset(0.647, 0.680),
-  35: Offset(0.710, 0.734), 36: Offset(0.784, 0.796),
-  37: Offset(0.865, 0.862), 38: Offset(0.950, 0.930),
-  // Q4 — lower right
-  41: Offset(0.480, 0.594), 42: Offset(0.447, 0.610),
-  43: Offset(0.405, 0.638), 44: Offset(0.353, 0.680),
-  45: Offset(0.290, 0.734), 46: Offset(0.216, 0.796),
-  47: Offset(0.135, 0.862), 48: Offset(0.050, 0.930),
-};
-
-// ─────────────────────────────────────────────
-//  Status map helpers
-// ─────────────────────────────────────────────
-
-_ToothStatus _statusForDiente(Diente d) {
-  if (d.diagnosis.isNotEmpty) {
-    var worst = SeveridadDiagnosis.leve;
-    for (final diag in d.diagnosis) {
-      if (diag.severidad == SeveridadDiagnosis.grave) return _ToothStatus.critical;
-      if (diag.severidad == SeveridadDiagnosis.moderada) worst = SeveridadDiagnosis.moderada;
-    }
-    return worst == SeveridadDiagnosis.moderada ? _ToothStatus.moderate : _ToothStatus.mild;
-  }
-  if (d.tratamientos.isNotEmpty) return _ToothStatus.treated;
-  if (d.superficies.any((s) => s.diagnosisId != null)) return _ToothStatus.mild;
-  return _ToothStatus.empty;
+int _statusRank(Diente d) {
+  final s = statusForDiente(d);
+  return switch (s) {
+    ToothStatus.critical => 4,
+    ToothStatus.moderate => 3,
+    ToothStatus.mild => 2,
+    ToothStatus.treated => 1,
+    ToothStatus.empty => 0,
+  };
 }
 
-_ToothStatus _worstOf(List<_ToothStatus> statuses) {
-  const order = [
-    _ToothStatus.critical,
-    _ToothStatus.moderate,
-    _ToothStatus.mild,
-    _ToothStatus.treated,
-    _ToothStatus.empty,
-  ];
-  for (final s in order) {
-    if (statuses.contains(s)) return s;
-  }
-  return _ToothStatus.empty;
-}
-
-Map<int, _ToothStatus> _buildMap(List<Diente> dientes) {
-  final map = <int, _ToothStatus>{};
-  for (final d in dientes) {
-    map[d.fdiCode] = _statusForDiente(d);
-  }
-  return map;
-}
-
-Map<int, _ToothStatus> _buildAggregateMap(List<Consulta> consultas) {
-  final grouped = <int, List<_ToothStatus>>{};
+Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
+  final Map<int, Diente> worst = {};
   for (final c in consultas) {
     final odo = c.odontograma;
     if (odo == null) continue;
     for (final d in odo.dientes) {
-      grouped.putIfAbsent(d.fdiCode, () => []).add(_statusForDiente(d));
+      final existing = worst[d.fdiCode];
+      if (existing == null || _statusRank(d) > _statusRank(existing)) {
+        worst[d.fdiCode] = d;
+      }
     }
   }
-  return grouped.map((code, statuses) => MapEntry(code, _worstOf(statuses)));
+  return Odontograma(
+    consultaId: '',
+    dientes: worst.values.toList(),
+  );
 }
 
 // ─────────────────────────────────────────────
-//  CustomPainter
-// ─────────────────────────────────────────────
-
-class _ArchPainter extends CustomPainter {
-  final Map<int, _ToothStatus> toothStatus;
-  const _ArchPainter(this.toothStatus);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final toothW = size.width * 0.060;
-    final toothH = size.height * 0.086;
-    const r = Radius.circular(4);
-
-    // Subtle jaw separator line
-    final sepY = size.height * 0.500;
-    canvas.drawLine(
-      Offset(size.width * 0.08, sepY),
-      Offset(size.width * 0.92, sepY),
-      Paint()
-        ..color = const Color(0xFFE5E7EB)
-        ..strokeWidth = 1.0,
-    );
-
-    for (final entry in _kNorm.entries) {
-      final fdi = entry.key;
-      final norm = entry.value;
-      final status = toothStatus[fdi] ?? _ToothStatus.empty;
-      final color = _colorFor(status);
-      final center = Offset(norm.dx * size.width, norm.dy * size.height);
-      final rect = Rect.fromCenter(center: center, width: toothW, height: toothH);
-      final rrect = RRect.fromRectAndRadius(rect, r);
-
-      // Fill
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = status == _ToothStatus.empty
-              ? const Color(0xFFF3F4F6)
-              : color.withValues(alpha: 0.14),
-      );
-
-      // Border
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = status == _ToothStatus.empty
-              ? const Color(0xFFD1D5DB)
-              : color.withValues(alpha: 0.55)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4,
-      );
-
-      // FDI number
-      final tp = TextPainter(
-        text: TextSpan(
-          text: fdi.toString(),
-          style: TextStyle(
-            fontSize: toothW * 0.40,
-            fontWeight: FontWeight.w600,
-            color: status == _ToothStatus.empty ? kTextDisabled : color,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      tp.paint(
-        canvas,
-        center - Offset(tp.width / 2, tp.height / 2),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ArchPainter old) => old.toothStatus != toothStatus;
-}
-
-// ─────────────────────────────────────────────
-//  Navigation helper row
+//  Navigation row
 // ─────────────────────────────────────────────
 
 class _NavRow extends StatelessWidget {
@@ -206,11 +70,7 @@ class _NavRow extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           '${current + 1} / $total',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: kTextPrimary,
-          ),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
         ),
         const SizedBox(width: 8),
         _NavBtn(icon: Icons.chevron_right_rounded, onTap: onNext),
@@ -237,9 +97,7 @@ class _NavBtn extends StatelessWidget {
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: onTap != null
-              ? kTeal.withValues(alpha: 0.10)
-              : const Color(0xFFF3F4F6),
+          color: onTap != null ? kTeal.withValues(alpha: 0.10) : const Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
@@ -262,17 +120,16 @@ class _Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      (_ToothStatus.treated, 'Tratado'),
-      (_ToothStatus.mild, 'Leve'),
-      (_ToothStatus.moderate, 'Moderado'),
-      (_ToothStatus.critical, 'Grave'),
+      (ToothStatus.treated, 'Tratado'),
+      (ToothStatus.mild, 'Leve'),
+      (ToothStatus.moderate, 'Moderado'),
+      (ToothStatus.critical, 'Grave'),
     ];
-
     return Wrap(
       spacing: 12,
       runSpacing: 6,
       children: items.map((item) {
-        final color = _colorFor(item.$1);
+        final color = colorForStatus(item.$1);
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -332,7 +189,7 @@ class _TogglePill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Main widget
+//  OdontogramArchWidget — multi-consultation wrapper
 // ─────────────────────────────────────────────
 
 class OdontogramArchWidget extends StatefulWidget {
@@ -348,14 +205,20 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
   int _idx = 0;
 
   List<Consulta> get _withOdo {
-    final list = widget.consultas.where((c) => c.odontograma != null).toList()
+    return widget.consultas.where((c) => c.odontograma != null).toList()
       ..sort((a, b) => b.fecha.compareTo(a.fecha));
-    return list;
   }
 
   @override
   Widget build(BuildContext context) {
     final withOdo = _withOdo;
+    final clampedIdx = _idx.clamp(0, withOdo.isEmpty ? 0 : withOdo.length - 1);
+
+    final Odontograma? currentOdo = withOdo.isEmpty
+        ? null
+        : _aggregate
+            ? _buildAggregateOdontograma(withOdo)
+            : withOdo[clampedIdx].odontograma;
 
     return Container(
       width: double.infinity,
@@ -395,60 +258,35 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             ],
           ),
 
-          if (withOdo.isEmpty) ...[
+          // Consultation navigation (only when not in aggregate mode)
+          if (withOdo.length > 1 && !_aggregate) ...[
             const SizedBox(height: 14),
-            const Text(
-              'Sin datos registrados',
-              style: TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500),
+            _NavRow(
+              current: clampedIdx,
+              total: withOdo.length,
+              fecha: withOdo[clampedIdx].fecha,
+              onPrev: clampedIdx < withOdo.length - 1
+                  ? () => setState(() => _idx = clampedIdx + 1)
+                  : null,
+              onNext: clampedIdx > 0 ? () => setState(() => _idx = clampedIdx - 1) : null,
             ),
-            const SizedBox(height: 14),
-            const _Legend(),
-            const SizedBox(height: 16),
-            AspectRatio(
-              aspectRatio: 1.22,
-              child: CustomPaint(painter: _ArchPainter(const {})),
-            ),
-          ] else ...[
-            // Navigation row (only if showing specific consulta)
-            if (!_aggregate) ...[
-              const SizedBox(height: 14),
-              _NavRow(
-                current: _idx.clamp(0, withOdo.length - 1),
-                total: withOdo.length,
-                fecha: withOdo[_idx.clamp(0, withOdo.length - 1)].fecha,
-                onPrev: _idx < withOdo.length - 1
-                    ? () => setState(() => _idx++)
-                    : null,
-                onNext: _idx > 0 ? () => setState(() => _idx--) : null,
-              ),
-            ] else ...[
-              const SizedBox(height: 6),
-              Text(
-                '${withOdo.length} consulta${withOdo.length > 1 ? 's' : ''} consolidada${withOdo.length > 1 ? 's' : ''}',
-                style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500),
-              ),
-            ],
-
-            const SizedBox(height: 14),
-            const _Legend(),
-            const SizedBox(height: 16),
-
-            // Arch
-            AspectRatio(
-              aspectRatio: 1.22,
-              child: CustomPaint(
-                painter: _ArchPainter(
-                  _aggregate
-                      ? _buildAggregateMap(withOdo)
-                      : _buildMap(
-                          withOdo[_idx.clamp(0, withOdo.length - 1)]
-                              .odontograma!
-                              .dientes,
-                        ),
-                ),
-              ),
+          ] else if (_aggregate && withOdo.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${withOdo.length} consulta${withOdo.length > 1 ? 's' : ''} consolidada${withOdo.length > 1 ? 's' : ''}',
+              style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500),
             ),
           ],
+
+          const SizedBox(height: 12),
+          const _Legend(),
+          const SizedBox(height: 4),
+
+          // Core widget — handles arch rendering + interaction
+          OdontogramWidget(
+            odontograma: currentOdo,
+            editMode: false,
+          ),
         ],
       ),
     );

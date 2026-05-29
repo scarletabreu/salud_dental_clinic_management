@@ -30,6 +30,7 @@ class CitaRepositoryImpl implements CitaRepository {
         doctor: cita.doctor,
         persona: cita.persona,
         date: cita.date,
+        duracionMinutos: cita.duracionMinutos,
         esEmergencia: cita.esEmergencia,
         estado: cita.estado,
       );

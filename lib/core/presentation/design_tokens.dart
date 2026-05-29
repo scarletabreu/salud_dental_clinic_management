@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 // Fondos
 const kBgPage = Color(0xFFF2F5FB);
+const kCardBg = Colors.white;
 const kDivider = Color(0xFFF3F4F6);
 const kRowDivider = Color(0xFFF9FAFB);
 const kChipBg = Color(0xFFF3F4F6);
@@ -25,6 +26,7 @@ const kRed = Color(0xFFDC2626);
 const kOrange = Color(0xFFD97706);
 
 // Sombra estándar para todas las cards
+// Sombra estándar
 const kCardShadow = BoxShadow(
   color: Color(0x0D000000),
   blurRadius: 20,

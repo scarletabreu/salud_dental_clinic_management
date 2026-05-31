@@ -11,7 +11,7 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
     try {
       final response = await supabaseClient
           .from('tratamientos')
-          .select('*, contraindicaciones:tratamiento_id(*)')
+          .select('*, contraindicaciones(*)')
           .filter('deleted_at', 'is', null)
           .order('nombre', ascending: true);
 

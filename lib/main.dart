@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // 1. Asegúrate de tener esta importación
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/di/service_locator.dart' as di;
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
@@ -14,7 +15,8 @@ Future<void> main() async {
 
   await di.init();
 
-  runApp(const MyApp());
+  // 2. Aquí está el secreto, debe envolver a MyApp() por completo
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

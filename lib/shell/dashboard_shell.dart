@@ -11,6 +11,8 @@ import 'package:salud_dental_clinic_management/features/inicio/presentation/page
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
+// Importamos tu nueva pantalla de tratamientos
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
@@ -70,6 +72,13 @@ class _DashboardShellState extends State<DashboardShell> {
       selectedIcon: Icons.medication_rounded,
       label: 'Medicinas',
       builder: (_) => MedicinaListPage(repository: sl<IMedicinaRepository>()),
+    ),
+    // 🦷 Destino del Catálogo de Tratamientos integrado aquí
+    ShellDestination(
+      icon: Icons.medical_services_outlined,
+      selectedIcon: Icons.medical_services_rounded,
+      label: 'Tratamientos',
+      builder: (_) => const TratamientosScreen(),
     ),
     ShellDestination(
       icon: Icons.settings_outlined,
@@ -142,6 +151,8 @@ class _DashboardShellState extends State<DashboardShell> {
         return 'Citas';
       case 'Configuración':
         return 'Ajustes';
+      case 'Tratamientos':
+        return 'Servicios';
       default:
         return label;
     }
@@ -312,6 +323,8 @@ class _RailItem extends StatelessWidget {
         return 'Citas';
       case 'Configuración':
         return 'Ajustes';
+      case 'Tratamientos':
+        return 'Servicios';
       default:
         return label;
     }

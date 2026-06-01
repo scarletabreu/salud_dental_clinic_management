@@ -1,5 +1,5 @@
-import 'package:salud_dental_clinic_management/features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
 
 class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   final SupabaseClient supabaseClient;
@@ -29,6 +29,11 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   Future<void> createTratamiento(Map<String, dynamic> data) async {
     try {
       data.remove('id');
+      data.remove('contraindicaciones');
+
+      if (data.containsKey('precio_base') && !data.containsKey('costo')) {
+        data['costo'] = data.remove('precio_base');
+      }
 
       final now = DateTime.now().toIso8601String();
       data['created_at'] = now;
@@ -46,6 +51,11 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   Future<void> updateTratamiento(String id, Map<String, dynamic> data) async {
     try {
       data.remove('id');
+      data.remove('contraindicaciones');
+
+      if (data.containsKey('precio_base') && !data.containsKey('costo')) {
+        data['costo'] = data.remove('precio_base');
+      }
 
       data['updated_at'] = DateTime.now().toIso8601String();
 

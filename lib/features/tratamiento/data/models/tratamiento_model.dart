@@ -24,7 +24,7 @@ class TratamientoModel extends Tratamiento {
                 .toList()
           : [],
       alcance: Alcance.values.firstWhere(
-        (e) => e.name == json['alcance'],
+        (e) => e.dbValue == json['alcance'],
         orElse: () => Alcance.diente,
       ),
     );
@@ -35,7 +35,7 @@ class TratamientoModel extends Tratamiento {
       'nombre': nombre,
       'descripcion': descripcion,
       'costo': costo,
-      'alcance': alcance.name,
+      'alcance': alcance.dbValue,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

@@ -4,16 +4,6 @@ enum Alcance {
   arcada,
   global;
 
-  String get name {
-    switch (this) {
-      case Alcance.puntual:
-        return 'Puntual';
-      case Alcance.diente:
-        return 'Diente';
-      case Alcance.arcada:
-        return 'Arcada';
-      case Alcance.global:
-        return 'Global';
-    }
-  }
+  String get dbValue => name.toLowerCase();
+  String get displayName => name[0].toUpperCase() + name.substring(1);
 }

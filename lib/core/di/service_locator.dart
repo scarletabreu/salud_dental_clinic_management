@@ -102,6 +102,10 @@ import '../../features/record/domain/repositories/record_repository.dart';
 import '../../features/suplidor/data/datasources/suplidor_remote_datasource.dart';
 import '../../features/suplidor/data/repositories/suplidor_repository_impl.dart';
 import '../../features/suplidor/domain/repositories/suplidor_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/repositories/i_auth_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_session_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -251,7 +255,6 @@ Future<void> init() async {
   sl.registerFactory<PacienteCubit>(
     () => PacienteCubit(sl()),
   );
-
   sl.registerLazySingleton<CitaRemoteDataSource>(
     () => CitaRemoteDataSource(sl()),
   );
@@ -267,9 +270,18 @@ Future<void> init() async {
   sl.registerLazySingleton<UsuarioRepository>(
     () => UsuarioRepositoryImpl(sl()),
   );
-
   sl.registerFactory<AuthCubit>(
     () => AuthCubit(usuarioRepository: sl()),
+  );
+
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSource(sl()),
+  );
+  sl.registerLazySingleton<IAuthRepository>(
+    () => AuthRepositoryImpl(sl()),
+  );
+  sl.registerSingleton<AuthSessionCubit>(
+    AuthSessionCubit(sl())..initialize(),
   );
 
   sl.registerFactory<DashboardCubit>(

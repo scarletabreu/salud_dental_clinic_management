@@ -4,8 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource.dart';
-
-// Importaciones de tus modelos específicos de personal para el mapeo polimórfico
 import 'package:salud_dental_clinic_management/features/personal/data/models/admin_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/asistente_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
@@ -19,7 +17,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   String? getCurrentUserId() {
     try {
       return remoteDataSource.getCurrentUserId();
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -28,7 +26,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   bool isSessionActive() {
     try {
       return remoteDataSource.isSessionActive();
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
@@ -45,58 +43,58 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   @override
   Future<Usuario> loginUsuario(String username, String password) async {
     try {
-      // 1. Delegamos la autenticación base al DataSource
+      print('>>> intentando login con: $username@saluddental.com');
       final response = await remoteDataSource.signInWithPassword(
         email: '$username@saluddental.com',
         password: password,
       );
-
+      print('>>> login ok, uuid: ${response.user?.id}');
       final userUuid = response.user?.id;
       if (userUuid == null) {
         throw Exception('Usuario no encontrado en la autenticación.');
       }
 
-      // 2. BUSQUEDA EN CASCADA (Polimorfismo en DB)
-      // Delegamos los queries de infraestructura al remoteDataSource usando su supabaseClient interno
-
-      // ¿Es un Doctor / Odontólogo?
-      final doctorData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'doctores',
-        uuid: userUuid,
-        selectColumns: '*, asistentes(*)',
-      );
-
-      if (doctorData != null) {
-        return DoctorModel.fromJson(doctorData);
+      final perfil = await getPerfilPorUuid(userUuid);
+      if (perfil == null) {
+        throw Exception('El usuario autenticado no tiene un perfil operativo asignado.');
       }
-
-      // ¿Es un Administrador?
-      final adminData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'administradores',
-        uuid: userUuid,
-      );
-
-      if (adminData != null) {
-        return AdminModel.fromJson(adminData);
-      }
-
-      // ¿Es un Asistente?
-      final asistenteData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'asistentes',
-        uuid: userUuid,
-      );
-
-      if (asistenteData != null) {
-        return AsistenteModel.fromJson(asistenteData);
-      }
-
-      // Failsafe corporativo
-      throw Exception('El usuario autenticado no tiene un perfil operativo asignado.');
-    } catch (e) {
-      throw Exception('Error de inicio de sesión: ${e.toString()}');
+      return perfil;
+    }catch (e) {
+      print('>>> ERROR login: $e');
+      rethrow;
     }
   }
 
+  
+
+  /// Búsqueda en cascada por UUID. Mismo orden que antes.
   @override
-  Stream<supabase.AuthState> get onAuthStateChange => remoteDataSource.authStateChanges;
+  Future<Usuario?> getPerfilPorUuid(String uuid) async {
+    final doctorData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'doctores',
+      uuid: uuid,
+      selectColumns: '*, usuarios(*, personas(*))',
+    );
+    if (doctorData != null) return DoctorModel.fromJson(doctorData);
+
+    final adminData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'admins',
+      uuid: uuid,
+      selectColumns: '*, usuarios(*, personas(*))',
+    );
+    if (adminData != null) return AdminModel.fromJson(adminData);
+
+    final asistenteData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'asistentes',
+      uuid: uuid,
+      selectColumns: '*, usuarios(*, personas(*))',
+    );
+    if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
+
+    return null;
+  }
+
+  @override
+  Stream<supabase.AuthState> get onAuthStateChange =>
+      remoteDataSource.authStateChanges;
 }

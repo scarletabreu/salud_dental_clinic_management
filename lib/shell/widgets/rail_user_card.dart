@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 
 class RailUserCard extends StatelessWidget {
   final bool extended;
@@ -25,7 +27,22 @@ class RailUserCard extends StatelessWidget {
     if (!extended) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: avatar,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            const SizedBox(height: 8),
+            IconButton(
+              icon: Icon(
+                Icons.logout_rounded,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              tooltip: 'Cerrar sesión',
+              onPressed: () => context.read<AuthCubit>().logout(),
+            ),
+          ],
+        ),
       );
     }
 
@@ -62,6 +79,15 @@ class RailUserCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.logout_rounded,
+              size: 20,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            tooltip: 'Cerrar sesión',
+            onPressed: () => context.read<AuthCubit>().logout(),
           ),
         ],
       ),

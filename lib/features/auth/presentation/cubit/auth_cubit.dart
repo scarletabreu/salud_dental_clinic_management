@@ -1,36 +1,87 @@
 // lib/features/auth/presentation/cubit/auth_cubit.dart
 
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
   final UsuarioRepository _usuarioRepository;
+  StreamSubscription<dynamic>? _authSubscription;
 
   AuthCubit({required UsuarioRepository usuarioRepository})
       : _usuarioRepository = usuarioRepository,
-        super(AuthState.initial());
+        super(const AuthState()) {
+    _subscribeToAuthChanges();
+  }
 
-  /// Método para iniciar sesión usando el repositorio de Usuarios existente
-  Future<void> login(String username, String password) async {
+  // ── Escucha el stream de Supabase Auth para restaurar sesión al arrancar ──
+  void _subscribeToAuthChanges() {
+    _authSubscription = _usuarioRepository.onAuthStateChange.listen((authState) async {
+      final session = authState.session;
+
+      if (session == null) {
+        // Sesión cerrada o expirada
+        if (state.isAuthenticated) emit(const AuthState());
+        return;
+      }
+
+      // Ya tenemos usuario cargado con ese mismo UUID → no volver a cargar
+      if (state.isAuthenticated && state.usuario?.id == session.user.id) return;
+
+      // Sesión activa pero el cubit está vacío (ej: reinicio de app) → cargar perfil
+      await _cargarPerfilDesdeUuid(session.user.id);
+    });
+  }
+
+  /// Carga el perfil del backend usando el UUID de Supabase Auth.
+  Future<void> _cargarPerfilDesdeUuid(String uuid) async {
     try {
-      // Tu UsuarioRepository debe encargarse de ir a Supabase, validar las credenciales,
-      // revisar si el ID existe en las tablas hijas (Admin, Doctor, Asistente)
-      // y retornar la instancia concreta (ej: AdminModel, DoctorModel) casteada como Usuario.
-      final usuario = await _usuarioRepository.loginUsuario(username, password);
-
-      emit(state.copyWith(
-        isAuthenticated: true,
-        usuario: usuario,
-      ));
-    } catch (e) {
-      // Si falla, volvemos al estado inicial no autenticado
-      emit(AuthState.initial());
+      final usuario = await _usuarioRepository.getPerfilPorUuid(uuid);
+      if (usuario != null) {
+        emit(state.copyWith(isAuthenticated: true, usuario: usuario));
+      } else {
+        // UUID en Auth pero sin perfil en el backend → limpiar
+        emit(const AuthState());
+      }
+    } catch (_) {
+      emit(const AuthState());
     }
   }
 
-  /// Restablecer el estado (Cerrar sesión)
-  void logout() {
-    emit(AuthState.initial());
+  /// Login con username. El email sintético se construye en el repositorio.
+  Future<void> login(String username, String password) async {
+    try {
+      final usuario = await _usuarioRepository.loginUsuario(username, password);
+      emit(state.copyWith(isAuthenticated: true, usuario: usuario));
+    } catch (e) {
+      // Re-emite el mismo estado limpio con el error para que la UI lo muestre
+      emit(AuthState(error: _parseError(e.toString())));
+    }
+  }
+
+  /// Cierre de sesión completo.
+  Future<void> logout() async {
+    await _usuarioRepository.signOut();
+    emit(const AuthState());
+  }
+
+  String _parseError(String raw) {
+    if (raw.contains('Invalid login credentials') || raw.contains('invalid_credentials')) {
+      return 'Usuario o contraseña incorrectos.';
+    }
+    if (raw.contains('no tiene un perfil operativo')) {
+      return 'El usuario no tiene un rol asignado. Contacta al administrador.';
+    }
+    if (raw.contains('network') || raw.contains('SocketException')) {
+      return 'Sin conexión. Verifica tu red e intenta de nuevo.';
+    }
+    return 'Ocurrió un error inesperado. Intenta de nuevo.';
+  }
+
+  @override
+  Future<void> close() {
+    _authSubscription?.cancel();
+    return super.close();
   }
 }

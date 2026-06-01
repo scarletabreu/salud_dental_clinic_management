@@ -12,6 +12,7 @@ class DienteModel extends Diente {
     super.diagnosis = const [],
     required super.fdiCode,
     super.observaciones,
+    super.estaAusente = false,
   });
 
   factory DienteModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +21,7 @@ class DienteModel extends Diente {
       odontogramaId: json['odontograma_id'] as String,
       fdiCode: (json['fdi_code'] as num).toInt(),
       observaciones: json['observaciones'] as String?,
+      estaAusente: json['esta_ausente'] as bool? ?? false,
       // Relaciones normalmente cargadas en una consulta con JOIN
       superficies: json['superficies'] != null
           ? (json['superficies'] as List)
@@ -44,6 +46,7 @@ class DienteModel extends Diente {
       'odontograma_id': odontogramaId,
       'fdi_code': fdiCode,
       'observaciones': observaciones,
+      'esta_ausente': estaAusente,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

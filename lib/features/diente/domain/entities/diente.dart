@@ -10,6 +10,7 @@ class Diente {
   final List<DiagnosticoAplicado> diagnosis;
   final int fdiCode;
   final String? observaciones;
+  final bool estaAusente;
 
   Diente({
     this.id,
@@ -19,6 +20,7 @@ class Diente {
     this.diagnosis = const [],
     required this.fdiCode,
     this.observaciones,
+    this.estaAusente = false,
   });
 
   Diente copyWith({
@@ -28,6 +30,7 @@ class Diente {
     List<DiagnosticoAplicado>? diagnosis,
     int? fdiCode,
     String? observaciones,
+    bool? estaAusente,
   }) {
     return Diente(
       id: id,
@@ -37,6 +40,7 @@ class Diente {
       diagnosis: diagnosis ?? this.diagnosis,
       fdiCode: fdiCode ?? this.fdiCode,
       observaciones: observaciones ?? this.observaciones,
+      estaAusente: estaAusente ?? this.estaAusente,
     );
   }
 }

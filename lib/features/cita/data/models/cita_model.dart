@@ -9,6 +9,7 @@ class CitaModel extends Cita {
     required super.doctor,
     required super.persona,
     required super.date,
+    super.duracionMinutos = 30,
     required super.esEmergencia,
     required super.estado,
   });
@@ -27,6 +28,7 @@ class CitaModel extends Cita {
       doctor: DoctorModel.fromJson(json['doctor']),
       persona: PersonaModel.fromJson(json['persona']),
       date: DateTime.parse(fechaRaw).toLocal(),
+      duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
       esEmergencia: json['es_emergencia'] ?? false,
       estado: EstadoCita.values.firstWhere(
         (e) => e.name == json['estado'],
@@ -39,6 +41,7 @@ class CitaModel extends Cita {
       'doctor_id': doctor.id,
       'persona_id': persona.id,
       'fecha': date.toUtc().toIso8601String(),
+      'duracion_minutos': duracionMinutos,
       'es_emergencia': esEmergencia,
       'estado': estado.name,
     };

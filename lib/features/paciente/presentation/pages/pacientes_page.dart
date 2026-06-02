@@ -347,7 +347,7 @@ Widget _buildFooter(BuildContext context, PacienteLoaded state) {
   final shown = state.filtrados.length;
   final total = state.todos.length;
   return Container(
-    color: colorScheme.surface,
+    color: context.appColors.cardBg,
     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -390,7 +390,7 @@ class _PacienteRowState extends State<_PacienteRow> {
     final ac = context.appColors;
     final Color fondoTarjeta = _expanded
         ? ac.primaryBlue.withValues(alpha: 0.04)
-        : colorScheme.surface;
+        : ac.cardBg;
 
     final Color colorBorde = _expanded
         ? ac.primaryBlue.withValues(alpha: 0.25)
@@ -526,7 +526,7 @@ class _PacienteRowState extends State<_PacienteRow> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface.withOpacity(0.2),
+        color: context.appColors.cardBg.withValues(alpha: 0.2),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(14),
           bottomRight: Radius.circular(14),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
@@ -99,35 +99,38 @@ class _PacientesPageState extends State<PacientesPage> {
                     ),
                     if (state is PacienteLoaded) ...[
                       const SizedBox(width: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3385FF).withOpacity(0.07),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${state.todos.length}',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF3385FF),
-                                  ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.people_alt_rounded,
-                              color: const Color(0xFF3385FF),
-                              size: 13,
-                            ),
-                          ],
-                        ),
-                      ),
+                      Builder(builder: (context) {
+                        final ac = context.appColors;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ac.primaryBlue.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${state.todos.length}',
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: ac.primaryBlue,
+                                    ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.people_alt_rounded,
+                                color: ac.primaryBlue,
+                                size: 13,
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                     ],
                   ],
                 ),
@@ -140,7 +143,7 @@ class _PacientesPageState extends State<PacientesPage> {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF3385FF),
+                  backgroundColor: context.appColors.primaryBlue,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 16,
@@ -190,7 +193,7 @@ class _PacientesPageState extends State<PacientesPage> {
                     )
                   : null,
               filled: true,
-              fillColor: const Color(0xFFEEF2F6),
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -204,8 +207,8 @@ class _PacientesPageState extends State<PacientesPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFF0066FF),
+                borderSide: BorderSide(
+                  color: context.appColors.primaryBlue,
                   width: 1.2,
                 ),
               ),
@@ -384,12 +387,13 @@ class _PacienteRowState extends State<_PacienteRow> {
     final colorScheme = Theme.of(context).colorScheme;
     final p = widget.paciente;
 
+    final ac = context.appColors;
     final Color fondoTarjeta = _expanded
-        ? const Color(0xFF3385FF).withOpacity(0.04)
+        ? ac.primaryBlue.withValues(alpha: 0.04)
         : colorScheme.surface;
 
     final Color colorBorde = _expanded
-        ? const Color(0xFF3385FF).withOpacity(0.25)
+        ? ac.primaryBlue.withValues(alpha: 0.25)
         : colorScheme.outlineVariant.withOpacity(0.4);
 
     return AnimatedContainer(
@@ -412,7 +416,7 @@ class _PacienteRowState extends State<_PacienteRow> {
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(14),
-            hoverColor: const Color(0xFF3385FF).withOpacity(0.02),
+            hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -495,7 +499,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                         _ActionIcon(
                           icon: Icons.visibility_outlined,
                           tooltip: 'Ver expediente',
-                          color: const Color(0xFF3385FF).withOpacity(0.85),
+                          color: ac.primaryBlue,
                           onTap: widget.onVerDetalle,
                         ),
                         const SizedBox(width: 6),

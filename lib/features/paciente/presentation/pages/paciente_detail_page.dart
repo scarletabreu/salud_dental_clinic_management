@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -53,24 +53,25 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Scaffold(
-      backgroundColor: kBgPage,
+      backgroundColor: ac.bgPage,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: ac.cardBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: kTextPrimary,
-        title: const Text(
+        foregroundColor: ac.textPrimary,
+        title: Text(
           'Expediente Clínico',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: kTextPrimary),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: ac.textPrimary),
         ),
         centerTitle: false,
       ),
       body: BlocBuilder<PacienteCubit, PacienteState>(
         builder: (context, state) {
           if (state is PacienteDetailLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: kTeal, strokeWidth: 2),
+            return Center(
+              child: CircularProgressIndicator(color: context.appColors.primaryBlue, strokeWidth: 2),
             );
           }
           if (state is PacienteError) {
@@ -121,13 +122,14 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   // ─────────────────────────────────────────────
 
   Widget _buildIdentityCard(Paciente p) {
+    final ac = context.appColors;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: [kCardShadow],
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        boxShadow: [ac.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,8 +164,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Editar'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kTextSecondary,
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      foregroundColor: ac.textSecondary,
+                      side: BorderSide(color: ac.divider),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -179,7 +181,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     icon: const Icon(Icons.calendar_today_outlined, size: 16),
                     label: const Text('Nueva Cita'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: kTeal,
+                      backgroundColor: ac.primaryBlue,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -193,10 +195,10 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           const SizedBox(height: 14),
           Text(
             p.fullName,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: ac.textPrimary,
               height: 1.1,
             ),
           ),
@@ -226,13 +228,15 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final hasCirugias = record.cirugiasPrevias.isNotEmpty;
     if (!hasCondiciones && !hasCirugias) return const SizedBox.shrink();
 
+    final ac = context.appColors;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          boxShadow: [kCardShadow],
+        decoration: BoxDecoration(
+          color: ac.cardBg,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          boxShadow: [ac.cardShadow],
         ),
         clipBehavior: Clip.antiAlias,
         child: IntrinsicHeight(
@@ -241,11 +245,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             children: [
               Container(
                 width: 3,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+                    colors: [ac.red, ac.red.withValues(alpha: 0.6)],
                   ),
                 ),
               ),
@@ -255,39 +259,37 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
                       Row(
                         children: [
                           Container(
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: kRed.withValues(alpha: 0.10),
+                              color: ac.red.withValues(alpha: 0.10),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.warning_amber_rounded, size: 18, color: kRed),
+                            child: Icon(Icons.warning_amber_rounded, size: 18, color: ac.red),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
+                          Text(
                             'Alertas Médicas',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
-                              color: kRed,
+                              color: ac.red,
                             ),
                           ),
                         ],
                       ),
-                      // Condiciones
                       if (hasCondiciones) ...[
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'CONDICIONES / ALERGIAS',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.0,
-                            color: kTextMuted,
+                            color: ac.textMuted,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -295,30 +297,29 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: kRed.withValues(alpha: 0.04),
+                            color: ac.red.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             record.condiciones,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: kTextSecondary,
+                              color: ac.textSecondary,
                               height: 1.55,
                             ),
                           ),
                         ),
                       ],
-                      // Cirugías
                       if (hasCirugias) ...[
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'CIRUGÍAS PREVIAS',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.0,
-                            color: kTextMuted,
+                            color: ac.textMuted,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -328,10 +329,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                           children: record.cirugiasPrevias
                               .map(
                                 (c) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: kRed.withValues(alpha: 0.08),
+                                    color: ac.red.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Row(
@@ -340,7 +340,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                                       Icon(
                                         Icons.local_hospital_outlined,
                                         size: 12,
-                                        color: kRed.withValues(alpha: 0.70),
+                                        color: ac.red.withValues(alpha: 0.70),
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
@@ -348,7 +348,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
-                                          color: kRed.withValues(alpha: 0.80),
+                                          color: ac.red.withValues(alpha: 0.80),
                                         ),
                                       ),
                                     ],
@@ -374,6 +374,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   // ─────────────────────────────────────────────
 
   Widget _buildContactoCard(Paciente p) {
+    final ac = context.appColors;
     final phone = p.contacto.numeroTelefono.isEmpty ? '—' : p.contacto.numeroTelefono;
     final email = p.contacto.email.isEmpty ? '—' : p.contacto.email;
     final hasAddress = p.contacto.direccion.isNotEmpty;
@@ -393,7 +394,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           if (hasAddress) ...[
             const SizedBox(height: 16),
-            const Divider(height: 1, color: kDivider),
+            Divider(height: 1, color: ac.divider),
             const SizedBox(height: 16),
             _InfoCell(
               icon: Icons.location_on_outlined,
@@ -412,6 +413,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   // ─────────────────────────────────────────────
 
   Widget _buildInfoClinicaCard(Record record) {
+    final ac = context.appColors;
     final hasHistorial = record.historialFamiliar.trim().isNotEmpty;
 
     return _SectionCard(
@@ -419,14 +421,16 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHeader(
-              icon: Icons.medical_information_outlined, title: 'Información Clínica'),
+            icon: Icons.medical_information_outlined,
+            title: 'Información Clínica',
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: _MetricTile(
                   icon: Icons.bloodtype_outlined,
-                  iconColor: kRed,
+                  iconColor: ac.red,
                   label: 'TIPO DE SANGRE',
                   value: record.tipoSangre.name.toUpperCase(),
                 ),
@@ -435,7 +439,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               Expanded(
                 child: _MetricTile(
                   icon: Icons.child_care_outlined,
-                  iconColor: kIndigo,
+                  iconColor: ac.indigo,
                   label: 'HIJOS',
                   value: '${record.cantHijos}',
                 ),
@@ -444,24 +448,24 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           if (hasHistorial) ...[
             const SizedBox(height: 16),
-            const Divider(height: 1, color: kDivider),
+            Divider(height: 1, color: ac.divider),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'HISTORIAL FAMILIAR',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.0,
-                color: kTextMuted,
+                color: ac.textMuted,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               record.historialFamiliar,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
-                color: kTextSecondary,
+                color: ac.textSecondary,
                 height: 1.6,
               ),
             ),
@@ -476,6 +480,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   // ─────────────────────────────────────────────
 
   Widget _buildTimelineCard(List<Consulta> sorted) {
+    final ac = context.appColors;
+
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,24 +489,25 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           Row(
             children: [
               const _SectionHeader(
-                  icon: Icons.history_edu_outlined, title: 'Historial de Consultas'),
+                icon: Icons.history_edu_outlined,
+                title: 'Historial de Consultas',
+              ),
               const Spacer(),
-              if (sorted.isNotEmpty)
-                _CountChip(sorted.length),
+              if (sorted.isNotEmpty) _CountChip(sorted.length),
             ],
           ),
           if (sorted.isEmpty) ...[
             const SizedBox(height: 32),
-            const Center(
+            Center(
               child: Column(
                 children: [
-                  Icon(Icons.folder_open_outlined, size: 32, color: Color(0xFFD1D5DB)),
-                  SizedBox(height: 8),
+                  Icon(Icons.folder_open_outlined, size: 32, color: ac.textDisabled),
+                  const SizedBox(height: 8),
                   Text(
                     'Sin consultas registradas',
                     style: TextStyle(
                       fontSize: 13,
-                      color: kTextDisabled,
+                      color: ac.textDisabled,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -519,11 +526,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   }
 
   Widget _buildTimelineItem(Consulta c, bool isLast) {
+    final ac = context.appColors;
+
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date column
           SizedBox(
             width: 48,
             child: Column(
@@ -531,54 +539,52 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               children: [
                 Text(
                   c.fecha.day.toString().padLeft(2, '0'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: kTextPrimary,
+                    color: ac.textPrimary,
                     height: 1,
                   ),
                 ),
                 Text(
                   _monthAbbr(c.fecha.month).toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
-                    color: kTextMuted,
+                    color: ac.textMuted,
                   ),
                 ),
                 Text(
                   '${c.fecha.year}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
-                    color: kTextDisabled,
+                    color: ac.textDisabled,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          // Timeline axis
           Column(
             children: [
               Container(
                 width: 9,
                 height: 9,
-                decoration: const BoxDecoration(color: kTeal, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: ac.teal, shape: BoxShape.circle),
               ),
               if (!isLast)
                 Expanded(
                   child: Container(
                     width: 1,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: const Color(0xFFE5E7EB),
+                    color: ac.divider,
                   ),
                 ),
             ],
           ),
           const SizedBox(width: 12),
-          // Content
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
@@ -589,20 +595,17 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     c.motivoConsulta?.isNotEmpty == true
                         ? c.motivoConsulta!
                         : 'Consulta general',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: kTextPrimary,
+                      color: ac.textPrimary,
                     ),
                   ),
                   if (c.tempCondiciones.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       c.tempCondiciones.join(' · '),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: kTextSecondary,
-                      ),
+                      style: TextStyle(fontSize: 12, color: ac.textSecondary),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -614,23 +617,21 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     children: [
                       if (c.recetas.isNotEmpty)
                         _MiniChip(
-                          label:
-                              '${c.recetas.length} receta${c.recetas.length > 1 ? 's' : ''}',
+                          label: '${c.recetas.length} receta${c.recetas.length > 1 ? 's' : ''}',
                           icon: Icons.medication_outlined,
-                          color: kIndigo,
+                          color: ac.indigo,
                         ),
                       if (c.documentosClinicos.isNotEmpty)
                         _MiniChip(
-                          label:
-                              '${c.documentosClinicos.length} doc${c.documentosClinicos.length > 1 ? 's' : ''}',
+                          label: '${c.documentosClinicos.length} doc${c.documentosClinicos.length > 1 ? 's' : ''}',
                           icon: Icons.description_outlined,
-                          color: kTeal,
+                          color: ac.teal,
                         ),
                       if (c.odontograma != null)
                         _MiniChip(
                           label: 'Odontograma',
                           icon: Icons.medical_services_outlined,
-                          color: kAmber,
+                          color: ac.amber,
                         ),
                     ],
                   ),
@@ -650,18 +651,18 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
 class _SectionCard extends StatelessWidget {
   final Widget child;
-
   const _SectionCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        boxShadow: [kCardShadow],
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        boxShadow: [ac.cardShadow],
       ),
       child: child,
     );
@@ -675,24 +676,25 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Row(
       children: [
         Container(
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: kTeal.withValues(alpha: 0.10),
+            color: ac.teal.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 18, color: kTeal),
+          child: Icon(icon, size: 18, color: ac.teal),
         ),
         const SizedBox(width: 12),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: kTextPrimary,
+            color: ac.textPrimary,
           ),
         ),
       ],
@@ -715,6 +717,7 @@ class _InfoCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -722,10 +725,10 @@ class _InfoCell extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: kBgPage,
+            color: ac.bgPage,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 18, color: kTeal),
+          child: Icon(icon, size: 18, color: ac.teal),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -734,20 +737,20 @@ class _InfoCell extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.0,
-                  color: kTextMuted,
+                  color: ac.textMuted,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: kTextPrimary,
+                  color: ac.textPrimary,
                 ),
                 overflow: fullWidth ? null : TextOverflow.ellipsis,
               ),
@@ -774,11 +777,12 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: const BoxDecoration(
-        color: kBgPage,
-        borderRadius: BorderRadius.all(Radius.circular(12)),
+      decoration: BoxDecoration(
+        color: ac.bgPage,
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,20 +799,20 @@ class _MetricTile extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
-              color: kTextMuted,
+              color: ac.textMuted,
             ),
           ),
           const SizedBox(height: 3),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: ac.textPrimary,
               height: 1,
             ),
           ),
@@ -825,17 +829,18 @@ class _MetaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: kTextMuted),
+        Icon(icon, size: 14, color: ac.textMuted),
         const SizedBox(width: 5),
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: kTextSecondary,
+            color: ac.textSecondary,
           ),
         ),
       ],
@@ -849,8 +854,9 @@ class _TipoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final isEmergencia = tipo == TipoPaciente.emergencia;
-    final color = isEmergencia ? kRed : kTeal;
+    final color = isEmergencia ? ac.red : ac.teal;
     final label = isEmergencia ? 'EMERGENCIA' : 'INTEGRADO';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -877,6 +883,7 @@ class _GenderChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     const labels = {
       Genero.masculino: 'Masculino',
       Genero.femenino: 'Femenino',
@@ -885,16 +892,16 @@ class _GenderChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.all(Radius.circular(100)),
+      decoration: BoxDecoration(
+        color: ac.chipBg,
+        borderRadius: const BorderRadius.all(Radius.circular(100)),
       ),
       child: Text(
         labels[genero] ?? genero.name,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: kTextMuted,
+          color: ac.textMuted,
         ),
       ),
     );
@@ -907,15 +914,16 @@ class _CountChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: kTeal.withValues(alpha: 0.10),
+        color: ac.teal.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Text(
         '$count',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTeal),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ac.teal),
       ),
     );
   }
@@ -956,23 +964,24 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: kRed),
+            Icon(Icons.error_outline_rounded, size: 48, color: ac.red),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Error al cargar el expediente',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: kTextPrimary),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ac.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: kTextMuted),
+              style: TextStyle(fontSize: 13, color: ac.textMuted),
             ),
           ],
         ),

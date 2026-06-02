@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
@@ -25,12 +26,12 @@ class TratamientoCard extends StatelessWidget {
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.5),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.03),
+            color: colorScheme.shadow.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -40,7 +41,7 @@ class TratamientoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: () => _abrirEdicion(context),
-          hoverColor: colorScheme.primaryContainer.withOpacity(0.15),
+          hoverColor: colorScheme.primaryContainer.withValues(alpha: 0.15),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -49,7 +50,7 @@ class TratamientoCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.08),
+                    color: colorScheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -111,9 +112,7 @@ class TratamientoCard extends StatelessWidget {
                         Text(
                           'Precio Base',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant.withOpacity(
-                              0.7,
-                            ),
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -122,7 +121,7 @@ class TratamientoCard extends StatelessWidget {
                           '\$${tratamiento.costo.toStringAsFixed(2)}',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green.shade700,
+                            color: context.appColors.green,
                             fontSize: 20,
                           ),
                         ),
@@ -194,7 +193,7 @@ class TratamientoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withOpacity(0.4),
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -223,9 +222,9 @@ class TratamientoCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            Icon(Icons.warning_amber_rounded, color: colorScheme.error),
             SizedBox(width: 10),
             Text('¿Eliminar tratamiento?'),
           ],

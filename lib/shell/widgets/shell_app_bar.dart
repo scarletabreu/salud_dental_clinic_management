@@ -24,15 +24,14 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final ac = context.appColors;
 
     return Material(
-      color: colorScheme.surface,
+      color: ac.cardBg,
       elevation: 0,
       child: Container(
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: ac.divider, width: 1)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
@@ -108,7 +107,7 @@ class _AvailabilityToggle extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: selected ? colorScheme.surface : Colors.transparent,
+            color: selected ? ac.cardBg : Colors.transparent,
             borderRadius: BorderRadius.circular(100),
             boxShadow: selected
                 ? [
@@ -150,7 +149,7 @@ class _AvailabilityToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: ac.chipBg,
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(

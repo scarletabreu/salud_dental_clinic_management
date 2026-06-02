@@ -11,7 +11,6 @@ import 'package:salud_dental_clinic_management/features/inicio/presentation/page
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
-// Importamos tu nueva pantalla de tratamientos
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
@@ -73,7 +72,6 @@ class _DashboardShellState extends State<DashboardShell> {
       label: 'Medicinas',
       builder: (_) => MedicinaListPage(repository: sl<IMedicinaRepository>()),
     ),
-    // 🦷 Destino del Catálogo de Tratamientos integrado aquí
     ShellDestination(
       icon: Icons.medical_services_outlined,
       selectedIcon: Icons.medical_services_rounded,

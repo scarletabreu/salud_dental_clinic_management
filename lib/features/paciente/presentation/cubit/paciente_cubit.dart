@@ -10,6 +10,7 @@ class PacienteCubit extends Cubit<PacienteState> {
   Future<void> load() async {
     emit(const PacienteLoading());
     final result = await _repository.getPacientes();
+
     result.fold(
       (failure) => emit(PacienteError(failure.message)),
       (list) => emit(PacienteLoaded(todos: list, filtrados: list)),
@@ -19,6 +20,7 @@ class PacienteCubit extends Cubit<PacienteState> {
   Future<void> loadById(String id) async {
     emit(const PacienteDetailLoading());
     final result = await _repository.getPacienteById(id);
+
     result.fold(
       (failure) => emit(PacienteError(failure.message)),
       (paciente) => emit(PacienteDetailLoaded(paciente)),
@@ -30,6 +32,7 @@ class PacienteCubit extends Cubit<PacienteState> {
     if (current is! PacienteLoaded) return;
 
     final q = query.toLowerCase().trim();
+
     if (q.isEmpty) {
       emit(PacienteLoaded(todos: current.todos, filtrados: current.todos));
       return;

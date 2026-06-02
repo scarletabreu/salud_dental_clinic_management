@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class ShellLogo extends StatelessWidget {
   final bool extended;
@@ -7,19 +8,19 @@ class ShellLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     final textTheme = Theme.of(context).textTheme;
 
     final icon = Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
+        color: ac.railSelectedBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(
         Icons.medical_services_rounded,
-        color: colorScheme.onPrimaryContainer,
+        color: ac.railTextSelected,
         size: 22,
       ),
     );
@@ -45,14 +46,14 @@ class ShellLogo extends StatelessWidget {
                   'Salud Dental',
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: colorScheme.primary,
+                    color: ac.railTextSelected,
                     height: 1.1,
                   ),
                 ),
                 Text(
                   'Gestión Clínica',
                   style: textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                    color: ac.railText,
                     letterSpacing: 1.2,
                   ),
                 ),

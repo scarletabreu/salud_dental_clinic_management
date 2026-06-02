@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/asistente_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
@@ -7,7 +8,7 @@ class DoctorModel extends Doctor {
     super.id,
     required super.nombre,
     required super.apellido,
-    required super.contacto,
+    required super.contactos,
     required super.birthDate,
     required super.govID,
     required super.estatus,
@@ -19,36 +20,68 @@ class DoctorModel extends Doctor {
   });
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
+    // 1. Entramos al primer nivel (usuarios)
+    final usuarioData = json['usuarios'] as Map<String, dynamic>? ?? {};
+    
+    // 2. Entramos al segundo nivel (personas) desde usuarios
+    final personaData = usuarioData['personas'] as Map<String, dynamic>? ?? {};
+
     return DoctorModel(
       id: json['id'] as String?,
-      nombre: json['nombre'],
-      apellido: json['apellido'],
-      contacto: ContactoModel.fromJson(json['contacto']),
-      birthDate: DateTime.parse(json['fecha_nacimiento']),
-      govID: json['cedula'],
-      estatus: json['estatus'],
-      username: json['username'],
-      passwordHash: json['password_hash'],
-      specialty: json['especialidad'],
-      assistants:
-          (json['assistants'] as List?)
-              ?.map((e) => AsistenteModel.fromJson(e))
+      
+      // Datos que vienen del fondo: de la tabla 'personas'
+      nombre: personaData['nombre'] as String? ?? '',
+      apellido: personaData['apellido'] as String? ?? '',
+      birthDate: personaData['fecha_nacimiento'] != null
+          ? DateTime.parse(personaData['fecha_nacimiento'])
+          : DateTime.now(),
+      govID: personaData['cedula'] as String? ?? '',
+      contactos: _parseContactos(personaData),
+      
+      // Datos que vienen del medio: de la tabla 'usuarios'
+      estatus: _parseEstatus(personaData['estatus'] as String?),
+      username: usuarioData['username'] as String? ?? '',
+      passwordHash: usuarioData['password_hash'] as String? ?? '',
+      
+      // Datos de la raíz: de la tabla 'doctores'
+      specialty: json['especialidad'] as String? ?? '',
+      isAvailable: json['esta_disponible'] as bool? ?? true,
+      
+      assistants: (json['assistants'] as List?)
+              ?.map((e) => AsistenteModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      isAvailable: json['esta_disponible'] ?? true,
     );
+  }
+
+  static EstatusPersona _parseEstatus(String? estatusStr) {
+    if (estatusStr == null) return EstatusPersona.activo; // Fallback por defecto
+    
+    return EstatusPersona.values.firstWhere(
+      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
+      orElse: () => EstatusPersona.activo, // Por si en DB guardas algo raro
+    );
+  }
+
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
+    final raw = json['contactos'];
+
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map((item) => ContactoModel.fromJson(item))
+          .toList();
+    }
+
+    if (raw is Map<String, dynamic>) {
+      return [ContactoModel.fromJson(raw)];
+    }
+
+    return [];
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'nombre': nombre,
-      'apellido': apellido,
-      'contacto': (contacto as ContactoModel).toJson(),
-      'fecha_nacimiento': birthDate.toIso8601String(),
-      'cedula': govID,
-      'estatus': estatus,
-      'username': username,
-      'password_hash': passwordHash,
       'especialidad': specialty,
       'esta_disponible': isAvailable,
       'assistants': assistants

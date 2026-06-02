@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 enum DoctorAvailability { disponible, ocupado }
 
@@ -23,15 +27,14 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final ac = context.appColors;
 
     return Material(
-      color: colorScheme.surface,
+      color: ac.cardBg,
       elevation: 0,
       child: Container(
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: ac.divider, width: 1)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
@@ -60,7 +63,7 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ? Icons.check_circle_rounded
                       : Icons.do_not_disturb_on_rounded,
                   color: availability == DoctorAvailability.disponible
-                      ? Colors.green.shade600
+                      ? context.appColors.green
                       : colorScheme.error,
                 ),
                 onSelected: onAvailabilityChanged,
@@ -92,6 +95,7 @@ class _AvailabilityToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final ac = context.appColors;
 
     Widget pill({
       required DoctorAvailability target,
@@ -106,12 +110,12 @@ class _AvailabilityToggle extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: selected ? colorScheme.surface : Colors.transparent,
+            color: selected ? ac.cardBg : Colors.transparent,
             borderRadius: BorderRadius.circular(100),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: colorScheme.shadow.withValues(alpha: 0.08),
                       blurRadius: 6,
                       offset: const Offset(0, 1),
                     ),
@@ -148,7 +152,7 @@ class _AvailabilityToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: ac.chipBg,
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -157,7 +161,7 @@ class _AvailabilityToggle extends StatelessWidget {
           pill(
             target: DoctorAvailability.disponible,
             label: 'Disponible',
-            dotColor: Colors.green.shade500,
+            dotColor: ac.green,
           ),
           pill(
             target: DoctorAvailability.ocupado,
@@ -178,6 +182,24 @@ class _DoctorChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final usuario = context.select((AuthCubit c) => c.state.usuario);
+
+    String initials() {
+      if (usuario == null) return 'JM';
+      final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
+      final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
+      final s = (n + a).trim();
+      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+    }
+
+    final displayName = usuario != null
+        ? (usuario is Doctor
+            ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+            : '${usuario.nombre} ${usuario.apellido}')
+        : 'Doctor';
+
+    final subtitle = usuario is Doctor ? usuario.specialty : '';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -185,14 +207,14 @@ class _DoctorChip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'Dr. Javier Méndez',
+              displayName,
               style: textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: colorScheme.onSurface,
               ),
             ),
             Text(
-              'Odontólogo Especialista',
+              subtitle,
               style: textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -204,7 +226,7 @@ class _DoctorChip extends StatelessWidget {
           radius: 18,
           backgroundColor: colorScheme.primary,
           child: Text(
-            'JM',
+            initials(),
             style: textTheme.labelMedium?.copyWith(
               color: colorScheme.onPrimary,
               fontWeight: FontWeight.w700,

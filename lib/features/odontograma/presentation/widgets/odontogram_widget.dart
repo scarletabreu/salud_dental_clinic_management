@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
@@ -9,17 +9,28 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/enums/
 import 'tooth_geometry.dart';
 
 // ─────────────────────────────────────────────
+//  Functional tooth status colors — dental data, NOT theme-adaptive
+// ─────────────────────────────────────────────
+
+const _kToothTeal   = Color(0xFF0D9488);
+const _kToothIndigo = Color(0xFF6366F1);
+const _kToothAmber  = Color(0xFFF59E0B);
+const _kToothRed    = Color(0xFFEF4444);
+const _kToothGreen  = Color(0xFF10B981);
+const _kToothEmpty  = Color(0xFFCBD5E1);
+
+// ─────────────────────────────────────────────
 //  Tooth status
 // ─────────────────────────────────────────────
 
 enum ToothStatus { empty, treated, mild, moderate, critical }
 
 Color colorForStatus(ToothStatus s) => switch (s) {
-      ToothStatus.empty => const Color(0xFFCBD5E1),
-      ToothStatus.treated => kTeal,
-      ToothStatus.mild => kIndigo,
-      ToothStatus.moderate => kAmber,
-      ToothStatus.critical => kRed,
+      ToothStatus.empty    => _kToothEmpty,
+      ToothStatus.treated  => _kToothTeal,
+      ToothStatus.mild     => _kToothIndigo,
+      ToothStatus.moderate => _kToothAmber,
+      ToothStatus.critical => _kToothRed,
     };
 
 ToothStatus statusForDiente(Diente? d) {
@@ -39,16 +50,18 @@ ToothStatus statusForDiente(Diente? d) {
 }
 
 // ─────────────────────────────────────────────
-//  CustomPainter
+//  CustomPainter — arch
 // ─────────────────────────────────────────────
 
 class _OdontogramPainter extends CustomPainter {
   final Map<int, Diente> dientes;
   final int? selectedFdi;
   final int? hoveredFdi;
+  final Color labelColor;
 
   const _OdontogramPainter({
     required this.dientes,
+    required this.labelColor,
     this.selectedFdi,
     this.hoveredFdi,
   });
@@ -58,7 +71,6 @@ class _OdontogramPainter extends CustomPainter {
     final layout = archLayout(size);
     final labelFontSize = size.width * 0.052 * 0.42;
 
-    // Subtle vertical midline guide
     canvas.drawLine(
       Offset(size.width / 2, size.height * 0.10),
       Offset(size.width / 2, size.height * 0.90),
@@ -76,7 +88,7 @@ class _OdontogramPainter extends CustomPainter {
       final isSelected = fdi == selectedFdi;
       final isHovered = fdi == hoveredFdi && !isSelected;
       final hasStatus = status != ToothStatus.empty && !isAbsent;
-      final statusColor = isAbsent ? const Color(0xFFCBD5E1) : colorForStatus(status);
+      final statusColor = isAbsent ? _kToothEmpty : colorForStatus(status);
 
       final path = buildToothPath(type, p.size);
       final groove = buildGroovePath(type, p.size, upper: upper);
@@ -85,7 +97,6 @@ class _OdontogramPainter extends CustomPainter {
       canvas.translate(p.center.dx, p.center.dy);
       canvas.rotate(p.angle);
 
-      // Fill — white base, tinted by status / interaction
       final fillColor = isAbsent
           ? const Color(0xFFF1F5F9)
           : isSelected
@@ -97,12 +108,11 @@ class _OdontogramPainter extends CustomPainter {
                       : Colors.white;
       canvas.drawPath(path, Paint()..color = fillColor);
 
-      // Occlusal grooves
       if (groove != null && !isAbsent) {
         canvas.drawPath(
           groove,
           Paint()
-            ..color = (hasStatus ? statusColor : const Color(0xFFCBD5E1))
+            ..color = (hasStatus ? statusColor : _kToothEmpty)
                 .withAlpha(hasStatus ? 140 : 255)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.0
@@ -111,12 +121,11 @@ class _OdontogramPainter extends CustomPainter {
         );
       }
 
-      // Outline
       final outlineColor = isAbsent
-          ? const Color(0xFFCBD5E1)
+          ? _kToothEmpty
           : (isSelected || isHovered || hasStatus)
               ? statusColor
-              : kTextDisabled;
+              : labelColor;
       final strokeWidth = isSelected
           ? 2.2
           : isHovered
@@ -136,10 +145,9 @@ class _OdontogramPainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Absent tooth: X mark
       if (isAbsent) {
         final xPaint = Paint()
-          ..color = const Color(0xFFCBD5E1)
+          ..color = _kToothEmpty
           ..strokeWidth = 1.2
           ..strokeCap = StrokeCap.round;
         final mx = p.size.width * 0.30;
@@ -151,14 +159,13 @@ class _OdontogramPainter extends CustomPainter {
       canvas.restore();
     });
 
-    // FDI labels — outside the arch, always horizontal
     layout.forEach((fdi, p) {
       final d = dientes[fdi];
       final status = statusForDiente(d);
       final isAbsent = d?.estaAusente ?? false;
       final isSelected = fdi == selectedFdi;
       final hasStatus = status != ToothStatus.empty && !isAbsent;
-      final statusColor = isAbsent ? const Color(0xFFCBD5E1) : colorForStatus(status);
+      final statusColor = isAbsent ? _kToothEmpty : colorForStatus(status);
 
       final tp = TextPainter(
         text: TextSpan(
@@ -170,7 +177,7 @@ class _OdontogramPainter extends CustomPainter {
                 ? statusColor
                 : hasStatus
                     ? statusColor.withAlpha(200)
-                    : kTextDisabled,
+                    : labelColor,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -187,7 +194,8 @@ class _OdontogramPainter extends CustomPainter {
   bool shouldRepaint(_OdontogramPainter old) =>
       old.dientes != dientes ||
       old.selectedFdi != selectedFdi ||
-      old.hoveredFdi != hoveredFdi;
+      old.hoveredFdi != hoveredFdi ||
+      old.labelColor != labelColor;
 }
 
 // ─────────────────────────────────────────────
@@ -223,6 +231,7 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final name = kFdiNames[widget.fdi] ?? 'Diente ${widget.fdi}';
     final d = widget.diente;
     final isAbsent = d?.estaAusente ?? false;
@@ -230,13 +239,12 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kBgPage,
+        color: ac.bgPage,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -261,10 +269,10 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
               Expanded(
                 child: Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: ac.textPrimary,
                   ),
                 ),
               ),
@@ -275,8 +283,8 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: isAbsent
-                          ? kTeal.withValues(alpha: 0.10)
-                          : kRed.withValues(alpha: 0.08),
+                          ? _kToothTeal.withValues(alpha: 0.10)
+                          : _kToothRed.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
@@ -284,7 +292,7 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: isAbsent ? kTeal : kRed.withValues(alpha: 0.70),
+                        color: isAbsent ? _kToothTeal : _kToothRed.withValues(alpha: 0.70),
                       ),
                     ),
                   ),
@@ -296,20 +304,19 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
+                    color: ac.chipBg,
                     borderRadius: BorderRadius.circular(7),
                   ),
-                  child: const Icon(Icons.close_rounded, size: 15, color: kTextMuted),
+                  child: Icon(Icons.close_rounded, size: 15, color: ac.textMuted),
                 ),
               ),
             ],
           ),
 
           const SizedBox(height: 14),
-          const Divider(height: 1, color: kDivider),
+          Divider(height: 1, color: ac.divider),
           const SizedBox(height: 16),
 
-          // Surface map — centered
           Center(
             child: _SurfaceMap(
               fdi: widget.fdi,
@@ -323,7 +330,6 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
           ),
           const SizedBox(height: 16),
 
-          // Clinical data
           _ToothInfoPanel(
             diente: d,
             editMode: widget.editMode,
@@ -338,8 +344,7 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
 }
 
 // ─────────────────────────────────────────────
-//  Surface map — classic connected 5-zone tooth cell
-//  (Vestibular / Mesial / Distal / Lingual·Palatina / Oclusal·Incisal)
+//  Surface map
 // ─────────────────────────────────────────────
 
 class _SurfaceMap extends StatelessWidget {
@@ -358,7 +363,7 @@ class _SurfaceMap extends StatelessWidget {
   });
 
   static const double _size = 152;
-  static const double _a = 0.32; // inner square edges
+  static const double _a = 0.32;
   static const double _b = 0.68;
 
   Map<TipoSuperficie, Superficie> _surfaceMap() {
@@ -384,6 +389,8 @@ class _SurfaceMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labelColor = context.appColors.textDisabled;
+
     Widget map = CustomPaint(
       size: const Size(_size, _size),
       painter: _SurfaceMapPainter(
@@ -393,6 +400,7 @@ class _SurfaceMap extends StatelessWidget {
         selected: selectedSurface,
         a: _a,
         b: _b,
+        labelColor: labelColor,
       ),
     );
 
@@ -420,6 +428,7 @@ class _SurfaceMapPainter extends CustomPainter {
   final TipoSuperficie? selected;
   final double a;
   final double b;
+  final Color labelColor;
 
   const _SurfaceMapPainter({
     required this.surfaces,
@@ -428,13 +437,14 @@ class _SurfaceMapPainter extends CustomPainter {
     required this.selected,
     required this.a,
     required this.b,
+    required this.labelColor,
   });
 
   Color _baseColor(TipoSuperficie t) {
     final s = surfaces[t];
     if (s == null) return Colors.white;
-    if (s.diagnosisId != null) return kAmber;
-    if (s.tratamientos.isNotEmpty) return kTeal;
+    if (s.diagnosisId != null) return _kToothAmber;
+    if (s.tratamientos.isNotEmpty) return _kToothTeal;
     return Colors.white;
   }
 
@@ -483,7 +493,7 @@ class _SurfaceMapPainter extends CustomPainter {
         path,
         Paint()
           ..color = isSel
-              ? kTeal.withAlpha(38)
+              ? _kToothTeal.withAlpha(38)
               : hasData
                   ? base.withAlpha(46)
                   : Colors.white,
@@ -492,7 +502,7 @@ class _SurfaceMapPainter extends CustomPainter {
         path,
         Paint()
           ..color = isSel
-              ? kTeal
+              ? _kToothTeal
               : hasData
                   ? base.withAlpha(150)
                   : const Color(0xFFE5E7EB)
@@ -513,10 +523,10 @@ class _SurfaceMapPainter extends CustomPainter {
             fontSize: 12,
             fontWeight: FontWeight.w700,
             color: isSel
-                ? kTeal
+                ? _kToothTeal
                 : hasData
                     ? base
-                    : kTextDisabled,
+                    : labelColor,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -530,11 +540,12 @@ class _SurfaceMapPainter extends CustomPainter {
       old.surfaces != surfaces ||
       old.selected != selected ||
       old.centerSurface != centerSurface ||
-      old.bottomSurface != bottomSurface;
+      old.bottomSurface != bottomSurface ||
+      old.labelColor != labelColor;
 }
 
 // ─────────────────────────────────────────────
-//  Tooth info panel (diagnosis + treatment lists)
+//  Tooth info panel
 // ─────────────────────────────────────────────
 
 class _ToothInfoPanel extends StatelessWidget {
@@ -554,11 +565,12 @@ class _ToothInfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final d = diente;
     if (d == null || (d.diagnosis.isEmpty && d.tratamientos.isEmpty && !editMode)) {
-      return const Text(
+      return Text(
         'Sin datos registrados',
-        style: TextStyle(fontSize: 12, color: kTextDisabled),
+        style: TextStyle(fontSize: 12, color: ac.textDisabled),
       );
     }
 
@@ -566,13 +578,13 @@ class _ToothInfoPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (d.diagnosis.isNotEmpty) ...[
-          const Text(
+          Text(
             'DIAGNÓSTICOS',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
-              color: kTextMuted,
+              color: ac.textMuted,
             ),
           ),
           const SizedBox(height: 6),
@@ -581,14 +593,14 @@ class _ToothInfoPanel extends StatelessWidget {
             runSpacing: 5,
             children: d.diagnosis.map((diag) {
               final color = switch (diag.severidad) {
-                SeveridadDiagnosis.grave => kRed,
-                SeveridadDiagnosis.moderada => kAmber,
-                SeveridadDiagnosis.leve => kIndigo,
+                SeveridadDiagnosis.grave    => _kToothRed,
+                SeveridadDiagnosis.moderada => _kToothAmber,
+                SeveridadDiagnosis.leve     => _kToothIndigo,
               };
               final label = switch (diag.severidad) {
-                SeveridadDiagnosis.grave => 'Grave',
+                SeveridadDiagnosis.grave    => 'Grave',
                 SeveridadDiagnosis.moderada => 'Moderado',
-                SeveridadDiagnosis.leve => 'Leve',
+                SeveridadDiagnosis.leve     => 'Leve',
               };
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -621,13 +633,13 @@ class _ToothInfoPanel extends StatelessWidget {
           if (d.tratamientos.isNotEmpty) const SizedBox(height: 12),
         ],
         if (d.tratamientos.isNotEmpty) ...[
-          const Text(
+          Text(
             'TRATAMIENTOS',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
-              color: kTextMuted,
+              color: ac.textMuted,
             ),
           ),
           const SizedBox(height: 6),
@@ -641,13 +653,13 @@ class _ToothInfoPanel extends StatelessWidget {
                         ? Icons.check_circle_outline_rounded
                         : Icons.pending_outlined,
                     size: 14,
-                    color: t.estaTerminado ? kGreen : kAmber,
+                    color: t.estaTerminado ? _kToothGreen : _kToothAmber,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       t.esContinuo ? 'Tratamiento continuo' : 'Tratamiento puntual',
-                      style: const TextStyle(fontSize: 12, color: kTextSecondary),
+                      style: TextStyle(fontSize: 12, color: ac.textSecondary),
                     ),
                   ),
                 ],
@@ -659,16 +671,16 @@ class _ToothInfoPanel extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             d.observaciones!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: kTextMuted,
+              color: ac.textMuted,
               fontStyle: FontStyle.italic,
             ),
           ),
         ],
         if (editMode) ...[
           const SizedBox(height: 14),
-          const Divider(height: 1, color: kDivider),
+          Divider(height: 1, color: ac.divider),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -682,8 +694,8 @@ class _ToothInfoPanel extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: const Text('Diagnóstico'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: kIndigo,
-                  side: BorderSide(color: kIndigo.withValues(alpha: 0.40)),
+                  foregroundColor: _kToothIndigo,
+                  side: BorderSide(color: _kToothIndigo.withValues(alpha: 0.40)),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -697,8 +709,8 @@ class _ToothInfoPanel extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: const Text('Tratamiento'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: kTeal,
-                  side: BorderSide(color: kTeal.withValues(alpha: 0.40)),
+                  foregroundColor: _kToothTeal,
+                  side: BorderSide(color: _kToothTeal.withValues(alpha: 0.40)),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -772,11 +784,11 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
     return null;
   }
 
-  /// Teeth on the viewer's left half of the arch (quadrants 1 & 4).
   bool _isLeftHalf(int fdi) =>
       (fdi >= 11 && fdi <= 18) || (fdi >= 41 && fdi <= 48);
 
-  Widget _buildArch(double w, double h) {
+  Widget _buildArch(BuildContext context, double w, double h) {
+    final labelColor = context.appColors.textDisabled;
     return MouseRegion(
       cursor: _hoveredFdi != null
           ? SystemMouseCursors.click
@@ -805,6 +817,7 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
             dientes: _dienteMap,
             selectedFdi: _selectedFdi,
             hoveredFdi: _hoveredFdi,
+            labelColor: labelColor,
           ),
         ),
       ),
@@ -830,7 +843,6 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
         const sideMin = 300.0;
         const panelMaxW = 360.0;
         const archMax = 760.0;
-        // Side layout only when there's room for the arch + a panel on each side.
         final useSide = _selectedFdi != null && maxW >= 520 + 2 * sideMin;
 
         final archW = useSide
@@ -842,7 +854,7 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
         final arch = SizedBox(
           width: archW,
           height: archH,
-          child: _buildArch(archW, archH),
+          child: _buildArch(ctx, archW, archH),
         );
 
         if (useSide) {
@@ -881,7 +893,6 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
           );
         }
 
-        // Narrow layout — arch centered, panel expands below.
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [

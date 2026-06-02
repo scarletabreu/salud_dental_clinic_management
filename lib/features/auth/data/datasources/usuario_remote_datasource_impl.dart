@@ -27,5 +27,23 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   bool isSessionActive() => supabase.auth.currentSession != null;
 
   @override
+  Future<AuthResponse> signInWithPassword({required String email, required String password}) {
+    return supabase.auth.signInWithPassword(email: email, password: password);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getPerfilPorTabla({
+    required String tabla, 
+    required String uuid, 
+    String selectColumns = '*',
+  }) async {
+    return await supabase
+        .from(tabla)
+        .select(selectColumns)
+        .eq('id', uuid)
+        .maybeSingle();
+  }
+
+  @override
   Stream<AuthState> get authStateChanges => supabase.auth.onAuthStateChange;
 }

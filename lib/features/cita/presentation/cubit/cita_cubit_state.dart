@@ -3,28 +3,33 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 
 enum CalendarioViewMode { mensual, semanal, diaria }
 
-abstract class CitaState extends Equatable {
-  const CitaState();
+abstract class CitaCubitState extends Equatable {
+  const CitaCubitState();
 
   @override
   List<Object?> get props => [];
 }
 
-class CitaLoading extends CitaState {
-  const CitaLoading();
+class CitaCubitLoading extends CitaCubitState {
+  const CitaCubitLoading();
 }
 
-class CitaLoaded extends CitaState {
+class CitaCubitLoaded extends CitaCubitState {
   final List<Cita> citas;
   final DateTime focusedDay;
   final DateTime selectedDay;
   final CalendarioViewMode viewMode;
 
-  const CitaLoaded({
+  final bool isSubmitting;
+  final String? errorMessage;
+
+  const CitaCubitLoaded({
     required this.citas,
     required this.focusedDay,
     required this.selectedDay,
     required this.viewMode,
+    this.isSubmitting = false,
+    this.errorMessage,
   });
 
   List<Cita> citasForDay(DateTime day) {
@@ -39,17 +44,21 @@ class CitaLoaded extends CitaState {
       ..sort((a, b) => a.date.compareTo(b.date));
   }
 
-  CitaLoaded copyWith({
+  CitaCubitLoaded copyWith({
     List<Cita>? citas,
     DateTime? focusedDay,
     DateTime? selectedDay,
     CalendarioViewMode? viewMode,
+    bool? isSubmitting,
+    String? Function()? errorMessage,
   }) {
-    return CitaLoaded(
+    return CitaCubitLoaded(
       citas: citas ?? this.citas,
       focusedDay: focusedDay ?? this.focusedDay,
       selectedDay: selectedDay ?? this.selectedDay,
       viewMode: viewMode ?? this.viewMode,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
     );
   }
 
@@ -57,10 +66,10 @@ class CitaLoaded extends CitaState {
   List<Object?> get props => [citas, focusedDay, selectedDay, viewMode];
 }
 
-class CitaError extends CitaState {
+class CitaCubitError extends CitaCubitState {
   final String message;
 
-  const CitaError(this.message);
+  const CitaCubitError(this.message);
 
   @override
   List<Object?> get props => [message];

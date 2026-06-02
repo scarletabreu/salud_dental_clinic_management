@@ -38,7 +38,9 @@ class PacienteRemoteDatasource {
         if (contacto != null) map['contactos'] = [contacto];
         return PacienteModel.fromJson(map);
       }).toList();
-      lista.addAll(_pacientesPrueba);
+      // Only include local mock patients when the backend returns no results,
+      // so we don't mix test data with real data in production.
+      if (lista.isEmpty) lista.addAll(_pacientesPrueba);
       lista.sort((a, b) => a.nombre.compareTo(b.nombre));
       return lista;
     } on PostgrestException catch (e) {
@@ -53,12 +55,12 @@ class PacienteRemoteDatasource {
       apellido: 'Méndez',
       birthDate: DateTime(1990, 3, 15),
       govID: '001-1234567-8',
-      contacto: ContactoModel(
+      contactos: [ContactoModel(
         id: 'c-001',
         email: 'carlos.mendez@email.com',
         numeroTelefono: '809-555-0101',
         direccion: 'Calle Primera #10, Santo Domingo',
-      ),
+      )],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -73,12 +75,12 @@ class PacienteRemoteDatasource {
       apellido: 'Rodríguez',
       birthDate: DateTime(1998, 7, 22),
       govID: '002-9876543-1',
-      contacto: ContactoModel(
+      contactos: [ContactoModel(
         id: 'c-002',
         email: 'maria.rodriguez@email.com',
         numeroTelefono: '829-555-0202',
         direccion: 'Av. Winston Churchill, Santiago',
-      ),
+      )],
       estatus: EstatusPersona.activo,
       genero: Genero.femenino,
       record: RecordModel.empty(),
@@ -93,12 +95,12 @@ class PacienteRemoteDatasource {
       apellido: 'Almonte',
       birthDate: DateTime(1975, 11, 5),
       govID: '003-1112223-4',
-      contacto: ContactoModel(
+      contactos: [ContactoModel(
         id: 'c-003',
         email: 'pedro.almonte@email.com',
         numeroTelefono: '849-555-0303',
         direccion: 'Los Prados, Santo Domingo Norte',
-      ),
+      )],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -109,15 +111,11 @@ class PacienteRemoteDatasource {
     ),
   ];
 
-  Future<void> addPaciente(PacienteModel paciente) async {
+    Future<void> addPaciente(PacienteModel paciente) async {
     try {
       final data = paciente.toJson();
       data['created_at'] = DateTime.now().toIso8601String();
       data['updated_at'] = DateTime.now().toIso8601String();
-
-      if (!(_isValidUuid(data['id']))) {
-        data.remove('id');
-      }
 
       await client.from('pacientes').insert(data);
     } on PostgrestException catch (e) {
@@ -130,7 +128,6 @@ class PacienteRemoteDatasource {
       final data = paciente.toJson();
       data.remove('id');
       data['updated_at'] = DateTime.now().toIso8601String();
-
       await client.from('pacientes').update(data).eq('id', paciente.id!);
     } on PostgrestException catch (e) {
       throw Exception('Error al actualizar paciente: ${e.message}');

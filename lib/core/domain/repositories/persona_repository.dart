@@ -5,9 +5,12 @@ abstract class PersonaRepository {
 
   Future<Persona> getPersonaById(String id);
 
-  Future<void> createPersona(Persona persona);
+  Future<Persona> createPersona(Persona persona);
 
   Future<void> updatePersona(Persona persona);
 
   Future<void> deletePersona(String id);
+
+  Future<List<Persona>> searchPersonas(String query);
+
 }

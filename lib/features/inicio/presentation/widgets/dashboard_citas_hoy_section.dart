@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
@@ -14,17 +15,13 @@ class DashboardCitasHoySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.cardBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [ac.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,12 +31,12 @@ class DashboardCitasHoySection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Citas de Hoy',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827),
+                    color: ac.textPrimary,
                   ),
                 ),
                 const Spacer(),
@@ -49,15 +46,15 @@ class DashboardCitasHoySection extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: ac.chipBg,
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
                     '${citas.length} total',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF6B7280),
+                      color: ac.textMuted,
                     ),
                   ),
                 ),
@@ -65,25 +62,25 @@ class DashboardCitasHoySection extends StatelessWidget {
             ),
           ),
 
-          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          Divider(height: 1, color: ac.divider),
 
           if (citas.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: Center(
                 child: Column(
                   children: [
                     Icon(
                       Icons.event_available_rounded,
                       size: 32,
-                      color: Color(0xFFD1D5DB),
+                      color: ac.textDisabled,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Sin citas programadas para hoy',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF9CA3AF),
+                        color: ac.textDisabled,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -98,9 +95,9 @@ class DashboardCitasHoySection extends StatelessWidget {
                 for (int i = 0; i < citas.length; i++) ...[
                   _CitaRow(cita: citas[i], onCambiarEstado: onCambiarEstado),
                   if (i < citas.length - 1)
-                    const Divider(
+                    Divider(
                       height: 1,
-                      color: Color(0xFFF9FAFB),
+                      color: ac.rowDivider,
                       indent: 76,
                       endIndent: 20,
                     ),
@@ -129,15 +126,16 @@ class _CitaRow extends StatelessWidget {
     return '${diff.inHours}h ${mins % 60}min';
   }
 
-  Color _waitColor() {
+  Color _waitColor(AppColors ac) {
     final mins = DateTime.now().difference(cita.date).inMinutes;
-    if (mins >= 30) return const Color(0xFFDC2626);
-    if (mins >= 15) return const Color(0xFFD97706);
-    return const Color(0xFF059669);
+    if (mins >= 30) return ac.red;
+    if (mins >= 15) return ac.orange;
+    return ac.green;
   }
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final h = cita.date.hour.toString().padLeft(2, '0');
     final m = cita.date.minute.toString().padLeft(2, '0');
     final waitLabel = _waitLabel();
@@ -148,21 +146,19 @@ class _CitaRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Time column — fixed width, right-aligned
           SizedBox(
             width: 40,
             child: Text(
               '$h:$m',
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF9CA3AF),
+                color: ac.textDisabled,
               ),
             ),
           ),
           const SizedBox(width: 12),
-          // Estado dot
           Container(
             width: 9,
             height: 9,
@@ -172,7 +168,6 @@ class _CitaRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Name + secondary info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,10 +178,10 @@ class _CitaRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         cita.persona.fullName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827),
+                          color: ac.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -200,15 +195,15 @@ class _CitaRow extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                          color: ac.emergencyBg,
                           borderRadius: BorderRadius.circular(100),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Emergencia',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFDC2626),
+                            color: ac.red,
                           ),
                         ),
                       ),
@@ -221,7 +216,7 @@ class _CitaRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: _waitColor(),
+                      color: _waitColor(ac),
                     ),
                   ),
                 ],
@@ -229,7 +224,6 @@ class _CitaRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Status pill — tappable popup when changes available
           if (canChange)
             PopupMenuButton<EstadoCita>(
               onSelected: (nuevoEstado) =>

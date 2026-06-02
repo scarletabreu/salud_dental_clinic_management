@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_state.dart';
@@ -29,7 +30,7 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
     ref.listen<TratamientoState>(tratamientoProvider, (previous, next) {
       if (next is TratamientoError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.message), backgroundColor: Colors.red),
+          SnackBar(content: Text(next.message), backgroundColor: context.appColors.red),
         );
       }
     });

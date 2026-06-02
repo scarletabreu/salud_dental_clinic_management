@@ -1,4 +1,13 @@
 import 'package:get_it/get_it.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
+import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/repositories/usuario_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Citas
@@ -27,6 +36,10 @@ import 'package:salud_dental_clinic_management/features/movimiento_caja/data/dat
 import 'package:salud_dental_clinic_management/features/odontograma/data/datasources/odontograma_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/orden_medica/data/datasources/orden_medica_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/repositories/doctor_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/record/data/datasources/record_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/superficie/data/datasources/superficie_remote_datasource_impl.dart';
@@ -92,6 +105,10 @@ import '../../features/record/domain/repositories/record_repository.dart';
 import '../../features/suplidor/data/datasources/suplidor_remote_datasource.dart';
 import '../../features/suplidor/data/repositories/suplidor_repository_impl.dart';
 import '../../features/suplidor/domain/repositories/suplidor_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/repositories/i_auth_repository.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_session_cubit.dart';
 
 // Módulo Tratamiento (Mapeado usando las mismas rutas relativas)
 import '../../features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
@@ -236,8 +253,39 @@ Future<void> init() async {
   sl.registerLazySingleton<IPacienteRepository>(
     () => PacienteRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<DoctorRemoteDatasource>(
+    () => DoctorRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<DoctorRepository>(
+    () => DoctorRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<PersonaRemoteDataSource>(
+    () => PersonaRemoteDataSourceImpl(sl()),
+  );
+  sl.registerLazySingleton<PersonaRepository>(
+    () => PersonaRepositoryImpl(sl()),
+  );
   sl.registerLazySingleton<CitaRepository>(
     () => CitaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<UsuarioRemoteDataSource>(
+    () => UsuarioRemoteDataSourceImpl(sl()),
+  );
+  sl.registerLazySingleton<UsuarioRepository>(
+    () => UsuarioRepositoryImpl(sl()),
+  );
+  sl.registerFactory<AuthCubit>(
+    () => AuthCubit(usuarioRepository: sl()),
+  );
+
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSource(sl()),
+  );
+  sl.registerLazySingleton<IAuthRepository>(
+    () => AuthRepositoryImpl(sl()),
+  );
+  sl.registerSingleton<AuthSessionCubit>(
+    AuthSessionCubit(sl())..initialize(),
   );
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));

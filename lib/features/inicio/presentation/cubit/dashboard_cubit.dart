@@ -9,6 +9,8 @@ class DashboardCubit extends Cubit<DashboardState> {
   final CitaRepository _citaRepository;
   final IPacienteRepository _pacienteRepository;
   final IMedicinaRepository _medicinaRepository;
+  String? doctorId;
+  String? doctorName;
 
   DashboardCubit({
     required CitaRepository citaRepository,
@@ -19,12 +21,15 @@ class DashboardCubit extends Cubit<DashboardState> {
         _medicinaRepository = medicinaRepository,
         super(const DashboardLoading());
 
-  Future<void> load() async {
+  Future<void> load(String doctorId, String doctorName) async {
     emit(const DashboardLoading());
     try {
+      this.doctorId = doctorId;
+      this.doctorName = doctorName;
+
       final now = DateTime.now();
 
-      final citas = await _citaRepository.getCitas();
+      final citas = await _citaRepository.getCitasByDoctor(doctorId);
       final pacientesResult = await _pacienteRepository.getPacientes();
       final medicinas = await _medicinaRepository.getCatalogoMedicinas();
 
@@ -48,12 +53,6 @@ class DashboardCubit extends Cubit<DashboardState> {
       final totalPacientes =
           pacientesResult.fold((_) => 0, (list) => list.length);
 
-      // Pull doctor name from today's citas, falling back to any cita
-      final sourceCita =
-          citasDeHoy.isNotEmpty ? citasDeHoy.first : citas.isNotEmpty ? citas.first : null;
-      final nombreDoctor =
-          sourceCita != null ? 'Dr. ${sourceCita.doctor.apellido}' : null;
-
       emit(DashboardLoaded(
         citasHoy: citasDeHoy.length,
         citasPendientes: citasPendientes,
@@ -62,7 +61,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         totalPacientes: totalPacientes,
         totalMedicinas: medicinas.length,
         citasDeHoy: citasDeHoy,
-        nombreDoctor: nombreDoctor,
+        nombreDoctor: doctorName,
       ));
     } catch (e) {
       emit(DashboardError(e.toString()));
@@ -95,8 +94,10 @@ class DashboardCubit extends Cubit<DashboardState> {
     try {
       await _citaRepository.updateCitaEstado(citaId, nuevoEstado);
     } catch (_) {
-      // Revert to server state on failure
-      await load();
+      // Revert to server state on failure if we still have the authenticated doctor info.
+      if (doctorId != null && doctorName != null) {
+        await load(doctorId!, doctorName!);
+      }
     }
   }
 }

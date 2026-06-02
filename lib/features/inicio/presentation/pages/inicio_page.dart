@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_state.dart';
@@ -8,14 +11,6 @@ import 'package:salud_dental_clinic_management/features/inicio/presentation/widg
 import 'package:salud_dental_clinic_management/features/inicio/presentation/widgets/dashboard_metric_card.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/widgets/dashboard_quick_action_card.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/widgets/siguiente_paciente_card.dart';
-
-// Panacea-Clean palette
-const _kBg = Color(0xFFF2F5FB);
-const _kAmber = Color(0xFFF59E0B);
-const _kGreen = Color(0xFF22C55E);
-const _kIndigo = Color(0xFF6366F1);
-const _kTeal = Color(0xFF0D9488);
-const _kPurple = Color(0xFFA855F7);
 
 class InicioPage extends StatelessWidget {
   final VoidCallback? onNavigateToCitas;
@@ -31,17 +26,18 @@ class InicioPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final isNarrow = MediaQuery.sizeOf(context).width < 700;
 
     return ColoredBox(
-      color: _kBg,
+      color: ac.bgPage,
       child: SafeArea(
         child: BlocBuilder<DashboardCubit, DashboardState>(
           builder: (context, state) {
             if (state is DashboardLoading) {
-              return const Center(
+              return Center(
                 child: CircularProgressIndicator(
-                  color: _kTeal,
+                  color: ac.primaryBlue,
                   strokeWidth: 2,
                 ),
               );
@@ -52,25 +48,30 @@ class InicioPage extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.error_outline_rounded,
                       size: 48,
-                      color: Color(0xFFDC2626),
+                      color: ac.red,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'No se pudo cargar el dashboard',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151),
+                        color: ac.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: () => context.read<DashboardCubit>().load(),
+                      onPressed: () {
+                        final usuario = context.read<AuthCubit>().state.usuario;
+                        if (usuario is Doctor && usuario.id != null) {
+                          context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+                        }
+                      },
                       style: FilledButton.styleFrom(
-                        backgroundColor: _kTeal,
+                        backgroundColor: ac.primaryBlue,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -101,7 +102,6 @@ class InicioPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 1 — Header
                   DashboardHeaderCard(
                     onVerCitas: onNavigateToCitas,
                     nombreDoctor: loaded.nombreDoctor,
@@ -110,11 +110,9 @@ class InicioPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2 — Métricas
                   _MetricsGrid(loaded: loaded, isNarrow: isNarrow),
                   const SizedBox(height: 16),
 
-                  // 3 — Siguiente paciente
                   SiguientePacienteCard(
                     cita: siguiente,
                     onCambiarEstado: siguiente?.id != null
@@ -123,7 +121,6 @@ class InicioPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // 4 — Accesos rápidos
                   _QuickActionsSection(
                     onNavigateToCitas: onNavigateToCitas,
                     onNavigateToPacientes: onNavigateToPacientes,
@@ -133,7 +130,6 @@ class InicioPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // 5 — Citas de hoy
                   DashboardCitasHoySection(
                     citas: loaded.citasDeHoy,
                     onCambiarEstado: (id, estado) => cambiarEstado(id, estado),
@@ -159,35 +155,37 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     final enEspera = DashboardMetricCard(
       icon: Icons.hourglass_empty_rounded,
       label: 'En espera',
       value: '${loaded.citasEnEspera}',
-      accentColor: _kAmber,
+      accentColor: ac.amber,
     );
     final completadas = DashboardMetricCard(
       icon: Icons.check_circle_outline_rounded,
       label: 'Completadas',
       value: '${loaded.citasCompletadas}',
-      accentColor: _kGreen,
+      accentColor: ac.green,
     );
     final pendientes = DashboardMetricCard(
       icon: Icons.pending_actions_rounded,
       label: 'Pendientes',
       value: '${loaded.citasPendientes}',
-      accentColor: _kIndigo,
+      accentColor: ac.indigo,
     );
     final pacientes = DashboardMetricCard(
       icon: Icons.people_alt_rounded,
       label: 'Pacientes',
       value: '${loaded.totalPacientes}',
-      accentColor: _kTeal,
+      accentColor: ac.teal,
     );
     final medicinas = DashboardMetricCard(
       icon: Icons.medication_rounded,
       label: 'Medicinas',
       value: '${loaded.totalMedicinas}',
-      accentColor: _kPurple,
+      accentColor: ac.purple,
     );
 
     if (!isNarrow) {
@@ -206,7 +204,6 @@ class _MetricsGrid extends StatelessWidget {
       );
     }
 
-    // Narrow: 2-top + 3-bottom
     return Column(
       children: [
         Row(
@@ -250,47 +247,43 @@ class _QuickActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.cardBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [ac.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, 14),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
             child: Text(
               'Accesos Rápidos',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF111827),
+                color: ac.textPrimary,
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          Divider(height: 1, color: ac.divider),
           DashboardQuickActionCard(
             icon: Icons.people_alt_rounded,
             label: 'Pacientes',
             onTap: onNavigateToPacientes ?? () {},
             badge: totalPacientes > 0 ? '$totalPacientes' : null,
           ),
-          const Divider(height: 1, color: Color(0xFFF3F4F6), indent: 68),
+          Divider(height: 1, color: ac.divider, indent: 68),
           DashboardQuickActionCard(
             icon: Icons.today_rounded,
             label: 'Mis Citas',
             onTap: onNavigateToCitas ?? () {},
             badge: citasRestantes > 0 ? '$citasRestantes restantes' : null,
           ),
-          const Divider(height: 1, color: Color(0xFFF3F4F6), indent: 68),
+          Divider(height: 1, color: ac.divider, indent: 68),
           DashboardQuickActionCard(
             icon: Icons.medication_rounded,
             label: 'Medicinas',

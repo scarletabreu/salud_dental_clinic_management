@@ -40,7 +40,7 @@ class CitaModel extends Cita {
     final Map<String, dynamic> data = {
       'doctor_id': doctor.id,
       'persona_id': persona.id,
-      'fecha': date.toUtc().toIso8601String(),
+      'fecha_hora': date.toUtc().toIso8601String(),
       'duracion_minutos': duracionMinutos,
       'es_emergencia': esEmergencia,
       'estado': estado.name,

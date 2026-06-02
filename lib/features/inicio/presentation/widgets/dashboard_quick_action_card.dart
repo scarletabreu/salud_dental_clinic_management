@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class DashboardQuickActionCard extends StatelessWidget {
   final IconData icon;
@@ -16,6 +17,8 @@ class DashboardQuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -29,19 +32,19 @@ class DashboardQuickActionCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.10),
+                  color: ac.primaryBlue.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 18, color: const Color(0xFF0D9488)),
+                child: Icon(icon, size: 18, color: ac.primaryBlue),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF111827),
+                    color: ac.textPrimary,
                   ),
                 ),
               ),
@@ -52,24 +55,24 @@ class DashboardQuickActionCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: ac.chipBg,
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
                     badge!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF6B7280),
+                      color: ac.textMuted,
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
               ],
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 17,
-                color: Color(0xFFD1D5DB),
+                color: ac.textDisabled,
               ),
             ],
           ),

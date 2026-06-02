@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class RailUserCard extends StatelessWidget {
   final bool extended;
@@ -7,16 +11,26 @@ class RailUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     final textTheme = Theme.of(context).textTheme;
+
+    final usuario = context.select((AuthCubit c) => c.state.usuario);
+
+    String initials() {
+      if (usuario == null) return 'JM';
+      final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
+      final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
+      final s = (n + a).trim();
+      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+    }
 
     final avatar = CircleAvatar(
       radius: 18,
-      backgroundColor: colorScheme.primary,
+      backgroundColor: ac.railSelectedBg,
       child: Text(
-        'JM',
+        initials(),
         style: textTheme.labelLarge?.copyWith(
-          color: colorScheme.onPrimary,
+          color: ac.railTextSelected,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -25,7 +39,22 @@ class RailUserCard extends StatelessWidget {
     if (!extended) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: avatar,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            const SizedBox(height: 8),
+            IconButton(
+              icon: Icon(
+                Icons.logout_rounded,
+                size: 20,
+                color: ac.railText,
+              ),
+              tooltip: 'Cerrar sesión',
+              onPressed: () => context.read<AuthCubit>().logout(),
+            ),
+          ],
+        ),
       );
     }
 
@@ -33,7 +62,7 @@ class RailUserCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: ac.railTextSelected.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -45,23 +74,38 @@ class RailUserCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dr. Javier Méndez',
+                  usuario != null
+                      ? (usuario is Doctor
+                          ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+                          : '${usuario.nombre} ${usuario.apellido}')
+                      : 'Usuario',
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                    color: ac.railTextSelected,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Odontólogo Especialista',
+                  usuario is Doctor
+                      ? usuario.specialty
+                      : '',
                   style: textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                    color: ac.railText,
                     letterSpacing: 0.8,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.logout_rounded,
+              size: 20,
+              color: ac.railText,
+            ),
+            tooltip: 'Cerrar sesión',
+            onPressed: () => context.read<AuthCubit>().logout(),
           ),
         ],
       ),

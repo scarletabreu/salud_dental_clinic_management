@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
@@ -10,17 +11,13 @@ class SiguientePacienteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.cardBg,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [ac.cardShadow],
       ),
       clipBehavior: Clip.antiAlias,
       child: IntrinsicHeight(
@@ -29,11 +26,11 @@ class SiguientePacienteCard extends StatelessWidget {
           children: [
             Container(
               width: 4,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF0D9488), Color(0xFF14B8A6)],
+                  colors: [ac.teal, ac.tealLight],
                 ),
               ),
             ),
@@ -59,19 +56,21 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Row(
       children: [
         Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
+            color: ac.chipBg,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.person_outline_rounded,
             size: 24,
-            color: Color(0xFF9CA3AF),
+            color: ac.textDisabled,
           ),
         ),
         const SizedBox(width: 16),
@@ -79,22 +78,22 @@ class _Empty extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'SIGUIENTE PACIENTE',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF9CA3AF),
+                  color: ac.textDisabled,
                   letterSpacing: 1.0,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Sin pacientes en espera',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
+                  color: ac.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -102,7 +101,7 @@ class _Empty extends StatelessWidget {
                 'Cuando un paciente sea registrado en espera, aparecerá aquí.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade500,
+                  color: ac.textMuted,
                 ),
               ),
             ],
@@ -131,15 +130,16 @@ class _WithPatient extends StatelessWidget {
     return 'Esperando ${hrs}h ${mins % 60}min';
   }
 
-  Color _waitColor() {
+  Color _waitColor(AppColors ac) {
     final mins = DateTime.now().difference(cita.date).inMinutes;
-    if (mins >= 30) return const Color(0xFFDC2626);
-    if (mins >= 15) return const Color(0xFFD97706);
-    return const Color(0xFF059669);
+    if (mins >= 30) return ac.red;
+    if (mins >= 15) return ac.orange;
+    return ac.green;
   }
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final h = cita.date.hour.toString().padLeft(2, '0');
     final m = cita.date.minute.toString().padLeft(2, '0');
     final canAct = onCambiarEstado != null && cita.id != null;
@@ -149,12 +149,12 @@ class _WithPatient extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'SIGUIENTE PACIENTE',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0D9488),
+                color: ac.teal,
                 letterSpacing: 1.0,
               ),
             ),
@@ -163,15 +163,15 @@ class _WithPatient extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
+                  color: ac.emergencyBg,
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Text(
+                child: Text(
                   'EMERGENCIA',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFFDC2626),
+                    color: ac.red,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -186,13 +186,13 @@ class _WithPatient extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.10),
+                color: ac.teal.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.person_rounded,
                 size: 26,
-                color: Color(0xFF0D9488),
+                color: ac.teal,
               ),
             ),
             const SizedBox(width: 14),
@@ -202,10 +202,10 @@ class _WithPatient extends StatelessWidget {
                 children: [
                   Text(
                     cita.persona.fullName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
+                      color: ac.textPrimary,
                       height: 1.1,
                     ),
                     maxLines: 1,
@@ -214,17 +214,17 @@ class _WithPatient extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.access_time_rounded,
                         size: 12,
-                        color: Color(0xFF9CA3AF),
+                        color: ac.textDisabled,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '$h:$m',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF6B7280),
+                          color: ac.textMuted,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -232,8 +232,8 @@ class _WithPatient extends StatelessWidget {
                       Container(
                         width: 4,
                         height: 4,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFD1D5DB),
+                        decoration: BoxDecoration(
+                          color: ac.textDisabled,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -243,7 +243,7 @@ class _WithPatient extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _waitColor(),
+                          color: _waitColor(ac),
                         ),
                       ),
                     ],
@@ -266,8 +266,8 @@ class _WithPatient extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  foregroundColor: const Color(0xFFDC2626),
-                  side: const BorderSide(color: Color(0xFFFECACA)),
+                  foregroundColor: ac.red,
+                  side: BorderSide(color: ac.red.withValues(alpha: 0.35)),
                   textStyle: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -288,7 +288,7 @@ class _WithPatient extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  backgroundColor: const Color(0xFF0D9488),
+                  backgroundColor: ac.primaryBlue,
                   foregroundColor: Colors.white,
                   textStyle: const TextStyle(
                     fontSize: 13,

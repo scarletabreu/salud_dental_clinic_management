@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
@@ -34,6 +35,29 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
       );
     } on PostgrestException catch (e) {
       throw Exception('Error al recuperar lista de doctores: ${e.message}');
+    }
+  }
+
+  @override
+  Future<List<DoctorModel>> fetchActiveDoctores() async {
+  try {
+    final response = await supabaseClient
+        .from('doctores')
+        // 🔴 Anidamos personas(*) dentro de usuarios(*)
+        .select('*, usuarios(*, personas(*))') 
+        .isFilter('deleted_at', null);
+
+    print('--- RESPUESTA CRUDA DE SUPABASE ---');
+    print(response);
+
+    return (response as List)
+        .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+    } on PostgrestException catch (e) {
+      print('🚨 Error Postgrest: ${e.message} | Detalles: ${e.details}');
+      throw Exception('Error al recuperar doctores activos: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado: $e');
     }
   }
 

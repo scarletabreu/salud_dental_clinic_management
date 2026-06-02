@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 enum DoctorAvailability { disponible, ocupado }
 
@@ -60,7 +61,7 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ? Icons.check_circle_rounded
                       : Icons.do_not_disturb_on_rounded,
                   color: availability == DoctorAvailability.disponible
-                      ? Colors.green.shade600
+                      ? context.appColors.green
                       : colorScheme.error,
                 ),
                 onSelected: onAvailabilityChanged,
@@ -92,6 +93,7 @@ class _AvailabilityToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final ac = context.appColors;
 
     Widget pill({
       required DoctorAvailability target,
@@ -111,7 +113,7 @@ class _AvailabilityToggle extends StatelessWidget {
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: colorScheme.shadow.withValues(alpha: 0.08),
                       blurRadius: 6,
                       offset: const Offset(0, 1),
                     ),
@@ -157,7 +159,7 @@ class _AvailabilityToggle extends StatelessWidget {
           pill(
             target: DoctorAvailability.disponible,
             label: 'Disponible',
-            dotColor: Colors.green.shade500,
+            dotColor: ac.green,
           ),
           pill(
             target: DoctorAvailability.ocupado,

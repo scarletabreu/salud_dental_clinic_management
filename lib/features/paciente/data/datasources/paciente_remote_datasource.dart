@@ -38,7 +38,9 @@ class PacienteRemoteDatasource {
         if (contacto != null) map['contactos'] = [contacto];
         return PacienteModel.fromJson(map);
       }).toList();
-      lista.addAll(_pacientesPrueba);
+      // Only include local mock patients when the backend returns no results,
+      // so we don't mix test data with real data in production.
+      if (lista.isEmpty) lista.addAll(_pacientesPrueba);
       lista.sort((a, b) => a.nombre.compareTo(b.nombre));
       return lista;
     } on PostgrestException catch (e) {

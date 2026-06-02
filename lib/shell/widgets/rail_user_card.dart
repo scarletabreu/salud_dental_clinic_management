@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 
 class RailUserCard extends StatelessWidget {
@@ -12,11 +13,21 @@ class RailUserCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final usuario = context.select((AuthCubit c) => c.state.usuario);
+
+    String initials() {
+      if (usuario == null) return 'JM';
+      final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
+      final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
+      final s = (n + a).trim();
+      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+    }
+
     final avatar = CircleAvatar(
       radius: 18,
       backgroundColor: colorScheme.primary,
       child: Text(
-        'JM',
+        initials(),
         style: textTheme.labelLarge?.copyWith(
           color: colorScheme.onPrimary,
           fontWeight: FontWeight.w700,
@@ -62,7 +73,11 @@ class RailUserCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dr. Javier Méndez',
+                  usuario != null
+                      ? (usuario is Doctor
+                          ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+                          : '${usuario.nombre} ${usuario.apellido}')
+                      : 'Usuario',
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurface,
@@ -70,7 +85,9 @@ class RailUserCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Odontólogo Especialista',
+                  usuario is Doctor
+                      ? usuario.specialty
+                      : '',
                   style: textTheme.labelSmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     letterSpacing: 0.8,

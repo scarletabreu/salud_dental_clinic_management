@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
 enum DoctorAvailability { disponible, ocupado }
 
@@ -178,6 +181,24 @@ class _DoctorChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final usuario = context.select((AuthCubit c) => c.state.usuario);
+
+    String initials() {
+      if (usuario == null) return 'JM';
+      final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
+      final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
+      final s = (n + a).trim();
+      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+    }
+
+    final displayName = usuario != null
+        ? (usuario is Doctor
+            ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+            : '${usuario.nombre} ${usuario.apellido}')
+        : 'Doctor';
+
+    final subtitle = usuario is Doctor ? usuario.specialty : '';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -185,14 +206,14 @@ class _DoctorChip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'Dr. Javier Méndez',
+              displayName,
               style: textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: colorScheme.onSurface,
               ),
             ),
             Text(
-              'Odontólogo Especialista',
+              subtitle,
               style: textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -204,7 +225,7 @@ class _DoctorChip extends StatelessWidget {
           radius: 18,
           backgroundColor: colorScheme.primary,
           child: Text(
-            'JM',
+            initials(),
             style: textTheme.labelMedium?.copyWith(
               color: colorScheme.onPrimary,
               fontWeight: FontWeight.w700,

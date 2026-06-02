@@ -53,6 +53,17 @@ class CitaRepositoryImpl implements CitaRepository {
   }
 
   @override
+  Future<List<Cita>> getCitasByDoctor(String doctorId) async {
+    try {
+      return await remoteDataSource.fetchCitasByDoctor(doctorId);
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener citas del doctor: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
     try {
       await remoteDataSource.updateCitaEstado(id, nuevoEstado);

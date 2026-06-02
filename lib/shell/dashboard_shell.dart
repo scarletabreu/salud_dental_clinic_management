@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
@@ -60,11 +61,27 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       selectedIcon: Icons.dashboard_rounded,
       label: 'Inicio',
       builder: (_) => BlocProvider(
-        create: (_) => sl<DashboardCubit>()..load(),
-        child: InicioPage(
-          onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
-          onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
-          onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
+        create: (context) {
+          final cubit = sl<DashboardCubit>();
+          final usuario = context.read<AuthCubit>().state.usuario;
+          if (usuario is Doctor && usuario.id != null) {
+            cubit.load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+          }
+          return cubit;
+        },
+        child: BlocListener<AuthCubit, AuthState>(
+          listenWhen: (previous, current) => previous.usuario != current.usuario,
+          listener: (context, authState) {
+            final usuario = authState.usuario;
+            if (usuario is Doctor && usuario.id != null) {
+              context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+            }
+          },
+          child: InicioPage(
+            onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
+            onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
+            onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
+          ),
         ),
       ),
     ),
@@ -117,10 +134,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar el rol actual de forma reactiva mediante Polimorfismo
     final rol = context.select((AuthCubit cubit) => cubit.state.rol);
 
-    // Matriz de acceso basada en especificaciones del ticket
     _visibleDestinations = _allDestinations.where((destination) {
       if (rol == null) return false;
 

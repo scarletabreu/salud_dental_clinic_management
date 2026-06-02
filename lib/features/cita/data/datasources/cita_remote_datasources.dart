@@ -20,7 +20,8 @@ class CitaRemoteDataSource {
           .filter('deleted_at', 'is', null);
       real = await _assembleCitas(citasRes as List);
     } catch (_) {}
-    return [...real, ..._citasPrueba];
+    // Only fall back to test data when no real citas were obtained.
+    return real.isEmpty ? _citasPrueba : real;
   }
 
   Future<List<CitaModel>> fetchCitasByPaciente(String pacienteId) async {
@@ -34,6 +35,20 @@ class CitaRemoteDataSource {
       return _assembleCitas(citasRes as List);
     } catch (e) {
       throw Exception('Error al obtener citas del paciente: $e');
+    }
+  }
+
+    Future<List<CitaModel>> fetchCitasByDoctor(String doctorId) async {
+    try {
+      final citasRes = await supabase
+          .from('citas')
+          .select('*')
+          .eq('doctor_id', doctorId)
+          .filter('deleted_at', 'is', null);
+
+      return _assembleCitas(citasRes as List);
+    } catch (e) {
+      throw Exception('Error al obtener citas del doctor: $e');
     }
   }
 

@@ -23,6 +23,11 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.emergencyBg,
     required this.searchFill,
     required this.cardShadow,
+    required this.railBg,
+    required this.railSelectedBg,
+    required this.railText,
+    required this.railTextSelected,
+    required this.railDivider,
   });
 
   final Color bgPage;
@@ -46,6 +51,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color emergencyBg;
   final Color searchFill;
   final BoxShadow cardShadow;
+
+  // Sidebar (rail) — navy oscuro fijo en ambos temas.
+  final Color railBg;
+  final Color railSelectedBg;
+  final Color railText;
+  final Color railTextSelected;
+  final Color railDivider;
 
   static const light = AppColors(
     bgPage: Color(0xFFEEF2F8),
@@ -73,6 +85,11 @@ class AppColors extends ThemeExtension<AppColors> {
       blurRadius: 20,
       offset: Offset(0, 4),
     ),
+    railBg: Color(0xFF161D2F),
+    railSelectedBg: Color(0xFF3385FF),
+    railText: Color(0xFFAEB9CC),
+    railTextSelected: Color(0xFFFFFFFF),
+    railDivider: Color(0xFF2A3650),
   );
 
   static const dark = AppColors(
@@ -101,6 +118,11 @@ class AppColors extends ThemeExtension<AppColors> {
       blurRadius: 20,
       offset: Offset(0, 4),
     ),
+    railBg: Color(0xFF0C1320),
+    railSelectedBg: Color(0xFF3B82F6),
+    railText: Color(0xFF8A9BB5),
+    railTextSelected: Color(0xFFFFFFFF),
+    railDivider: Color(0xFF1E2A40),
   );
 
   @override
@@ -126,6 +148,11 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? emergencyBg,
     Color? searchFill,
     BoxShadow? cardShadow,
+    Color? railBg,
+    Color? railSelectedBg,
+    Color? railText,
+    Color? railTextSelected,
+    Color? railDivider,
   }) {
     return AppColors(
       bgPage: bgPage ?? this.bgPage,
@@ -149,6 +176,11 @@ class AppColors extends ThemeExtension<AppColors> {
       emergencyBg: emergencyBg ?? this.emergencyBg,
       searchFill: searchFill ?? this.searchFill,
       cardShadow: cardShadow ?? this.cardShadow,
+      railBg: railBg ?? this.railBg,
+      railSelectedBg: railSelectedBg ?? this.railSelectedBg,
+      railText: railText ?? this.railText,
+      railTextSelected: railTextSelected ?? this.railTextSelected,
+      railDivider: railDivider ?? this.railDivider,
     );
   }
 
@@ -177,6 +209,11 @@ class AppColors extends ThemeExtension<AppColors> {
       emergencyBg: Color.lerp(emergencyBg, other.emergencyBg, t)!,
       searchFill: Color.lerp(searchFill, other.searchFill, t)!,
       cardShadow: BoxShadow.lerp(cardShadow, other.cardShadow, t)!,
+      railBg: Color.lerp(railBg, other.railBg, t)!,
+      railSelectedBg: Color.lerp(railSelectedBg, other.railSelectedBg, t)!,
+      railText: Color.lerp(railText, other.railText, t)!,
+      railTextSelected: Color.lerp(railTextSelected, other.railTextSelected, t)!,
+      railDivider: Color.lerp(railDivider, other.railDivider, t)!,
     );
   }
 }

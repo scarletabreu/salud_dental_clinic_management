@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class DashboardMetricCard extends StatelessWidget {
   final IconData icon;
@@ -16,18 +17,14 @@ class DashboardMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.cardBg,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [ac.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,10 +36,10 @@ class DashboardMetricCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF9CA3AF),
+                    color: ac.textDisabled,
                     letterSpacing: 0.1,
                   ),
                   maxLines: 2,
@@ -63,10 +60,10 @@ class DashboardMetricCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF111827),
+              color: ac.textPrimary,
               height: 1,
             ),
           ),

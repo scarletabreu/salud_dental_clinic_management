@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class DashboardHeaderCard extends StatelessWidget {
   final VoidCallback? onVerCitas;
@@ -33,18 +34,14 @@ class DashboardHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.cardBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [ac.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,12 +54,12 @@ class DashboardHeaderCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.10),
+                  color: ac.teal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.local_hospital_rounded,
-                  color: Color(0xFF0D9488),
+                  color: ac.teal,
                   size: 22,
                 ),
               ),
@@ -73,20 +70,20 @@ class DashboardHeaderCard extends StatelessWidget {
                   children: [
                     Text(
                       _saludo(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF9CA3AF),
+                        color: ac.textDisabled,
                         height: 1,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       nombreDoctor ?? 'Doctor',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: ac.textPrimary,
                         height: 1.1,
                       ),
                     ),
@@ -96,15 +93,15 @@ class DashboardHeaderCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
+                  color: ac.chipBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _fechaFormateada(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF6B7280),
+                    color: ac.textMuted,
                   ),
                 ),
               ),
@@ -112,7 +109,7 @@ class DashboardHeaderCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 20),
-          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          Divider(height: 1, color: ac.divider),
           const SizedBox(height: 16),
 
           Row(
@@ -120,14 +117,14 @@ class DashboardHeaderCard extends StatelessWidget {
               if (citasHoy != null) ...[
                 _StatusChip(
                   label: '$citasHoy citas hoy',
-                  color: const Color(0xFF6366F1),
+                  color: ac.indigo,
                 ),
               ],
               if (citasEnEspera != null && citasEnEspera! > 0) ...[
                 const SizedBox(width: 8),
                 _StatusChip(
                   label: '$citasEnEspera en espera',
-                  color: const Color(0xFFF59E0B),
+                  color: ac.amber,
                 ),
               ],
               const Spacer(),
@@ -135,7 +132,7 @@ class DashboardHeaderCard extends StatelessWidget {
                 GestureDetector(
                   onTap: onVerCitas,
                   behavior: HitTestBehavior.opaque,
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
@@ -143,14 +140,14 @@ class DashboardHeaderCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF0D9488),
+                          color: ac.primaryBlue,
                         ),
                       ),
-                      SizedBox(width: 3),
+                      const SizedBox(width: 3),
                       Icon(
                         Icons.arrow_forward_rounded,
                         size: 14,
-                        color: Color(0xFF0D9488),
+                        color: ac.primaryBlue,
                       ),
                     ],
                   ),

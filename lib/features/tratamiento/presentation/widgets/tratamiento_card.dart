@@ -23,7 +23,7 @@ class TratamientoCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: context.appColors.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),

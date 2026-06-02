@@ -34,7 +34,6 @@ class DashboardShell extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthCubit>(
-          // Aquí Flutter va a buscar la instancia que registraste en tu service_locator
           create: (_) => sl<AuthCubit>(), 
         ),
         BlocProvider<PacienteCubit>(
@@ -152,6 +151,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           return rol == RolUsuario.admin;
         case 'Consultas':
         case 'Medicinas':
+        case 'Tratamientos':
           return rol == RolUsuario.admin || rol == RolUsuario.doctor;
         case 'Pacientes':
         case 'Mis Citas del Día':

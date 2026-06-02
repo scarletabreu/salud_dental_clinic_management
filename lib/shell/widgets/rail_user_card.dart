@@ -48,7 +48,7 @@ class RailUserCard extends StatelessWidget {
               icon: Icon(
                 Icons.logout_rounded,
                 size: 20,
-                color: colorScheme.onSurfaceVariant,
+                color: ac.railText,
               ),
               tooltip: 'Cerrar sesión',
               onPressed: () => context.read<AuthCubit>().logout(),
@@ -102,7 +102,7 @@ class RailUserCard extends StatelessWidget {
             icon: Icon(
               Icons.logout_rounded,
               size: 20,
-              color: colorScheme.onSurfaceVariant,
+              color: ac.railText,
             ),
             tooltip: 'Cerrar sesión',
             onPressed: () => context.read<AuthCubit>().logout(),

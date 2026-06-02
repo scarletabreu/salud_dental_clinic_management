@@ -265,17 +265,8 @@ Future<void> init() async {
   sl.registerLazySingleton<PersonaRepository>(
     () => PersonaRepositoryImpl(sl()),
   );
-  sl.registerFactory<PacienteCubit>(
-    () => PacienteCubit(sl()),
-  );
-  sl.registerLazySingleton<CitaRemoteDataSource>(
-    () => CitaRemoteDataSource(sl()),
-  );
   sl.registerLazySingleton<CitaRepository>(
     () => CitaRepositoryImpl(remoteDataSource: sl()),
-  );
-  sl.registerFactory<CitaCubit>(
-    () => CitaCubit(sl()),
   );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),

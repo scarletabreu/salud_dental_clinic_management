@@ -982,8 +982,8 @@ class _EmptyDay extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            decoration: BoxDecoration(color: kChipBg, shape: BoxShape.circle),
-            child: const Icon(
+            decoration: BoxDecoration(color: ac.chipBg, shape: BoxShape.circle),
+            child: Icon(
               Icons.event_available_outlined,
               size: 28,
               color: ac.textDisabled,

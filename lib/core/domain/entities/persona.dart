@@ -1,22 +1,22 @@
 import 'contacto.dart';
-import '../enums/persona_estatus.dart';
+import '../enums/estatus_persona.dart';
 
 class Persona {
-  final String id;
+  final String? id;
   final String nombre;
   final String apellido;
   final DateTime birthDate;
   final String govID;
-  final Contacto contacto;
-  final PersonaEstatus estatus;
+  final List<Contacto> contactos;
+  final EstatusPersona estatus;
 
   Persona({
-    required this.id,
+    this.id,
     required this.nombre,
     required this.apellido,
     required this.birthDate,
     required this.govID,
-    required this.contacto,
+    required this.contactos,
     required this.estatus,
   });
 

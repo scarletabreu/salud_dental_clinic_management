@@ -3,7 +3,7 @@ import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entit
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 
 class Cuenta {
-  final String id;
+  final String? id;
   final String consultaId;
   final DateTime fechaCreacion;
   final DateTime? fechaPago;
@@ -13,7 +13,7 @@ class Cuenta {
   final List<ItemCuenta> itemCuentas;
 
   Cuenta({
-    required this.id,
+    this.id,
     required this.consultaId,
     required this.fechaCreacion,
     this.fechaPago,

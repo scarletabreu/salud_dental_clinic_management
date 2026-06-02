@@ -12,8 +12,8 @@ class MedicinaModel extends Medicina {
 
   factory MedicinaModel.fromJson(Map<String, dynamic> json) {
     return MedicinaModel(
-      id: json['id'],
-      nombre: json['nombre'],
+      id: json['id'] as String,
+      nombre: json['nombre'] as String,
       contraindicaciones:
           (json['contraindicaciones'] as List?)
               ?.map((c) => ContraindicacionModel.fromJson(c))
@@ -21,21 +21,27 @@ class MedicinaModel extends Medicina {
           [],
       efectosSecundarios:
           (json['efectos_secundarios'] as List?)
-              ?.map((e) => EfectoSecundario.values.byName(e))
+              ?.map(
+                (e) => EfectoSecundario.values.firstWhere(
+                  (val) => val.name == e,
+                  orElse: () => EfectoSecundario.inflamacion,
+                ),
+              )
               .toList() ??
           [],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      if (id.contains('-')) 'id': id,
+    final Map<String, dynamic> data = {
       'nombre': nombre,
-      'contraindicaciones': contraindicaciones
-          .map((c) => ContraindicacionModel.fromEntity(c).toJson())
-          .toList(),
       'efectos_secundarios': efectosSecundarios.map((e) => e.name).toList(),
     };
+    if (id != null && id!.length == 36 && id!.contains('-')) {
+      data['id'] = id;
+    }
+
+    return data;
   }
 
   factory MedicinaModel.fromEntity(Medicina medicina) {

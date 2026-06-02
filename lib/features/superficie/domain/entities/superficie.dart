@@ -1,14 +1,14 @@
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
 class Superficie {
-  final String id;
+  final String? id;
   final String dienteId;
   final TipoSuperficie tipoSuperficie;
   final String? diagnosisId;
   final List<String> tratamientos;
 
   Superficie({
-    required this.id,
+    this.id,
     required this.dienteId,
     required this.tipoSuperficie,
     this.diagnosisId,

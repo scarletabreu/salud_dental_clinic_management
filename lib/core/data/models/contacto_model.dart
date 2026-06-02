@@ -1,0 +1,42 @@
+import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
+
+class ContactoModel extends Contacto {
+  ContactoModel({
+    super.id,
+    required super.email,
+    required super.numeroTelefono,
+    required super.direccion,
+  });
+
+  factory ContactoModel.fromJson(Map<String, dynamic> json) {
+    return ContactoModel(
+      id: json['id'],
+      email: json['email'],
+      numeroTelefono: json['numero_telefono'],
+      direccion: json['direccion'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = {
+      'email': email,
+      'numero_telefono': numeroTelefono,
+      'direccion': direccion,
+    };
+
+    if (id != null && id!.contains('-') && id!.length == 36) {
+      data['id'] = id;
+    }
+
+    return data;
+  }
+
+  factory ContactoModel.empty() {
+    return ContactoModel(
+      id: '',
+      email: '',
+      numeroTelefono: '',
+      direccion: '',
+    );
+  }
+}

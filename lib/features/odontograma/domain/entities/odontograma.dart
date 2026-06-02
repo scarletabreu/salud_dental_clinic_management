@@ -3,14 +3,14 @@ import 'package:salud_dental_clinic_management/features/tratamiento/domain/entit
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 
 class Odontograma {
-  final String id;
+  final String? id;
   final String consultaId;
   final List<Diente> dientes;
   final List<Tratamiento> tratamientos;
   final List<Diagnosis> diagnosis;
 
   Odontograma({
-    required this.id,
+    this.id,
     required this.consultaId,
     required this.dientes,
     this.tratamientos = const [],

@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
 
 class DocumentoClinico {
-  final String id;
+  final String? id;
   final String pacienteId;
   final String consultaId;
   final String descripcion;
@@ -10,7 +10,7 @@ class DocumentoClinico {
   final String urlArchivo;
 
   DocumentoClinico({
-    required this.id,
+    this.id,
     required this.pacienteId,
     required this.consultaId,
     required this.descripcion,

@@ -2,7 +2,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
 class Record {
-  final String id;
+  final String? id;
   final String pacienteId;
   final TipoSangre tipoSangre;
   final List<Consulta> consultas;
@@ -12,7 +12,7 @@ class Record {
   final String historialFamiliar;
 
   Record({
-    required this.id,
+    this.id,
     required this.pacienteId,
     required this.tipoSangre,
     this.consultas = const [],
@@ -21,6 +21,12 @@ class Record {
     required this.cirugiasPrevias,
     required this.historialFamiliar,
   });
+
+  String get bloodType => tipoSangre.name.toUpperCase();
+  String get conditions => condiciones;
+  String get history => historialFamiliar;
+  int get childrenCount => cantHijos;
+  List<String> get surgeries => cirugiasPrevias;
 
   Record copyWith({
     String? id,

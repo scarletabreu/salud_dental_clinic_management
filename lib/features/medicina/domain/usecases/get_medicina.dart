@@ -9,6 +9,11 @@ class GetMedicinas {
   GetMedicinas(this.repository);
 
   Future<Either<Failure, List<Medicina>>> call() async {
-    return await repository.getMedicinas();
+    try {
+      final medicinas = await repository.getCatalogoMedicinas();
+      return Right(medicinas);
+    } catch (e) {
+      return Left(ServerFailure());
+    }
   }
 }

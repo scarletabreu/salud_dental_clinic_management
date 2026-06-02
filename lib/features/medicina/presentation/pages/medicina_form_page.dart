@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/condicion_medica.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
@@ -13,11 +14,7 @@ class MedicinaFormPage extends StatefulWidget {
   final IMedicinaRepository repository;
   final Medicina? medicina;
 
-  const MedicinaFormPage({
-    super.key,
-    required this.repository,
-    this.medicina,
-  });
+  const MedicinaFormPage({super.key, required this.repository, this.medicina});
 
   @override
   State<MedicinaFormPage> createState() => _MedicinaFormPageState();
@@ -38,8 +35,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
   @override
   void initState() {
     super.initState();
-    _nombreController =
-        TextEditingController(text: widget.medicina?.nombre ?? '');
+    _nombreController = TextEditingController(
+      text: widget.medicina?.nombre ?? '',
+    );
     _addMedicina = AddMedicina(widget.repository);
     _updateMedicina = UpdateMedicina(widget.repository);
     if (widget.medicina != null) {
@@ -59,8 +57,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     setState(() => _saving = true);
 
     final medicina = Medicina(
-      id: widget.medicina?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.medicina?.id,
       nombre: _nombreController.text.trim(),
       contraindicaciones: _contraindicaciones,
       efectosSecundarios: _efectosSeleccionados.toList(),
@@ -74,8 +71,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     setState(() => _saving = false);
 
     result.fold(
-      (f) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(f.message))),
+      (f) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(f.message))),
       (_) => Navigator.pop(context),
     );
   }
@@ -108,7 +106,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
   Widget _buildHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      color: colorScheme.surface,
+      color: context.appColors.cardBg,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,18 +118,21 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 onTap: () => Navigator.pop(context),
                 child: Text(
                   'Inventario',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.primary,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: colorScheme.primary),
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  size: 16, color: colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
               Text(
                 _isEditing ? 'Editar Medicina' : 'Nueva Medicina',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -146,20 +147,16 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                       _isEditing
                           ? 'Editar Medicamento'
                           : 'Registro de Medicamento',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     Text(
                       _isEditing
                           ? 'Modifica los datos del fármaco.'
                           : 'Complete los detalles para agregar un nuevo fármaco.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -169,7 +166,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 onPressed: _saving ? null : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -184,13 +183,19 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.save_outlined, size: 18),
-                label: Text(_isEditing ? 'Guardar Cambios' : 'Guardar Medicina'),
+                label: Text(
+                  _isEditing ? 'Guardar Cambios' : 'Guardar Medicina',
+                ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -222,10 +227,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 ),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                flex: 4,
-                child: _buildEfectosPanel(context),
-              ),
+              Expanded(flex: 4, child: _buildEfectosPanel(context)),
             ],
           );
         }
@@ -246,7 +248,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: context.appColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
@@ -262,15 +264,18 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(Icons.info_outline,
-                    size: 16, color: colorScheme.primary),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
               ),
               const SizedBox(width: 8),
               Text(
                 'Información General',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -282,8 +287,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
               labelText: 'Nombre de Medicina *',
               hintText: 'Ej. Ibuprofeno 400mg',
               helperText: 'Este nombre aparecerá en las recetas médicas.',
-              prefixIcon:
-                  const Icon(Icons.medication_outlined, size: 20),
+              prefixIcon: const Icon(Icons.medication_outlined, size: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -304,7 +308,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: context.appColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
@@ -320,22 +324,27 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   color: colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(Icons.block_rounded,
-                    size: 16, color: colorScheme.error),
+                child: Icon(
+                  Icons.block_rounded,
+                  size: 16,
+                  color: colorScheme.error,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Contraindicaciones',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
               if (_contraindicaciones.isNotEmpty)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.error,
                     borderRadius: BorderRadius.circular(12),
@@ -355,8 +364,10 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Agregar'),
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
@@ -366,8 +377,8 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
           Text(
             'Condiciones o situaciones en las que no se debe usar este medicamento.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           if (_contraindicaciones.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -378,8 +389,10 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   c.tipoContraindicacion == TipoContraindicacion.absoluta;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer.withAlpha(60),
                   borderRadius: BorderRadius.circular(8),
@@ -390,7 +403,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: isAbsoluta
                             ? colorScheme.error
@@ -413,10 +428,8 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                         children: [
                           Text(
                             c.descripcion,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onErrorContainer,
-                                    ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.onErrorContainer),
                           ),
                           if (c.efectosAdversos.isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -427,21 +440,22 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                                   .map(
                                     (e) => Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 1),
+                                        horizontal: 6,
+                                        vertical: 1,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color:
-                                            colorScheme.error.withAlpha(26),
-                                        borderRadius:
-                                            BorderRadius.circular(4),
+                                        color: colorScheme.error.withAlpha(26),
+                                        borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
-                                            color: colorScheme.error
-                                                .withAlpha(77)),
+                                          color: colorScheme.error.withAlpha(
+                                            77,
+                                          ),
+                                        ),
                                       ),
                                       child: Text(
                                         e.name,
                                         style: TextStyle(
-                                          color:
-                                              colorScheme.onErrorContainer,
+                                          color: colorScheme.onErrorContainer,
                                           fontSize: 10,
                                         ),
                                       ),
@@ -479,9 +493,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
               child: Text(
                 'Ninguna registrada',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  color: colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
           ],
@@ -494,8 +508,10 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     setState(() => _contraindicaciones.removeAt(index));
   }
 
-  Future<void> _showContraindicacionDialog(BuildContext context,
-      {int? index}) async {
+  Future<void> _showContraindicacionDialog(
+    BuildContext context, {
+    int? index,
+  }) async {
     final existing = index != null ? _contraindicaciones[index] : null;
     final result = await showDialog<Contraindicacion>(
       context: context,
@@ -515,7 +531,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: context.appColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
@@ -531,15 +547,18 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   color: colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(Icons.warning_amber_outlined,
-                    size: 16, color: colorScheme.secondary),
+                child: Icon(
+                  Icons.warning_amber_outlined,
+                  size: 16,
+                  color: colorScheme.secondary,
+                ),
               ),
               const SizedBox(width: 8),
               Text(
                 'Efectos Secundarios',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -547,8 +566,8 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
           Text(
             'Selecciona los efectos secundarios más comunes reportados.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -557,18 +576,14 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
             children: EfectoSecundario.values.map((efecto) {
               final selected = _efectosSeleccionados.contains(efecto);
               return FilterChip(
-                label: Text(
-                  efecto.nombre,
-                  style: const TextStyle(fontSize: 13),
-                ),
+                label: Text(efecto.label, style: const TextStyle(fontSize: 13)),
                 selected: selected,
                 onSelected: (v) => setState(() {
                   v
                       ? _efectosSeleccionados.add(efecto)
                       : _efectosSeleccionados.remove(efecto);
                 }),
-                selectedColor:
-                    colorScheme.secondaryContainer,
+                selectedColor: colorScheme.secondaryContainer,
                 checkmarkColor: colorScheme.secondary,
                 side: BorderSide(
                   color: selected
@@ -578,16 +593,14 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 4, vertical: 0),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
               );
             }).toList(),
           ),
           if (_efectosSeleccionados.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: colorScheme.secondaryContainer.withAlpha(80),
                 borderRadius: BorderRadius.circular(8),
@@ -595,9 +608,9 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
               child: Text(
                 '${_efectosSeleccionados.length} efecto${_efectosSeleccionados.length == 1 ? '' : 's'} seleccionado${_efectosSeleccionados.length == 1 ? '' : 's'}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -622,16 +635,18 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   late final TextEditingController _descripcionController;
   late TipoContraindicacion _tipo;
   late Set<EfectoAdverso> _efectosAdversos;
-  CondicionMedica? _condicion;
+  //CondicionMedica _condicion;
 
   @override
   void initState() {
     super.initState();
-    _descripcionController =
-        TextEditingController(text: widget.existing?.descripcion ?? '');
-    _tipo = widget.existing?.tipoContraindicacion ?? TipoContraindicacion.relativa;
+    _descripcionController = TextEditingController(
+      text: widget.existing?.descripcion ?? '',
+    );
+    _tipo =
+        widget.existing?.tipoContraindicacion ?? TipoContraindicacion.relativa;
     _efectosAdversos = Set.from(widget.existing?.efectosAdversos ?? []);
-    _condicion = widget.existing?.condicion;
+    //_condicion = widget.existing?.condicion;
   }
 
   @override
@@ -643,9 +658,8 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   void _confirm() {
     if (!_formKey.currentState!.validate()) return;
     final result = Contraindicacion(
-      id: widget.existing?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      condicion: _condicion,
+      id: widget.existing?.id,
+      condicionId: 'TODO',
       medicinaId: widget.existing?.medicinaId ?? '',
       contraindicacionId: widget.existing?.contraindicacionId ?? '',
       tratamientoId: widget.existing?.tratamientoId ?? '',
@@ -681,18 +695,20 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                         color: colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Icon(Icons.block_rounded,
-                          size: 16, color: colorScheme.error),
+                      child: Icon(
+                        Icons.block_rounded,
+                        size: 16,
+                        color: colorScheme.error,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
                       isEditing
                           ? 'Editar Contraindicación'
                           : 'Nueva Contraindicación',
-                      style:
-                          Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -703,7 +719,8 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                   maxLines: 3,
                   decoration: InputDecoration(
                     labelText: 'Descripción *',
-                    hintText: 'Ej. No usar en pacientes con insuficiencia renal.',
+                    hintText:
+                        'Ej. No usar en pacientes con insuficiencia renal.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -717,7 +734,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<CondicionMedica?>(
-                  value: _condicion,
+                  initialValue: CondicionMedica.alergiaAines /*_condicion*/,
                   decoration: InputDecoration(
                     labelText: 'Condición médica',
                     border: OutlineInputBorder(
@@ -736,7 +753,19 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       ),
                     ),
                   ],
-                  onChanged: (v) => setState(() => _condicion = v),
+
+                  // TODO: Programar lógica para cambiar la condición médica
+                  // Por ahora, este campo es solo decorativo.
+                  onChanged: (v) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Próximamente se podrá asociar una condición médica',
+                        ),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TipoContraindicacion>(
@@ -749,10 +778,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                   ),
                   items: TipoContraindicacion.values
                       .map(
-                        (t) => DropdownMenuItem(
-                          value: t,
-                          child: Text(t.name),
-                        ),
+                        (t) => DropdownMenuItem(value: t, child: Text(t.name)),
                       )
                       .toList(),
                   onChanged: (v) {
@@ -789,7 +815,9 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 0),
+                        horizontal: 4,
+                        vertical: 0,
+                      ),
                     );
                   }).toList(),
                 ),
@@ -804,8 +832,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: _confirm,
-                      child: Text(
-                          isEditing ? 'Guardar Cambios' : 'Agregar'),
+                      child: Text(isEditing ? 'Guardar Cambios' : 'Agregar'),
                     ),
                   ],
                 ),

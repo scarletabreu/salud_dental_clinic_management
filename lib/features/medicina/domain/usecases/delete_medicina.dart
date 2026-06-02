@@ -8,6 +8,11 @@ class DeleteMedicina {
   DeleteMedicina(this.repository);
 
   Future<Either<Failure, void>> call(String id) async {
-    return await repository.deleteMedicina(id);
+    try {
+      await repository.eliminarMedicina(id);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure());
+    }
   }
 }

@@ -12,7 +12,7 @@ class PacienteModel extends Paciente {
     required super.apellido,
     required super.birthDate,
     required super.govID,
-    required super.contacto,
+    required super.contactos,
     required super.estatus,
     required super.genero,
     required super.record,
@@ -30,7 +30,7 @@ class PacienteModel extends Paciente {
       apellido: persona['apellido'] as String,
       birthDate: DateTime.parse(persona['fecha_nacimiento'] as String),
       govID: persona['cedula'] as String,
-      contacto: _parseContacto(json),
+      contactos: _parseContactos(json),
       estatus: EstatusPersona.values.byName(persona['estatus'] as String),
       genero: Genero.values.byName(json['genero'] as String),
       tipoPaciente: TipoPaciente.values.byName(json['tipo_paciente'] as String),
@@ -42,15 +42,9 @@ class PacienteModel extends Paciente {
       citas: const [],
     );
   }
-
+  
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'nombre': nombre,
-      'apellido': apellido,
-      'birth_date': _formatDate(birthDate),
-      'gov_id': govID,
-      'contacto': contacto,
-      'estatus': estatus.name,
       'genero': genero.name,
       'tipo_paciente': tipoPaciente.name,
       'trabajo': trabajo,
@@ -64,19 +58,24 @@ class PacienteModel extends Paciente {
     return data;
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  static ContactoModel _parseContacto(Map<String, dynamic> json) {
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
     final raw = json['contactos'];
-    if (raw is List && raw.isNotEmpty) {
-      return ContactoModel.fromJson(raw.first as Map<String, dynamic>);
+
+    // Caso 1: Si viene como una Lista (lo ideal)
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>() // Filtra y asegura que cada item sea un Map
+          .map((item) => ContactoModel.fromJson(item))
+          .toList();
     }
+
+    // Caso 2: Por si acaso el backend viejo o un fallback envía un solo objeto Map
     if (raw is Map<String, dynamic>) {
-      return ContactoModel.fromJson(raw);
+      return [ContactoModel.fromJson(raw)];
     }
-    return ContactoModel.empty();
+
+    // Caso 3: Si es nulo o no es un formato válido, devolvemos una lista vacía
+    return [];
   }
 
   factory PacienteModel.fromEntity(Paciente paciente) {
@@ -86,7 +85,7 @@ class PacienteModel extends Paciente {
       apellido: paciente.apellido,
       birthDate: paciente.birthDate,
       govID: paciente.govID,
-      contacto: paciente.contacto,
+      contactos: paciente.contactos,
       estatus: paciente.estatus,
       genero: paciente.genero,
       record: paciente.record,

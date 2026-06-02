@@ -35,13 +35,23 @@ class _PacientesPageState extends State<PacientesPage> {
     });
   }
 
-  Future<void> _openForm({Paciente? paciente}) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => PacienteFormPage(paciente: paciente)),
-    );
-    if (mounted) context.read<PacienteCubit>().load();
+Future<void> _openForm({Paciente? paciente}) async {
+  final pacienteCubit = context.read<PacienteCubit>();
+
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BlocProvider.value(
+        value: pacienteCubit,
+        child: PacienteFormPage(paciente: paciente),
+      ),
+    ),
+  );
+
+  if (mounted) {
+    pacienteCubit.load();
   }
+}
 
   Future<void> _openDetalle(Paciente paciente) async {
     final cubit = context.read<PacienteCubit>();
@@ -470,9 +480,9 @@ class _PacienteRowState extends State<_PacienteRow> {
                   Expanded(
                     flex: 2,
                     child: Text(
-                      p.contacto.numeroTelefono.isEmpty
+                      p.contactos.firstOrNull!.numeroTelefono.isEmpty //TODO
                           ? '—'
-                          : p.contacto.numeroTelefono,
+                          : p.contactos.firstOrNull!.numeroTelefono, //TODO
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant.withOpacity(0.8),
                         fontSize: 13,
@@ -560,13 +570,13 @@ class _PacienteRowState extends State<_PacienteRow> {
               ),
               _DetailItem(
                 label: 'Email',
-                value: p.contacto.email.isEmpty ? '—' : p.contacto.email,
+                value: p.contactos.firstOrNull!.email.isEmpty ? '—' : p.contactos.firstOrNull!.email, //TODO
               ),
               _DetailItem(
                 label: 'Dirección Residencia',
-                value: p.contacto.direccion.isEmpty
+                value: p.contactos.firstOrNull!.direccion.isEmpty //TODO
                     ? '—'
-                    : p.contacto.direccion,
+                    : p.contactos.firstOrNull!.direccion, //TODO
               ),
             ],
           ),

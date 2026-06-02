@@ -17,6 +17,16 @@ class PersonaRepositoryImpl implements PersonaRepository {
     }
   }
 
+    @override
+  Future<List<Persona>> searchPersonas(String query) async {
+    try {
+      return await remoteDataSource.searchPersonas(query);
+    } catch (e) {
+      throw Exception('Error en el repositorio al buscar personas: $e');
+    }
+  }
+
+
   @override
   Future<Persona> getPersonaById(String id) async {
     try {
@@ -27,11 +37,14 @@ class PersonaRepositoryImpl implements PersonaRepository {
   }
 
   @override
-  Future<void> createPersona(Persona persona) async {
+  Future<Persona> createPersona(Persona persona) async {
     try {
       final model = _toModel(persona);
-      await remoteDataSource.createPersona(model);
+      final personaCreada = await remoteDataSource.createPersona(model);
+      return personaCreada; 
+      
     } catch (e) {
+      // Propagamos el error con un mensaje claro hacia el Cubit/UI
       throw Exception('Error en el repositorio al crear persona: $e');
     }
   }
@@ -62,8 +75,9 @@ class PersonaRepositoryImpl implements PersonaRepository {
       apellido: persona.apellido,
       birthDate: persona.birthDate,
       govID: persona.govID,
-      contacto: persona.contacto,
+      contactos: persona.contactos,
       estatus: persona.estatus,
     );
   }
+
 }

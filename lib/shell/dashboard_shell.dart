@@ -1,9 +1,15 @@
+// lib/shell/dashboard_shell.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
@@ -18,28 +24,66 @@ import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 
-class DashboardShell extends StatefulWidget {
+class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
-  @override
-  State<DashboardShell> createState() => _DashboardShellState();
+@override
+  Widget build(BuildContext context) {
+    // Usamos MultiBlocProvider para meter tanto el PacienteCubit como el AuthCubit
+    // dentro del árbol de widgets de esta vista.
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthCubit>(
+          // Aquí Flutter va a buscar la instancia que registraste en tu service_locator
+          create: (_) => sl<AuthCubit>(), 
+        ),
+        BlocProvider<PacienteCubit>(
+          create: (_) => sl<PacienteCubit>()..load(),
+        ),
+      ],
+      child: const _DashboardShellView(),
+    );
+  }
 }
 
-class _DashboardShellState extends State<DashboardShell> {
+class _DashboardShellView extends StatefulWidget {
+  const _DashboardShellView();
+
+  @override
+  State<_DashboardShellView> createState() => _DashboardShellViewState();
+}
+
+class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
   DoctorAvailability _availability = DoctorAvailability.disponible;
 
-  late final List<ShellDestination> _destinations = [
+  late final List<ShellDestination> _allDestinations = [
     ShellDestination(
       icon: Icons.dashboard_outlined,
       selectedIcon: Icons.dashboard_rounded,
       label: 'Inicio',
       builder: (_) => BlocProvider(
-        create: (_) => sl<DashboardCubit>()..load(),
-        child: InicioPage(
-          onNavigateToCitas: () => _onDestinationSelected(1),
-          onNavigateToPacientes: () => _onDestinationSelected(3),
-          onNavigateToMedicinas: () => _onDestinationSelected(4),
+        create: (context) {
+          final cubit = sl<DashboardCubit>();
+          final usuario = context.read<AuthCubit>().state.usuario;
+          if (usuario is Doctor && usuario.id != null) {
+            cubit.load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+          }
+          return cubit;
+        },
+        child: BlocListener<AuthCubit, AuthState>(
+          listenWhen: (previous, current) => previous.usuario != current.usuario,
+          listener: (context, authState) {
+            final usuario = authState.usuario;
+            if (usuario is Doctor && usuario.id != null) {
+              context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+            }
+          },
+          child: InicioPage(
+            onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
+            onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
+            onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
+          ),
         ),
       ),
     ),
@@ -62,10 +106,7 @@ class _DashboardShellState extends State<DashboardShell> {
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<PacienteCubit>()..load(),
-        child: const PacientesPage(),
-      ),
+      builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
       icon: Icons.medication_outlined,
@@ -87,26 +128,59 @@ class _DashboardShellState extends State<DashboardShell> {
     ),
   ];
 
+  List<ShellDestination> _visibleDestinations = [];
+
   void _onDestinationSelected(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
   }
 
+  void _navigateToLabel(String label) {
+    final index = _visibleDestinations.indexWhere((d) => d.label == label);
+    if (index != -1) _onDestinationSelected(index);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rol = context.select((AuthCubit cubit) => cubit.state.rol);
+
+    _visibleDestinations = _allDestinations.where((destination) {
+      if (rol == null) return false;
+
+      switch (destination.label) {
+        case 'Configuración':
+          return rol == RolUsuario.admin;
+        case 'Consultas':
+        case 'Medicinas':
+          return rol == RolUsuario.admin || rol == RolUsuario.doctor;
+        case 'Pacientes':
+        case 'Mis Citas del Día':
+        case 'Inicio':
+          return true;
+        default:
+          return false;
+      }
+    }).toList();
+
+    if (_selectedIndex >= _visibleDestinations.length) {
+      _selectedIndex = 0;
+    }
+
     final width = MediaQuery.sizeOf(context).width;
     final layout = _ShellLayout.forWidth(width);
     final colorScheme = Theme.of(context).colorScheme;
 
     final content = IndexedStack(
       index: _selectedIndex,
-      children: [for (final d in _destinations) Builder(builder: d.builder)],
+      children: [for (final d in _visibleDestinations) Builder(builder: d.builder)],
     );
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: ShellAppBar(
-        sectionTitle: _destinations[_selectedIndex].label,
+        sectionTitle: _visibleDestinations.isNotEmpty 
+            ? _visibleDestinations[_selectedIndex].label 
+            : '',
         availability: _availability,
         onAvailabilityChanged: (v) => setState(() => _availability = v),
         compact: layout == _ShellLayout.mobile,
@@ -119,7 +193,7 @@ class _DashboardShellState extends State<DashboardShell> {
                 children: [
                   _SideRail(
                     extended: layout == _ShellLayout.desktop,
-                    destinations: _destinations,
+                    destinations: _visibleDestinations,
                     selectedIndex: _selectedIndex,
                     onDestinationSelected: _onDestinationSelected,
                   ),
@@ -132,7 +206,7 @@ class _DashboardShellState extends State<DashboardShell> {
               selectedIndex: _selectedIndex,
               onDestinationSelected: _onDestinationSelected,
               destinations: [
-                for (final d in _destinations)
+                for (final d in _visibleDestinations)
                   NavigationDestination(
                     icon: Icon(d.icon),
                     selectedIcon: Icon(d.selectedIcon),

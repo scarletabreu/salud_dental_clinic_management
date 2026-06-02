@@ -6,4 +6,12 @@ abstract class UsuarioRemoteDataSource {
   Future<void> signOut();
   bool isSessionActive();
   Stream<AuthState> get authStateChanges;
+  Future<AuthResponse> signInWithPassword({required String email, required String password});
+
+  Future<Map<String, dynamic>?> getPerfilPorTabla({
+    required String tabla, 
+    required String uuid, 
+    String selectColumns = '*',
+  });
+
 }

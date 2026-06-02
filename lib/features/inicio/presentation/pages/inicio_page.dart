@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -62,7 +64,12 @@ class InicioPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: () => context.read<DashboardCubit>().load(),
+                      onPressed: () {
+                        final usuario = context.read<AuthCubit>().state.usuario;
+                        if (usuario is Doctor && usuario.id != null) {
+                          context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
+                        }
+                      },
                       style: FilledButton.styleFrom(
                         backgroundColor: ac.primaryBlue,
                         shape: RoundedRectangleBorder(

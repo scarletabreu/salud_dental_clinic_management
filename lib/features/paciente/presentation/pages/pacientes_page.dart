@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
@@ -43,16 +44,17 @@ class _PacientesPageState extends State<PacientesPage> {
   }
 
   Future<void> _openDetalle(Paciente paciente) async {
+    final cubit = context.read<PacienteCubit>();
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
-          value: context.read<PacienteCubit>(),
+          value: cubit,
           child: PacienteDetailPage(pacienteId: paciente.id!),
         ),
       ),
     );
-    if (mounted) context.read<PacienteCubit>().load();
+    if (mounted) cubit.load();
   }
 
   @override

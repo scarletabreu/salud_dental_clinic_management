@@ -239,8 +239,9 @@ Future<void> init() async {
   sl.registerLazySingleton<CitaRepository>(
     () => CitaRepositoryImpl(remoteDataSource: sl()),
   );
-  sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
 
+  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
+  sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
   sl.registerFactory<DashboardCubit>(
     () => DashboardCubit(
       citaRepository: sl(),

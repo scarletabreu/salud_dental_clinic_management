@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/usecases/delete_medicina.dart';
@@ -133,7 +134,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   Widget _buildHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      color: colorScheme.surface,
+      color: context.appColors.cardBg,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,8 +184,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
 
   Widget _buildSearchBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     return Container(
-      color: colorScheme.surface,
+      color: ac.cardBg,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: TextField(
         controller: _searchController,
@@ -206,7 +208,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 )
               : null,
           filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
+          fillColor: ac.searchFill,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none,
@@ -226,6 +228,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
 
   Widget _buildStatsBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: Row(
@@ -241,7 +244,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
+              color: ac.primaryBlue.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -251,11 +254,11 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                   '${_medicinas.length}',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: colorScheme.onPrimaryContainer,
+                    color: ac.primaryBlue,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.check_circle, color: colorScheme.primary, size: 14),
+                Icon(Icons.check_circle, color: ac.primaryBlue, size: 14),
               ],
             ),
           ),
@@ -343,12 +346,11 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   }
 
   Widget _buildTableHeader() {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: context.appColors.chipBg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -381,7 +383,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
     final shown = _filtered.length;
     final total = _medicinas.length;
     return Container(
-      color: colorScheme.surface,
+      color: context.appColors.cardBg,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Text(
         'Mostrando $shown–$shown de $total medicina${total == 1 ? '' : 's'}',
@@ -422,7 +424,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: context.appColors.cardBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: _expanded

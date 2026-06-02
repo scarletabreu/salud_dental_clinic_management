@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 
 class RailUserCard extends StatelessWidget {
   final bool extended;
@@ -7,16 +8,16 @@ class RailUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     final textTheme = Theme.of(context).textTheme;
 
     final avatar = CircleAvatar(
       radius: 18,
-      backgroundColor: colorScheme.primary,
+      backgroundColor: ac.railSelectedBg,
       child: Text(
         'JM',
         style: textTheme.labelLarge?.copyWith(
-          color: colorScheme.onPrimary,
+          color: ac.railTextSelected,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -33,7 +34,7 @@ class RailUserCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: ac.railTextSelected.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -48,14 +49,14 @@ class RailUserCard extends StatelessWidget {
                   'Dr. Javier Méndez',
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                    color: ac.railTextSelected,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   'Odontólogo Especialista',
                   style: textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                    color: ac.railText,
                     letterSpacing: 0.8,
                   ),
                   overflow: TextOverflow.ellipsis,

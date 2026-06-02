@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -184,21 +185,19 @@ class _SideRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
 
     return Container(
       width: extended ? 248 : 88,
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          right: BorderSide(color: colorScheme.outlineVariant, width: 1),
-        ),
+        color: ac.railBg,
+        border: Border(right: BorderSide(color: ac.railDivider, width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShellLogo(extended: extended),
-          Divider(height: 1, color: colorScheme.outlineVariant),
+          Divider(height: 1, color: ac.railDivider),
           const SizedBox(height: 12),
           Expanded(
             child: SingleChildScrollView(
@@ -216,7 +215,7 @@ class _SideRail extends StatelessWidget {
               ),
             ),
           ),
-          Divider(height: 1, color: colorScheme.outlineVariant),
+          Divider(height: 1, color: ac.railDivider),
           RailUserCard(extended: extended),
         ],
       ),
@@ -239,13 +238,11 @@ class _RailItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     final textTheme = Theme.of(context).textTheme;
 
-    final bg = selected ? colorScheme.primaryContainer : Colors.transparent;
-    final fg = selected
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurfaceVariant;
+    final bg = selected ? ac.railSelectedBg : Colors.transparent;
+    final fg = selected ? ac.railTextSelected : ac.railText;
 
     final icon = Icon(
       selected ? destination.selectedIcon : destination.icon,

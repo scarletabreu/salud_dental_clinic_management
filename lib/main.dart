@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/di/service_locator.dart' as di;
+import 'core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
@@ -25,13 +26,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Salud Dental',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3385FF),
-          brightness: Brightness.light,
-        ).copyWith(surfaceContainerLowest: const Color(0xFFF5F8FA)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: const DashboardShell(),
     );
   }

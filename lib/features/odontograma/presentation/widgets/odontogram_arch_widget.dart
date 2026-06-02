@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:salud_dental_clinic_management/core/presentation/design_tokens.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
@@ -65,20 +65,21 @@ class _NavRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return Row(
       children: [
         _NavBtn(icon: Icons.chevron_left_rounded, onTap: onPrev),
         const SizedBox(width: 8),
         Text(
           '${current + 1} / $total',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ac.textPrimary),
         ),
         const SizedBox(width: 8),
         _NavBtn(icon: Icons.chevron_right_rounded, onTap: onNext),
         const SizedBox(width: 12),
         Text(
           _fmt(fecha),
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: ac.textMuted),
         ),
       ],
     );
@@ -92,19 +93,20 @@ class _NavBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: onTap != null ? kTeal.withValues(alpha: 0.10) : const Color(0xFFF3F4F6),
+          color: onTap != null ? ac.teal.withValues(alpha: 0.10) : ac.chipBg,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
           size: 16,
-          color: onTap != null ? kTeal : kTextDisabled,
+          color: onTap != null ? ac.teal : ac.textDisabled,
         ),
       ),
     );
@@ -120,6 +122,7 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     const items = [
       (ToothStatus.treated, 'Tratado'),
       (ToothStatus.mild, 'Leve'),
@@ -146,7 +149,7 @@ class _Legend extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               item.$2,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: kTextMuted),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: ac.textMuted),
             ),
           ],
         );
@@ -167,13 +170,14 @@ class _TogglePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? kTeal : const Color(0xFFF3F4F6),
+          color: active ? ac.teal : ac.chipBg,
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
@@ -181,7 +185,7 @@ class _TogglePill extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: active ? Colors.white : kTextMuted,
+            color: active ? Colors.white : ac.textMuted,
           ),
         ),
       ),
@@ -212,11 +216,10 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final withOdo = _withOdo;
     final clampedIdx = _idx.clamp(0, withOdo.isEmpty ? 0 : withOdo.length - 1);
 
-    // DEMO: sin odontograma real → mostrar datos de ejemplo. Borrar al
-    // conectar datos reales (junto con odontogram_sample_data.dart).
     final isSample = withOdo.isEmpty;
 
     final Odontograma? currentOdo = isSample
@@ -227,43 +230,42 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        boxShadow: [kCardShadow],
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        boxShadow: [ac.cardShadow],
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: kTeal.withValues(alpha: 0.10),
+                  color: ac.teal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.medical_services_outlined, size: 18, color: kTeal),
+                child: Icon(Icons.medical_services_outlined, size: 18, color: ac.teal),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Odontograma',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ac.textPrimary),
               ),
               if (isSample) ...[
                 const SizedBox(width: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: kAmber.withValues(alpha: 0.10),
+                    color: ac.amber.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(100),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Ejemplo',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kAmber),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ac.amber),
                   ),
                 ),
               ],
@@ -277,7 +279,6 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             ],
           ),
 
-          // Consultation navigation (only when not in aggregate mode)
           if (withOdo.length > 1 && !_aggregate) ...[
             const SizedBox(height: 14),
             _NavRow(
@@ -293,7 +294,7 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             const SizedBox(height: 6),
             Text(
               '${withOdo.length} consulta${withOdo.length > 1 ? 's' : ''} consolidada${withOdo.length > 1 ? 's' : ''}',
-              style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 11, color: ac.textMuted, fontWeight: FontWeight.w500),
             ),
           ],
 
@@ -301,7 +302,6 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
           const _Legend(),
           const SizedBox(height: 4),
 
-          // Core widget — handles arch rendering + interaction
           OdontogramWidget(
             odontograma: currentOdo,
             editMode: false,

@@ -5,7 +5,6 @@ import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/auth/presentation/pages/login_page.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
-/// Widget raíz que escucha el estado de autenticación y enruta sin parpadeos.
 class AppRouter extends StatelessWidget {
   const AppRouter({super.key});
 
@@ -30,7 +29,6 @@ class AppRouter extends StatelessWidget {
   }
 }
 
-/// Pantalla de carga inicial — misma paleta que LoginPage para evitar flash.
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 

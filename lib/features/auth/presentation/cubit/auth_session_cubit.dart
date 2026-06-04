@@ -9,21 +9,15 @@ class AuthSessionCubit extends Cubit<AuthState> {
 
   AuthSessionCubit(this._repository) : super(const AuthInitial());
 
-  /// Llama esto en main.dart justo antes de runApp para escuchar
-  /// onAuthStateChange de Supabase y derivar el estado inicial.
   void initialize() {
-    _authSubscription = _repository.onAuthStateChange.listen(
-      (usuario) {
-        if (usuario != null) {
-          emit(Authenticated(usuario));
-        } else {
-          emit(const Unauthenticated());
-        }
-      },
-      onError: (_) => emit(const Unauthenticated()),
-    );
+    _authSubscription = _repository.onAuthStateChange.listen((usuario) {
+      if (usuario != null) {
+        emit(Authenticated(usuario));
+      } else {
+        emit(const Unauthenticated());
+      }
+    }, onError: (_) => emit(const Unauthenticated()));
 
-    // Resuelve el estado inicial de forma síncrona si ya hay sesión.
     final current = _repository.currentUser;
     if (current != null) {
       emit(Authenticated(current));
@@ -32,25 +26,26 @@ class AuthSessionCubit extends Cubit<AuthState> {
     }
   }
 
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn({required String email, required String password}) async {
     emit(const AuthLoading());
     try {
-      final usuario = await _repository.signIn(email: email, password: password);
+      final usuario = await _repository.signIn(
+        email: email,
+        password: password,
+      );
       emit(Authenticated(usuario));
     } on Exception catch (e) {
       final raw = e.toString();
 
-      // Mapeo de errores de Supabase a mensajes amigables en español
       if (raw.contains('Invalid login credentials') ||
           raw.contains('invalid_credentials')) {
         emit(const AuthError('Correo o contraseña incorrectos.'));
       } else if (raw.contains('Email not confirmed')) {
         emit(const AuthError('Debes confirmar tu correo electrónico primero.'));
       } else if (raw.contains('network') || raw.contains('SocketException')) {
-        emit(const AuthError('Sin conexión. Verifica tu red e intenta de nuevo.'));
+        emit(
+          const AuthError('Sin conexión. Verifica tu red e intenta de nuevo.'),
+        );
       } else {
         emit(const AuthError('Ocurrió un error inesperado. Intenta de nuevo.'));
       }

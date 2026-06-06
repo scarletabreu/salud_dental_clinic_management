@@ -52,7 +52,7 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color searchFill;
   final BoxShadow cardShadow;
 
-  // Sidebar (rail) — navy oscuro fijo en ambos temas.
+  // Sidebar (rail) — claro en tema light, navy oscuro en tema dark.
   final Color railBg;
   final Color railSelectedBg;
   final Color railText;
@@ -85,11 +85,11 @@ class AppColors extends ThemeExtension<AppColors> {
       blurRadius: 20,
       offset: Offset(0, 4),
     ),
-    railBg: Color(0xFF161D2F),
+    railBg: Color(0xFFFFFFFF),
     railSelectedBg: Color(0xFF3385FF),
-    railText: Color(0xFFAEB9CC),
+    railText: Color(0xFF64748B),
     railTextSelected: Color(0xFFFFFFFF),
-    railDivider: Color(0xFF2A3650),
+    railDivider: Color(0xFFE2E8F2),
   );
 
   static const dark = AppColors(

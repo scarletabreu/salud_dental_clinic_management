@@ -21,6 +21,13 @@ import 'package:salud_dental_clinic_management/features/paciente/data/repositori
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 
+// Consultas
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
+
 // Data Sources Impl (Mapeados correctamente)
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource_impl.dart';
@@ -188,6 +195,9 @@ Future<void> init() async {
   sl.registerLazySingleton<CitaRemoteDataSource>(
     () => CitaRemoteDataSource(sl()),
   );
+  sl.registerLazySingleton<ConsultaRemoteDatasource>(
+    () => ConsultaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
 
   // --- Repositories ---
   sl.registerLazySingleton<IMedicinaRepository>(
@@ -268,6 +278,9 @@ Future<void> init() async {
   sl.registerLazySingleton<CitaRepository>(
     () => CitaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<ConsultaRepository>(
+    () => ConsultaRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -290,6 +303,13 @@ Future<void> init() async {
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<ConsultasListCubit>(
+    () => ConsultasListCubit(
+      consultaRepository: sl(),
+      pacienteRepository: sl(),
+      doctorRepository: sl(),
+    ),
+  );
   sl.registerFactory<DashboardCubit>(
     () => DashboardCubit(
       citaRepository: sl(),

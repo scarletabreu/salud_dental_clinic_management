@@ -15,7 +15,8 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_list_page.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -54,6 +55,7 @@ class _DashboardShellState extends State<DashboardShell> {
   late final DashboardCubit _dashboardCubit;
   late final CitaCubit _citaCubit;
   late final PacienteCubit _pacienteCubit;
+  late final ConsultasListCubit _consultaCubit;
 
   // Se inicializa en initState para poder referenciar _onDestinationSelected.
   late final List<ShellDestination> _destinations;
@@ -65,6 +67,7 @@ class _DashboardShellState extends State<DashboardShell> {
     _dashboardCubit = sl<DashboardCubit>();
     _citaCubit      = sl<CitaCubit>()..load();
     _pacienteCubit  = sl<PacienteCubit>()..load();
+    _consultaCubit  = sl<ConsultasListCubit>()..cargar();
 
     _destinations = [
     ShellDestination(
@@ -105,7 +108,10 @@ class _DashboardShellState extends State<DashboardShell> {
         icon: Icons.medical_information_outlined,
         selectedIcon: Icons.medical_information_rounded,
         label: 'Consultas',
-        builder: (_) => const ConsultasPage(),
+        builder: (_) => BlocProvider.value(
+          value: _consultaCubit,
+          child: const ConsultasListPage(),
+        ),
       ),
       ShellDestination(
         icon: Icons.people_alt_outlined,
@@ -142,6 +148,7 @@ class _DashboardShellState extends State<DashboardShell> {
     _dashboardCubit.close();
     _citaCubit.close();
     _pacienteCubit.close();
+    _consultaCubit.close();
     super.dispose();
   }
 

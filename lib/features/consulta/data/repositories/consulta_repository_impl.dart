@@ -30,6 +30,27 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
+  Future<List<Consulta>> getConsultas() async {
+    try {
+      final data = await remoteDataSource.fetchConsultas();
+      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener consultas: $e');
+    }
+  }
+
+  @override
+  Future<Set<String>> getPacienteIdsConTratamientos() async {
+    try {
+      return await remoteDataSource.fetchPacienteIdsConTratamientos();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener pacientes con tratamientos: $e',
+      );
+    }
+  }
+
+  @override
   Future<List<Consulta>> getHistorialPaciente(String pacienteId) async {
     try {
       final data = await remoteDataSource.fetchConsultasByPaciente(pacienteId);

@@ -47,6 +47,44 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchConsultas() async {
+    try {
+      // Solo embebemos lo que tiene FK fiable hacia `consultas`:
+      // `recetas` y `documentos_clinicos` (ambas con `consulta_id`).
+      // Los tratamientos aplicados NO cuelgan de la consulta (solo de
+      // `paciente_id`), así que no se pueden derivar por consulta aquí.
+      final response = await supabaseClient
+          .from('consultas')
+          .select('*, recetas(*), documentos_clinicos(*)')
+          .isFilter('deleted_at', null)
+          .order('fecha', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener el listado de consultas: ${e.message}');
+    }
+  }
+
+  @override
+  Future<Set<String>> fetchPacienteIdsConTratamientos() async {
+    try {
+      final response = await supabaseClient
+          .from('tratamientos_aplicados')
+          .select('paciente_id')
+          .isFilter('deleted_at', null);
+
+      return {
+        for (final row in (response as List))
+          if (row['paciente_id'] != null) row['paciente_id'] as String,
+      };
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al obtener pacientes con tratamientos: ${e.message}',
+      );
+    }
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   ) async {

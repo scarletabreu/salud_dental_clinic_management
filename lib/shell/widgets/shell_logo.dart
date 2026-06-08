@@ -46,7 +46,7 @@ class ShellLogo extends StatelessWidget {
                   'Salud Dental',
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: ac.railTextSelected,
+                    color: ac.textPrimary,
                     height: 1.1,
                   ),
                 ),

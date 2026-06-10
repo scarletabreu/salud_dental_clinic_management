@@ -1,5 +1,3 @@
-// lib/shell/dashboard_shell.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -27,18 +25,12 @@ import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
-@override
+  @override
   Widget build(BuildContext context) {
-    // Usamos MultiBlocProvider para meter tanto el PacienteCubit como el AuthCubit
-    // dentro del árbol de widgets de esta vista.
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthCubit>(
-          create: (_) => sl<AuthCubit>(), 
-        ),
-        BlocProvider<PacienteCubit>(
-          create: (_) => sl<PacienteCubit>()..load(),
-        ),
+        BlocProvider<AuthCubit>(create: (_) => sl<AuthCubit>()),
+        BlocProvider<PacienteCubit>(create: (_) => sl<PacienteCubit>()..load()),
       ],
       child: const _DashboardShellView(),
     );
@@ -64,24 +56,35 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       builder: (_) => BlocProvider(
         create: (context) {
           final cubit = sl<DashboardCubit>();
-          final usuario = context.read<AuthCubit>().state.usuario;
-          if (usuario is Doctor && usuario.id != null) {
-            cubit.load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
-          }
+          final authState = context.read<AuthCubit>().state;
+          final usuario = authState.usuario;
+          cubit.load(
+            roles: authState.roles,
+            doctorId: usuario is Doctor ? usuario.id : null,
+            doctorName: usuario is Doctor
+                ? '${usuario.nombre} ${usuario.apellido}'
+                : null,
+          );
           return cubit;
         },
         child: BlocListener<AuthCubit, AuthState>(
-          listenWhen: (previous, current) => previous.usuario != current.usuario,
+          listenWhen: (previous, current) =>
+              previous.usuario != current.usuario,
           listener: (context, authState) {
             final usuario = authState.usuario;
-            if (usuario is Doctor && usuario.id != null) {
-              context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
-            }
+            context.read<DashboardCubit>().load(
+              roles: authState.roles,
+              doctorId: usuario is Doctor ? usuario.id : null,
+              doctorName: usuario is Doctor
+                  ? '${usuario.nombre} ${usuario.apellido}'
+                  : null,
+            );
           },
           child: InicioPage(
             onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
             onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
             onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
+            onNavigateToConfiguracion: () => _navigateToLabel('Configuración'),
           ),
         ),
       ),
@@ -141,18 +144,19 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
   @override
   Widget build(BuildContext context) {
-    final rol = context.select((AuthCubit cubit) => cubit.state.rol);
+    final roles = context.select((AuthCubit cubit) => cubit.state.roles);
 
     _visibleDestinations = _allDestinations.where((destination) {
-      if (rol == null) return false;
+      if (roles.isEmpty) return false;
 
       switch (destination.label) {
         case 'Configuración':
-          return rol == RolUsuario.admin;
+          return roles.contains(RolUsuario.admin);
         case 'Consultas':
         case 'Medicinas':
         case 'Tratamientos':
-          return rol == RolUsuario.admin || rol == RolUsuario.doctor;
+          return roles.contains(RolUsuario.admin) ||
+              roles.contains(RolUsuario.doctor);
         case 'Pacientes':
         case 'Mis Citas del Día':
         case 'Inicio':
@@ -172,14 +176,16 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
     final content = IndexedStack(
       index: _selectedIndex,
-      children: [for (final d in _visibleDestinations) Builder(builder: d.builder)],
+      children: [
+        for (final d in _visibleDestinations) Builder(builder: d.builder),
+      ],
     );
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: ShellAppBar(
-        sectionTitle: _visibleDestinations.isNotEmpty 
-            ? _visibleDestinations[_selectedIndex].label 
+        sectionTitle: _visibleDestinations.isNotEmpty
+            ? _visibleDestinations[_selectedIndex].label
             : '',
         availability: _availability,
         onAvailabilityChanged: (v) => setState(() => _availability = v),
@@ -245,17 +251,17 @@ enum _ShellLayout {
 }
 
 class _SideRail extends StatelessWidget {
-  final bool extended;
-  final List<ShellDestination> destinations;
-  final int selectedIndex;
-  final ValueChanged<int> onDestinationSelected;
-
   const _SideRail({
     required this.extended,
     required this.destinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
   });
+
+  final bool extended;
+  final List<ShellDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -298,17 +304,17 @@ class _SideRail extends StatelessWidget {
 }
 
 class _RailItem extends StatelessWidget {
-  final ShellDestination destination;
-  final bool selected;
-  final bool extended;
-  final VoidCallback onTap;
-
   const _RailItem({
     required this.destination,
     required this.selected,
     required this.extended,
     required this.onTap,
   });
+
+  final ShellDestination destination;
+  final bool selected;
+  final bool extended;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

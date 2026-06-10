@@ -15,20 +15,17 @@ enum RolUsuario {
         return 'Asistente';
     }
   }
-
 }
 
-extension RolPermisos on RolUsuario {
-  // Módulo de Configuración y Finanzas
-  bool get puedeAccederAConfiguracion => this == RolUsuario.admin;
-  bool get puedeAccederACompras => this == RolUsuario.admin;
+extension RolPermisosLista on List<RolUsuario> {
+  bool get puedeAccederAConfiguracion => contains(RolUsuario.admin);
+  bool get puedeAccederACompras => contains(RolUsuario.admin);
 
-  // Módulo Médico / Clínico
-  bool get puedeVerExpedientes => 
-      this == RolUsuario.admin || this == RolUsuario.doctor;
-  bool get puedeEditarAlertasYRecetas => 
-      this == RolUsuario.admin || this == RolUsuario.doctor;
+  bool get puedeVerExpedientes =>
+      contains(RolUsuario.admin) || contains(RolUsuario.doctor);
 
-  // Gestión de Citas (Acceso irrestricto para el flujo operativo)
+  bool get puedeEditarAlertasYRecetas =>
+      contains(RolUsuario.admin) || contains(RolUsuario.doctor);
+
   bool get puedeGestionarCitas => true;
 }

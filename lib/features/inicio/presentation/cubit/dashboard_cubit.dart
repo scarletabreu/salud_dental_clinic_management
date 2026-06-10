@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
@@ -9,60 +10,79 @@ class DashboardCubit extends Cubit<DashboardState> {
   final CitaRepository _citaRepository;
   final IPacienteRepository _pacienteRepository;
   final IMedicinaRepository _medicinaRepository;
-  String? doctorId;
-  String? doctorName;
+
+  List<RolUsuario> _roles = const [];
+  String? _doctorId;
+  String? _doctorName;
 
   DashboardCubit({
     required CitaRepository citaRepository,
     required IPacienteRepository pacienteRepository,
     required IMedicinaRepository medicinaRepository,
-  })  : _citaRepository = citaRepository,
-        _pacienteRepository = pacienteRepository,
-        _medicinaRepository = medicinaRepository,
-        super(const DashboardLoading());
+  }) : _citaRepository = citaRepository,
+       _pacienteRepository = pacienteRepository,
+       _medicinaRepository = medicinaRepository,
+       super(const DashboardLoading());
 
-  Future<void> load(String doctorId, String doctorName) async {
+  Future<void> load({
+    required List<RolUsuario> roles,
+    String? doctorId,
+    String? doctorName,
+  }) async {
     emit(const DashboardLoading());
     try {
-      this.doctorId = doctorId;
-      this.doctorName = doctorName;
+      _roles = roles;
+      _doctorId = doctorId;
+      _doctorName = doctorName;
 
       final now = DateTime.now();
+      final isAdmin = roles.contains(RolUsuario.admin);
+      final isDoctor = roles.contains(RolUsuario.doctor);
 
-      final citas = await _citaRepository.getCitasByDoctor(doctorId);
+      final citas = (isDoctor && doctorId != null)
+          ? await _citaRepository.getCitasByDoctor(doctorId)
+          : await _citaRepository.getCitas();
+
       final pacientesResult = await _pacienteRepository.getPacientes();
-      final medicinas = await _medicinaRepository.getCatalogoMedicinas();
+      final totalPacientes = pacientesResult.fold(
+        (_) => 0,
+        (list) => list.length,
+      );
 
-      final citasDeHoy = citas
-          .where(
-            (c) =>
-                c.date.year == now.year &&
-                c.date.month == now.month &&
-                c.date.day == now.day,
-          )
-          .toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
+      final medicinas = (isAdmin || isDoctor)
+          ? await _medicinaRepository.getCatalogoMedicinas()
+          : <dynamic>[];
 
-      final citasPendientes =
-          citasDeHoy.where((c) => c.estado == EstadoCita.pendiente).length;
-      final citasEnEspera =
-          citasDeHoy.where((c) => c.estado == EstadoCita.enEspera).length;
-      final citasCompletadas =
-          citasDeHoy.where((c) => c.estado == EstadoCita.completada).length;
+      final citasDeHoy =
+          citas
+              .where(
+                (c) =>
+                    c.date.year == now.year &&
+                    c.date.month == now.month &&
+                    c.date.day == now.day,
+              )
+              .toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
 
-      final totalPacientes =
-          pacientesResult.fold((_) => 0, (list) => list.length);
-
-      emit(DashboardLoaded(
-        citasHoy: citasDeHoy.length,
-        citasPendientes: citasPendientes,
-        citasEnEspera: citasEnEspera,
-        citasCompletadas: citasCompletadas,
-        totalPacientes: totalPacientes,
-        totalMedicinas: medicinas.length,
-        citasDeHoy: citasDeHoy,
-        nombreDoctor: doctorName,
-      ));
+      emit(
+        DashboardLoaded(
+          roles: roles,
+          nombreDoctor: isDoctor ? doctorName : null,
+          citasHoy: citasDeHoy.length,
+          citasPendientes: citasDeHoy
+              .where((c) => c.estado == EstadoCita.pendiente)
+              .length,
+          citasEnEspera: citasDeHoy
+              .where((c) => c.estado == EstadoCita.enEspera)
+              .length,
+          citasCompletadas: citasDeHoy
+              .where((c) => c.estado == EstadoCita.completada)
+              .length,
+          totalPacientes: totalPacientes,
+          totalMedicinas: medicinas.length,
+          citasDeHoy: citasDeHoy,
+        ),
+      );
     } catch (e) {
       emit(DashboardError(e.toString()));
     }
@@ -72,32 +92,29 @@ class DashboardCubit extends Cubit<DashboardState> {
     final current = state;
     if (current is! DashboardLoaded) return;
 
-    // Optimistic update so UI responds immediately
-    final updatedCitas = current.citasDeHoy.map((c) {
-      return c.id == citaId ? c.copyWith(estado: nuevoEstado) : c;
-    }).toList();
+    final updatedCitas = current.citasDeHoy
+        .map((c) => c.id == citaId ? c.copyWith(estado: nuevoEstado) : c)
+        .toList();
 
-    final pendientes =
-        updatedCitas.where((c) => c.estado == EstadoCita.pendiente).length;
-    final enEspera =
-        updatedCitas.where((c) => c.estado == EstadoCita.enEspera).length;
-    final completadas =
-        updatedCitas.where((c) => c.estado == EstadoCita.completada).length;
-
-    emit(current.copyWith(
-      citasDeHoy: updatedCitas,
-      citasPendientes: pendientes,
-      citasEnEspera: enEspera,
-      citasCompletadas: completadas,
-    ));
+    emit(
+      current.copyWith(
+        citasDeHoy: updatedCitas,
+        citasPendientes: updatedCitas
+            .where((c) => c.estado == EstadoCita.pendiente)
+            .length,
+        citasEnEspera: updatedCitas
+            .where((c) => c.estado == EstadoCita.enEspera)
+            .length,
+        citasCompletadas: updatedCitas
+            .where((c) => c.estado == EstadoCita.completada)
+            .length,
+      ),
+    );
 
     try {
       await _citaRepository.updateCitaEstado(citaId, nuevoEstado);
     } catch (_) {
-      // Revert to server state on failure if we still have the authenticated doctor info.
-      if (doctorId != null && doctorName != null) {
-        await load(doctorId!, doctorName!);
-      }
+      await load(roles: _roles, doctorId: _doctorId, doctorName: _doctorName);
     }
   }
 }

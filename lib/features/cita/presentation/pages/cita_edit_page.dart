@@ -29,7 +29,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
   TimeOfDay? _horaSeleccionada;
   bool _esEmergencia = false;
   int _duracionMinutos = 30;
-  EstadoCita _estadoCita = EstadoCita.pendiente;
 
   @override
   void initState() {
@@ -38,7 +37,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     _horaSeleccionada = TimeOfDay.fromDateTime(widget.cita.date.toLocal());
     _esEmergencia = widget.cita.esEmergencia;
     _duracionMinutos = widget.cita.duracionMinutos;
-    _estadoCita = widget.cita.estado;
     _cargarDoctores();
   }
 
@@ -109,10 +107,19 @@ class _CitaEditPageState extends State<CitaEditPage> {
         date: fechaHoraFinal.toUtc(),
         duracionMinutos: _duracionMinutos,
         esEmergencia: _esEmergencia,
-        estado: _estadoCita,
       ),
     );
   }
+
+  void _cancelarCita() {
+  setState(() => _intentandoGuardar = true);
+
+  context.read<CitaCubit>().actualizarCita(
+    widget.cita.copyWith(
+      estado: EstadoCita.cancelada,
+    ),
+  );
+}
 
   void _snackError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -150,23 +157,30 @@ class _CitaEditPageState extends State<CitaEditPage> {
         listenWhen: (prev, curr) {
           if (prev is CitaCubitLoaded && curr is CitaCubitLoaded) {
             return prev.isSubmitting != curr.isSubmitting ||
-                prev.errorMessage != curr.errorMessage;
+                  prev.errorMessage != curr.errorMessage;
           }
           return true;
         },
-        listener: (context, state) {
+        listener: (listenerContext, state) {
+          print("DEBUG: Llegó un estado de tipo: ${state.runtimeType}");
           if (state is CitaCubitLoaded) {
+            print("DEBUG: isSubmitting = ${state.isSubmitting}, _intentandoGuardar = $_intentandoGuardar");
             if (state.errorMessage != null) {
               _snackError(state.errorMessage!);
               setState(() => _intentandoGuardar = false);
-            } else if (!state.isSubmitting && _intentandoGuardar) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
+            } 
+            else if (!state.isSubmitting && _intentandoGuardar) {
+              _intentandoGuardar = false;
+
+              if (!mounted) return;
+
+              Navigator.of(listenerContext).pop();
+
+              ScaffoldMessenger.of(listenerContext).showSnackBar(
                 SnackBar(
-                  content: const Text('Cita reprogramada con éxito.'),
-                  backgroundColor: ac.teal,
+                  content: const Text('Cita actualizada con éxito.'),
+                  backgroundColor: listenerContext.appColors.primaryBlue,
                   behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(16),
                 ),
               );
             }
@@ -396,27 +410,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
             ),
           ),
           const SizedBox(height: 14),
-          _FieldGroup(
-            ac: ac,
-            icon: Icons.info_outline_rounded,
-            label: 'Estado operativo',
-            child: DropdownButtonFormField<EstadoCita>(
-              value: _estadoCita,
-              decoration: _dropDecoration(ac),
-              items: EstadoCita.values
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e.label)))
-                  .toList(),
-              onChanged: isSubmitting
-                  ? null
-                  : (v) =>
-                        setState(() => _estadoCita = v ?? EstadoCita.pendiente),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: ac.textPrimary,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -483,12 +476,43 @@ class _CitaEditPageState extends State<CitaEditPage> {
     );
   }
 
+  Future<void> _confirmarCancelarCita() async {
+  final confirmar = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Cancelar cita'),
+        content: const Text(
+          '¿Está seguro de que desea cancelar esta cita? '
+          'Esta acción no debería realizarse accidentalmente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancelar cita'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmar == true) {
+    _cancelarCita();
+  }
+}
+
   Widget _buildBotones(AppColors ac, bool isSubmitting) {
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+            onPressed: isSubmitting
+                ? null
+                : () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
               foregroundColor: ac.textSecondary,
               side: BorderSide(color: ac.divider),
@@ -501,10 +525,33 @@ class _CitaEditPageState extends State<CitaEditPage> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            child: const Text('Cancelar'),
+            child: const Text('Cerrar'),
           ),
         ),
+
         const SizedBox(width: 12),
+
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: isSubmitting ? null : _confirmarCancelarCita,
+            icon: const Icon(Icons.cancel_outlined, size: 18),
+            label: const Text(
+              'Cancelar',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: ac.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
         Expanded(
           flex: 2,
           child: FilledButton.icon(
@@ -518,7 +565,10 @@ class _CitaEditPageState extends State<CitaEditPage> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                : const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 18,
+                  ),
             label: const Text(
               'Guardar cambios',
               style: TextStyle(fontWeight: FontWeight.w600),
@@ -711,6 +761,7 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("BUILD CUBIT: ${context.read<CitaCubit>().hashCode}");
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(

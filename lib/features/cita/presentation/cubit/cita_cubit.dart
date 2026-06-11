@@ -141,6 +141,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
   }
 
   Future<void> actualizarCita(Cita citaActualizada) async {
+    print("ACTUALIZAR CUBIT: ${hashCode}");
     final current = state;
     if (current is! CitaCubitLoaded) return;
 
@@ -171,16 +172,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
       final citasActualizadas = await _repository.getCitas();
 
       emit(
-        CitaCubitLoaded(
+        current.copyWith(
           citas: citasActualizadas,
-          focusedDay: current.focusedDay,
-          selectedDay: current.selectedDay,
-          viewMode: current.viewMode,
           isSubmitting: false,
-          errorMessage: null,
+          errorMessage: () => null,
         ),
       );
     } catch (e) {
+      print('Error capturado en actualizarCita: $e');
       emit(
         current.copyWith(
           isSubmitting: false,

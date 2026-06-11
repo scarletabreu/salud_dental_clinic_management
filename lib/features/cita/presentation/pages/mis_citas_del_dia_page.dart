@@ -65,12 +65,14 @@ class MisCitasDelDiaPage extends StatelessWidget {
       backgroundColor: ac.bgPage,
       body: BlocBuilder<CitaCubit, CitaCubitState>(builder: _buildState),
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
+        
         builder: (context, state) {
           if (state is! CitaCubitLoaded) {
             return const SizedBox.shrink();
           }
 
           return FloatingActionButton.extended(
+            heroTag: 'fab_nueva_cita_unique_tag',
             onPressed: () async {
               await NuevaCitaDialog.show(
                 context,

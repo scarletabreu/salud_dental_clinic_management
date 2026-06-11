@@ -63,7 +63,14 @@ class CitaCubitLoaded extends CitaCubitState {
   }
 
   @override
-  List<Object?> get props => [citas, focusedDay, selectedDay, viewMode];
+  List<Object?> get props => [
+    citas,
+    focusedDay,
+    selectedDay,
+    viewMode,
+    isSubmitting,
+    errorMessage,
+  ];
 }
 
 class CitaCubitError extends CitaCubitState {

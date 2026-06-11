@@ -1,4 +1,3 @@
-// features/cita/presentation/pages/cita_edit_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
@@ -205,8 +204,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     );
   }
 
-  // ── 1. Paciente ───────────────────────────────
-
   Widget _buildPacienteCard(AppColors ac) {
     final initials = widget.cita.persona.fullName
         .split(' ')
@@ -268,8 +265,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     );
   }
 
-  // ── 2. Doctor ─────────────────────────────────
-
   Widget _buildDoctorCard(AppColors ac, bool isSubmitting) {
     return _EditCard(
       ac: ac,
@@ -316,8 +311,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
             ),
     );
   }
-
-  // ── 3. Fecha y hora ───────────────────────────
 
   Widget _buildFechaHoraCard(AppColors ac, bool isSubmitting) {
     final fechaLabel = _fechaSeleccionada == null
@@ -370,8 +363,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
       ),
     );
   }
-
-  // ── 4. Duración + Estado ──────────────────────
 
   Widget _buildParametrosCard(AppColors ac, bool isSubmitting) {
     return _EditCard(
@@ -430,8 +421,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
       ),
     );
   }
-
-  // ── 5. Emergencia ─────────────────────────────
 
   Widget _buildEmergenciaCard(AppColors ac, bool isSubmitting) {
     return AnimatedContainer(
@@ -494,8 +483,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     );
   }
 
-  // ── 6. Botones ────────────────────────────────
-
   Widget _buildBotones(AppColors ac, bool isSubmitting) {
     return Row(
       children: [
@@ -551,8 +538,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     );
   }
 
-  // ── Helpers ───────────────────────────────────
-
   InputDecoration _dropDecoration(AppColors ac) => InputDecoration(
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     border: OutlineInputBorder(
@@ -567,8 +552,6 @@ class _CitaEditPageState extends State<CitaEditPage> {
     fillColor: ac.bgPage,
   );
 }
-
-// ── Shared widgets ─────────────────────────────
 
 class _EditCard extends StatelessWidget {
   final AppColors ac;

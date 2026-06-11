@@ -17,9 +17,16 @@ class ConsultaLoading extends ConsultaState {
   const ConsultaLoading();
 }
 
-/// La consulta (con odontograma, dientes y superficies) quedó creada.
+/// La consulta (con odontograma, dientes y superficies) quedó creada; se pasa
+/// al workspace clínico (odontograma, tratamientos, notas).
 class ConsultaCreada extends ConsultaState {
   const ConsultaCreada();
+}
+
+/// El doctor finalizó la consulta ("Terminar consulta"); si venía de una cita,
+/// esta se marcó como completada.
+class ConsultaTerminada extends ConsultaState {
+  const ConsultaTerminada();
 }
 
 /// Falló la operación; no se registró nada (sin huérfanos).

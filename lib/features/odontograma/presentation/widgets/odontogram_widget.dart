@@ -702,10 +702,7 @@ class _ToothInfoPanel extends StatelessWidget {
                 ),
               ),
               OutlinedButton.icon(
-                onPressed: () {
-                  onAddTratamiento?.call(d, selectedSurface);
-                  _showComingSoon(context);
-                },
+                onPressed: () => onAddTratamiento?.call(d, selectedSurface),
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: const Text('Tratamiento'),
                 style: OutlinedButton.styleFrom(

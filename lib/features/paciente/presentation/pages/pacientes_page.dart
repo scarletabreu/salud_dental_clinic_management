@@ -15,7 +15,9 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_list_page.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -105,7 +107,23 @@ class _DashboardShellState extends State<DashboardShell> {
         icon: Icons.medical_information_outlined,
         selectedIcon: Icons.medical_information_rounded,
         label: 'Consultas',
-        builder: (_) => const ConsultasPage(),
+        builder: (_) => BlocProvider(
+          create: (context) {
+            final cubit = sl<ConsultasListCubit>();
+            final authState = context.read<AuthCubit>().state;
+            final usuario = authState.usuario;
+            // Un doctor solo ve sus propias consultas; el admin las ve todas.
+            if (authState.rol == RolUsuario.doctor &&
+                usuario is Doctor &&
+                usuario.id != null) {
+              cubit.cargar(restringidoADoctorId: usuario.id);
+            } else {
+              cubit.cargar();
+            }
+            return cubit;
+          },
+          child: const ConsultasListPage(),
+        ),
       ),
       ShellDestination(
         icon: Icons.people_alt_outlined,

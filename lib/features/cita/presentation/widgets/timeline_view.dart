@@ -427,8 +427,14 @@ class _CitaBlock extends StatelessWidget {
 
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    final puedeEfectuar =
-        pacienteId != null && doctorId != null && cita.id != null;
+    // Solo se efectúan citas vigentes (pendiente o en espera); una completada
+    // o cancelada no debe poder efectuarse.
+    final esEfectuable = cita.estado == EstadoCita.pendiente ||
+        cita.estado == EstadoCita.enEspera;
+    final puedeEfectuar = esEfectuable &&
+        pacienteId != null &&
+        doctorId != null &&
+        cita.id != null;
 
     showMenu<Object>(
       context: context,

@@ -38,6 +38,7 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
     return Scaffold(
       body: _buildBody(state),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_tratamientos',
         onPressed: () => _abrirFormulario(context),
         icon: const Icon(Icons.add),
         label: const Text('Nuevo Servicio'),

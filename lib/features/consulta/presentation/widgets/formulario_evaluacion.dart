@@ -10,13 +10,13 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 class FormularioEvaluacion extends StatefulWidget {
   final String pacienteId;
   final String doctorId;
-  final String citaId;
+  final String? citaId;
 
   const FormularioEvaluacion({
     super.key,
     required this.pacienteId,
     required this.doctorId,
-    required this.citaId,
+    this.citaId,
   });
 
   @override
@@ -205,7 +205,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Guardar consulta'),
+                      : const Text('Iniciar consulta'),
                 ),
               );
             },

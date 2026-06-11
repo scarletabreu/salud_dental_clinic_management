@@ -6,23 +6,34 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/formulario_evaluacion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/panel_paciente.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/workspace_consulta.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 
-/// Pantalla "Efectuar Consulta": carga el paciente en un panel lateral y
-/// presenta el formulario de evaluación clínica para crear la consulta con su
-/// odontograma inicializado.
-class EfectuarConsultaPage extends StatelessWidget {
-  final String citaId;
+/// Pantalla "Efectuar Consulta". Flujo de dos etapas con el paciente fijo a la
+/// izquierda:
+///   1. [FormularioEvaluacion] — evaluación clínica que crea la consulta y su
+///      odontograma inicializado.
+///   2. [WorkspaceConsulta] — odontograma interactivo, tratamientos y notas;
+///      finaliza con "Terminar consulta".
+class EfectuarConsultaPage extends StatefulWidget {
+  final String? citaId;
   final String pacienteId;
   final String doctorId;
 
   const EfectuarConsultaPage({
     super.key,
-    required this.citaId,
+    this.citaId,
     required this.pacienteId,
     required this.doctorId,
   });
+
+  @override
+  State<EfectuarConsultaPage> createState() => _EfectuarConsultaPageState();
+}
+
+class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
+  bool _enWorkspace = false;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +41,7 @@ class EfectuarConsultaPage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => sl<PacienteCubit>()..loadById(pacienteId),
+          create: (_) => sl<PacienteCubit>()..loadById(widget.pacienteId),
         ),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
       ],
@@ -40,7 +51,7 @@ class EfectuarConsultaPage extends StatelessWidget {
           backgroundColor: c.cardBg,
           foregroundColor: c.textPrimary,
           elevation: 0,
-          title: const Text('Efectuar Consulta'),
+          title: Text(_enWorkspace ? 'Consulta en curso' : 'Efectuar Consulta'),
         ),
         body: BlocListener<ConsultaCubit, ConsultaState>(
           listener: _onConsultaState,
@@ -49,11 +60,13 @@ class EfectuarConsultaPage extends StatelessWidget {
             children: [
               _buildPanel(),
               Expanded(
-                child: FormularioEvaluacion(
-                  pacienteId: pacienteId,
-                  doctorId: doctorId,
-                  citaId: citaId,
-                ),
+                child: _enWorkspace
+                    ? WorkspaceConsulta(citaId: widget.citaId)
+                    : FormularioEvaluacion(
+                        pacienteId: widget.pacienteId,
+                        doctorId: widget.doctorId,
+                        citaId: widget.citaId,
+                      ),
               ),
             ],
           ),
@@ -94,10 +107,11 @@ class EfectuarConsultaPage extends StatelessWidget {
 
   void _onConsultaState(BuildContext context, ConsultaState state) {
     if (state is ConsultaCreada) {
+      // Etapa 1 completada: la consulta y su odontograma quedaron creados.
+      setState(() => _enWorkspace = true);
+    } else if (state is ConsultaTerminada) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Consulta registrada con su odontograma.'),
-        ),
+        const SnackBar(content: Text('Consulta finalizada.')),
       );
       Navigator.of(context).pop(true);
     } else if (state is ConsultaError) {

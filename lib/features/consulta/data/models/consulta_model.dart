@@ -8,7 +8,7 @@ class ConsultaModel extends Consulta {
     super.id,
     required super.pacienteId,
     required super.doctorId,
-    required super.citaId,
+    super.citaId,
     required super.fecha,
     super.recetas,
     super.documentosClinicos,

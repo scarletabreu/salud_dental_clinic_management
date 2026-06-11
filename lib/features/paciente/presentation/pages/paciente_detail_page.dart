@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_session_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_session_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -268,6 +272,7 @@ class _PacienteDetailPageState
                     ),
                   ),
                   const SizedBox(width: 8),
+                  _BotonEfectuarConsulta(pacienteId: p.id!),
                   FilledButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(
@@ -1067,6 +1072,52 @@ class _PacienteDetailPageState
 // ─────────────────────────────────────────────
 //  Shared helper widgets
 // ─────────────────────────────────────────────
+
+/// Botón para iniciar una consulta desde el expediente del paciente (sin cita).
+/// El doctor se toma de la sesión activa; si no hay doctor logueado, no se
+/// muestra. El `doctor_id` coincide con el uuid de sesión (el perfil se carga
+/// por ese uuid en el login).
+class _BotonEfectuarConsulta extends StatelessWidget {
+  final String pacienteId;
+
+  const _BotonEfectuarConsulta({required this.pacienteId});
+
+  @override
+  Widget build(BuildContext context) {
+    final session = sl<AuthSessionCubit>().state;
+    if (session is! Authenticated) return const SizedBox.shrink();
+    final doctorId = session.usuario.id;
+    final ac = context.appColors;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilledButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EfectuarConsultaPage(
+                pacienteId: pacienteId,
+                doctorId: doctorId,
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.medical_services_outlined, size: 16),
+        label: const Text('Efectuar consulta'),
+        style: FilledButton.styleFrom(
+          backgroundColor: ac.teal,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
 
 class _SectionCard extends StatelessWidget {
   final Widget child;

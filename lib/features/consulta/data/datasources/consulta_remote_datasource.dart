@@ -5,6 +5,12 @@ abstract class ConsultaRemoteDatasource {
 
   /// Invoca el RPC transaccional `crear_consulta_completa` con [params].
   Future<void> crearConsultaCompleta(Map<String, dynamic> params);
+  Future<List<Map<String, dynamic>>> fetchConsultas();
+
+  /// Devuelve el conjunto de `paciente_id` que tienen al menos un tratamiento
+  /// aplicado vigente. `tratamientos_aplicados` solo se vincula al paciente,
+  /// por lo que el indicador de tratamientos del listado es por paciente.
+  Future<Set<String>> fetchPacienteIdsConTratamientos();
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   );

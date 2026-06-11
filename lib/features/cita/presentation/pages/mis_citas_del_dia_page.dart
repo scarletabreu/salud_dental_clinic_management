@@ -72,6 +72,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
           }
 
           return FloatingActionButton.extended(
+            heroTag: 'fab_mis_citas',
             onPressed: () async {
               await NuevaCitaDialog.show(
                 context,
@@ -909,7 +910,13 @@ class _CitaCard extends StatelessWidget {
     final ac = context.appColors;
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    if (pacienteId == null || doctorId == null || cita.id == null) {
+    // Solo se efectúan citas vigentes (pendiente o en espera).
+    final esEfectuable = cita.estado == EstadoCita.pendiente ||
+        cita.estado == EstadoCita.enEspera;
+    if (!esEfectuable ||
+        pacienteId == null ||
+        doctorId == null ||
+        cita.id == null) {
       return const SizedBox.shrink();
     }
     return Align(

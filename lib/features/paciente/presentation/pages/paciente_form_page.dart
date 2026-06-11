@@ -1,4 +1,3 @@
-// features/paciente/presentation/pages/paciente_form_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,10 +12,6 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/util/validators.dart';
-
-// ─────────────────────────────────────────────
-//  Formatter
-// ─────────────────────────────────────────────
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -37,10 +32,6 @@ class _CedulaInputFormatter extends TextInputFormatter {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-//  Contacto entry model
-// ─────────────────────────────────────────────
 
 class _ContactoEntry {
   final String? originalId;
@@ -89,10 +80,6 @@ class _ContactoEntry {
     return 'Nuevo contacto';
   }
 }
-
-// ─────────────────────────────────────────────
-//  Page
-// ─────────────────────────────────────────────
 
 class PacienteFormPage extends StatefulWidget {
   final Paciente? paciente;
@@ -272,10 +259,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  //  AppBar
-  // ─────────────────────────────────────────────
-
   PreferredSizeWidget _buildAppBar(AppColors ac, bool isSaving) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(72),
@@ -286,7 +269,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           bottom: false,
           child: Row(
             children: [
-              // Back
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
@@ -304,7 +286,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Title + breadcrumb
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,7 +320,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ],
                 ),
               ),
-              // Buttons
               OutlinedButton(
                 onPressed: isSaving ? null : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
@@ -395,10 +375,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       ),
     );
   }
-
-  // ─────────────────────────────────────────────
-  //  1. Datos personales
-  // ─────────────────────────────────────────────
 
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
@@ -530,10 +506,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  //  2. Contactos
-  // ─────────────────────────────────────────────
-
   Widget _buildContactosCard(AppColors ac) {
     return _FormCard(
       ac: ac,
@@ -589,7 +561,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       ),
       child: Column(
         children: [
-          // Header
           InkWell(
             onTap: () => _toggleContacto(index),
             borderRadius: BorderRadius.circular(12),
@@ -663,7 +634,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               ),
             ),
           ),
-          // Body
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 200),
             crossFadeState: entry.isExpanded
@@ -736,10 +706,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  //  3. Info adicional
-  // ─────────────────────────────────────────────
-
   Widget _buildInfoAdicionalCard(AppColors ac) {
     return _FormCard(
       ac: ac,
@@ -789,10 +755,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  //  Input decoration helper
-  // ─────────────────────────────────────────────
-
   InputDecoration _inputDeco(
     AppColors ac, {
     String? hint,
@@ -822,10 +784,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     alignLabelWithHint: alignLabelWithHint,
   );
 }
-
-// ─────────────────────────────────────────────
-//  Shared widgets
-// ─────────────────────────────────────────────
 
 class _FormCard extends StatelessWidget {
   final AppColors ac;

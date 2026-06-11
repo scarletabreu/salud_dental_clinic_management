@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/auth/data/datasources/us
 import 'package:salud_dental_clinic_management/features/auth/data/repositories/usuario_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 
@@ -296,6 +297,7 @@ Future<void> init() async {
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),

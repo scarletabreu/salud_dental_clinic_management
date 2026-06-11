@@ -27,6 +27,14 @@ class Consulta {
     this.motivoConsulta,
   });
 
+  /// Indica si la consulta tiene al menos una receta asociada.
+  bool get tieneRecetas => recetas.isNotEmpty;
+
+  /// Indica si la consulta tiene tratamientos aplicados. La relación es
+  /// indirecta: consulta → odontograma → dientes → tratamientos.
+  bool get tieneTratamientosAplicados =>
+      odontograma?.dientes.any((d) => d.tratamientos.isNotEmpty) ?? false;
+
   Consulta copyWith({
     String? pacienteId,
     String? doctorId,

@@ -1,18 +1,27 @@
 import 'package:equatable/equatable.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 
-abstract class DashboardState extends Equatable {
+sealed class DashboardState extends Equatable {
   const DashboardState();
-
-  @override
-  List<Object?> get props => [];
 }
 
 class DashboardLoading extends DashboardState {
   const DashboardLoading();
+  @override
+  List<Object?> get props => [];
+}
+
+class DashboardError extends DashboardState {
+  final String message;
+  const DashboardError(this.message);
+  @override
+  List<Object?> get props => [message];
 }
 
 class DashboardLoaded extends DashboardState {
+  final List<RolUsuario> roles;
+  final String? nombreDoctor;
   final int citasHoy;
   final int citasPendientes;
   final int citasEnEspera;
@@ -20,9 +29,10 @@ class DashboardLoaded extends DashboardState {
   final int totalPacientes;
   final int totalMedicinas;
   final List<Cita> citasDeHoy;
-  final String? nombreDoctor;
 
   const DashboardLoaded({
+    required this.roles,
+    this.nombreDoctor,
     required this.citasHoy,
     required this.citasPendientes,
     required this.citasEnEspera,
@@ -30,10 +40,15 @@ class DashboardLoaded extends DashboardState {
     required this.totalPacientes,
     required this.totalMedicinas,
     required this.citasDeHoy,
-    this.nombreDoctor,
   });
 
+  bool get isAdmin => roles.contains(RolUsuario.admin);
+  bool get isDoctor => roles.contains(RolUsuario.doctor);
+  bool get isSecretaria => roles.contains(RolUsuario.asistente);
+
   DashboardLoaded copyWith({
+    List<RolUsuario>? roles,
+    String? nombreDoctor,
     int? citasHoy,
     int? citasPendientes,
     int? citasEnEspera,
@@ -41,22 +56,22 @@ class DashboardLoaded extends DashboardState {
     int? totalPacientes,
     int? totalMedicinas,
     List<Cita>? citasDeHoy,
-    String? nombreDoctor,
-  }) {
-    return DashboardLoaded(
-      citasHoy: citasHoy ?? this.citasHoy,
-      citasPendientes: citasPendientes ?? this.citasPendientes,
-      citasEnEspera: citasEnEspera ?? this.citasEnEspera,
-      citasCompletadas: citasCompletadas ?? this.citasCompletadas,
-      totalPacientes: totalPacientes ?? this.totalPacientes,
-      totalMedicinas: totalMedicinas ?? this.totalMedicinas,
-      citasDeHoy: citasDeHoy ?? this.citasDeHoy,
-      nombreDoctor: nombreDoctor ?? this.nombreDoctor,
-    );
-  }
+  }) => DashboardLoaded(
+    roles: roles ?? this.roles,
+    nombreDoctor: nombreDoctor ?? this.nombreDoctor,
+    citasHoy: citasHoy ?? this.citasHoy,
+    citasPendientes: citasPendientes ?? this.citasPendientes,
+    citasEnEspera: citasEnEspera ?? this.citasEnEspera,
+    citasCompletadas: citasCompletadas ?? this.citasCompletadas,
+    totalPacientes: totalPacientes ?? this.totalPacientes,
+    totalMedicinas: totalMedicinas ?? this.totalMedicinas,
+    citasDeHoy: citasDeHoy ?? this.citasDeHoy,
+  );
 
   @override
   List<Object?> get props => [
+    roles,
+    nombreDoctor,
     citasHoy,
     citasPendientes,
     citasEnEspera,
@@ -64,15 +79,5 @@ class DashboardLoaded extends DashboardState {
     totalPacientes,
     totalMedicinas,
     citasDeHoy,
-    nombreDoctor,
   ];
-}
-
-class DashboardError extends DashboardState {
-  final String message;
-
-  const DashboardError(this.message);
-
-  @override
-  List<Object?> get props => [message];
 }

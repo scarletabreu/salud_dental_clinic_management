@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -11,10 +12,6 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/util/validators.dart';
-
-// =============================================================================
-// Input formatter: auto-inserta guiones → 000-0000000-0
-// =============================================================================
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -36,10 +33,6 @@ class _CedulaInputFormatter extends TextInputFormatter {
   }
 }
 
-// =============================================================================
-// Modelo de trabajo para editar un contacto en memoria
-// =============================================================================
-
 class _ContactoEntry {
   final String? originalId;
   final TextEditingController telefono;
@@ -53,9 +46,9 @@ class _ContactoEntry {
     String emailInitial = '',
     String direccionInitial = '',
     this.isExpanded = true,
-  })  : telefono = TextEditingController(text: telefonoInitial),
-        email = TextEditingController(text: emailInitial),
-        direccion = TextEditingController(text: direccionInitial);
+  }) : telefono = TextEditingController(text: telefonoInitial),
+       email = TextEditingController(text: emailInitial),
+       direccion = TextEditingController(text: direccionInitial);
 
   factory _ContactoEntry.fromContacto(Contacto c, {bool isExpanded = false}) =>
       _ContactoEntry(
@@ -67,11 +60,11 @@ class _ContactoEntry {
       );
 
   ContactoModel toModel() => ContactoModel(
-        id: originalId,
-        numeroTelefono: telefono.text.trim(),
-        email: email.text.trim(),
-        direccion: direccion.text.trim(),
-      );
+    id: originalId,
+    numeroTelefono: telefono.text.trim(),
+    email: email.text.trim(),
+    direccion: direccion.text.trim(),
+  );
 
   void dispose() {
     telefono.dispose();
@@ -79,7 +72,6 @@ class _ContactoEntry {
     direccion.dispose();
   }
 
-  /// Etiqueta de resumen para la tarjeta colapsada.
   String get resumen {
     final tel = telefono.text.trim();
     final mail = email.text.trim();
@@ -89,13 +81,8 @@ class _ContactoEntry {
   }
 }
 
-// =============================================================================
-// Page
-// =============================================================================
-
 class PacienteFormPage extends StatefulWidget {
   final Paciente? paciente;
-
   const PacienteFormPage({super.key, this.paciente});
 
   @override
@@ -110,7 +97,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   late final TextEditingController _cedulaController;
   late final TextEditingController _trabajoController;
   late final TextEditingController _referenciaController;
-
   late final List<_ContactoEntry> _contactos;
 
   DateTime? _fechaNacimiento;
@@ -123,7 +109,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   void initState() {
     super.initState();
     final p = widget.paciente;
-
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _apellidoController = TextEditingController(text: p?.apellido ?? '');
     _cedulaController = TextEditingController(text: p?.govID ?? '');
@@ -137,13 +122,15 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       _contactos = p.contactos.isEmpty
           ? [_ContactoEntry(isExpanded: true)]
           : p.contactos
-              .asMap()
-              .entries
-              .map((e) => _ContactoEntry.fromContacto(
+                .asMap()
+                .entries
+                .map(
+                  (e) => _ContactoEntry.fromContacto(
                     e.value,
                     isExpanded: e.key == 0,
-                  ))
-              .toList();
+                  ),
+                )
+                .toList();
     } else {
       _contactos = [_ContactoEntry(isExpanded: true)];
     }
@@ -156,21 +143,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController.dispose();
     _trabajoController.dispose();
     _referenciaController.dispose();
-    for (final c in _contactos) {
-      c.dispose();
-    }
+    for (final c in _contactos) c.dispose();
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // Contactos helpers
-  // ---------------------------------------------------------------------------
-
   void _addContacto() {
     setState(() {
-      for (final c in _contactos) {
-        c.isExpanded = false;
-      }
+      for (final c in _contactos) c.isExpanded = false;
       _contactos.add(_ContactoEntry(isExpanded: true));
     });
   }
@@ -187,21 +166,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
 
   void _toggleContacto(int index) {
     setState(() {
-      final isNowExpanded = !_contactos[index].isExpanded;
-      for (final c in _contactos) {
-        c.isExpanded = false;
-      }
-      _contactos[index].isExpanded = isNowExpanded;
+      final nowExpanded = !_contactos[index].isExpanded;
+      for (final c in _contactos) c.isExpanded = false;
+      _contactos[index].isExpanded = nowExpanded;
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Guardar
-  // ---------------------------------------------------------------------------
-
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-
     if (_contactos.isEmpty ||
         _contactos.every((c) => c.telefono.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -211,16 +183,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       );
       return;
     }
-
-    final contactosFinal = _contactos.map((c) => c.toModel()).toList();
-
     final paciente = Paciente(
       id: widget.paciente?.id,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
       govID: _cedulaController.text.trim(),
-      contactos: contactosFinal,
+      contactos: _contactos.map((c) => c.toModel()).toList(),
       estatus: widget.paciente?.estatus ?? EstatusPersona.activo,
       genero: _genero,
       tipoPaciente: _tipoPaciente,
@@ -229,70 +198,58 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       record: widget.paciente?.record ?? RecordModel.empty(),
       citas: widget.paciente?.citas ?? const [],
     );
-
     final cubit = context.read<PacienteCubit>();
-    if (_isEditing) {
-      cubit.updatePaciente(paciente);
-    } else {
-      cubit.addPaciente(paciente);
-    }
+    _isEditing ? cubit.updatePaciente(paciente) : cubit.addPaciente(paciente);
   }
 
-  Future<void> _pickFechaNacimiento() async {
+  Future<void> _pickFecha() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _fechaNacimiento ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
       lastDate: now,
-      helpText: 'Fecha de Nacimiento',
+      helpText: 'Fecha de nacimiento',
       confirmText: 'Seleccionar',
       cancelText: 'Cancelar',
     );
     if (picked != null) setState(() => _fechaNacimiento = picked);
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/'
-      '${date.month.toString().padLeft(2, '0')}/'
-      '${date.year}';
-
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/'
+      '${d.year}';
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+    final ac = context.appColors;
     return BlocConsumer<PacienteCubit, PacienteState>(
       listener: (context, state) {
         if (state is PacienteError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
-        if (state is PacienteOperationSuccess) {
-          Navigator.pop(context);
-        }
+        if (state is PacienteOperationSuccess) Navigator.pop(context);
       },
       builder: (context, state) {
         final isSaving = state is PacienteLoading;
-
         return Scaffold(
-          backgroundColor: colorScheme.surfaceContainerLowest,
-          body: SafeArea(
-            child: Form(
-              key: _formKey,
+          backgroundColor: ac.bgPage,
+          appBar: _buildAppBar(ac, isSaving),
+          body: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildHeader(context, isSaving: isSaving),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: _buildFormBody(context),
-                    ),
-                  ),
+                  _buildDatosPersonalesCard(ac),
+                  const SizedBox(height: 16),
+                  _buildContactosCard(ac),
+                  const SizedBox(height: 16),
+                  _buildInfoAdicionalCard(ac),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -302,74 +259,83 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, {required bool isSaving}) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      color: colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  PreferredSizeWidget _buildAppBar(AppColors ac, bool isSaving) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(72),
+      child: Container(
+        color: ac.cardBg,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: Text(
-                  'Pacientes',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: colorScheme.primary),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: ac.divider),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18,
+                    color: ac.textSecondary,
+                  ),
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  size: 16, color: colorScheme.onSurfaceVariant),
-              Text(
-                _isEditing ? 'Editar Paciente' : 'Nuevo Paciente',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      _isEditing
-                          ? 'Editar Paciente'
-                          : 'Registro de Paciente',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          'Pacientes',
+                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 13,
+                          color: ac.textMuted,
+                        ),
+                        Text(
+                          _isEditing ? 'Editar paciente' : 'Nuevo paciente',
+                          style: TextStyle(fontSize: 11, color: ac.textMuted),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      _isEditing
-                          ? 'Modifica los datos del paciente.'
-                          : 'Complete los datos para registrar un nuevo paciente.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      _isEditing ? 'Editar paciente' : 'Registro de paciente',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: ac.textPrimary,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
               OutlinedButton(
                 onPressed: isSaving ? null : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: ac.textSecondary,
+                  side: BorderSide(color: ac.divider),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 child: const Text('Cancelar'),
               ),
@@ -378,483 +344,461 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
+                        width: 14,
+                        height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.save_outlined, size: 18),
-                label: Text(
-                    _isEditing ? 'Guardar Cambios' : 'Guardar Paciente'),
+                    : const Icon(Icons.save_outlined, size: 16),
+                label: const Text('Guardar'),
                 style: FilledButton.styleFrom(
+                  backgroundColor: ac.primaryBlue,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildFormBody(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 600;
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
-                    _buildDatosPersonalesPanel(context),
-                    const SizedBox(height: 16),
-                    _buildContactosPanel(context),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 4,
-                child: _buildInfoAdicionalPanel(context),
-              ),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            _buildDatosPersonalesPanel(context),
-            const SizedBox(height: 16),
-            _buildContactosPanel(context),
-            const SizedBox(height: 16),
-            _buildInfoAdicionalPanel(context),
-          ],
-        );
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Panel: Datos Personales
-  // ---------------------------------------------------------------------------
-
-  Widget _buildDatosPersonalesPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.person_outline,
-      iconColor: colorScheme.primary,
-      iconBackground: colorScheme.primaryContainer,
-      title: 'Datos Personales',
+  Widget _buildDatosPersonalesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.primaryBlue,
+      iconBg: ac.primaryBlue.withOpacity(0.10),
+      icon: Icons.person_outline_rounded,
+      title: 'Datos personales',
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: _nombreController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre *',
-                    prefixIcon:
-                        const Icon(Icons.badge_outlined, size: 20),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.badge_outlined,
+                  label: 'Nombre',
+                  child: TextFormField(
+                    controller: _nombreController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _inputDeco(ac, hint: 'Ana'),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El nombre es obligatorio'
-                      : null,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextFormField(
-                  controller: _apellidoController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Apellido *',
-                    prefixIcon:
-                        const Icon(Icons.badge_outlined, size: 20),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.badge_outlined,
+                  label: 'Apellido',
+                  child: TextFormField(
+                    controller: _apellidoController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _inputDeco(ac, hint: 'García'),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El apellido es obligatorio'
-                      : null,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _cedulaController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [_CedulaInputFormatter()],
-            decoration: InputDecoration(
-              labelText: 'Cédula *',
-              hintText: '000-0000000-0',
-              prefixIcon:
-                  const Icon(Icons.credit_card_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.credit_card_outlined,
+            label: 'Cédula',
+            child: TextFormField(
+              controller: _cedulaController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [_CedulaInputFormatter()],
+              decoration: _inputDeco(ac, hint: '000-0000000-0'),
+              validator: cedulaValidator,
             ),
-            validator: cedulaValidator,
           ),
-          const SizedBox(height: 16),
-          FormField<DateTime>(
-            initialValue: _fechaNacimiento,
-            validator: (_) => _fechaNacimiento == null
-                ? 'La fecha de nacimiento es obligatoria'
-                : null,
-            builder: (field) {
-              return InkWell(
-                onTap: _pickFechaNacimiento,
-                borderRadius: BorderRadius.circular(8),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Fecha de Nacimiento',
-                    prefixIcon: const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 20),
-                    suffixIcon: const Icon(Icons.arrow_drop_down),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: field.hasError
-                          ? BorderSide(
-                              color: Theme.of(context).colorScheme.error)
-                          : const BorderSide(),
-                    ),
-                    errorText: field.errorText,
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.calendar_today_outlined,
+            label: 'Fecha de nacimiento',
+            child: FormField<DateTime>(
+              initialValue: _fechaNacimiento,
+              validator: (_) =>
+                  _fechaNacimiento == null ? 'Selecciona una fecha' : null,
+              builder: (field) => GestureDetector(
+                onTap: _pickFecha,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 12,
                   ),
-                  child: Text(
-                    _fechaNacimiento != null
-                        ? _formatDate(_fechaNacimiento!)
-                        : 'Seleccionar fecha',
-                    style:
-                        Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: _fechaNacimiento != null
-                                  ? null
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                            ),
+                  decoration: BoxDecoration(
+                    color: ac.bgPage,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: field.hasError ? ac.red : ac.divider,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_month_rounded,
+                        size: 16,
+                        color: ac.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _fechaNacimiento != null
+                              ? _formatDate(_fechaNacimiento!)
+                              : 'Seleccionar fecha',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: _fechaNacimiento != null
+                                ? ac.textPrimary
+                                : ac.textMuted,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: ac.textMuted,
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<Genero>(
-            value: _genero,
-            decoration: InputDecoration(
-              labelText: 'Género',
-              prefixIcon: const Icon(Icons.wc_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            items: Genero.values
-                .map((g) =>
-                    DropdownMenuItem(value: g, child: Text(g.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _genero = v);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Panel: Contactos (dinámico, expandible)
-  // ---------------------------------------------------------------------------
-
-  Widget _buildContactosPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.contact_phone_outlined,
-      iconColor: colorScheme.secondary,
-      iconBackground: colorScheme.secondaryContainer,
-      title: 'Información de Contacto',
-      action: TextButton.icon(
-        onPressed: _addContacto,
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('Agregar'),
-      ),
-      child: Column(
-        children: [
-          if (_contactos.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Sin contactos. Presiona "Agregar" para añadir uno.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
               ),
             ),
-          ...List.generate(
-            _contactos.length,
-            (index) => _buildContactoCard(context, index),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.wc_outlined,
+            label: 'Género',
+            child: _ChipSelector<Genero>(
+              ac: ac,
+              options: Genero.values,
+              selected: _genero,
+              labelOf: (g) => g.label,
+              activeColor: ac.primaryBlue,
+              onSelected: (g) => setState(() => _genero = g),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContactoCard(BuildContext context, int index) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildContactosCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.teal,
+      iconBg: ac.teal.withOpacity(0.10),
+      icon: Icons.phone_outlined,
+      title: 'Contactos',
+      action: TextButton.icon(
+        onPressed: _addContacto,
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        label: Text(
+          'Agregar',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: ac.primaryBlue,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      child: Column(
+        children: List.generate(
+          _contactos.length,
+          (i) => Padding(
+            padding: EdgeInsets.only(
+              bottom: i < _contactos.length - 1 ? 12 : 0,
+            ),
+            child: _buildContactoCard(ac, i),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactoCard(AppColors ac, int index) {
     final entry = _contactos[index];
     final isFirst = index == 0;
 
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: index < _contactos.length - 1 ? 12 : 0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: entry.isExpanded
-                ? colorScheme.secondary
-                : colorScheme.outlineVariant,
-            width: entry.isExpanded ? 1.5 : 1,
-          ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: ac.bgPage,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: entry.isExpanded
+              ? ac.primaryBlue.withOpacity(0.40)
+              : ac.divider,
+          width: entry.isExpanded ? 1.0 : 0.5,
         ),
-        child: Column(
-          children: [
-            // Header de la tarjeta
-            InkWell(
-              onTap: () => _toggleContacto(index),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(10),
-                topRight: const Radius.circular(10),
-                bottomLeft: Radius.circular(entry.isExpanded ? 0 : 10),
-                bottomRight: Radius.circular(entry.isExpanded ? 0 : 10),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${index + 1}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => _toggleContacto(index),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: ac.primaryBlue.withOpacity(0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: ac.primaryBlue,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isFirst ? 'Contacto principal' : entry.resumen,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_contactos.length > 1)
-                      IconButton(
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: colorScheme.error.withOpacity(0.8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isFirst ? 'Contacto principal' : entry.resumen,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: ac.textPrimary,
+                          ),
                         ),
-                        tooltip: 'Eliminar contacto',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _removeContacto(index),
-                      ),
-                    Icon(
-                      entry.isExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
+                        if (!entry.isExpanded && entry.telefono.text.isNotEmpty)
+                          Text(
+                            entry.telefono.text,
+                            style: TextStyle(fontSize: 11, color: ac.textMuted),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  if (!isFirst)
+                    GestureDetector(
+                      onTap: () => _removeContacto(index),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 16,
+                          color: ac.red.withOpacity(0.70),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    entry.isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: ac.textMuted,
+                  ),
+                ],
               ),
             ),
-
-            // Cuerpo expandible
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 200),
-              crossFadeState: entry.isExpanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              firstChild: Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: Column(
-                  children: [
-                    const Divider(height: 16),
-                    TextFormField(
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            crossFadeState: entry.isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Column(
+                children: [
+                  Divider(height: 16, color: ac.divider),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.phone_outlined,
+                    label: isFirst ? 'Teléfono *' : 'Teléfono',
+                    child: TextFormField(
                       controller: entry.telefono,
                       keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText:
-                            isFirst ? 'Teléfono *' : 'Teléfono',
-                        prefixIcon: const Icon(
-                            Icons.phone_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
+                      decoration: _inputDeco(ac, hint: '809-000-0000'),
                       validator: isFirst
-                          ? (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'El teléfono principal es obligatorio'
-                                  : null
+                          ? (v) => (v == null || v.trim().isEmpty)
+                                ? 'Teléfono obligatorio'
+                                : null
                           : null,
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
+                  ),
+                  const SizedBox(height: 12),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.email_outlined,
+                    label: 'Correo electrónico',
+                    child: TextFormField(
                       controller: entry.email,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Correo Electrónico',
-                        prefixIcon: const Icon(
-                            Icons.email_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
+                      decoration: _inputDeco(ac, hint: 'correo@ejemplo.com'),
                       validator: (v) {
                         if (v != null &&
                             v.trim().isNotEmpty &&
-                            !RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                                .hasMatch(v.trim())) {
-                          return 'Formato de correo inválido';
+                            !RegExp(
+                              r'^[^@]+@[^@]+\.[^@]+',
+                            ).hasMatch(v.trim())) {
+                          return 'Correo inválido';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
+                  ),
+                  const SizedBox(height: 12),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.home_outlined,
+                    label: 'Dirección',
+                    child: TextFormField(
                       controller: entry.direccion,
-                      textCapitalization:
-                          TextCapitalization.sentences,
+                      textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Dirección',
-                        prefixIcon: const Icon(
-                            Icons.home_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                      decoration: _inputDeco(
+                        ac,
+                        hint: 'Calle, ciudad…',
                         alignLabelWithHint: true,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              secondChild: const SizedBox.shrink(),
             ),
-          ],
-        ),
+            secondChild: const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Panel: Info Adicional
-  // ---------------------------------------------------------------------------
-
-  Widget _buildInfoAdicionalPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.info_outline,
-      iconColor: colorScheme.tertiary,
-      iconBackground: colorScheme.tertiaryContainer,
-      title: 'Información Adicional',
+  Widget _buildInfoAdicionalCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: Color(0xFF534AB7),
+      iconBg: Color(0xFFEEEDFE),
+      icon: Icons.info_outline_rounded,
+      title: 'Información adicional',
       child: Column(
         children: [
-          DropdownButtonFormField<TipoPaciente>(
-            value: _tipoPaciente,
-            decoration: InputDecoration(
-              labelText: 'Tipo de Paciente',
-              prefixIcon:
-                  const Icon(Icons.category_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            items: TipoPaciente.values
-                .map((t) =>
-                    DropdownMenuItem(value: t, child: Text(t.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _tipoPaciente = v);
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _trabajoController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Trabajo / Ocupación',
-              prefixIcon: const Icon(Icons.work_outline, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          _FormField(
+            ac: ac,
+            icon: Icons.category_outlined,
+            label: 'Tipo de paciente',
+            child: _ChipSelector<TipoPaciente>(
+              ac: ac,
+              options: TipoPaciente.values,
+              selected: _tipoPaciente,
+              labelOf: (t) => t.label,
+              activeColor: ac.teal,
+              onSelected: (t) => setState(() => _tipoPaciente = t),
             ),
           ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _referenciaController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Referencia',
-              prefixIcon:
-                  const Icon(Icons.share_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.work_outline_rounded,
+            label: 'Trabajo / ocupación',
+            child: TextFormField(
+              controller: _trabajoController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _inputDeco(ac, hint: 'Médico, ingeniero…'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.share_outlined,
+            label: 'Referencia',
+            child: TextFormField(
+              controller: _referenciaController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _inputDeco(ac, hint: '¿Cómo nos conoció?'),
             ),
           ),
         ],
       ),
     );
   }
+
+  InputDecoration _inputDeco(
+    AppColors ac, {
+    String? hint,
+    bool alignLabelWithHint = false,
+  }) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(fontSize: 13, color: ac.textMuted),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+    filled: true,
+    fillColor: ac.bgPage,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.divider),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.divider, width: 0.5),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.red, width: 0.5),
+    ),
+    alignLabelWithHint: alignLabelWithHint,
+  );
 }
 
-// =============================================================================
-// _Panel: contenedor reutilizable con soporte de acción en el header
-// =============================================================================
-
-class _Panel extends StatelessWidget {
-  final IconData icon;
+class _FormCard extends StatelessWidget {
+  final AppColors ac;
   final Color iconColor;
-  final Color iconBackground;
+  final Color iconBg;
+  final IconData icon;
   final String title;
   final Widget child;
   final Widget? action;
 
-  const _Panel({
-    required this.icon,
+  const _FormCard({
+    required this.ac,
     required this.iconColor,
-    required this.iconBackground,
+    required this.iconBg,
+    required this.icon,
     required this.title,
     required this.child,
     this.action,
@@ -862,36 +806,38 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ac.divider, width: 0.5),
+        boxShadow: [ac.cardShadow],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(6),
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
+                child: Icon(icon, size: 17, color: iconColor),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
                 ),
               ),
               if (action != null) action!,
@@ -901,6 +847,98 @@ class _Panel extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final AppColors ac;
+  final IconData icon;
+  final String label;
+  final Widget child;
+
+  const _FormField({
+    required this.ac,
+    required this.icon,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 13, color: ac.primaryBlue),
+            const SizedBox(width: 5),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: ac.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        child,
+      ],
+    );
+  }
+}
+
+class _ChipSelector<T> extends StatelessWidget {
+  final AppColors ac;
+  final List<T> options;
+  final T selected;
+  final String Function(T) labelOf;
+  final Color activeColor;
+  final void Function(T) onSelected;
+
+  const _ChipSelector({
+    required this.ac,
+    required this.options,
+    required this.selected,
+    required this.labelOf,
+    required this.activeColor,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((opt) {
+        final isActive = opt == selected;
+        return GestureDetector(
+          onTap: () => onSelected(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.10) : ac.bgPage,
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(
+                color: isActive ? activeColor.withOpacity(0.50) : ac.divider,
+                width: isActive ? 1.0 : 0.5,
+              ),
+            ),
+            child: Text(
+              labelOf(opt),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? activeColor : ac.textSecondary,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

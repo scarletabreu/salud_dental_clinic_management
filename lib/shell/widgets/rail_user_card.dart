@@ -62,7 +62,7 @@ class RailUserCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: ac.railTextSelected.withValues(alpha: 0.06),
+        color: ac.textPrimary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -81,7 +81,7 @@ class RailUserCard extends StatelessWidget {
                       : 'Usuario',
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: ac.railTextSelected,
+                    color: ac.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

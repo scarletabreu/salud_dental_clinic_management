@@ -17,6 +17,8 @@ import 'package:salud_dental_clinic_management/features/medicina/domain/reposito
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/pages/perfiles_list_page.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
@@ -111,6 +113,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
+      icon: Icons.admin_panel_settings_outlined,
+      selectedIcon: Icons.admin_panel_settings_rounded,
+      label: 'Perfiles',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<PersonalPerfilesCubit>(),
+        child: const PerfilesListPage(),
+      ),
+    ),
+    ShellDestination(
       icon: Icons.medication_outlined,
       selectedIcon: Icons.medication_rounded,
       label: 'Medicinas',
@@ -151,6 +162,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
       switch (destination.label) {
         case 'Configuración':
+        case 'Perfiles':
           return roles.contains(RolUsuario.admin);
         case 'Consultas':
         case 'Medicinas':

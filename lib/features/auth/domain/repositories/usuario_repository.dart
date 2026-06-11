@@ -13,6 +13,7 @@ abstract interface class UsuarioRepository {
   Future<void> signOut();
   String? getCurrentUserId();
   bool isSessionActive();
+  Future<List<Usuario>> getUsuarios();
 
   Stream<supabase.AuthState> get onAuthStateChange;
 }

@@ -27,14 +27,17 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   bool isSessionActive() => supabase.auth.currentSession != null;
 
   @override
-  Future<AuthResponse> signInWithPassword({required String email, required String password}) {
+  Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  }) {
     return supabase.auth.signInWithPassword(email: email, password: password);
   }
 
   @override
   Future<Map<String, dynamic>?> getPerfilPorTabla({
-    required String tabla, 
-    required String uuid, 
+    required String tabla,
+    required String uuid,
     String selectColumns = '*',
   }) async {
     return await supabase
@@ -42,6 +45,15 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
         .select(selectColumns)
         .eq('id', uuid)
         .maybeSingle();
+  }
+
+  @override
+  Future<List<dynamic>?> getPerfilesPorTabla({
+    required String tabla,
+    required String selectColumns,
+  }) async {
+    final response = await supabase.from(tabla).select(selectColumns);
+    return response as List<dynamic>?;
   }
 
   @override

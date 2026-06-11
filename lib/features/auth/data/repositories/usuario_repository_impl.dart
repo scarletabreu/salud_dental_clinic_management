@@ -56,16 +56,16 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
 
       final perfil = await getPerfilPorUuid(userUuid);
       if (perfil == null) {
-        throw Exception('El usuario autenticado no tiene un perfil operativo asignado.');
+        throw Exception(
+          'El usuario autenticado no tiene un perfil operativo asignado.',
+        );
       }
       return perfil;
-    }catch (e) {
+    } catch (e) {
       print('>>> ERROR login: $e');
       rethrow;
     }
   }
-
-  
 
   /// Búsqueda en cascada por UUID. Mismo orden que antes.
   @override
@@ -92,6 +92,56 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
     if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
 
     return null;
+  }
+
+  @override
+  Future<List<Usuario>> getUsuarios() async {
+    final List<Usuario> usuariosConsolidados = [];
+
+    try {
+      final List<dynamic>? listDoctores = await remoteDataSource
+          .getPerfilesPorTabla(
+            tabla: 'doctores',
+            selectColumns: '*, usuarios(*, personas(*))',
+          );
+      if (listDoctores != null) {
+        usuariosConsolidados.addAll(
+          listDoctores.map(
+            (json) => DoctorModel.fromJson(json as Map<String, dynamic>),
+          ),
+        );
+      }
+
+      final List<dynamic>? listAdmins = await remoteDataSource
+          .getPerfilesPorTabla(
+            tabla: 'admins',
+            selectColumns: '*, usuarios(*, personas(*))',
+          );
+      if (listAdmins != null) {
+        usuariosConsolidados.addAll(
+          listAdmins.map(
+            (json) => AdminModel.fromJson(json as Map<String, dynamic>),
+          ),
+        );
+      }
+
+      final List<dynamic>? listAsistentes = await remoteDataSource
+          .getPerfilesPorTabla(
+            tabla: 'asistentes',
+            selectColumns: '*, usuarios(*, personas(*))',
+          );
+      if (listAsistentes != null) {
+        usuariosConsolidados.addAll(
+          listAsistentes.map(
+            (json) => AsistenteModel.fromJson(json as Map<String, dynamic>),
+          ),
+        );
+      }
+
+      return usuariosConsolidados;
+    } catch (e) {
+      throw Exception('Error al consolidar el listado de perfiles: $e');
+    }
   }
 
   @override

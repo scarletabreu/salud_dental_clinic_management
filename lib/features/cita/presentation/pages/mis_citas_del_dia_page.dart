@@ -7,24 +7,50 @@ import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:table_calendar/table_calendar.dart';
-
 import '../../presentation/widgets/nueva_cita_dialog.dart';
 import '../cubit/cita_cubit.dart';
 import '../cubit/cita_cubit_state.dart';
 import '../widgets/timeline_view.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 
 const _kMonths = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 const _kMonthsShort = [
-  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
 ];
 
 const _kWeekdays = [
-  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
 ];
 
 const _kWeekdaysShort = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -37,16 +63,16 @@ class MisCitasDelDiaPage extends StatelessWidget {
     final ac = context.appColors;
     return Scaffold(
       backgroundColor: ac.bgPage,
-      body: BlocBuilder<CitaCubit, CitaCubitState>(
-        builder: _buildState,
-      ),
+      body: BlocBuilder<CitaCubit, CitaCubitState>(builder: _buildState),
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
+        
         builder: (context, state) {
           if (state is! CitaCubitLoaded) {
             return const SizedBox.shrink();
           }
 
           return FloatingActionButton.extended(
+            heroTag: 'fab_nueva_cita_unique_tag',
             onPressed: () async {
               await NuevaCitaDialog.show(
                 context,
@@ -64,10 +90,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
     );
   }
 
-  static Widget _buildState(
-    BuildContext context,
-    CitaCubitState state,
-  ) {
+  static Widget _buildState(BuildContext context, CitaCubitState state) {
     if (state is CitaCubitLoading) {
       return Center(
         child: CircularProgressIndicator(
@@ -102,9 +125,7 @@ class _CalendarioView extends StatelessWidget {
       children: [
         _ControlBar(state: state),
         Divider(height: 1, color: ac.divider),
-        Expanded(
-          child: _CalendarioBody(state: state),
-        ),
+        Expanded(child: _CalendarioBody(state: state)),
       ],
     );
   }
@@ -122,10 +143,7 @@ class _ControlBar extends StatelessWidget {
 
     return Container(
       color: ac.cardBg,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
           _ViewModePill(
@@ -149,9 +167,7 @@ class _ControlBar extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
             tooltip: 'Anterior',
             visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              foregroundColor: ac.textMuted,
-            ),
+            style: IconButton.styleFrom(foregroundColor: ac.textMuted),
           ),
           OutlinedButton(
             onPressed: cubit.goToToday,
@@ -172,9 +188,7 @@ class _ControlBar extends StatelessWidget {
             icon: const Icon(Icons.chevron_right),
             tooltip: 'Siguiente',
             visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              foregroundColor: ac.textMuted,
-            ),
+            style: IconButton.styleFrom(foregroundColor: ac.textMuted),
           ),
         ],
       ),
@@ -224,17 +238,12 @@ class _CalendarioBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    // ── Vista Día: timeline de 1 columna ──────────────────────
     if (state.viewMode == CalendarioViewMode.diaria) {
       final dayCitas = state.citasForDay(state.selectedDay);
 
-      return DayTimelineView(
-        citas: dayCitas,
-        day: state.selectedDay,
-      );
+      return DayTimelineView(citas: dayCitas, day: state.selectedDay);
     }
 
-    // ── Vista Semana: timeline de 7 columnas ──────────────────
     if (state.viewMode == CalendarioViewMode.semanal) {
       final weekStart = _weekStartFor(state.focusedDay);
       final weekEnd = weekStart.add(const Duration(days: 6));
@@ -243,31 +252,16 @@ class _CalendarioBody extends StatelessWidget {
         final d = c.date;
 
         return !d.isBefore(
-              DateTime(
-                weekStart.year,
-                weekStart.month,
-                weekStart.day,
-              ),
+              DateTime(weekStart.year, weekStart.month, weekStart.day),
             ) &&
             !d.isAfter(
-              DateTime(
-                weekEnd.year,
-                weekEnd.month,
-                weekEnd.day,
-                23,
-                59,
-                59,
-              ),
+              DateTime(weekEnd.year, weekEnd.month, weekEnd.day, 23, 59, 59),
             );
       }).toList();
 
-      return WeekTimelineView(
-        citas: weekCitas,
-        weekStart: weekStart,
-      );
+      return WeekTimelineView(citas: weekCitas, weekStart: weekStart);
     }
 
-    // ── Vista Mes: mes-grid + panel lateral ───────────────────
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 600;
@@ -280,20 +274,11 @@ class _CalendarioBody extends StatelessWidget {
                 flex: 55,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: _CalendarSection(
-                    state: state,
-                    fillHeight: true,
-                  ),
+                  child: _CalendarSection(state: state, fillHeight: true),
                 ),
               ),
-              VerticalDivider(
-                width: 1,
-                color: ac.divider,
-              ),
-              Expanded(
-                flex: 45,
-                child: _DetailPanel(state: state),
-              ),
+              VerticalDivider(width: 1, color: ac.divider),
+              Expanded(flex: 45, child: _DetailPanel(state: state)),
             ],
           );
         }
@@ -304,10 +289,7 @@ class _CalendarioBody extends StatelessWidget {
             children: [
               _CalendarSection(state: state),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 380,
-                child: _DetailPanel(state: state),
-              ),
+              SizedBox(height: 380, child: _DetailPanel(state: state)),
               const SizedBox(height: 16),
             ],
           ),
@@ -321,10 +303,7 @@ class _CalendarSection extends StatelessWidget {
   final CitaCubitLoaded state;
   final bool fillHeight;
 
-  const _CalendarSection({
-    required this.state,
-    this.fillHeight = false,
-  });
+  const _CalendarSection({required this.state, this.fillHeight = false});
 
   @override
   Widget build(BuildContext context) {
@@ -347,10 +326,9 @@ class _CalendarSection extends StatelessWidget {
           selectedDayPredicate: (day) {
             return isSameDay(day, state.selectedDay);
           },
-          calendarFormat:
-              state.viewMode == CalendarioViewMode.mensual
-                  ? CalendarFormat.month
-                  : CalendarFormat.week,
+          calendarFormat: state.viewMode == CalendarioViewMode.mensual
+              ? CalendarFormat.month
+              : CalendarFormat.week,
           availableCalendarFormats: const {
             CalendarFormat.month: 'Mes',
             CalendarFormat.week: 'Semana',
@@ -412,12 +390,7 @@ class _DowCell extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: ac.bgPage,
-        border: Border(
-          bottom: BorderSide(
-            color: ac.divider,
-            width: 1,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: ac.divider, width: 1)),
       ),
       child: Text(
         label,
@@ -425,31 +398,21 @@ class _DowCell extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: isWeekend
-              ? ac.red.withValues(alpha: 0.7)
-              : ac.textMuted,
+          color: isWeekend ? ac.red.withValues(alpha: 0.7) : ac.textMuted,
         ),
       ),
     );
   }
 }
 
-enum _DayCellType {
-  normal,
-  today,
-  selected,
-}
+enum _DayCellType { normal, today, selected }
 
 class _DayCell extends StatelessWidget {
   final DateTime day;
   final List<Cita> events;
   final _DayCellType type;
 
-  const _DayCell({
-    required this.day,
-    required this.events,
-    required this.type,
-  });
+  const _DayCell({required this.day, required this.events, required this.type});
 
   @override
   Widget build(BuildContext context) {
@@ -473,12 +436,8 @@ class _DayCell extends StatelessWidget {
       dayWeight = FontWeight.w700;
     } else {
       cellBg = Colors.transparent;
-      dayColor = isWeekend
-          ? ac.red.withValues(alpha: 0.7)
-          : ac.textSecondary;
-      dayWeight = hasEvents
-          ? FontWeight.w600
-          : FontWeight.w400;
+      dayColor = isWeekend ? ac.red.withValues(alpha: 0.7) : ac.textSecondary;
+      dayWeight = hasEvents ? FontWeight.w600 : FontWeight.w400;
     }
 
     return Center(
@@ -509,13 +468,13 @@ class _DayCell extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                ...events.take(3).map(
+                ...events
+                    .take(3)
+                    .map(
                       (c) => Container(
                         width: 5,
                         height: 5,
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 1.5,
-                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
@@ -587,21 +546,18 @@ class _DetailPanel extends StatelessWidget {
                       citas.isEmpty
                           ? 'Sin citas programadas'
                           : '${citas.length} '
-                              'cita${citas.length == 1 ? '' : 's'} '
-                              'agendada${citas.length == 1 ? '' : 's'}',
+                                'cita${citas.length == 1 ? '' : 's'} '
+                                'agendada${citas.length == 1 ? '' : 's'}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: citas.isEmpty
-                            ? ac.textMuted
-                            : ac.primaryBlue,
+                        color: citas.isEmpty ? ac.textMuted : ac.primaryBlue,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (citas.isNotEmpty)
-                const _StatusLegend(),
+              if (citas.isNotEmpty) const _StatusLegend(),
             ],
           ),
         ),
@@ -610,12 +566,7 @@ class _DetailPanel extends StatelessWidget {
           child: citas.isEmpty
               ? const _EmptyDay()
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(
-                    12,
-                    12,
-                    12,
-                    80,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
                   itemCount: citas.length,
                   separatorBuilder: (_, _) {
                     return const SizedBox(height: 8);
@@ -674,10 +625,7 @@ class _CitaCard extends StatelessWidget {
 
   const _CitaCard({required this.cita});
 
-  void _mostrarDialogoCancelacion(
-    BuildContext context,
-    String citaId,
-  ) {
+  void _mostrarDialogoCancelacion(BuildContext context, String citaId) {
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -688,10 +636,7 @@ class _CitaCard extends StatelessWidget {
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.warning_amber_rounded,
-                color: ac.red,
-              ),
+              Icon(Icons.warning_amber_rounded, color: ac.red),
               const SizedBox(width: 8),
               Text(
                 '¿Cancelar Cita?',
@@ -712,10 +657,7 @@ class _CitaCard extends StatelessWidget {
               onPressed: () {
                 Navigator.pop(dialogContext);
               },
-              child: Text(
-                'Atrás',
-                style: TextStyle(color: ac.textMuted),
-              ),
+              child: Text('Atrás', style: TextStyle(color: ac.textMuted)),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -730,15 +672,13 @@ class _CitaCard extends StatelessWidget {
               ),
               onPressed: () {
                 context.read<CitaCubit>().cambiarEstadoCita(
-                      citaId,
-                      EstadoCita.cancelada,
-                    );
+                  citaId,
+                  EstadoCita.cancelada,
+                );
 
                 Navigator.pop(dialogContext);
               },
-              child: const Text(
-                'Confirmar Cancelación',
-              ),
+              child: const Text('Confirmar Cancelación'),
             ),
           ],
         );
@@ -751,13 +691,9 @@ class _CitaCard extends StatelessWidget {
     final ac = context.appColors;
     final statusColor = cita.estado.color;
 
-    final hour = cita.date.hour
-        .toString()
-        .padLeft(2, '0');
+    final hour = cita.date.hour.toString().padLeft(2, '0');
 
-    final min = cita.date.minute
-        .toString()
-        .padLeft(2, '0');
+    final min = cita.date.minute.toString().padLeft(2, '0');
 
     return Container(
       decoration: BoxDecoration(
@@ -765,204 +701,213 @@ class _CitaCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [ac.cardShadow],
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 52,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: statusColor.withAlpha(30),
-                borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<CitaCubit>(),
+                  child: CitaEditPage(cita: cita),
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    hour,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: statusColor,
-                      height: 1,
-                    ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    min,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor.withValues(alpha: 0.65),
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          cita.persona.fullName,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: ac.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (cita.esEmergencia)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ac.red.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.priority_high_rounded,
-                                size: 10,
-                                color: ac.red,
-                              ),
-                              Text(
-                                'Urgente',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: ac.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline_rounded,
-                        size: 12,
-                        color: ac.textMuted,
-                      ),
-                      const SizedBox(width: 3),
                       Text(
-                        'Dr. ${cita.doctor.nombre} '
-                        '${cita.doctor.apellido}',
+                        hour,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: ac.textMuted,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        min,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor.withValues(alpha: 0.65),
+                          height: 1.1,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            PopupMenuButton<EstadoCita>(
-              initialValue: cita.estado,
-              tooltip: 'Cambiar estado de la cita',
-              onSelected: (EstadoCita nuevoEstado) {
-                if (nuevoEstado == cita.estado) {
-                  return;
-                }
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cita.persona.fullName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: ac.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (cita.esEmergencia)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: ac.red.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.priority_high_rounded,
+                                    size: 10,
+                                    color: ac.red,
+                                  ),
+                                  Text(
+                                    'Urgente',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: ac.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 12,
+                            color: ac.textMuted,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Dr. ${cita.doctor.nombre} '
+                            '${cita.doctor.apellido}',
+                            style: TextStyle(fontSize: 12, color: ac.textMuted),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<EstadoCita>(
+                  initialValue: cita.estado,
+                  tooltip: 'Cambiar estado de la cita',
+                  onSelected: (EstadoCita nuevoEstado) {
+                    if (nuevoEstado == cita.estado) {
+                      return;
+                    }
 
-                if (nuevoEstado == EstadoCita.cancelada) {
-                  _mostrarDialogoCancelacion(
-                    context,
-                    cita.id!,
-                  );
-                } else {
-                  context.read<CitaCubit>().cambiarEstadoCita(
+                    if (nuevoEstado == EstadoCita.cancelada) {
+                      _mostrarDialogoCancelacion(context, cita.id!);
+                    } else {
+                      context.read<CitaCubit>().cambiarEstadoCita(
                         cita.id!,
                         nuevoEstado,
                       );
-                }
-              },
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      cita.estado.label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
-                      ),
+                    }
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
                     ),
-                    const SizedBox(width: 2),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      size: 14,
-                      color: statusColor,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(100),
                     ),
-                  ],
-                ),
-              ),
-              itemBuilder: (BuildContext context) {
-                final ac = context.appColors;
-                return EstadoCita.values.map((EstadoCita e) {
-                  final isActive = e == cita.estado;
-
-                  return PopupMenuItem<EstadoCita>(
-                    value: e,
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: e.color,
-                            shape: BoxShape.circle,
+                        Text(
+                          cita.estado.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          e.label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isActive
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                            color: isActive
-                                ? e.color
-                                : ac.textSecondary,
-                          ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.arrow_drop_down,
+                          size: 14,
+                          color: statusColor,
                         ),
                       ],
                     ),
-                  );
-                }).toList();
-              },
+                  ),
+                  itemBuilder: (BuildContext context) {
+                    final ac = context.appColors;
+                    return EstadoCita.values.map((EstadoCita e) {
+                      final isActive = e == cita.estado;
+
+                      return PopupMenuItem<EstadoCita>(
+                        value: e,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: e.color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              e.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                color: isActive ? e.color : ac.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1001,10 +946,7 @@ class _EmptyDay extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Selecciona otro día para ver citas',
-            style: TextStyle(
-              fontSize: 12,
-              color: ac.textMuted,
-            ),
+            style: TextStyle(fontSize: 12, color: ac.textMuted),
           ),
         ],
       ),
@@ -1028,11 +970,7 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: ac.red,
-            ),
+            Icon(Icons.error_outline_rounded, size: 48, color: ac.red),
             const SizedBox(height: 12),
             Text(
               'Error al cargar citas',
@@ -1045,10 +983,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               message,
-              style: TextStyle(
-                fontSize: 13,
-                color: ac.textMuted,
-              ),
+              style: TextStyle(fontSize: 13, color: ac.textMuted),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -1080,10 +1015,7 @@ class _ViewModePill extends StatelessWidget {
   final CalendarioViewMode selected;
   final ValueChanged<CalendarioViewMode> onChanged;
 
-  const _ViewModePill({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _ViewModePill({required this.selected, required this.onChanged});
 
   static const _options = [
     (CalendarioViewMode.mensual, 'Mes'),
@@ -1115,13 +1047,9 @@ class _ViewModePill extends StatelessWidget {
               curve: Curves.easeInOut,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? ac.cardBg
-                    : Colors.transparent,
+                color: isSelected ? ac.cardBg : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
-                boxShadow: isSelected
-                    ? [ac.cardShadow]
-                    : null,
+                boxShadow: isSelected ? [ac.cardShadow] : null,
               ),
               alignment: Alignment.center,
               child: Text(
@@ -1129,9 +1057,7 @@ class _ViewModePill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isSelected
-                      ? ac.textPrimary
-                      : ac.textMuted,
+                  color: isSelected ? ac.textPrimary : ac.textMuted,
                   height: 1,
                 ),
               ),

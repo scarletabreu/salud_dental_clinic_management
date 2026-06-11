@@ -2,6 +2,9 @@ import 'package:salud_dental_clinic_management/features/consulta/data/models/con
 
 abstract class ConsultaRemoteDatasource {
   Future<void> crearConsulta(ConsultaModel consulta);
+
+  /// Invoca el RPC transaccional `crear_consulta_completa` con [params].
+  Future<void> crearConsultaCompleta(Map<String, dynamic> params);
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   );

@@ -47,6 +47,17 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<void> crearConsultaCompleta(Map<String, dynamic> params) async {
+    try {
+      await supabaseClient.rpc('crear_consulta_completa', params: params);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al crear la consulta completa: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al crear la consulta completa: $e');
+    }
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   ) async {

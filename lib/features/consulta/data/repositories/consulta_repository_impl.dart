@@ -30,6 +30,47 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
+  Future<void> crearConsultaCompleta(Consulta consulta) async {
+    try {
+      final dientes = (consulta.odontograma?.dientes ?? [])
+          .map(
+            (d) => {
+              'fdi_code': d.fdiCode,
+              'superficies':
+                  d.superficies.map((s) => s.tipoSuperficie.name).toList(),
+            },
+          )
+          .toList();
+
+      final documentos = consulta.documentosClinicos
+          .map(
+            (doc) => {
+              'descripcion': doc.descripcion,
+              'tipo_documento': doc.tipoDocumento.name,
+              'url_archivo': doc.urlArchivo,
+              'fecha_creacion': doc.fechaCreacion.toUtc().toIso8601String(),
+            },
+          )
+          .toList();
+
+      final params = {
+        'p_paciente_id': consulta.pacienteId,
+        'p_doctor_id': consulta.doctorId,
+        'p_cita_id': consulta.citaId,
+        'p_fecha': consulta.fecha.toUtc().toIso8601String(),
+        'p_motivo_consulta': consulta.motivoConsulta,
+        'p_temp_condiciones': consulta.tempCondiciones,
+        'p_dientes': dientes,
+        'p_documentos': documentos,
+      };
+
+      await remoteDataSource.crearConsultaCompleta(params);
+    } catch (e) {
+      throw Exception('Error en el repositorio al crear consulta completa: $e');
+    }
+  }
+
+  @override
   Future<List<Consulta>> getHistorialPaciente(String pacienteId) async {
     try {
       final data = await remoteDataSource.fetchConsultasByPaciente(pacienteId);

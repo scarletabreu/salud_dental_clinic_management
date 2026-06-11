@@ -4,6 +4,10 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
+
+/// Valor centinela para la opción "Efectuar Consulta" del menú de la cita.
+const _kEfectuarConsulta = 'efectuar_consulta';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -421,7 +425,12 @@ class _CitaBlock extends StatelessWidget {
     final RenderBox box = context.findRenderObject() as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
 
-    showMenu<EstadoCita>(
+    final pacienteId = cita.persona.id;
+    final doctorId = cita.doctor.id;
+    final puedeEfectuar =
+        pacienteId != null && doctorId != null && cita.id != null;
+
+    showMenu<Object>(
       context: context,
       position: RelativeRect.fromLTRB(
         offset.dx,
@@ -430,40 +439,78 @@ class _CitaBlock extends StatelessWidget {
         0,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      items: EstadoCita.values.map((e) {
-        final isActive = e == cita.estado;
-        return PopupMenuItem<EstadoCita>(
-          value: e,
-          child: Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: e.color,
-                  shape: BoxShape.circle,
+      items: [
+        if (puedeEfectuar) ...[
+          PopupMenuItem<Object>(
+            value: _kEfectuarConsulta,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.medical_services_outlined,
+                  size: 16,
+                  color: ac.primaryBlue,
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                e.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  color: isActive ? e.color : ac.textSecondary,
+                const SizedBox(width: 10),
+                Text(
+                  'Efectuar Consulta',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: ac.primaryBlue,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
+        ...EstadoCita.values.map((e) {
+          final isActive = e == cita.estado;
+          return PopupMenuItem<Object>(
+            value: e,
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: e.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  e.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                    color: isActive ? e.color : ac.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    ).then((value) {
+      if (!context.mounted) return;
+      if (value == _kEfectuarConsulta) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EfectuarConsultaPage(
+              citaId: cita.id!,
+              pacienteId: pacienteId!,
+              doctorId: doctorId!,
+            ),
           ),
         );
-      }).toList(),
-    ).then((nuevoEstado) {
-      if (!context.mounted) return;
-      if (nuevoEstado == null || nuevoEstado == cita.estado) return;
-      if (nuevoEstado == EstadoCita.cancelada) {
+        return;
+      }
+      if (value is! EstadoCita || value == cita.estado) return;
+      if (value == EstadoCita.cancelada) {
         _showCancelDialog(context, cubit);
       } else {
-        cubit.cambiarEstadoCita(cita.id!, nuevoEstado);
+        cubit.cambiarEstadoCita(cita.id!, value);
       }
     });
   }

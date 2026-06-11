@@ -1,5 +1,12 @@
 import 'package:get_it/get_it.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
@@ -188,6 +195,12 @@ Future<void> init() async {
   sl.registerLazySingleton<CitaRemoteDataSource>(
     () => CitaRemoteDataSource(sl()),
   );
+  sl.registerLazySingleton<ConsultaRemoteDatasource>(
+    () => ConsultaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<SupabaseStorageHelper>(
+    () => SupabaseStorageHelper(supabaseClient: sl()),
+  );
 
   // --- Repositories ---
   sl.registerLazySingleton<IMedicinaRepository>(
@@ -268,6 +281,12 @@ Future<void> init() async {
   sl.registerLazySingleton<CitaRepository>(
     () => CitaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<ConsultaRepository>(
+    () => ConsultaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<CrearConsultaUseCase>(
+    () => CrearConsultaUseCase(sl()),
+  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -290,6 +309,7 @@ Future<void> init() async {
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl()));
   sl.registerFactory<DashboardCubit>(
     () => DashboardCubit(
       citaRepository: sl(),

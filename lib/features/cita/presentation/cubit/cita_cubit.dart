@@ -27,27 +27,29 @@ class CitaCubit extends Cubit<CitaCubitState> {
     }
   }
 
-Future<void> createCita(Cita cita) async {
-  final current = state;
-  if (current is! CitaCubitLoaded) return;
+  Future<void> createCita(Cita cita) async {
+    final current = state;
+    if (current is! CitaCubitLoaded) return;
 
-  try {
-    emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
-    
-    // 1. AGREGA ESTO PARA INSPECCIONAR EL CONTENIDO:
-    // (Asegúrate de tener un método toMap() o toJson() en tu entidad Cita)
-    print('Datos enviados a Supabase: ${cita}'); 
-    
-    await _repository.createCita(cita);
-    await load();
-  } catch (e) {
-    print('Error capturado en Cubit: $e');
-    emit(current.copyWith(
-      isSubmitting: false,
-      errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
-    ));
+    try {
+      emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
+
+      // 1. AGREGA ESTO PARA INSPECCIONAR EL CONTENIDO:
+      // (Asegúrate de tener un método toMap() o toJson() en tu entidad Cita)
+      print('Datos enviados a Supabase: ${cita}');
+
+      await _repository.createCita(cita);
+      await load();
+    } catch (e) {
+      print('Error capturado en Cubit: $e');
+      emit(
+        current.copyWith(
+          isSubmitting: false,
+          errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
+        ),
+      );
+    }
   }
-}
 
   Future<void> cambiarEstadoCita(String id, EstadoCita nuevoEstado) async {
     final current = state;
@@ -65,20 +67,24 @@ Future<void> createCita(Cita cita) async {
 
       emit(current.copyWith(citas: citasActualizadas));
     } catch (e) {
-      emit(current.copyWith(
-        errorMessage: () => 'No se pudo actualizar el estado de la cita: $e',
-      ));
+      emit(
+        current.copyWith(
+          errorMessage: () => 'No se pudo actualizar el estado de la cita: $e',
+        ),
+      );
     }
   }
 
   void selectDay(DateTime selectedDay, DateTime focusedDay) {
     final current = state;
     if (current is! CitaCubitLoaded) return;
-    emit(current.copyWith(
-      selectedDay: selectedDay, 
-      focusedDay: focusedDay,
-      errorMessage: () => null, // Limpiamos errores al interactuar
-    ));
+    emit(
+      current.copyWith(
+        selectedDay: selectedDay,
+        focusedDay: focusedDay,
+        errorMessage: () => null, // Limpiamos errores al interactuar
+      ),
+    );
   }
 
   void onPageChanged(DateTime focusedDay) {
@@ -132,5 +138,55 @@ Future<void> createCita(Cita cita) async {
     final current = state;
     if (current is! CitaCubitLoaded) return [];
     return current.citasForDay(day);
+  }
+
+  Future<void> actualizarCita(Cita citaActualizada) async {
+    final current = state;
+    if (current is! CitaCubitLoaded) return;
+
+    try {
+      emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
+
+      final tieneChoque = current.citas.any((c) {
+        if (c.id == citaActualizada.id) return false;
+        if (c.doctor.id != citaActualizada.doctor.id) return false;
+
+        return citaActualizada.date.isBefore(c.fechaFin) &&
+            c.date.isBefore(citaActualizada.fechaFin);
+      });
+
+      if (tieneChoque) {
+        emit(
+          current.copyWith(
+            isSubmitting: false,
+            errorMessage: () =>
+                'El odontólogo elegido no tiene disponibilidad en este horario.',
+          ),
+        );
+        return;
+      }
+
+      await _repository.updateCita(citaActualizada);
+
+      final citasActualizadas = await _repository.getCitas();
+
+      emit(
+        CitaCubitLoaded(
+          citas: citasActualizadas,
+          focusedDay: current.focusedDay,
+          selectedDay: current.selectedDay,
+          viewMode: current.viewMode,
+          isSubmitting: false,
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        current.copyWith(
+          isSubmitting: false,
+          errorMessage: () => 'Error al guardar cambios en el servidor: $e',
+        ),
+      );
+    }
   }
 }

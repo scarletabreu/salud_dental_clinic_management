@@ -68,7 +68,9 @@ class CitaRepositoryImpl implements CitaRepository {
     try {
       await remoteDataSource.updateCitaEstado(id, nuevoEstado);
     } catch (e) {
-      throw Exception('Error en el repositorio al actualizar el estado de la cita: $e');
+      throw Exception(
+        'Error en el repositorio al actualizar el estado de la cita: $e',
+      );
     }
   }
 
@@ -78,6 +80,29 @@ class CitaRepositoryImpl implements CitaRepository {
       await remoteDataSource.deleteCita(id);
     } catch (e) {
       throw Exception('Error en el repositorio al eliminar cita: $e');
+    }
+  }
+
+  @override
+  Future<void> updateCita(Cita cita) async {
+    try {
+      if (cita.id == null) {
+        throw Exception("No se puede actualizar una cita sin un ID válido");
+      }
+
+      final model = CitaModel(
+        id: cita.id,
+        doctor: cita.doctor,
+        persona: cita.persona,
+        date: cita.date,
+        duracionMinutos: cita.duracionMinutos,
+        esEmergencia: cita.esEmergencia,
+        estado: cita.estado,
+      );
+
+      await remoteDataSource.updateCita(model);
+    } catch (e) {
+      throw Exception('Error en el repositorio al actualizar la cita: $e');
     }
   }
 }

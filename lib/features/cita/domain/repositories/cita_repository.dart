@@ -8,4 +8,5 @@ abstract class CitaRepository {
   Future<void> createCita(Cita cita);
   Future<void> deleteCita(String id);
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado);
+  Future<void> updateCita(Cita cita);
 }

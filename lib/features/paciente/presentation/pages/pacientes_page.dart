@@ -42,8 +42,6 @@ class DashboardShell extends StatefulWidget {
 
 class _DashboardShellState extends State<DashboardShell> {
   int _selectedIndex = 0;
-  DoctorAvailability _availability = DoctorAvailability.disponible;
-
   late final DashboardCubit _dashboardCubit;
   late final CitaCubit _citaCubit;
   late final PacienteCubit _pacienteCubit;
@@ -219,8 +217,6 @@ class _DashboardShellState extends State<DashboardShell> {
         sectionTitle: _visibleDestinations.isNotEmpty
             ? _visibleDestinations[_selectedIndex].label
             : '',
-        availability: _availability,
-        onAvailabilityChanged: (v) => setState(() => _availability = v),
         compact: layout == _ShellLayout.mobile,
       ),
       body: SafeArea(
@@ -760,22 +756,65 @@ class _HeaderLabel extends StatelessWidget {
 }
 
 Widget _buildFooter(BuildContext context, PacienteLoaded state) {
-  final colorScheme = Theme.of(context).colorScheme;
+  final ac = context.appColors;
   final shown = state.filtrados.length;
   final total = state.todos.length;
-  return Container(
-    color: context.appColors.cardBg,
-    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-    child: Row(
-      children: [
-        Text(
-          'Mostrando $shown de $total paciente${total == 1 ? '' : 's'}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
-          ),
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(
+          color: ac.divider.withValues(alpha: 0.5),
+          width: 0.5,
         ),
-      ],
+        boxShadow: [ac.cardShadow],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: shown == total ? ac.primaryBlue : ac.amber,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            shown == total
+                ? '$total paciente${total == 1 ? '' : 's'} en total'
+                : '$shown de $total paciente${total == 1 ? '' : 's'}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: ac.textSecondary,
+            ),
+          ),
+          if (shown != total) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: ac.amber.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'filtrado',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: ac.amber,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     ),
   );
 }

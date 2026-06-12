@@ -49,7 +49,6 @@ class _DashboardShellView extends StatefulWidget {
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
-  DoctorAvailability _availability = DoctorAvailability.disponible;
 
   late final List<ShellDestination> _allDestinations = [
     ShellDestination(
@@ -110,7 +109,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           final cubit = sl<ConsultasListCubit>();
           final authState = context.read<AuthCubit>().state;
           final usuario = authState.usuario;
-          // Un doctor solo ve sus propias consultas; el admin las ve todas.
           if (authState.rol == RolUsuario.doctor &&
               usuario is Doctor &&
               usuario.id != null) {
@@ -176,7 +174,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
     _visibleDestinations = _allDestinations.where((destination) {
       if (roles.isEmpty) return false;
-
       switch (destination.label) {
         case 'Configuración':
         case 'Perfiles':
@@ -216,24 +213,31 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         sectionTitle: _visibleDestinations.isNotEmpty
             ? _visibleDestinations[_selectedIndex].label
             : '',
-        availability: _availability,
-        onAvailabilityChanged: (v) => setState(() => _availability = v),
         compact: layout == _ShellLayout.mobile,
       ),
       body: SafeArea(
         top: false,
         child: layout == _ShellLayout.mobile
             ? content
-            : Row(
-                children: [
-                  _SideRail(
-                    extended: layout == _ShellLayout.desktop,
-                    destinations: _visibleDestinations,
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: _onDestinationSelected,
-                  ),
-                  Expanded(child: content),
-                ],
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  children: [
+                    _SideRail(
+                      extended: layout == _ShellLayout.desktop,
+                      destinations: _visibleDestinations,
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _onDestinationSelected,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: content,
+                      ),
+                    ),
+                  ],
+                ),
               ),
       ),
       bottomNavigationBar: layout == _ShellLayout.mobile
@@ -297,17 +301,22 @@ class _SideRail extends StatelessWidget {
     final ac = context.appColors;
 
     return Container(
-      width: extended ? 248 : 88,
+      width: extended ? 240 : 76,
       decoration: BoxDecoration(
         color: ac.railBg,
-        border: Border(right: BorderSide(color: ac.railDivider, width: 1)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: ac.railDivider.withValues(alpha: 0.6),
+          width: 0.5,
+        ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShellLogo(extended: extended),
-          Divider(height: 1, color: ac.railDivider),
-          const SizedBox(height: 12),
+          Divider(height: 1, thickness: 0.5, color: ac.railDivider),
+          const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -324,7 +333,6 @@ class _SideRail extends StatelessWidget {
               ),
             ),
           ),
-          Divider(height: 1, color: ac.railDivider),
           RailUserCard(extended: extended),
         ],
       ),

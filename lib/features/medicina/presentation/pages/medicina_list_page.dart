@@ -442,15 +442,61 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   Widget _buildFooter(AppColors ac) {
     final shown = _filtered.length;
     final total = _medicinas.length;
-    return Container(
-      color: ac.cardBg,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: Text(
-        'Mostrando $shown de $total medicina${total == 1 ? '' : 's'}',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: ac.textMuted,
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: ac.cardBg,
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(
+            color: ac.divider.withValues(alpha: 0.5),
+            width: 0.5,
+          ),
+          boxShadow: [ac.cardShadow],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: shown == total ? ac.primaryBlue : ac.amber,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              shown == total
+                  ? '$total medicina${total == 1 ? '' : 's'} en total'
+                  : '$shown de $total medicina${total == 1 ? '' : 's'}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ac.textSecondary,
+              ),
+            ),
+            if (shown != total) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: ac.amber.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'filtrado',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ac.amber,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -21,8 +21,8 @@ class ConsultaModel extends Consulta {
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
     return ConsultaModel(
       id: json['id'] as String?,
-      pacienteId: json['paciente_id'] ?? json['pacienteId'],
-      doctorId: json['doctor_id'] ?? json['doctorId'],
+      pacienteId: (json['paciente_id'] ?? json['pacienteId'] ?? '') as String,
+      doctorId: (json['doctor_id'] ?? json['doctorId'] ?? '') as String,
       citaId: json['cita_id'] ?? json['citaId'],
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       motivoConsulta: json['motivo_consulta'] ?? json['motivoConsulta'],

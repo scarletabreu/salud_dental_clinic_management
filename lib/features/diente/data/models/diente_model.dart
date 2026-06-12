@@ -19,12 +19,14 @@ class DienteModel extends Diente {
   factory DienteModel.fromJson(Map<String, dynamic> json) {
     return DienteModel(
       id: json['id'] as String?,
-      odontogramaId: json['odontograma_id'] as String,
+      odontogramaId: (json['odontograma_id'] ?? '') as String,
       fdiCode: (json['fdi_code'] as num).toInt(),
       observaciones: json['observaciones'] as String?,
       estaAusente: json['esta_ausente'] as bool? ?? false,
       tratamientosAplicadosIds: json['tratamientos_aplicados_ids'] != null
-          ? List<String>.from(json['tratamientos_aplicados_ids'] as List)
+          ? (json['tratamientos_aplicados_ids'] as List)
+                .whereType<String>()
+                .toList()
           : const [],
       // Relaciones normalmente cargadas en una consulta con JOIN
       superficies: json['superficies'] != null

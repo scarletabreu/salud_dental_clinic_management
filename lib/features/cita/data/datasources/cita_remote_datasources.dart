@@ -227,14 +227,13 @@ class CitaRemoteDataSource {
 
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
     try {
-      final updateData = <String, dynamic>{
-        'estado': nuevoEstado.dbValue,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      if (nuevoEstado == EstadoCita.completada) {
-        updateData['fecha_fin'] = DateTime.now().toIso8601String();
-      }
-      await supabase.from('citas').update(updateData).eq('id', id);
+      await supabase
+          .from('citas')
+          .update({
+            'estado': nuevoEstado.dbValue,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', id);
     } on PostgrestException catch (e) {
       throw Exception(
         'Error al actualizar el estado en Supabase: ${e.message}',

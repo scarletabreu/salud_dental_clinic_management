@@ -36,7 +36,9 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
       // así que usamos el filtro `or` explícito.
       final response = await supabase
           .from('personas')
-          .select('*, persona_contacto(*, contactos(*))')
+          // La tabla puente es `persona_contactos` (plural); se usa el alias
+          // `persona_contacto` porque PersonaModel.fromJson lee esa clave.
+          .select('*, persona_contacto:persona_contactos(*, contactos(*))')
           .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
           .eq('estatus', 'activo')
           .filter('deleted_at', 'is', null)
@@ -57,7 +59,7 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
     try {
       final response = await supabase
           .from('personas')
-          .select('*, persona_contacto(*, contactos(*))')
+          .select('*, persona_contacto:persona_contactos(*, contactos(*))')
           .eq('id', id)
           .single();
 

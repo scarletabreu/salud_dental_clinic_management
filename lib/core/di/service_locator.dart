@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/consulta/data/repositori
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
@@ -308,9 +309,10 @@ Future<void> init() async {
     AuthSessionCubit(sl())..initialize(),
   );
 
-  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
+  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
-  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl()));
+  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
+  sl.registerFactory<ConsultaDetalleCubit>(() => ConsultaDetalleCubit(sl()));
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),

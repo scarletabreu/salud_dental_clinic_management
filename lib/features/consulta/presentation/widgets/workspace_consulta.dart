@@ -203,9 +203,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               child: FilledButton.icon(
                 onPressed: cargando
                     ? null
-                    : () => context
-                        .read<ConsultaCubit>()
-                        .terminarConsulta(citaId: widget.citaId),
+                    : () => context.read<ConsultaCubit>().terminarConsulta(
+                          citaId: widget.citaId,
+                          odontograma: _odontograma,
+                          notas: _notasController.text,
+                        ),
                 style: FilledButton.styleFrom(backgroundColor: c.primaryBlue),
                 icon: cargando
                     ? const SizedBox(

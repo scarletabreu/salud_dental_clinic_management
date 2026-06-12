@@ -4,10 +4,12 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 
 /// Documento (radiografía) seleccionado en el formulario, aún sin subir.
 class DocumentoAdjunto {
@@ -26,9 +28,18 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   final CrearConsultaUseCase _crearConsulta;
   final SupabaseStorageHelper _storage;
   final CitaRepository _citaRepository;
+  final ConsultaRepository _consultaRepository;
 
-  ConsultaCubit(this._crearConsulta, this._storage, this._citaRepository)
-    : super(const ConsultaInitial());
+  /// Id de la consulta creada en la etapa 1; lo necesita la etapa 2 para
+  /// persistir el trabajo clínico al terminar.
+  String? _consultaId;
+
+  ConsultaCubit(
+    this._crearConsulta,
+    this._storage,
+    this._citaRepository,
+    this._consultaRepository,
+  ) : super(const ConsultaInitial());
 
   Future<void> crearConsulta({
     required String pacienteId,
@@ -72,7 +83,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         documentosClinicos: documentos,
       );
 
-      await _crearConsulta(consulta);
+      _consultaId = await _crearConsulta(consulta);
       emit(const ConsultaCreada());
     } catch (e) {
       if (kDebugMode) debugPrint('Error al crear consulta: $e');
@@ -80,30 +91,60 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  /// Finaliza la consulta. Si proviene de una cita, la marca como completada.
-  /// Los pasos posteriores (facturación, recetas) aún no están implementados.
-  Future<void> terminarConsulta({String? citaId}) async {
+  /// Finaliza la consulta: persiste los tratamientos asignados en el
+  /// [odontograma] y las [notas], y marca la cita como completada.
+  Future<void> terminarConsulta({
+    String? citaId,
+    required Odontograma odontograma,
+    String? notas,
+  }) async {
+    final consultaId = _consultaId;
+    if (consultaId == null) {
+      emit(const ConsultaError('No hay una consulta en curso.'));
+      return;
+    }
+
     emit(const ConsultaLoading());
     try {
+      await _consultaRepository.guardarResultadoConsulta(
+        consultaId: consultaId,
+        odontograma: odontograma,
+        notas: notas,
+      );
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.completada);
       }
       emit(const ConsultaTerminada());
     } catch (e) {
       if (kDebugMode) debugPrint('Error al terminar consulta: $e');
-      emit(ConsultaError(_mensajeError(e)));
+      emit(
+        ConsultaError(
+          _mensajeError(
+            e,
+            fallback:
+                'No se pudo guardar el resultado de la consulta. '
+                'Inténtalo de nuevo.',
+          ),
+        ),
+      );
     }
   }
 
-  String _mensajeError(Object e) {
+  String _mensajeError(
+    Object e, {
+    String fallback = 'No se pudo registrar la consulta. Inténtalo de nuevo.',
+  }) {
     final raw = e.toString();
     if (raw.contains('SocketException') ||
         raw.contains('Failed host lookup') ||
         raw.contains('network') ||
         raw.contains('connection')) {
-      return 'Sin conexión. No se registró la consulta; '
+      return 'Sin conexión. No se guardó la operación; '
           'verifica tu red e inténtalo de nuevo.';
     }
-    return 'No se pudo registrar la consulta. Inténtalo de nuevo.';
+    if (raw.contains('paciente de prueba')) {
+      return raw.replaceFirst('Exception: ', '');
+    }
+    return fallback;
   }
 }

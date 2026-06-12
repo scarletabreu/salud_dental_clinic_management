@@ -13,6 +13,7 @@ class Consulta {
   final Odontograma? odontograma;
   final List<String> tempCondiciones;
   final String? motivoConsulta;
+  final String? notas;
 
   Consulta({
     this.id,
@@ -25,15 +26,21 @@ class Consulta {
     this.odontograma,
     this.tempCondiciones = const [],
     this.motivoConsulta,
+    this.notas,
   });
 
   /// Indica si la consulta tiene al menos una receta asociada.
   bool get tieneRecetas => recetas.isNotEmpty;
 
   /// Indica si la consulta tiene tratamientos aplicados. La relación es
-  /// indirecta: consulta → odontograma → dientes → tratamientos.
+  /// indirecta: consulta → odontograma → dientes → tratamientos (entidades
+  /// cargadas o ids vinculados en `tratamientos_aplicados_ids`).
   bool get tieneTratamientosAplicados =>
-      odontograma?.dientes.any((d) => d.tratamientos.isNotEmpty) ?? false;
+      odontograma?.dientes.any(
+        (d) =>
+            d.tratamientos.isNotEmpty || d.tratamientosAplicadosIds.isNotEmpty,
+      ) ??
+      false;
 
   Consulta copyWith({
     String? pacienteId,
@@ -45,6 +52,7 @@ class Consulta {
     String? citaId,
     List<String>? tempCondiciones,
     String? motivoConsulta,
+    String? notas,
   }) {
     return Consulta(
       id: id,
@@ -58,6 +66,7 @@ class Consulta {
       odontograma: odontograma ?? this.odontograma,
       tempCondiciones: tempCondiciones ?? List.from(this.tempCondiciones),
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
+      notas: notas ?? this.notas,
     );
   }
 }

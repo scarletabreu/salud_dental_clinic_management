@@ -22,6 +22,14 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
        _doctorRepository = doctorRepository,
        super(const ConsultasInitial());
 
+  /// Restricción aplicada en la última carga (doctor logueado); se conserva
+  /// para poder recargar el listado sin perderla.
+  String? _restringidoADoctorId;
+
+  /// Recarga el listado conservando la restricción por doctor.
+  Future<void> recargar() =>
+      cargar(restringidoADoctorId: _restringidoADoctorId);
+
   /// Carga el listado completo de consultas junto con los nombres de pacientes
   /// y doctores. Permite además aplicar filtros iniciales.
   Future<void> cargar({
@@ -30,6 +38,7 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     DateTimeRange? rangoFechas,
     String? restringidoADoctorId,
   }) async {
+    _restringidoADoctorId = restringidoADoctorId;
     emit(const ConsultasLoading());
     try {
       var consultas = await _consultaRepository.getConsultas();
@@ -42,7 +51,6 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
       }
       final pacientes = await _cargarPacientes();
       final doctores = await _cargarDoctores();
-      final pacientesConTratamientos = await _cargarPacientesConTratamientos();
 
       final pacienteNombres = <String, String>{
         for (final p in pacientes)
@@ -73,7 +81,6 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
           doctorNombres: doctorNombres,
           doctores: doctores,
           puedeFiltrarPorDoctor: restringidoADoctorId == null,
-          pacientesConTratamientos: pacientesConTratamientos,
           busquedaPaciente: busqueda,
           doctorIdFiltro: doctorId,
           rangoFechas: rangoFechas,
@@ -128,7 +135,6 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
         doctorNombres: current.doctorNombres,
         doctores: current.doctores,
         puedeFiltrarPorDoctor: current.puedeFiltrarPorDoctor,
-        pacientesConTratamientos: current.pacientesConTratamientos,
       ),
     );
   }
@@ -138,16 +144,6 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
   Future<List<Paciente>> _cargarPacientes() async {
     final result = await _pacienteRepository.getPacientes();
     return result.fold((_) => <Paciente>[], (list) => list);
-  }
-
-  /// Degrada a conjunto vacío si falla: el listado debe mostrarse igual aunque
-  /// no se pueda calcular el indicador de tratamientos.
-  Future<Set<String>> _cargarPacientesConTratamientos() async {
-    try {
-      return await _consultaRepository.getPacienteIdsConTratamientos();
-    } catch (_) {
-      return <String>{};
-    }
   }
 
   Future<List<Doctor>> _cargarDoctores() async {

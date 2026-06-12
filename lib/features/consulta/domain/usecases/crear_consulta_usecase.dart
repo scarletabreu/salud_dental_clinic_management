@@ -14,7 +14,8 @@ class CrearConsultaUseCase {
 
   CrearConsultaUseCase(this._repository);
 
-  Future<void> call(Consulta consulta) async {
+  /// Devuelve el id de la consulta creada.
+  Future<String> call(Consulta consulta) async {
     // Los IDs reales (odontograma_id, diente_id, consulta_id) los asigna la
     // base de datos dentro del RPC; aquí solo describimos la estructura.
     final odontograma = Odontograma(
@@ -31,6 +32,6 @@ class CrearConsultaUseCase {
     );
 
     final completa = consulta.copyWith(odontograma: odontograma);
-    await _repository.crearConsultaCompleta(completa);
+    return _repository.crearConsultaCompleta(completa);
   }
 }

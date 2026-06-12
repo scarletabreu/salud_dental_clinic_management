@@ -15,6 +15,7 @@ class ConsultaModel extends Consulta {
     super.odontograma,
     super.tempCondiciones,
     super.motivoConsulta,
+    super.notas,
   });
 
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
@@ -25,6 +26,7 @@ class ConsultaModel extends Consulta {
       citaId: json['cita_id'] ?? json['citaId'],
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       motivoConsulta: json['motivo_consulta'] ?? json['motivoConsulta'],
+      notas: json['notas'] as String?,
       recetas: json['recetas'] != null
           ? (json['recetas'] as List)
                 .map((x) => RecetaModel.fromJson(x))
@@ -35,13 +37,21 @@ class ConsultaModel extends Consulta {
                 .map((x) => DocumentoClinicoModel.fromJson(x))
                 .toList()
           : [],
-      odontograma: json['odontograma'] != null
-          ? OdontogramaModel.fromJson(json['odontograma'])
-          : null,
+      odontograma: _parseOdontograma(json['odontograma']),
       tempCondiciones: json['temp_condiciones'] != null
           ? List<String>.from(json['temp_condiciones'])
           : [],
     );
+  }
+
+  /// El embed `odontograma:odontogramas(...)` llega como lista (relación 1:N
+  /// en la BD aunque en la práctica sea 1:1); se toma el primero.
+  static OdontogramaModel? _parseOdontograma(dynamic raw) {
+    if (raw is Map<String, dynamic>) return OdontogramaModel.fromJson(raw);
+    if (raw is List && raw.isNotEmpty) {
+      return OdontogramaModel.fromJson(raw.first as Map<String, dynamic>);
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {

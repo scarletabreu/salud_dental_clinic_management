@@ -10,10 +10,13 @@
 --    2. El bucket público `documentos-clinicos` y sus políticas para subir
 --       radiografías.
 --
---  Supuestos sobre el esquema (ajusta si difiere):
+--  Esquema real (verificado contra la BD):
 --    · Las PK `id` tienen DEFAULT gen_random_uuid().
---    · consultas.temp_condiciones es jsonb.
---    · superficies.tratamientos es jsonb (default '[]').
+--    · consultas.temp_condiciones es text[].
+--    · dientes NO tiene `esta_ausente`.
+--    · superficies.tipo_superficie es un enum en minúscula; los tratamientos
+--      viven en `tratamientos_ids uuid[]` (aquí se dejan vacíos).
+--    · documentos_clinicos NO tiene `fecha_creacion` (se usa created_at).
 -- ============================================================================
 
 create or replace function crear_consulta_completa(
@@ -44,7 +47,14 @@ begin
   )
   values (
     p_paciente_id, p_doctor_id, p_cita_id, p_fecha,
-    p_motivo_consulta, coalesce(p_temp_condiciones, '[]'::jsonb), now(), now()
+    p_motivo_consulta,
+    -- temp_condiciones es text[]: convertimos el array jsonb de strings a text[].
+    coalesce(
+      (select array_agg(val)
+         from jsonb_array_elements_text(coalesce(p_temp_condiciones, '[]'::jsonb)) as t(val)),
+      '{}'::text[]
+    ),
+    now(), now()
   )
   returning id into v_consulta_id;
 
@@ -57,20 +67,22 @@ begin
   for v_diente in select * from jsonb_array_elements(p_dientes)
   loop
     insert into dientes (
-      odontograma_id, fdi_code, esta_ausente, created_at, updated_at
+      odontograma_id, fdi_code, created_at, updated_at
     )
     values (
-      v_odontograma_id, (v_diente ->> 'fdi_code')::int, false, now(), now()
+      v_odontograma_id, (v_diente ->> 'fdi_code')::int, now(), now()
     )
     returning id into v_diente_id;
 
     for v_superficie in select * from jsonb_array_elements(v_diente -> 'superficies')
     loop
       insert into superficies (
-        diente_id, tipo_superficie, tratamientos, created_at, updated_at
+        diente_id, tipo_superficie, tratamientos_ids, created_at, updated_at
       )
       values (
-        v_diente_id, v_superficie #>> '{}', '[]'::jsonb, now(), now()
+        -- el enum tipo_superficie es minúscula; la app envía 'Mesial', etc.
+        v_diente_id, lower(v_superficie #>> '{}')::tipo_superficie,
+        '{}'::uuid[], now(), now()
       );
     end loop;
   end loop;
@@ -81,15 +93,14 @@ begin
     loop
       insert into documentos_clinicos (
         paciente_id, consulta_id, descripcion, tipo_documento,
-        url_archivo, fecha_creacion, created_at, updated_at
+        url_archivo, created_at, updated_at
       )
       values (
         p_paciente_id,
         v_consulta_id,
         v_doc ->> 'descripcion',
-        v_doc ->> 'tipo_documento',
+        (v_doc ->> 'tipo_documento')::tipo_documento,
         v_doc ->> 'url_archivo',
-        (v_doc ->> 'fecha_creacion')::timestamptz,
         now(), now()
       );
     end loop;
@@ -111,10 +122,12 @@ insert into storage.buckets (id, name, public)
 values ('documentos-clinicos', 'documentos-clinicos', true)
 on conflict (id) do nothing;
 
+drop policy if exists "documentos_clinicos_insert" on storage.objects;
 create policy "documentos_clinicos_insert"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'documentos-clinicos');
 
+drop policy if exists "documentos_clinicos_select" on storage.objects;
 create policy "documentos_clinicos_select"
   on storage.objects for select to public
   using (bucket_id = 'documentos-clinicos');

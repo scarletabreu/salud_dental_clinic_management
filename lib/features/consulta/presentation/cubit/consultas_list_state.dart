@@ -39,11 +39,6 @@ class ConsultasLoaded extends ConsultasListState {
   /// queda restringido a sus propias consultas y no se muestran los chips.
   final bool puedeFiltrarPorDoctor;
 
-  /// `paciente_id`s con tratamientos aplicados vigentes. El esquema solo
-  /// vincula `tratamientos_aplicados` al paciente, así que el indicador de la
-  /// card es por paciente (no por consulta).
-  final Set<String> pacientesConTratamientos;
-
   /// Filtros activos.
   final String busquedaPaciente;
   final String? doctorIdFiltro;
@@ -56,7 +51,6 @@ class ConsultasLoaded extends ConsultasListState {
     required this.doctorNombres,
     required this.doctores,
     this.puedeFiltrarPorDoctor = true,
-    this.pacientesConTratamientos = const {},
     this.busquedaPaciente = '',
     this.doctorIdFiltro,
     this.rangoFechas,
@@ -70,11 +64,6 @@ class ConsultasLoaded extends ConsultasListState {
   String nombrePaciente(String id) => pacienteNombres[id] ?? 'Paciente desconocido';
 
   String nombreDoctor(String id) => doctorNombres[id] ?? 'Doctor desconocido';
-
-  /// Indica (por paciente) si la consulta corresponde a un paciente con
-  /// tratamientos aplicados vigentes.
-  bool pacienteTieneTratamientos(String pacienteId) =>
-      pacientesConTratamientos.contains(pacienteId);
 
   /// Para los campos anulables (`doctorIdFiltro`, `rangoFechas`) se usa un
   /// `ValueGetter`: pasar la función permite distinguir "no cambiar" (null)
@@ -92,7 +81,6 @@ class ConsultasLoaded extends ConsultasListState {
       doctorNombres: doctorNombres,
       doctores: doctores,
       puedeFiltrarPorDoctor: puedeFiltrarPorDoctor,
-      pacientesConTratamientos: pacientesConTratamientos,
       busquedaPaciente: busquedaPaciente ?? this.busquedaPaciente,
       doctorIdFiltro:
           doctorIdFiltro != null ? doctorIdFiltro() : this.doctorIdFiltro,
@@ -104,7 +92,6 @@ class ConsultasLoaded extends ConsultasListState {
   List<Object?> get props => [
     todas,
     filtradas,
-    pacientesConTratamientos,
     busquedaPaciente,
     doctorIdFiltro,
     rangoFechas,

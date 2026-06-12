@@ -17,13 +17,14 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 ///   2. [WorkspaceConsulta] — odontograma interactivo, tratamientos y notas;
 ///      finaliza con "Terminar consulta".
 class EfectuarConsultaPage extends StatefulWidget {
-  final String? citaId;
+  /// La consulta siempre se efectúa desde una cita.
+  final String citaId;
   final String pacienteId;
   final String doctorId;
 
   const EfectuarConsultaPage({
     super.key,
-    this.citaId,
+    required this.citaId,
     required this.pacienteId,
     required this.doctorId,
   });
@@ -41,7 +42,9 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => sl<PacienteCubit>()..loadById(widget.pacienteId),
+          // El id viene de la persona de la cita; si aún no es paciente, se
+          // crea aquí (pacientes comparte PK con personas).
+          create: (_) => sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
         ),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
       ],

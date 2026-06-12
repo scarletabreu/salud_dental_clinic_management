@@ -8,6 +8,7 @@ abstract class ConsultaRemoteDatasource {
   });
 
   Future<List<Map<String, dynamic>>> fetchConsultas();
+  Future<List<Map<String, dynamic>>> fetchConsultasByDoctor(String doctorId);
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   );

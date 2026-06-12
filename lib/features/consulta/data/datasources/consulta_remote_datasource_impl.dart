@@ -112,6 +112,26 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchConsultasByDoctor(
+    String doctorId,
+  ) async {
+    try {
+      final response = await supabaseClient
+          .from('consultas')
+          .select(_selectConsulta)
+          .eq('doctor_id', doctorId)
+          .isFilter('deleted_at', null)
+          .order('fecha', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al obtener consultas del doctor: ${e.message}',
+      );
+    }
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   ) async {

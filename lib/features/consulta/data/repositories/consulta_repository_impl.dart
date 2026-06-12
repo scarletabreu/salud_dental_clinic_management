@@ -19,6 +19,16 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     }
   }
 
+  @override
+  Future<List<Consulta>> getConsultasByDoctor(String doctorId) async {
+    try {
+      final data = await remoteDataSource.fetchConsultasByDoctor(doctorId);
+      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Error en el repositorio al obtener consultas: $e');
+    }
+  }
+
   bool _isValidUuid(String? id) =>
       id != null && id.length == 36 && id.contains('-');
 

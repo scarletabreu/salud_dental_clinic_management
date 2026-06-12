@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 
 abstract class ConsultaRepository {
   Future<List<Consulta>> getConsultas();
+  Future<List<Consulta>> getConsultasByDoctor(String doctorId);
 
   Future<String> crearConsultaCompleta(Consulta consulta);
 

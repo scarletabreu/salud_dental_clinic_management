@@ -53,6 +53,19 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
+  Future<Either<Failure, Paciente>> getOrCreatePacienteByPersonaId(
+    String personaId,
+  ) async {
+    try {
+      final paciente =
+          await remoteDataSource.getOrCreateByPersonaId(personaId);
+      return Right(paciente);
+    } catch (e) {
+      return Left(ServerFailure('Error al cargar paciente: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> deletePaciente(String id) async {
     try {
       await remoteDataSource.deletePaciente(id);

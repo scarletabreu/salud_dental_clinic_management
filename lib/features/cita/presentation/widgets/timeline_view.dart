@@ -501,15 +501,18 @@ class _CitaBlock extends StatelessWidget {
     ).then((value) {
       if (!context.mounted) return;
       if (value == _kEfectuarConsulta) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => EfectuarConsultaPage(
-              citaId: cita.id!,
-              pacienteId: pacienteId!,
-              doctorId: doctorId!,
-            ),
-          ),
-        );
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id!,
+                  pacienteId: pacienteId!,
+                  doctorId: doctorId!,
+                ),
+              ),
+            )
+            // Al volver, la cita pudo quedar completada.
+            .then((_) => cubit.load());
         return;
       }
       if (value is! EstadoCita || value == cita.estado) return;

@@ -30,10 +30,7 @@ class CitaModel extends Cita {
       date: DateTime.parse(fechaRaw).toLocal(),
       duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
       esEmergencia: json['es_emergencia'] ?? false,
-      estado: EstadoCita.values.firstWhere(
-        (e) => e.name == json['estado'],
-        orElse: () => EstadoCita.pendiente,
-      ),
+      estado: EstadoCita.fromDb(json['estado'] as String?),
     );
   }
   Map<String, dynamic> toJson() {
@@ -43,7 +40,7 @@ class CitaModel extends Cita {
       'fecha_hora': date.toUtc().toIso8601String(),
       'duracion_minutos': duracionMinutos,
       'es_emergencia': esEmergencia,
-      'estado': estado.name,
+      'estado': estado.dbValue,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

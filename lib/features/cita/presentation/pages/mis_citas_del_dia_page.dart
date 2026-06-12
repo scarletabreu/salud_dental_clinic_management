@@ -922,8 +922,9 @@ class _CitaCard extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: FilledButton.icon(
-        onPressed: () {
-          Navigator.of(context).push(
+        onPressed: () async {
+          final cubit = context.read<CitaCubit>();
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => EfectuarConsultaPage(
                 citaId: cita.id!,
@@ -932,6 +933,8 @@ class _CitaCard extends StatelessWidget {
               ),
             ),
           );
+          // Al volver, la cita pudo quedar completada.
+          cubit.load();
         },
         style: FilledButton.styleFrom(
           backgroundColor: ac.primaryBlue,

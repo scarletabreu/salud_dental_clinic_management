@@ -39,14 +39,9 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     _restringidoADoctorId = restringidoADoctorId;
     emit(const ConsultasLoading());
     try {
-      var consultas = await _consultaRepository.getConsultas();
-      // Un doctor solo ve sus propias consultas: restringimos la base y
-      // ocultamos el filtro por doctor.
-      if (restringidoADoctorId != null) {
-        consultas = consultas
-            .where((c) => c.doctorId == restringidoADoctorId)
-            .toList();
-      }
+      final consultas = restringidoADoctorId != null
+          ? await _consultaRepository.getConsultasByDoctor(restringidoADoctorId)
+          : await _consultaRepository.getConsultas();
       final pacientes = await _cargarPacientes();
       final doctores = await _cargarDoctores();
 

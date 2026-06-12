@@ -20,7 +20,7 @@ class RecetaModel extends Receta {
       createdAt: DateTime.parse(
         json['created_at'] ?? json['createdAt'],
       ).toLocal(),
-      medicinaId: json['medicina_id'] ?? json['medicinaId'] as String,
+      medicinaId: (json['medicina_id'] ?? json['medicinaId']) as String,
       dosis: json['dosis'] as String,
       frecuencia: json['frecuencia'] as String,
       indicaciones: json['indicaciones'] as String,

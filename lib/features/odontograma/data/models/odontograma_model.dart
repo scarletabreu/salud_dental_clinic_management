@@ -15,7 +15,7 @@ class OdontogramaModel extends Odontograma {
   factory OdontogramaModel.fromJson(Map<String, dynamic> json) {
     return OdontogramaModel(
       id: json['id'] as String?,
-      consultaId: json['consulta_id'] ?? json['consultaId'],
+      consultaId: (json['consulta_id'] ?? json['consultaId'] ?? '') as String,
       dientes: json['dientes'] != null
           ? (json['dientes'] as List)
                 .map((e) => DienteModel.fromJson(e))

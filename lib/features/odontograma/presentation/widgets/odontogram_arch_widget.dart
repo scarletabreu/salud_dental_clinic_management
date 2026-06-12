@@ -3,7 +3,6 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'odontogram_sample_data.dart';
 import 'odontogram_widget.dart';
 
 // ─────────────────────────────────────────────
@@ -220,10 +219,8 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
     final withOdo = _withOdo;
     final clampedIdx = _idx.clamp(0, withOdo.isEmpty ? 0 : withOdo.length - 1);
 
-    final isSample = withOdo.isEmpty;
-
-    final Odontograma? currentOdo = isSample
-        ? buildSampleOdontograma()
+    final Odontograma? currentOdo = withOdo.isEmpty
+        ? null
         : _aggregate
             ? _buildAggregateOdontograma(withOdo)
             : withOdo[clampedIdx].odontograma;
@@ -255,20 +252,6 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
                 'Odontograma',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ac.textPrimary),
               ),
-              if (isSample) ...[
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: ac.amber.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    'Ejemplo',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ac.amber),
-                  ),
-                ),
-              ],
               const Spacer(),
               if (withOdo.length > 1)
                 _TogglePill(
@@ -298,14 +281,31 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             ),
           ],
 
-          const SizedBox(height: 12),
-          const _Legend(),
-          const SizedBox(height: 4),
+          if (currentOdo == null) ...[
+            const SizedBox(height: 20),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  'Este paciente aún no tiene consultas con odontograma.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: ac.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            const _Legend(),
+            const SizedBox(height: 4),
 
-          OdontogramWidget(
-            odontograma: currentOdo,
-            editMode: false,
-          ),
+            OdontogramWidget(
+              odontograma: currentOdo,
+              editMode: false,
+            ),
+          ],
         ],
       ),
     );

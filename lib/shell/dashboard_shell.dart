@@ -1,5 +1,3 @@
-// lib/shell/dashboard_shell.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -20,6 +18,8 @@ import 'package:salud_dental_clinic_management/features/medicina/domain/reposito
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/pages/perfiles_list_page.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
@@ -28,18 +28,12 @@ import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
-@override
+  @override
   Widget build(BuildContext context) {
-    // Usamos MultiBlocProvider para meter tanto el PacienteCubit como el AuthCubit
-    // dentro del árbol de widgets de esta vista.
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthCubit>(
-          create: (_) => sl<AuthCubit>(), 
-        ),
-        BlocProvider<PacienteCubit>(
-          create: (_) => sl<PacienteCubit>()..load(),
-        ),
+        BlocProvider<AuthCubit>(create: (_) => sl<AuthCubit>()),
+        BlocProvider<PacienteCubit>(create: (_) => sl<PacienteCubit>()..load()),
       ],
       child: const _DashboardShellView(),
     );
@@ -55,7 +49,6 @@ class _DashboardShellView extends StatefulWidget {
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
-  DoctorAvailability _availability = DoctorAvailability.disponible;
 
   late final List<ShellDestination> _allDestinations = [
     ShellDestination(
@@ -65,24 +58,35 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       builder: (_) => BlocProvider(
         create: (context) {
           final cubit = sl<DashboardCubit>();
-          final usuario = context.read<AuthCubit>().state.usuario;
-          if (usuario is Doctor && usuario.id != null) {
-            cubit.load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
-          }
+          final authState = context.read<AuthCubit>().state;
+          final usuario = authState.usuario;
+          cubit.load(
+            roles: authState.roles,
+            doctorId: usuario is Doctor ? usuario.id : null,
+            doctorName: usuario is Doctor
+                ? '${usuario.nombre} ${usuario.apellido}'
+                : null,
+          );
           return cubit;
         },
         child: BlocListener<AuthCubit, AuthState>(
-          listenWhen: (previous, current) => previous.usuario != current.usuario,
+          listenWhen: (previous, current) =>
+              previous.usuario != current.usuario,
           listener: (context, authState) {
             final usuario = authState.usuario;
-            if (usuario is Doctor && usuario.id != null) {
-              context.read<DashboardCubit>().load(usuario.id!, '${usuario.nombre} ${usuario.apellido}');
-            }
+            context.read<DashboardCubit>().load(
+              roles: authState.roles,
+              doctorId: usuario is Doctor ? usuario.id : null,
+              doctorName: usuario is Doctor
+                  ? '${usuario.nombre} ${usuario.apellido}'
+                  : null,
+            );
           },
           child: InicioPage(
             onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
             onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
             onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
+            onNavigateToConfiguracion: () => _navigateToLabel('Configuración'),
           ),
         ),
       ),
@@ -105,7 +109,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           final cubit = sl<ConsultasListCubit>();
           final authState = context.read<AuthCubit>().state;
           final usuario = authState.usuario;
-          // Un doctor solo ve sus propias consultas; el admin las ve todas.
           if (authState.rol == RolUsuario.doctor &&
               usuario is Doctor &&
               usuario.id != null) {
@@ -123,6 +126,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
       builder: (_) => const PacientesPage(),
+    ),
+    ShellDestination(
+      icon: Icons.admin_panel_settings_outlined,
+      selectedIcon: Icons.admin_panel_settings_rounded,
+      label: 'Perfiles',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<PersonalPerfilesCubit>(),
+        child: const PerfilesListPage(),
+      ),
     ),
     ShellDestination(
       icon: Icons.medication_outlined,
@@ -158,18 +170,19 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
   @override
   Widget build(BuildContext context) {
-    final rol = context.select((AuthCubit cubit) => cubit.state.rol);
+    final roles = context.select((AuthCubit cubit) => cubit.state.roles);
 
     _visibleDestinations = _allDestinations.where((destination) {
-      if (rol == null) return false;
-
+      if (roles.isEmpty) return false;
       switch (destination.label) {
         case 'Configuración':
-          return rol == RolUsuario.admin;
+        case 'Perfiles':
+          return roles.contains(RolUsuario.admin);
         case 'Consultas':
         case 'Medicinas':
         case 'Tratamientos':
-          return rol == RolUsuario.admin || rol == RolUsuario.doctor;
+          return roles.contains(RolUsuario.admin) ||
+              roles.contains(RolUsuario.doctor);
         case 'Pacientes':
         case 'Mis Citas del Día':
         case 'Inicio':
@@ -189,33 +202,42 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
     final content = IndexedStack(
       index: _selectedIndex,
-      children: [for (final d in _visibleDestinations) Builder(builder: d.builder)],
+      children: [
+        for (final d in _visibleDestinations) Builder(builder: d.builder),
+      ],
     );
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: ShellAppBar(
-        sectionTitle: _visibleDestinations.isNotEmpty 
-            ? _visibleDestinations[_selectedIndex].label 
+        sectionTitle: _visibleDestinations.isNotEmpty
+            ? _visibleDestinations[_selectedIndex].label
             : '',
-        availability: _availability,
-        onAvailabilityChanged: (v) => setState(() => _availability = v),
         compact: layout == _ShellLayout.mobile,
       ),
       body: SafeArea(
         top: false,
         child: layout == _ShellLayout.mobile
             ? content
-            : Row(
-                children: [
-                  _SideRail(
-                    extended: layout == _ShellLayout.desktop,
-                    destinations: _visibleDestinations,
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: _onDestinationSelected,
-                  ),
-                  Expanded(child: content),
-                ],
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  children: [
+                    _SideRail(
+                      extended: layout == _ShellLayout.desktop,
+                      destinations: _visibleDestinations,
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _onDestinationSelected,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: content,
+                      ),
+                    ),
+                  ],
+                ),
               ),
       ),
       bottomNavigationBar: layout == _ShellLayout.mobile
@@ -262,11 +284,6 @@ enum _ShellLayout {
 }
 
 class _SideRail extends StatelessWidget {
-  final bool extended;
-  final List<ShellDestination> destinations;
-  final int selectedIndex;
-  final ValueChanged<int> onDestinationSelected;
-
   const _SideRail({
     required this.extended,
     required this.destinations,
@@ -274,22 +291,32 @@ class _SideRail extends StatelessWidget {
     required this.onDestinationSelected,
   });
 
+  final bool extended;
+  final List<ShellDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
     return Container(
-      width: extended ? 248 : 88,
+      width: extended ? 240 : 76,
       decoration: BoxDecoration(
         color: ac.railBg,
-        border: Border(right: BorderSide(color: ac.railDivider, width: 1)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: ac.railDivider.withValues(alpha: 0.6),
+          width: 0.5,
+        ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShellLogo(extended: extended),
-          Divider(height: 1, color: ac.railDivider),
-          const SizedBox(height: 12),
+          Divider(height: 1, thickness: 0.5, color: ac.railDivider),
+          const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -306,7 +333,6 @@ class _SideRail extends StatelessWidget {
               ),
             ),
           ),
-          Divider(height: 1, color: ac.railDivider),
           RailUserCard(extended: extended),
         ],
       ),
@@ -315,17 +341,17 @@ class _SideRail extends StatelessWidget {
 }
 
 class _RailItem extends StatelessWidget {
-  final ShellDestination destination;
-  final bool selected;
-  final bool extended;
-  final VoidCallback onTap;
-
   const _RailItem({
     required this.destination,
     required this.selected,
     required this.extended,
     required this.onTap,
   });
+
+  final ShellDestination destination;
+  final bool selected;
+  final bool extended;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

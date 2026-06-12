@@ -22,13 +22,11 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
        _doctorRepository = doctorRepository,
        super(const ConsultasInitial());
 
-  /// Restricción aplicada en la última carga (doctor logueado); se conserva
-  /// para poder recargar el listado sin perderla.
   String? _restringidoADoctorId;
 
-  /// Recarga el listado conservando la restricción por doctor.
   Future<void> recargar() =>
       cargar(restringidoADoctorId: _restringidoADoctorId);
+
 
   /// Carga el listado completo de consultas junto con los nombres de pacientes
   /// y doctores. Permite además aplicar filtros iniciales.

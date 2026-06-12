@@ -8,9 +8,6 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 
-/// Detalle de una consulta: datos generales, condiciones, notas, odontograma
-/// con los tratamientos realizados y documentos clínicos. Recetas y
-/// facturación siguen pendientes de sus propios tickets.
 class ConsultaDetallePage extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;

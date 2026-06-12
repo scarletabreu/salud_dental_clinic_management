@@ -17,7 +17,9 @@ import 'package:salud_dental_clinic_management/features/auth/data/datasources/us
 import 'package:salud_dental_clinic_management/features/auth/data/repositories/usuario_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 
 // Citas
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
@@ -271,9 +273,7 @@ Future<void> init() async {
   sl.registerLazySingleton<DoctorRemoteDatasource>(
     () => DoctorRemoteDatasourceImpl(supabaseClient: sl()),
   );
-  sl.registerLazySingleton<DoctorRepository>(
-    () => DoctorRepositoryImpl(sl()),
-  );
+  sl.registerLazySingleton<DoctorRepository>(() => DoctorRepositoryImpl(sl()));
   sl.registerLazySingleton<PersonaRemoteDataSource>(
     () => PersonaRemoteDataSourceImpl(sl()),
   );
@@ -295,24 +295,19 @@ Future<void> init() async {
   sl.registerLazySingleton<UsuarioRepository>(
     () => UsuarioRepositoryImpl(sl()),
   );
-  sl.registerFactory<AuthCubit>(
-    () => AuthCubit(usuarioRepository: sl()),
-  );
+  sl.registerFactory<AuthCubit>(() => AuthCubit(usuarioRepository: sl()));
 
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSource(sl()),
   );
-  sl.registerLazySingleton<IAuthRepository>(
-    () => AuthRepositoryImpl(sl()),
-  );
-  sl.registerSingleton<AuthSessionCubit>(
-    AuthSessionCubit(sl())..initialize(),
-  );
+  sl.registerLazySingleton<IAuthRepository>(() => AuthRepositoryImpl(sl()));
+  sl.registerSingleton<AuthSessionCubit>(AuthSessionCubit(sl())..initialize());
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
   sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
   sl.registerFactory<ConsultaDetalleCubit>(() => ConsultaDetalleCubit(sl()));
+  sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),
@@ -326,5 +321,9 @@ Future<void> init() async {
       pacienteRepository: sl(),
       medicinaRepository: sl(),
     ),
+  );
+
+  sl.registerFactory<PersonalPerfilesCubit>(
+    () => PersonalPerfilesCubit(usuarioRepository: sl<UsuarioRepository>()),
   );
 }

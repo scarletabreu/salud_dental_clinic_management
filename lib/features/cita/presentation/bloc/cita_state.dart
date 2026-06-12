@@ -11,8 +11,6 @@ class CitaLoaded extends CitaState {
   CitaLoaded(this.citas);
 }
 
-/// Emitido puntualmente cuando una nueva cita se creó con éxito.
-/// El bloc vuelve a [CitaLoaded] con la lista actualizada justo después.
 class CitaCreated extends CitaState {}
 
 class CitaError extends CitaState {

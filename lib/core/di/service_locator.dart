@@ -1,5 +1,14 @@
 import 'package:get_it/get_it.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
@@ -22,13 +31,6 @@ import 'package:salud_dental_clinic_management/features/paciente/data/datasource
 import 'package:salud_dental_clinic_management/features/paciente/data/repositories/paciente_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
-
-// Consultas
-import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
-import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 
 // Data Sources Impl (Mapeados correctamente)
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource_impl.dart';
@@ -200,6 +202,9 @@ Future<void> init() async {
   sl.registerLazySingleton<ConsultaRemoteDatasource>(
     () => ConsultaRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<SupabaseStorageHelper>(
+    () => SupabaseStorageHelper(supabaseClient: sl()),
+  );
 
   // --- Repositories ---
   sl.registerLazySingleton<IMedicinaRepository>(
@@ -281,6 +286,9 @@ Future<void> init() async {
   sl.registerLazySingleton<ConsultaRepository>(
     () => ConsultaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerFactory<CrearConsultaUseCase>(
+    () => CrearConsultaUseCase(sl()),
+  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -295,8 +303,10 @@ Future<void> init() async {
   sl.registerLazySingleton<IAuthRepository>(() => AuthRepositoryImpl(sl()));
   sl.registerSingleton<AuthSessionCubit>(AuthSessionCubit(sl())..initialize());
 
-  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl()));
+  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
+  sl.registerFactory<ConsultaDetalleCubit>(() => ConsultaDetalleCubit(sl()));
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(

@@ -43,18 +43,13 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   try {
     final response = await supabaseClient
         .from('doctores')
-        // 🔴 Anidamos personas(*) dentro de usuarios(*)
-        .select('*, usuarios(*, personas(*))') 
+        .select('*, usuarios(*, personas(*))')
         .isFilter('deleted_at', null);
-
-    print('--- RESPUESTA CRUDA DE SUPABASE ---');
-    print(response);
 
     return (response as List)
         .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
         .toList();
     } on PostgrestException catch (e) {
-      print('🚨 Error Postgrest: ${e.message} | Detalles: ${e.details}');
       throw Exception('Error al recuperar doctores activos: ${e.message}');
     } catch (e) {
       throw Exception('Error inesperado: $e');

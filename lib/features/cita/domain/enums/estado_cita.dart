@@ -6,6 +6,33 @@ enum EstadoCita {
   completada,
   cancelada;
 
+  /// El enum `estado_cita` de Postgres usa otros nombres:
+  /// {pendiente, confirmada, atendida, cancelada}.
+  String get dbValue {
+    switch (this) {
+      case EstadoCita.enEspera:
+        return 'confirmada';
+      case EstadoCita.completada:
+        return 'atendida';
+      default:
+        return name;
+    }
+  }
+
+  static EstadoCita fromDb(String? valor) {
+    switch (valor) {
+      case 'confirmada':
+        return EstadoCita.enEspera;
+      case 'atendida':
+        return EstadoCita.completada;
+      default:
+        return EstadoCita.values.firstWhere(
+          (e) => e.name == valor,
+          orElse: () => EstadoCita.pendiente,
+        );
+    }
+  }
+
   Color get color {
     switch (this) {
       case EstadoCita.pendiente:

@@ -106,6 +106,13 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
               if (state is ConsultasLoaded) ...[
                 const SizedBox(width: 14),
                 _CountBadge(count: total),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Actualizar listado',
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  onPressed: () =>
+                      context.read<ConsultasListCubit>().recargar(),
+                ),
               ],
             ],
           ),
@@ -314,9 +321,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   consulta: consulta,
                   nombrePaciente: state.nombrePaciente(consulta.pacienteId),
                   nombreDoctor: state.nombreDoctor(consulta.doctorId),
-                  tieneTratamientos: state.pacienteTieneTratamientos(
-                    consulta.pacienteId,
-                  ),
+                  tieneTratamientos: consulta.tieneTratamientosAplicados,
                   onTap: () => _abrirDetalle(consulta, state),
                 );
               },

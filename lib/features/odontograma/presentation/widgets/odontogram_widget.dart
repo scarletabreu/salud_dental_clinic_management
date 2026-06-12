@@ -44,7 +44,10 @@ ToothStatus statusForDiente(Diente? d) {
     }
     return worst == SeveridadDiagnosis.moderada ? ToothStatus.moderate : ToothStatus.mild;
   }
-  if (d.tratamientos.isNotEmpty) return ToothStatus.treated;
+  // Tratamientos cargados como entidades o solo vinculados por id en la BD.
+  if (d.tratamientos.isNotEmpty || d.tratamientosAplicadosIds.isNotEmpty) {
+    return ToothStatus.treated;
+  }
   if (d.superficies.any((s) => s.diagnosisId != null)) return ToothStatus.mild;
   return ToothStatus.empty;
 }
@@ -702,10 +705,7 @@ class _ToothInfoPanel extends StatelessWidget {
                 ),
               ),
               OutlinedButton.icon(
-                onPressed: () {
-                  onAddTratamiento?.call(d, selectedSurface);
-                  _showComingSoon(context);
-                },
+                onPressed: () => onAddTratamiento?.call(d, selectedSurface),
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: const Text('Tratamiento'),
                 style: OutlinedButton.styleFrom(

@@ -74,7 +74,21 @@ class PacienteModel extends Paciente {
       return [ContactoModel.fromJson(raw)];
     }
 
-    // Caso 3: Si es nulo o no es un formato válido, devolvemos una lista vacía
+    // Caso 3: embed anidado de Supabase:
+    // personas(..., persona_contacto:persona_contactos(contactos(*)))
+    final persona = json['personas'];
+    if (persona is Map<String, dynamic>) {
+      final relaciones = persona['persona_contacto'];
+      if (relaciones is List) {
+        return relaciones
+            .map((rel) => rel is Map ? rel['contactos'] : null)
+            .whereType<Map<String, dynamic>>()
+            .map(ContactoModel.fromJson)
+            .toList();
+      }
+    }
+
+    // Si es nulo o no es un formato válido, devolvemos una lista vacía
     return [];
   }
 

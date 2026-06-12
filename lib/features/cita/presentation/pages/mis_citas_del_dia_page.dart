@@ -12,6 +12,7 @@ import '../cubit/cita_cubit.dart';
 import '../cubit/cita_cubit_state.dart';
 import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 
 const _kMonths = [
   'Enero',
@@ -994,123 +995,171 @@ class _CitaCard extends StatelessWidget {
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      hour,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: statusColor,
-                        height: 1,
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          hour,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor,
+                            height: 1,
+                          ),
+                        ),
+                        Text(
+                          min,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor.withValues(alpha: 0.6),
+                            height: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      color: statusColor.withValues(alpha: 0.15),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  cita.persona.fullName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: ac.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (cita.esEmergencia) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ac.red.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.priority_high_rounded,
+                                        size: 10,
+                                        color: ac.red,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        'Urgente',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: ac.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline_rounded,
+                                size: 12,
+                                color: ac.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: ac.textMuted,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      min,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor.withValues(alpha: 0.6),
-                        height: 1.1,
-                      ),
+                    const SizedBox(width: 8),
+                    _EstadoDropdown(
+                      cita: cita,
+                      onCancelar: () =>
+                          _mostrarDialogoCancelacion(context, cita.id!),
                     ),
                   ],
                 ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  color: statusColor.withValues(alpha: 0.15),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              cita.persona.fullName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: ac.textPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (cita.esEmergencia) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: ac.red.withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.priority_high_rounded,
-                                    size: 10,
-                                    color: ac.red,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    'Urgente',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: ac.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.person_outline_rounded,
-                            size: 12,
-                            color: ac.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: ac.textMuted,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _EstadoDropdown(
-                  cita: cita,
-                  onCancelar: () =>
-                      _mostrarDialogoCancelacion(context, cita.id!),
-                ),
+                _botonEfectuar(context),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _botonEfectuar(BuildContext context) {
+    final ac = context.appColors;
+    final pacienteId = cita.persona.id;
+    final doctorId = cita.doctor.id;
+    final esEfectuable = cita.estado == EstadoCita.pendiente ||
+        cita.estado == EstadoCita.enEspera;
+    if (!esEfectuable ||
+        pacienteId == null ||
+        doctorId == null ||
+        cita.id == null) {
+      return const SizedBox.shrink();
+    }
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: FilledButton.icon(
+          onPressed: () async {
+            final cubit = context.read<CitaCubit>();
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id!,
+                  pacienteId: pacienteId,
+                  doctorId: doctorId,
+                ),
+              ),
+            );
+            cubit.load();
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: ac.primaryBlue,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          icon: const Icon(Icons.medical_services_outlined, size: 16),
+          label: const Text('Efectuar Consulta'),
         ),
       ),
     );
@@ -1124,7 +1173,6 @@ class _EstadoDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ac = context.appColors;
     final statusColor = cita.estado.color;
 
     return PopupMenuButton<EstadoCita>(

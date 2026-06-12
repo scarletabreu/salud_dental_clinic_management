@@ -1,7 +1,4 @@
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/data/models/odontograma_model.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
@@ -9,53 +6,102 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   ConsultaRemoteDatasourceImpl({required this.supabaseClient});
 
+  /// Embed común del listado/detalle. Solo relaciones con FK fiable hacia
+  /// `consultas`: recetas, documentos clínicos y el odontograma con sus
+  /// dientes (los tratamientos cuelgan de `dientes.tratamientos_aplicados_ids`).
+  static const _selectConsulta =
+      '*, recetas(*), documentos_clinicos(*), '
+      'odontograma:odontogramas(id, consulta_id, '
+      'dientes(id, odontograma_id, fdi_code, observaciones, '
+      'tratamientos_aplicados_ids))';
+
   @override
-  Future<void> crearConsulta(ConsultaModel consulta) async {
+  Future<String> crearConsultaCompleta(Map<String, dynamic> params) async {
     try {
-      final Map<String, dynamic> consultaData = consulta.toJson();
+      final res = await supabaseClient.rpc(
+        'crear_consulta_completa',
+        params: params,
+      );
+      return res as String;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al crear la consulta completa: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al crear la consulta completa: $e');
+    }
+  }
 
+  @override
+  Future<void> guardarResultadoConsulta({
+    required String consultaId,
+    required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
+    String? notas,
+  }) async {
+    try {
       final now = DateTime.now().toIso8601String();
-      consultaData['created_at'] = now;
-      consultaData['updated_at'] = now;
 
-      final response = await supabaseClient
-          .from('consultas')
-          .insert(consultaData)
-          .select('id')
-          .single();
-
-      final String consultaId = response['id'];
-
-      if (consulta.odontograma != null) {
-        final odontoJson = (consulta.odontograma as OdontogramaModel).toJson();
-        odontoJson['consulta_id'] = consultaId;
-        odontoJson.remove('id');
-        await supabaseClient.from('odontograma').insert(odontoJson);
+      // Las notas van primero: si falla (p. ej. falta la migración de la
+      // columna `notas`), aún no se insertó ningún tratamiento y el doctor
+      // puede reintentar sin dejar filas duplicadas.
+      if (notas != null && notas.trim().isNotEmpty) {
+        await supabaseClient
+            .from('consultas')
+            .update({'notas': notas.trim(), 'updated_at': now})
+            .eq('id', consultaId);
       }
 
-      for (var receta in consulta.recetas) {
-        final recetaJson = (receta as RecetaModel).toJson();
-        recetaJson['consulta_id'] = consultaId;
-        recetaJson.remove('id');
-        await supabaseClient.from('recetas').insert(recetaJson);
+      if (tratamientosPorFdi.isNotEmpty) {
+        final odontograma = await supabaseClient
+            .from('odontogramas')
+            .select('id, dientes(id, fdi_code)')
+            .eq('consulta_id', consultaId)
+            .isFilter('deleted_at', null)
+            .maybeSingle();
+        if (odontograma == null) {
+          throw Exception('No se encontró el odontograma de la consulta.');
+        }
+        final dienteIdPorFdi = <int, String>{
+          for (final d in (odontograma['dientes'] as List))
+            (d['fdi_code'] as num).toInt(): d['id'] as String,
+        };
+
+        for (final entry in tratamientosPorFdi.entries) {
+          final dienteId = dienteIdPorFdi[entry.key];
+          if (dienteId == null) continue;
+
+          final insertados = await supabaseClient
+              .from('tratamientos_aplicados')
+              .insert([
+                for (final fila in entry.value)
+                  {...fila, 'created_at': now, 'updated_at': now},
+              ])
+              .select('id');
+
+          await supabaseClient
+              .from('dientes')
+              .update({
+                'tratamientos_aplicados_ids': [
+                  for (final row in insertados as List) row['id'] as String,
+                ],
+                'updated_at': now,
+              })
+              .eq('id', dienteId);
+        }
       }
     } on PostgrestException catch (e) {
-      throw Exception('Error al registrar consulta completa: ${e.message}');
+      throw Exception(
+        'Error al guardar el resultado de la consulta: ${e.message}',
+      );
     } catch (e) {
-      throw Exception('Error inesperado al registrar consulta: $e');
+      throw Exception('Error inesperado al guardar la consulta: $e');
     }
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchConsultas() async {
     try {
-      // Solo embebemos lo que tiene FK fiable hacia `consultas`:
-      // `recetas` y `documentos_clinicos` (ambas con `consulta_id`).
-      // Los tratamientos aplicados NO cuelgan de la consulta (solo de
-      // `paciente_id`), así que no se pueden derivar por consulta aquí.
       final response = await supabaseClient
           .from('consultas')
-          .select('*, recetas(*), documentos_clinicos(*)')
+          .select(_selectConsulta)
           .isFilter('deleted_at', null)
           .order('fecha', ascending: false);
 
@@ -66,32 +112,13 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
-  Future<Set<String>> fetchPacienteIdsConTratamientos() async {
-    try {
-      final response = await supabaseClient
-          .from('tratamientos_aplicados')
-          .select('paciente_id')
-          .isFilter('deleted_at', null);
-
-      return {
-        for (final row in (response as List))
-          if (row['paciente_id'] != null) row['paciente_id'] as String,
-      };
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al obtener pacientes con tratamientos: ${e.message}',
-      );
-    }
-  }
-
-  @override
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   ) async {
     try {
       final response = await supabaseClient
           .from('consultas')
-          .select('*, recetas(*), odontograma(*), documentos_clinicos(*)')
+          .select(_selectConsulta)
           .eq('paciente_id', pacienteId)
           .isFilter('deleted_at', null)
           .order('fecha', ascending: false);
@@ -107,12 +134,30 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     try {
       return await supabaseClient
           .from('consultas')
-          .select('*, recetas(*), odontograma(*), documentos_clinicos(*)')
+          .select(_selectConsulta)
           .eq('id', id)
           .isFilter('deleted_at', null)
           .maybeSingle();
     } on PostgrestException catch (e) {
       throw Exception('Error al recuperar consulta clínica: ${e.message}');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchTratamientosAplicadosPorIds(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return [];
+    try {
+      final response = await supabaseClient
+          .from('tratamientos_aplicados')
+          .select('*, tratamiento:tratamientos(nombre)')
+          .inFilter('id', ids)
+          .isFilter('deleted_at', null);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener tratamientos aplicados: ${e.message}');
     }
   }
 

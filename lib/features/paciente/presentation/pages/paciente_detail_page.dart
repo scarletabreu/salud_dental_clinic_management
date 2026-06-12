@@ -1068,6 +1068,7 @@ class _PacienteDetailPageState
 //  Shared helper widgets
 // ─────────────────────────────────────────────
 
+
 class _SectionCard extends StatelessWidget {
   final Widget child;
   const _SectionCard({

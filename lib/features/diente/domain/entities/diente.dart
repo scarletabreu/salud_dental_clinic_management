@@ -7,6 +7,11 @@ class Diente {
   final String odontogramaId;
   final List<Superficie> superficies;
   final List<TratamientoAplicado> tratamientos;
+
+  /// Ids de `tratamientos_aplicados` vinculados en la BD
+  /// (`dientes.tratamientos_aplicados_ids`); las entidades completas se
+  /// cargan aparte cuando hacen falta.
+  final List<String> tratamientosAplicadosIds;
   final List<DiagnosticoAplicado> diagnosis;
   final int fdiCode;
   final String? observaciones;
@@ -17,6 +22,7 @@ class Diente {
     required this.odontogramaId,
     required this.superficies,
     this.tratamientos = const [],
+    this.tratamientosAplicadosIds = const [],
     this.diagnosis = const [],
     required this.fdiCode,
     this.observaciones,
@@ -27,6 +33,7 @@ class Diente {
     String? odontogramaId,
     List<Superficie>? superficies,
     List<TratamientoAplicado>? tratamientos,
+    List<String>? tratamientosAplicadosIds,
     List<DiagnosticoAplicado>? diagnosis,
     int? fdiCode,
     String? observaciones,
@@ -37,6 +44,8 @@ class Diente {
       odontogramaId: odontogramaId ?? this.odontogramaId,
       superficies: superficies ?? this.superficies,
       tratamientos: tratamientos ?? this.tratamientos,
+      tratamientosAplicadosIds:
+          tratamientosAplicadosIds ?? this.tratamientosAplicadosIds,
       diagnosis: diagnosis ?? this.diagnosis,
       fdiCode: fdiCode ?? this.fdiCode,
       observaciones: observaciones ?? this.observaciones,

@@ -9,6 +9,7 @@ class DienteModel extends Diente {
     required super.odontogramaId,
     required super.superficies,
     super.tratamientos = const [],
+    super.tratamientosAplicadosIds = const [],
     super.diagnosis = const [],
     required super.fdiCode,
     super.observaciones,
@@ -22,6 +23,9 @@ class DienteModel extends Diente {
       fdiCode: (json['fdi_code'] as num).toInt(),
       observaciones: json['observaciones'] as String?,
       estaAusente: json['esta_ausente'] as bool? ?? false,
+      tratamientosAplicadosIds: json['tratamientos_aplicados_ids'] != null
+          ? List<String>.from(json['tratamientos_aplicados_ids'] as List)
+          : const [],
       // Relaciones normalmente cargadas en una consulta con JOIN
       superficies: json['superficies'] != null
           ? (json['superficies'] as List)

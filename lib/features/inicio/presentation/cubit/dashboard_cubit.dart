@@ -70,7 +70,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           nombreDoctor: isDoctor ? doctorName : null,
           citasHoy: citasDeHoy.length,
           citasPendientes: citasDeHoy
-              .where((c) => c.estado == EstadoCita.pendiente)
+              .where((c) => c.estado == EstadoCita.programada)
               .length,
           citasEnEspera: citasDeHoy
               .where((c) => c.estado == EstadoCita.enEspera)
@@ -100,7 +100,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       current.copyWith(
         citasDeHoy: updatedCitas,
         citasPendientes: updatedCitas
-            .where((c) => c.estado == EstadoCita.pendiente)
+            .where((c) => c.estado == EstadoCita.programada)
             .length,
         citasEnEspera: updatedCitas
             .where((c) => c.estado == EstadoCita.enEspera)

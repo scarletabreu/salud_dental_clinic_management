@@ -228,8 +228,7 @@ class _CitaRow extends StatelessWidget {
             PopupMenuButton<EstadoCita>(
               onSelected: (nuevoEstado) =>
                   onCambiarEstado!(cita.id!, nuevoEstado),
-              itemBuilder: (context) => EstadoCita.values
-                  .where((e) => e != cita.estado)
+              itemBuilder: (context) => cita.estado.transicionesPermitidas
                   .map(
                     (e) => PopupMenuItem<EstadoCita>(
                       value: e,

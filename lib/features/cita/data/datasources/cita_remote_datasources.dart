@@ -201,7 +201,7 @@ class CitaRemoteDataSource {
         'fecha_hora': cita.date.toUtc().toIso8601String(),
         'duracion_minutos': cita.duracionMinutos,
         'es_emergencia': cita.esEmergencia,
-        'estado': cita.estado.name,
+        'estado': cita.estado.dbValue,
         'updated_at': DateTime.now().toIso8601String(),
       };
       debugPrint('updateCita payload: $data para id=${cita.id}');
@@ -222,6 +222,22 @@ class CitaRemoteDataSource {
           .eq('id', id);
     } catch (e) {
       throw Exception('Error al borrar cita: $e');
+    }
+  }
+
+  /// Devuelve el estado actual de la cita en la BD, o `null` si no existe
+  /// (p. ej. datos de prueba con ids que no son UUID).
+  Future<EstadoCita?> fetchEstadoCita(String id) async {
+    try {
+      final res = await supabase
+          .from('citas')
+          .select('estado')
+          .eq('id', id)
+          .maybeSingle();
+      if (res == null) return null;
+      return EstadoCita.fromDb(res['estado'] as String?);
+    } on PostgrestException {
+      return null;
     }
   }
 
@@ -375,7 +391,7 @@ class CitaRemoteDataSource {
       18,
       10,
       0,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       urgente: true,
       duracion: 30,
     ),
@@ -387,7 +403,7 @@ class CitaRemoteDataSource {
       18,
       15,
       30,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 90,
     ),
     _cita(
@@ -443,7 +459,7 @@ class CitaRemoteDataSource {
       21,
       16,
       0,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 60,
     ),
     _cita(
@@ -465,7 +481,7 @@ class CitaRemoteDataSource {
       25,
       8,
       30,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 60,
     ),
     _cita(
@@ -476,7 +492,7 @@ class CitaRemoteDataSource {
       25,
       11,
       0,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 90,
     ),
     _cita(
@@ -487,7 +503,7 @@ class CitaRemoteDataSource {
       25,
       14,
       30,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 60,
     ),
     _cita(
@@ -498,7 +514,7 @@ class CitaRemoteDataSource {
       25,
       17,
       0,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 30,
     ),
     _cita(
@@ -509,7 +525,7 @@ class CitaRemoteDataSource {
       27,
       9,
       0,
-      EstadoCita.pendiente,
+      EstadoCita.programada,
       duracion: 60,
     ),
     _cita(

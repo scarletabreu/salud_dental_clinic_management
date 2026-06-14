@@ -84,6 +84,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       );
 
       _consultaId = await _crearConsulta(consulta);
+
+      // La cita estaba EN_ESPERA; al iniciar el trabajo clínico pasa a EN_CONSULTA.
+      if (citaId != null) {
+        await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
+      }
+
       emit(const ConsultaCreada());
     } catch (e) {
       if (kDebugMode) debugPrint('Error al crear consulta: $e');

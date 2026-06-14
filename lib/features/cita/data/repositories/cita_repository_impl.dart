@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/cita/data/models/cita_mo
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/errors/transicion_estado_invalida.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 
 class CitaRepositoryImpl implements CitaRepository {
@@ -65,6 +66,11 @@ class CitaRepositoryImpl implements CitaRepository {
 
   @override
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
+    final actual = await remoteDataSource.fetchEstadoCita(id);
+    // `actual == null` => la cita no existe en BD (datos de prueba): no validamos.
+    if (actual != null && !actual.puedeTransicionarA(nuevoEstado)) {
+      throw TransicionEstadoInvalida(actual, nuevoEstado);
+    }
     try {
       await remoteDataSource.updateCitaEstado(id, nuevoEstado);
     } catch (e) {
@@ -85,11 +91,19 @@ class CitaRepositoryImpl implements CitaRepository {
 
   @override
   Future<void> updateCita(Cita cita) async {
-    try {
-      if (cita.id == null) {
-        throw Exception("No se puede actualizar una cita sin un ID válido");
-      }
+    if (cita.id == null) {
+      throw Exception("No se puede actualizar una cita sin un ID válido");
+    }
 
+    // Si la actualización cambia el estado, validar la transición.
+    final actual = await remoteDataSource.fetchEstadoCita(cita.id!);
+    if (actual != null &&
+        actual != cita.estado &&
+        !actual.puedeTransicionarA(cita.estado)) {
+      throw TransicionEstadoInvalida(actual, cita.estado);
+    }
+
+    try {
       final model = CitaModel(
         id: cita.id,
         doctor: cita.doctor,

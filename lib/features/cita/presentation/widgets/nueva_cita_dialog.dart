@@ -232,7 +232,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       persona: persona,
       date: fechaHora.toUtc(),
       esEmergencia: _esEmergencia,
-      estado: EstadoCita.pendiente,
+      estado: EstadoCita.programada,
     );
 
     if (!mounted) return;

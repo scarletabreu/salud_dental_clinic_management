@@ -427,10 +427,8 @@ class _CitaBlock extends StatelessWidget {
 
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    // Solo se efectúan citas vigentes (pendiente o en espera); una completada
-    // o cancelada no debe poder efectuarse.
-    final esEfectuable = cita.estado == EstadoCita.pendiente ||
-        cita.estado == EstadoCita.enEspera;
+    // Solo se efectúan citas en espera; al efectuarse pasan a EN_CONSULTA.
+    final esEfectuable = cita.estado == EstadoCita.enEspera;
     final puedeEfectuar = esEfectuable &&
         pacienteId != null &&
         doctorId != null &&
@@ -470,8 +468,7 @@ class _CitaBlock extends StatelessWidget {
           ),
           const PopupMenuDivider(),
         ],
-        ...EstadoCita.values.map((e) {
-          final isActive = e == cita.estado;
+        ...cita.estado.transicionesPermitidas.map((e) {
           return PopupMenuItem<Object>(
             value: e,
             child: Row(
@@ -489,8 +486,8 @@ class _CitaBlock extends StatelessWidget {
                   e.label,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                    color: isActive ? e.color : ac.textSecondary,
+                    fontWeight: FontWeight.w400,
+                    color: ac.textSecondary,
                   ),
                 ),
               ],

@@ -140,7 +140,7 @@ class _ControlBar extends StatelessWidget {
     final citasHoy = state.citasForDay(state.selectedDay);
     final urgentes = citasHoy.where((c) => c.esEmergencia).length;
     final pendientes = citasHoy
-        .where((c) => c.estado == EstadoCita.pendiente)
+        .where((c) => c.estado == EstadoCita.programada)
         .length;
 
     // Tarjeta flotante — mismo estilo que el dashboard
@@ -698,7 +698,7 @@ class _DetailPanel extends StatelessWidget {
         .length;
     final enEspera = citas.where((c) => c.estado == EstadoCita.enEspera).length;
     final pendientes = citas
-        .where((c) => c.estado == EstadoCita.pendiente)
+        .where((c) => c.estado == EstadoCita.programada)
         .length;
 
     final isToday = isSameDay(d, DateTime.now());
@@ -1127,8 +1127,7 @@ class _CitaCard extends StatelessWidget {
     final ac = context.appColors;
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    final esEfectuable = cita.estado == EstadoCita.pendiente ||
-        cita.estado == EstadoCita.enEspera;
+    final esEfectuable = cita.estado == EstadoCita.enEspera;
     if (!esEfectuable ||
         pacienteId == null ||
         doctorId == null ||
@@ -1211,8 +1210,7 @@ class _EstadoDropdown extends StatelessWidget {
       ),
       itemBuilder: (BuildContext context) {
         final ac = context.appColors;
-        return EstadoCita.values.map((e) {
-          final isActive = e == cita.estado;
+        return cita.estado.transicionesPermitidas.map((e) {
           return PopupMenuItem<EstadoCita>(
             value: e,
             child: Row(
@@ -1230,8 +1228,8 @@ class _EstadoDropdown extends StatelessWidget {
                   e.label,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                    color: isActive ? e.color : ac.textSecondary,
+                    fontWeight: FontWeight.w400,
+                    color: ac.textSecondary,
                   ),
                 ),
               ],

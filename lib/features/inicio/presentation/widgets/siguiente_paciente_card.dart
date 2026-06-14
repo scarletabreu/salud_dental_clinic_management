@@ -281,7 +281,7 @@ class _WithPatient extends StatelessWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: canAct
-                    ? () => onCambiarEstado!(EstadoCita.completada)
+                    ? () => onCambiarEstado!(EstadoCita.enConsulta)
                     : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),

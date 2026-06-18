@@ -11,7 +11,6 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/util/validators.dart';
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -22,7 +21,8 @@ class _CedulaInputFormatter extends TextInputFormatter {
     final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final buffer = StringBuffer();
     for (int i = 0; i < digits.length && i < 11; i++) {
-      if (i == 3 || i == 10) buffer.write('-');
+      if (i == 3) buffer.write('-');
+      if (i == 10) buffer.write('-');
       buffer.write(digits[i]);
     }
     final formatted = buffer.toString();
@@ -174,15 +174,17 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    if (_contactos.isEmpty ||
-        _contactos.every((c) => c.telefono.text.trim().isEmpty)) {
+
+    // Verificación de negocio para el contacto principal requerido en el formulario
+    if (_contactos.isEmpty || _contactos.first.telefono.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debe ingresar al menos un contacto con teléfono.'),
+          content: Text('Debe ingresar el teléfono del contacto principal.'),
         ),
       );
       return;
     }
+
     final paciente = Paciente(
       id: widget.paciente?.id,
       nombre: _nombreController.text.trim(),
@@ -198,8 +200,15 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       record: widget.paciente?.record ?? RecordModel.empty(),
       citas: widget.paciente?.citas ?? const [],
     );
+
     final cubit = context.read<PacienteCubit>();
-    _isEditing ? cubit.updatePaciente(paciente) : cubit.addPaciente(paciente);
+
+    // Modo Edición vs Registro disparando los eventos/métodos correspondientes
+    if (_isEditing) {
+      cubit.updatePaciente(paciente);
+    } else {
+      cubit.addPaciente(paciente);
+    }
   }
 
   Future<void> _pickFecha() async {
@@ -208,6 +217,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       context: context,
       initialDate: _fechaNacimiento ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
+      // Prevenir el registro de fechas futuras bloqueando el calendario hasta el día de hoy
       lastDate: now,
       helpText: 'Fecha de nacimiento',
       confirmText: 'Seleccionar',
@@ -227,14 +237,28 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return BlocConsumer<PacienteCubit, PacienteState>(
       listener: (context, state) {
         if (state is PacienteError) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.message)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(backgroundColor: ac.red, content: Text(state.message)),
+          );
         }
-        if (state is PacienteOperationSuccess) Navigator.pop(context);
+        if (state is PacienteOperationSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: ac.teal,
+              content: Text(
+                _isEditing
+                    ? 'Paciente actualizado exitosamente'
+                    : 'Paciente registrado exitosamente',
+              ),
+            ),
+          );
+          Navigator.pop(context);
+        }
       },
       builder: (context, state) {
+        // Validación del estado de carga del Cubit para renderizar el loader en el botón
         final isSaving = state is PacienteLoading;
+
         return Scaffold(
           backgroundColor: ac.bgPage,
           appBar: _buildAppBar(ac, isSaving),
@@ -270,7 +294,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: isSaving ? null : () => Navigator.pop(context),
                 child: Container(
                   width: 36,
                   height: 36,
@@ -352,7 +376,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                         ),
                       )
                     : const Icon(Icons.save_outlined, size: 16),
-                label: const Text('Guardar'),
+                label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
                   backgroundColor: ac.primaryBlue,
                   foregroundColor: Colors.white,
@@ -391,13 +415,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 child: _FormField(
                   ac: ac,
                   icon: Icons.badge_outlined,
-                  label: 'Nombre',
+                  label: 'Nombre *',
                   child: TextFormField(
                     controller: _nombreController,
                     textCapitalization: TextCapitalization.words,
                     decoration: _inputDeco(ac, hint: 'Ana'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'El nombre es obligatorio'
+                        : null,
                   ),
                 ),
               ),
@@ -406,13 +431,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 child: _FormField(
                   ac: ac,
                   icon: Icons.badge_outlined,
-                  label: 'Apellido',
+                  label: 'Apellido *',
                   child: TextFormField(
                     controller: _apellidoController,
                     textCapitalization: TextCapitalization.words,
                     decoration: _inputDeco(ac, hint: 'García'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'El apellido es obligatorio'
+                        : null,
                   ),
                 ),
               ),
@@ -422,68 +448,93 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           _FormField(
             ac: ac,
             icon: Icons.credit_card_outlined,
-            label: 'Cédula',
+            label: 'Cédula *',
             child: TextFormField(
               controller: _cedulaController,
               keyboardType: TextInputType.number,
               inputFormatters: [_CedulaInputFormatter()],
               decoration: _inputDeco(ac, hint: '000-0000000-0'),
-              validator: cedulaValidator,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'La cédula es obligatoria';
+                }
+                // Limpiar guiones para verificar los 11 dígitos requeridos por el ticket
+                final demasked = v.replaceAll('-', '');
+                if (demasked.length != 11) {
+                  return 'La cédula debe contener exactamente 11 dígitos';
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 14),
           _FormField(
             ac: ac,
             icon: Icons.calendar_today_outlined,
-            label: 'Fecha de nacimiento',
+            label: 'Fecha de nacimiento *',
             child: FormField<DateTime>(
               initialValue: _fechaNacimiento,
-              validator: (_) =>
-                  _fechaNacimiento == null ? 'Selecciona una fecha' : null,
-              builder: (field) => GestureDetector(
-                onTap: _pickFecha,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ac.bgPage,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: field.hasError ? ac.red : ac.divider,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_month_rounded,
-                        size: 16,
-                        color: ac.textMuted,
+              validator: (_) => _fechaNacimiento == null
+                  ? 'La fecha de nacimiento es obligatoria'
+                  : null,
+              builder: (field) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: _pickFecha,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 12,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _fechaNacimiento != null
-                              ? _formatDate(_fechaNacimiento!)
-                              : 'Seleccionar fecha',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: _fechaNacimiento != null
-                                ? ac.textPrimary
-                                : ac.textMuted,
-                          ),
+                      decoration: BoxDecoration(
+                        color: ac.bgPage,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: field.hasError ? ac.red : ac.divider,
+                          width: field.hasError ? 1.0 : 0.5,
                         ),
                       ),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: ac.textMuted,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_month_rounded,
+                            size: 16,
+                            color: ac.textMuted,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _fechaNacimiento != null
+                                  ? _formatDate(_fechaNacimiento!)
+                                  : 'Seleccionar fecha',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: _fechaNacimiento != null
+                                    ? ac.textPrimary
+                                    : ac.textMuted,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: ac.textMuted,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  if (field.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 6),
+                      child: Text(
+                        field.errorText ?? '',
+                        style: TextStyle(color: ac.red, fontSize: 12),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -591,7 +642,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFirst ? 'Contacto principal' : entry.resumen,
+                          isFirst ? 'Contacto principal *' : entry.resumen,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -654,7 +705,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       decoration: _inputDeco(ac, hint: '809-000-0000'),
                       validator: isFirst
                           ? (v) => (v == null || v.trim().isEmpty)
-                                ? 'Teléfono obligatorio'
+                                ? 'El teléfono del contacto principal es obligatorio'
                                 : null
                           : null,
                     ),
@@ -709,8 +760,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Widget _buildInfoAdicionalCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: Color(0xFF534AB7),
-      iconBg: Color(0xFFEEEDFE),
+      iconColor: const Color(0xFF534AB7),
+      iconBg: const Color(0xFFEEEDFE),
       icon: Icons.info_outline_rounded,
       title: 'Información adicional',
       child: Column(

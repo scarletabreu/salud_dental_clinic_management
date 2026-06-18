@@ -95,6 +95,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'tratamiento_id': t.tratamientoId,
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
+                  // El enum tipo_superficie de la BD es en minúscula.
+                  'superficie': t.superficie?.name.toLowerCase(),
+                  'precio_aplicado': t.precioAplicado,
                 },
             ],
       };

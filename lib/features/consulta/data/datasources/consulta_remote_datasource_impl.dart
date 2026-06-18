@@ -72,7 +72,13 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
               .from('tratamientos_aplicados')
               .insert([
                 for (final fila in entry.value)
-                  {...fila, 'created_at': now, 'updated_at': now},
+                  {
+                    ...fila,
+                    'diente_id': dienteId,
+                    'consulta_id': consultaId,
+                    'created_at': now,
+                    'updated_at': now,
+                  },
               ])
               .select('id');
 

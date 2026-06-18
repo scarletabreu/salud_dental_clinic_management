@@ -18,6 +18,11 @@ class TratamientoAplicadoRepositoryImpl
         tratamientoPadreId: tratamiento.tratamientoPadreId,
         esContinuo: tratamiento.esContinuo,
         estaTerminado: tratamiento.estaTerminado,
+        consultaId: tratamiento.consultaId,
+        dienteId: tratamiento.dienteId,
+        superficie: tratamiento.superficie,
+        precioAplicado: tratamiento.precioAplicado,
+        notas: tratamiento.notas,
       );
 
       final data = model.toJson();

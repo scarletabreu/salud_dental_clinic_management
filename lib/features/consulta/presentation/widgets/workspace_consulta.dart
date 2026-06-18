@@ -87,7 +87,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     return '';
   }
 
-  Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? _) async {
+  Future<void> _onAddTratamiento(
+    Diente diente,
+    TipoSuperficie? superficie,
+  ) async {
     if (_cargandoCatalogo) return;
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
     if (tratamiento == null || !mounted) return;
@@ -103,6 +106,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       tratamientoId: tratamiento.id ?? '',
       esContinuo: false,
       estaTerminado: false,
+      superficie: superficie,
+      // Precio congelado: copia del catálogo al momento de aplicar.
+      precioAplicado: tratamiento.costo,
     );
     setState(() {
       _odontograma = _odontograma.copyWith(

@@ -92,6 +92,7 @@ import '../../features/superficie/domain/repositories/superficie_repository.dart
 import '../../features/tratamiento_aplicado/data/datasources/tratamiento_aplicado_datasource.dart';
 import '../../features/tratamiento_aplicado/data/repositories/tratamiento_aplicado_repository_impl.dart';
 import '../../features/tratamiento_aplicado/domain/repositories/tratamiento_aplicado_repository.dart';
+import '../../features/tratamiento_aplicado/domain/usecases/registrar_tratamiento_aplicado.dart';
 import '../../features/equipo/data/datasources/equipo_remote_datasource.dart';
 import '../../features/equipo/data/repositories/equipo_repository_impl.dart';
 import '../../features/equipo/domain/repositories/equipo_repository.dart';
@@ -242,6 +243,9 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<TratamientoAplicadoRepository>(
     () => TratamientoAplicadoRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<RegistrarTratamientoAplicado>(
+    () => RegistrarTratamientoAplicado(sl()),
   );
   sl.registerLazySingleton<EquipoRepository>(
     () => EquipoRepositoryImpl(remoteDataSource: sl()),

@@ -1,7 +1,5 @@
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
-import 'package:salud_dental_clinic_management/features/item_cuenta/data/models/item_cuenta_model.dart';
-import 'package:salud_dental_clinic_management/features/pago/data/models/pago_model.dart';
 
 class CuentaModel extends Cuenta {
   CuentaModel({

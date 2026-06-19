@@ -17,7 +17,7 @@ class Contacto {
     String? direccion,
   }) {
     return Contacto(
-      numeroTelefono: telefono ?? this.numeroTelefono,
+      numeroTelefono: telefono ?? numeroTelefono,
       email: email ?? this.email,
       direccion: direccion ?? this.direccion
     );

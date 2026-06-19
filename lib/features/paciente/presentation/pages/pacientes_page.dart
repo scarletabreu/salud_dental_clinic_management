@@ -705,7 +705,7 @@ class _PacientesPageState extends State<PacientesPage> {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
                 itemCount: state.filtrados.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _PacienteRow(
                   paciente: state.filtrados[i],
                   onEdit: () => _openForm(paciente: state.filtrados[i]),

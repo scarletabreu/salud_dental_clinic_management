@@ -36,7 +36,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
       // 1. AGREGA ESTO PARA INSPECCIONAR EL CONTENIDO:
       // (Asegúrate de tener un método toMap() o toJson() en tu entidad Cita)
-      print('Datos enviados a Supabase: ${cita}');
+      print('Datos enviados a Supabase: $cita');
 
       await _repository.createCita(cita);
       await load();
@@ -141,7 +141,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
   }
 
   Future<void> actualizarCita(Cita citaActualizada) async {
-    print("ACTUALIZAR CUBIT: ${hashCode}");
+    print("ACTUALIZAR CUBIT: $hashCode");
     final current = state;
     if (current is! CitaCubitLoaded) return;
 

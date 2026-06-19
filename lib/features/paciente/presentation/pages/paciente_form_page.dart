@@ -143,13 +143,17 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController.dispose();
     _trabajoController.dispose();
     _referenciaController.dispose();
-    for (final c in _contactos) c.dispose();
+    for (final c in _contactos) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _addContacto() {
     setState(() {
-      for (final c in _contactos) c.isExpanded = false;
+      for (final c in _contactos) {
+        c.isExpanded = false;
+      }
       _contactos.add(_ContactoEntry(isExpanded: true));
     });
   }
@@ -167,7 +171,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   void _toggleContacto(int index) {
     setState(() {
       final nowExpanded = !_contactos[index].isExpanded;
-      for (final c in _contactos) c.isExpanded = false;
+      for (final c in _contactos) {
+        c.isExpanded = false;
+      }
       _contactos[index].isExpanded = nowExpanded;
     });
   }
@@ -840,7 +846,7 @@ class _FormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (action != null) action!,
+              ?action,
             ],
           ),
           const SizedBox(height: 20),

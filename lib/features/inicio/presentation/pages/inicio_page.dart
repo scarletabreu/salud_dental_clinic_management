@@ -529,6 +529,10 @@ class _WeeklyBarChart extends StatelessWidget {
     return _ChartCard(
       title: 'Esta semana',
       subtitle: 'Citas por día',
+      legendItems: [
+        _LegendItem(color: ac.green, label: 'Completadas'),
+        _LegendItem(color: ac.indigo, label: 'Pendientes'),
+      ],
       child: SizedBox(
         height: 160,
         child: BarChart(
@@ -630,10 +634,6 @@ class _WeeklyBarChart extends StatelessWidget {
           ),
         ),
       ),
-      legendItems: [
-        _LegendItem(color: ac.green, label: 'Completadas'),
-        _LegendItem(color: ac.indigo, label: 'Pendientes'),
-      ],
     );
   }
 }
@@ -659,6 +659,10 @@ class _MonthlyTrendChart extends StatelessWidget {
     return _ChartCard(
       title: 'Último mes',
       subtitle: 'Citas atendidas y pacientes nuevos por semana',
+      legendItems: [
+        _LegendItem(color: ac.primaryBlue, label: 'Citas atendidas'),
+        _LegendItem(color: ac.teal, label: 'Pacientes nuevos', dashed: true),
+      ],
       child: SizedBox(
         height: 170,
         child: LineChart(
@@ -795,10 +799,6 @@ class _MonthlyTrendChart extends StatelessWidget {
           ),
         ),
       ),
-      legendItems: [
-        _LegendItem(color: ac.primaryBlue, label: 'Citas atendidas'),
-        _LegendItem(color: ac.teal, label: 'Pacientes nuevos', dashed: true),
-      ],
     );
   }
 }

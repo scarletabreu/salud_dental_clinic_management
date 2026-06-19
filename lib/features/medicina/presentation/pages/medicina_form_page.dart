@@ -613,7 +613,7 @@ class _FormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (action != null) action!,
+              ?action,
             ],
           ),
           if (subtitle != null) ...[

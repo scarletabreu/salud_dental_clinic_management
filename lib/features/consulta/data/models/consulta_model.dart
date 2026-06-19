@@ -16,6 +16,7 @@ class ConsultaModel extends Consulta {
     super.tempCondiciones,
     super.motivoConsulta,
     super.notas,
+    super.tienePreFactura,
   });
 
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
@@ -41,11 +42,12 @@ class ConsultaModel extends Consulta {
       tempCondiciones: json['temp_condiciones'] != null
           ? List<String>.from(json['temp_condiciones'])
           : [],
+      tienePreFactura:
+          (json['tiene_pre_factura'] ?? json['tienePreFactura'] ?? false)
+              as bool,
     );
   }
 
-  /// El embed `odontograma:odontogramas(...)` llega como lista (relación 1:N
-  /// en la BD aunque en la práctica sea 1:1); se toma el primero.
   static OdontogramaModel? _parseOdontograma(dynamic raw) {
     if (raw is Map<String, dynamic>) return OdontogramaModel.fromJson(raw);
     if (raw is List && raw.isNotEmpty) {
@@ -62,6 +64,7 @@ class ConsultaModel extends Consulta {
       'fecha': fecha.toUtc().toIso8601String(),
       'motivo_consulta': motivoConsulta,
       'temp_condiciones': tempCondiciones,
+      'tiene_pre_factura': tienePreFactura,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

@@ -17,6 +17,8 @@ class Consulta {
   final String? notas;
   final SignosVitales? signosVitales;
 
+  final bool tienePreFactura;
+
   Consulta({
     this.id,
     required this.pacienteId,
@@ -30,14 +32,10 @@ class Consulta {
     this.motivoConsulta,
     this.notas,
     this.signosVitales,
+    this.tienePreFactura = false,
   });
 
-  /// Indica si la consulta tiene al menos una receta asociada.
   bool get tieneRecetas => recetas.isNotEmpty;
-
-  /// Indica si la consulta tiene tratamientos aplicados. La relación es
-  /// indirecta: consulta → odontograma → dientes → tratamientos (entidades
-  /// cargadas o ids vinculados en `tratamientos_aplicados_ids`).
   bool get tieneTratamientosAplicados =>
       odontograma?.dientes.any(
         (d) =>
@@ -57,6 +55,7 @@ class Consulta {
     String? motivoConsulta,
     String? notas,
     SignosVitales? signosVitales,
+    bool? tienePreFactura,
   }) {
     return Consulta(
       id: id,
@@ -72,6 +71,7 @@ class Consulta {
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
       notas: notas ?? this.notas,
       signosVitales: signosVitales ?? this.signosVitales,
+      tienePreFactura: tienePreFactura ?? this.tienePreFactura,
     );
   }
 }

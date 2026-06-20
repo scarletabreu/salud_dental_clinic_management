@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -14,6 +15,7 @@ class Consulta {
   final List<String> tempCondiciones;
   final String? motivoConsulta;
   final String? notas;
+  final SignosVitales? signosVitales;
 
   Consulta({
     this.id,
@@ -27,6 +29,7 @@ class Consulta {
     this.tempCondiciones = const [],
     this.motivoConsulta,
     this.notas,
+    this.signosVitales,
   });
 
   /// Indica si la consulta tiene al menos una receta asociada.
@@ -53,6 +56,7 @@ class Consulta {
     List<String>? tempCondiciones,
     String? motivoConsulta,
     String? notas,
+    SignosVitales? signosVitales,
   }) {
     return Consulta(
       id: id,
@@ -67,6 +71,7 @@ class Consulta {
       tempCondiciones: tempCondiciones ?? List.from(this.tempCondiciones),
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
       notas: notas ?? this.notas,
+      signosVitales: signosVitales ?? this.signosVitales,
     );
   }
 }

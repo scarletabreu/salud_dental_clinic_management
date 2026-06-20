@@ -73,7 +73,14 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         'p_documentos': documentos,
       };
 
-      return await remoteDataSource.crearConsultaCompleta(params);
+      final id = await remoteDataSource.crearConsultaCompleta(params);
+      if (consulta.signosVitales != null &&
+          !consulta.signosVitales!.estaVacia) {
+        await remoteDataSource.updateConsulta(id, {
+          'signos_vitales': consulta.signosVitales!.toJson(),
+        });
+      }
+      return id;
     } catch (e) {
       throw Exception('Error en el repositorio al crear consulta completa: $e');
     }

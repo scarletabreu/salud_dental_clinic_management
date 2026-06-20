@@ -31,3 +31,7 @@ doc/api/
 # IntelliJ / Android Studio IDE files
 .idea/
 *.iml
+
+# Supabase CLI cache/temp (no deben versionarse)
+supabase/.temp/
+supabase/.branches/

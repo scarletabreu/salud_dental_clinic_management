@@ -156,8 +156,9 @@ class _TratamientoFormDialogState extends ConsumerState<TratamientoFormDialog> {
                     ),
                     decoration: _inputDeco(ac, hint: '0.00', prefix: '\$ '),
                     validator: (v) {
-                      if (v == null || v.isEmpty)
+                      if (v == null || v.isEmpty) {
                         return 'El precio es obligatorio';
+                      }
                       final n = double.tryParse(v);
                       if (n == null) return 'Ingresa un número válido';
                       if (n < 0) return 'El precio no puede ser negativo';
@@ -172,7 +173,7 @@ class _TratamientoFormDialogState extends ConsumerState<TratamientoFormDialog> {
                   icon: Icons.tune_rounded,
                   label: 'Alcance del tratamiento',
                   child: DropdownButtonFormField<Alcance>(
-                    value: _alcance,
+                    initialValue: _alcance,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 13,

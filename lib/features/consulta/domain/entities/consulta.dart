@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -14,6 +15,7 @@ class Consulta {
   final List<String> tempCondiciones;
   final String? motivoConsulta;
   final String? notas;
+  final SignosVitales? signosVitales;
 
   final bool tienePreFactura;
 
@@ -29,6 +31,7 @@ class Consulta {
     this.tempCondiciones = const [],
     this.motivoConsulta,
     this.notas,
+    this.signosVitales,
     this.tienePreFactura = false,
   });
 
@@ -51,6 +54,7 @@ class Consulta {
     List<String>? tempCondiciones,
     String? motivoConsulta,
     String? notas,
+    SignosVitales? signosVitales,
     bool? tienePreFactura,
   }) {
     return Consulta(
@@ -66,6 +70,7 @@ class Consulta {
       tempCondiciones: tempCondiciones ?? List.from(this.tempCondiciones),
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
       notas: notas ?? this.notas,
+      signosVitales: signosVitales ?? this.signosVitales,
       tienePreFactura: tienePreFactura ?? this.tienePreFactura,
     );
   }

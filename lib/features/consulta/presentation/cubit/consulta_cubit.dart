@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
@@ -48,6 +49,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     required String? motivoConsulta,
     required List<String> tempCondiciones,
     required List<DocumentoAdjunto> adjuntos,
+    SignosVitales? signosVitales,
   }) async {
     emit(const ConsultaLoading());
     try {
@@ -81,6 +83,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         motivoConsulta: motivoConsulta,
         tempCondiciones: tempCondiciones,
         documentosClinicos: documentos,
+        signosVitales: signosVitales,
       );
 
       _consultaId = await _crearConsulta(consulta);

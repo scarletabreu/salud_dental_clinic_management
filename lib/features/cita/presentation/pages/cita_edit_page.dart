@@ -300,7 +300,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               icon: Icons.person_search_rounded,
               label: 'Doctor',
               child: DropdownButtonFormField<Doctor>(
-                value: _doctores.contains(_doctorSeleccionado)
+                initialValue: _doctores.contains(_doctorSeleccionado)
                     ? _doctorSeleccionado
                     : null,
                 decoration: _dropDecoration(ac),
@@ -391,7 +391,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
             icon: Icons.hourglass_bottom_rounded,
             label: 'Duración estimada',
             child: DropdownButtonFormField<int>(
-              value: _duracionMinutos,
+              initialValue: _duracionMinutos,
               decoration: _dropDecoration(ac),
               items: const [
                 DropdownMenuItem(value: 15, child: Text('15 minutos')),
@@ -469,7 +469,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
             onChanged: isSubmitting
                 ? null
                 : (v) => setState(() => _esEmergencia = v),
-            activeColor: ac.red,
+            activeThumbColor: ac.red,
           ),
         ],
       ),

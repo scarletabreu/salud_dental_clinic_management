@@ -1,7 +1,9 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 
@@ -26,6 +28,11 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
   final _motivoController = TextEditingController();
   final _condicionController = TextEditingController();
   final _descripcionController = TextEditingController();
+  final _sistolicaCtrl = TextEditingController();
+  final _diastolicaCtrl = TextEditingController();
+  final _pulsoCtrl = TextEditingController();
+  final _temperaturaCtrl = TextEditingController();
+  final _saturacionCtrl = TextEditingController();
 
   final List<String> _condiciones = [];
   final List<DocumentoAdjunto> _adjuntos = [];
@@ -35,6 +42,11 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     _motivoController.dispose();
     _condicionController.dispose();
     _descripcionController.dispose();
+    _sistolicaCtrl.dispose();
+    _diastolicaCtrl.dispose();
+    _pulsoCtrl.dispose();
+    _temperaturaCtrl.dispose();
+    _saturacionCtrl.dispose();
     super.dispose();
   }
 
@@ -70,6 +82,17 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     });
   }
 
+  SignosVitales? _buildSignosVitales() {
+    final sv = SignosVitales(
+      presionSistolica: int.tryParse(_sistolicaCtrl.text.trim()),
+      presionDiastolica: int.tryParse(_diastolicaCtrl.text.trim()),
+      pulso: int.tryParse(_pulsoCtrl.text.trim()),
+      temperatura: double.tryParse(_temperaturaCtrl.text.trim()),
+      saturacionO2: int.tryParse(_saturacionCtrl.text.trim()),
+    );
+    return sv.estaVacia ? null : sv;
+  }
+
   void _guardar() {
     if (!_formKey.currentState!.validate()) return;
     context.read<ConsultaCubit>().crearConsulta(
@@ -79,6 +102,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
       motivoConsulta: _motivoController.text.trim(),
       tempCondiciones: _condiciones,
       adjuntos: _adjuntos,
+      signosVitales: _buildSignosVitales(),
     );
   }
 
@@ -210,6 +234,43 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          _FormCard(
+            ac: ac,
+            icon: Icons.monitor_heart_outlined,
+            iconColor: ac.red,
+            title: 'Signos vitales',
+            subtitle: 'Presión, pulso, temperatura y saturación (opcionales)',
+            child: Row(
+              children: [
+                Expanded(
+                  child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _campoVital(
+                    ac,
+                    _temperaturaCtrl,
+                    'Temp °C',
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _campoVital(ac, _saturacionCtrl, 'Sat %'),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 32),
 
           BlocBuilder<ConsultaCubit, ConsultaState>(
@@ -226,6 +287,26 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
       ),
     );
   }
+
+  Widget _campoVital(
+    AppColors c,
+    TextEditingController ctrl,
+    String hint, {
+    bool decimal = false,
+  }) =>
+      TextField(
+        controller: ctrl,
+        keyboardType: decimal
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : TextInputType.number,
+        inputFormatters: [
+          decimal
+              ? FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+              : FilteringTextInputFormatter.digitsOnly,
+        ],
+        decoration: _fieldDecoration(c, hint: hint),
+        textAlign: TextAlign.center,
+      );
 
   InputDecoration _fieldDecoration(AppColors ac, {required String hint}) =>
       InputDecoration(

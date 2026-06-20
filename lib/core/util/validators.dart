@@ -2,7 +2,7 @@
 ///
 /// Contiene validadores reutilizables para campos críticos del formulario,
 /// incluyendo el validador de cédula según el algoritmo oficial de la JCE.
-library validators;
+library;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDACIÓN DE CÉDULA (Algoritmo JCE / Módulo 10 / Luhn)

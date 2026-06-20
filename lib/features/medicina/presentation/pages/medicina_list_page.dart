@@ -403,7 +403,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
             itemCount: _filtered.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (_, i) => _MedicinaRow(
               medicina: _filtered[i],
               onEdit: () => _openForm(medicina: _filtered[i]),

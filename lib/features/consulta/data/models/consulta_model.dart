@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/data/models/documento_clinico_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/models/odontograma_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
@@ -16,6 +17,7 @@ class ConsultaModel extends Consulta {
     super.tempCondiciones,
     super.motivoConsulta,
     super.notas,
+    super.signosVitales,
     super.tienePreFactura,
   });
 
@@ -28,6 +30,11 @@ class ConsultaModel extends Consulta {
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       motivoConsulta: json['motivo_consulta'] ?? json['motivoConsulta'],
       notas: json['notas'] as String?,
+      signosVitales: json['signos_vitales'] != null
+          ? SignosVitales.fromJson(
+              json['signos_vitales'] as Map<String, dynamic>,
+            )
+          : null,
       recetas: json['recetas'] != null
           ? (json['recetas'] as List)
                 .map((x) => RecetaModel.fromJson(x))
@@ -64,6 +71,7 @@ class ConsultaModel extends Consulta {
       'fecha': fecha.toUtc().toIso8601String(),
       'motivo_consulta': motivoConsulta,
       'temp_condiciones': tempCondiciones,
+      'signos_vitales': signosVitales?.toJson(),
       'tiene_pre_factura': tienePreFactura,
     };
 

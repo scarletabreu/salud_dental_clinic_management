@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 
@@ -41,6 +42,15 @@ class ConsultaDetallePage extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               children: [
                 _cardDatosGenerales(context),
+                if (consulta.signosVitales != null &&
+                    !consulta.signosVitales!.estaVacia) ...[
+                  const SizedBox(height: 16),
+                  _seccion(
+                    context,
+                    'Signos vitales',
+                    _widgetSignosVitales(context, consulta.signosVitales!),
+                  ),
+                ],
                 if (consulta.tempCondiciones.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _seccion(
@@ -218,6 +228,34 @@ class ConsultaDetallePage extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+
+  Widget _widgetSignosVitales(BuildContext context, SignosVitales sv) {
+    final filas = <Widget>[];
+
+    void agregar(String label, String? valor) {
+      if (valor == null) return;
+      if (filas.isNotEmpty) filas.add(const SizedBox(height: 10));
+      filas.add(_fila(context, label, valor));
+    }
+
+    final ps = sv.presionSistolica;
+    final pd = sv.presionDiastolica;
+    if (ps != null && pd != null) {
+      agregar('Presión arterial', '$ps / $pd mmHg');
+    } else if (ps != null) {
+      agregar('Presión sistólica', '$ps mmHg');
+    } else if (pd != null) {
+      agregar('Presión diastólica', '$pd mmHg');
+    }
+    if (sv.pulso != null) agregar('Pulso', '${sv.pulso} lpm');
+    if (sv.temperatura != null) agregar('Temperatura', '${sv.temperatura} °C');
+    if (sv.saturacionO2 != null) agregar('Saturación O₂', '${sv.saturacionO2} %');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: filas,
     );
   }
 

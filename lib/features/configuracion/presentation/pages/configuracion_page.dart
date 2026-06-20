@@ -404,7 +404,7 @@ class _SwitchSettingRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: ac.primaryBlue,
+            activeThumbColor: ac.primaryBlue,
           ),
         ],
       ),

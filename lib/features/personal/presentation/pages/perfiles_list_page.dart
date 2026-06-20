@@ -250,7 +250,7 @@ class _PerfilesListPageState extends State<PerfilesListPage> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(28, 12, 28, 24),
               itemCount: state.filtrados.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 return PerfilCard(usuario: state.filtrados[index]);
               },

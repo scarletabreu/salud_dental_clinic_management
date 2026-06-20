@@ -278,7 +278,7 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) => TratamientoCard(
                 tratamiento: filtered[i],
                 ref: ref,

@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
 
 class TratamientoCard extends StatelessWidget {
   final Tratamiento tratamiento;
-  final WidgetRef ref;
   final VoidCallback? onEdit;
 
   const TratamientoCard({
     super.key,
     required this.tratamiento,
-    required this.ref,
     this.onEdit,
   });
 
@@ -141,15 +139,20 @@ class TratamientoCard extends StatelessWidget {
     if (onEdit != null) {
       onEdit!();
     } else {
+      final cubit = context.read<TratamientoCubit>();
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => TratamientoFormDialog(tratamiento: tratamiento),
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: TratamientoFormDialog(tratamiento: tratamiento),
+        ),
       );
     }
   }
 
   void _confirmarEliminacion(BuildContext context) {
+    final cubit = context.read<TratamientoCubit>();
     final ac = context.appColors;
     showDialog(
       context: context,
@@ -221,9 +224,7 @@ class TratamientoCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: () {
-                        ref
-                            .read(tratamientoProvider.notifier)
-                            .eliminarTratamiento(tratamiento.id!);
+                        cubit.eliminarTratamiento(tratamiento.id!);
                         Navigator.pop(ctx);
                       },
                       icon: const Icon(Icons.delete_outline_rounded, size: 16),

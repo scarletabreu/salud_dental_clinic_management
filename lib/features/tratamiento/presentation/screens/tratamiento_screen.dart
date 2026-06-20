@@ -1,32 +1,37 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_state.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_card.dart';
 
-class TratamientosScreen extends ConsumerStatefulWidget {
+class TratamientosScreen extends StatelessWidget {
   const TratamientosScreen({super.key});
 
   @override
-  ConsumerState<TratamientosScreen> createState() => _TratamientosScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<TratamientoCubit>()..loadTratamientos(),
+      child: const _TratamientosView(),
+    );
+  }
 }
 
-class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
+class _TratamientosView extends StatefulWidget {
+  const _TratamientosView();
+
+  @override
+  State<_TratamientosView> createState() => _TratamientosViewState();
+}
+
+class _TratamientosViewState extends State<_TratamientosView> {
   final _searchController = TextEditingController();
   Timer? _debounce;
   String _query = '';
-
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(
-      () => ref.read(tratamientoProvider.notifier).loadTratamientos(),
-    );
-  }
 
   @override
   void dispose() {
@@ -48,34 +53,42 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
   }
 
   void _abrirFormulario([Tratamiento? tratamiento]) {
+    final cubit = context.read<TratamientoCubit>();
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => TratamientoFormDialog(tratamiento: tratamiento),
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: TratamientoFormDialog(tratamiento: tratamiento),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final state = ref.watch(tratamientoProvider);
-
-    ref.listen<TratamientoState>(tratamientoProvider, (_, next) {
-      if (next is TratamientoError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.message), backgroundColor: ac.red),
-        );
-      }
-    });
-
-    return ColoredBox(
-      color: ac.bgPage,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeaderAndSearch(ac, state),
-          Expanded(child: _buildBody(ac, state)),
-        ],
+    return BlocListener<TratamientoCubit, TratamientoState>(
+      listener: (context, state) {
+        if (state is TratamientoError) {
+          final ac = context.appColors;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message), backgroundColor: ac.red),
+          );
+        }
+      },
+      child: BlocBuilder<TratamientoCubit, TratamientoState>(
+        builder: (context, state) {
+          final ac = context.appColors;
+          return ColoredBox(
+            color: ac.bgPage,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderAndSearch(ac, state),
+                Expanded(child: _buildBody(context, ac, state)),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -217,7 +230,11 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
     );
   }
 
-  Widget _buildBody(AppColors ac, TratamientoState state) {
+  Widget _buildBody(
+    BuildContext context,
+    AppColors ac,
+    TratamientoState state,
+  ) {
     if (state is TratamientoLoading) {
       return Center(child: CircularProgressIndicator(color: ac.primaryBlue));
     }
@@ -237,7 +254,7 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: () =>
-                  ref.read(tratamientoProvider.notifier).loadTratamientos(),
+                  context.read<TratamientoCubit>().loadTratamientos(),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Reintentar'),
             ),
@@ -281,7 +298,6 @@ class _TratamientosScreenState extends ConsumerState<TratamientosScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) => TratamientoCard(
                 tratamiento: filtered[i],
-                ref: ref,
                 onEdit: () => _abrirFormulario(filtered[i]),
               ),
             ),

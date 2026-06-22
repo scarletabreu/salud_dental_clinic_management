@@ -44,6 +44,7 @@ class Consulta {
       false;
 
   Consulta copyWith({
+    String? id,
     String? pacienteId,
     String? doctorId,
     DateTime? fecha,
@@ -58,7 +59,7 @@ class Consulta {
     bool? tienePreFactura,
   }) {
     return Consulta(
-      id: id,
+      id: id ?? this.id,
       pacienteId: pacienteId ?? this.pacienteId,
       doctorId: doctorId ?? this.doctorId,
       citaId: citaId ?? this.citaId,

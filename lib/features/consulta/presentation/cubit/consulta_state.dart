@@ -1,35 +1,46 @@
 import 'package:equatable/equatable.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 
-abstract class ConsultaState extends Equatable {
+sealed class ConsultaState extends Equatable {
   const ConsultaState();
 
   @override
   List<Object?> get props => [];
 }
 
-/// Estado inicial, antes de intentar guardar.
-class ConsultaInitial extends ConsultaState {
-  const ConsultaInitial();
+/// Estado inicial, antes de iniciar o cargar la consulta clínica.
+class ConsultaInactiva extends ConsultaState {
+  const ConsultaInactiva();
 }
 
-/// Guardando: subiendo documentos y ejecutando el RPC transaccional.
-class ConsultaLoading extends ConsultaState {
-  const ConsultaLoading();
+/// La consulta está activa en memoria. Contiene el odontograma, recetas, notas y signos vitales.
+class ConsultaIniciada extends ConsultaState {
+  final Consulta consulta;
+
+  const ConsultaIniciada({
+    required this.consulta,
+  });
+
+  @override
+  List<Object?> get props => [consulta];
 }
 
-/// La consulta (con odontograma, dientes y superficies) quedó creada; se pasa
-/// al workspace clínico (odontograma, tratamientos, notas).
-class ConsultaCreada extends ConsultaState {
-  const ConsultaCreada();
+/// Guardando la consulta (parcial o finalización).
+class ConsultaGuardando extends ConsultaState {
+  final Consulta? consulta;
+
+  const ConsultaGuardando({this.consulta});
+
+  @override
+  List<Object?> get props => [consulta];
 }
 
-/// El doctor finalizó la consulta ("Terminar consulta"); si venía de una cita,
-/// esta se marcó como completada.
+/// La consulta se finalizó con éxito.
 class ConsultaTerminada extends ConsultaState {
   const ConsultaTerminada();
 }
 
-/// Falló la operación; no se registró nada (sin huérfanos).
+/// Falló la operación u ocurrió un error.
 class ConsultaError extends ConsultaState {
   final String message;
 

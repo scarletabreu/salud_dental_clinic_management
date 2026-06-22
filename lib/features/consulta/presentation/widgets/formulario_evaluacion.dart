@@ -95,7 +95,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
 
   void _guardar() {
     if (!_formKey.currentState!.validate()) return;
-    context.read<ConsultaCubit>().crearConsulta(
+    context.read<ConsultaCubit>().iniciar(
       pacienteId: widget.pacienteId,
       doctorId: widget.doctorId,
       citaId: widget.citaId,
@@ -275,7 +275,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
 
           BlocBuilder<ConsultaCubit, ConsultaState>(
             builder: (context, state) {
-              final cargando = state is ConsultaLoading;
+              final cargando = state is ConsultaGuardando;
               return _IniciarButton(
                 cargando: cargando,
                 onTap: cargando ? null : _guardar,

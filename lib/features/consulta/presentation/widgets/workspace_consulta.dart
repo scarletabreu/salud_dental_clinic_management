@@ -2,20 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
-import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -26,7 +22,6 @@ class WorkspaceConsulta extends StatefulWidget {
 }
 
 class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
-  late Odontograma _odontograma;
   final _notasController = TextEditingController();
 
   List<Tratamiento> _catalogo = const [];
@@ -35,8 +30,18 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   @override
   void initState() {
     super.initState();
-    _odontograma = _odontogramaInicial();
     _cargarCatalogo();
+    
+    final state = context.read<ConsultaCubit>().state;
+    if (state is ConsultaIniciada && state.consulta.notas != null) {
+      _notasController.text = state.consulta.notas!;
+    } else if (state is ConsultaGuardando && state.consulta?.notas != null) {
+      _notasController.text = state.consulta!.notas!;
+    }
+
+    _notasController.addListener(() {
+      context.read<ConsultaCubit>().actualizarObservaciones(_notasController.text);
+    });
   }
 
   @override
@@ -45,25 +50,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     super.dispose();
   }
 
-  Odontograma _odontogramaInicial() {
-    return Odontograma(
-      consultaId: '',
-      dientes: kFdiPermanentes.map((fdi) {
-        return Diente(
-          odontogramaId: '',
-          fdiCode: fdi,
-          superficies: superficiesParaFdi(fdi)
-              .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
-              .toList(),
-        );
-      }).toList(),
-    );
-  }
-
   Future<void> _cargarCatalogo() async {
     try {
-      final catalogo = await sl<TratamientoRepository>()
-          .getCatalogoTratamientos();
+      final catalogo = await sl<TratamientoRepository>().getCatalogoTratamientos();
       if (!mounted) return;
       setState(() {
         _catalogo = catalogo;
@@ -83,10 +72,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     return '';
   }
 
-  Future<void> _onAddTratamiento(
-    Diente diente,
-    TipoSuperficie? superficie,
-  ) async {
+  Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? superficie) async {
     if (_cargandoCatalogo) return;
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
     if (tratamiento == null || !mounted) return;
@@ -98,30 +84,12 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     );
     if (!ok || !mounted) return;
 
-    final aplicado = TratamientoAplicado(
-      tratamientoId: tratamiento.id ?? '',
-      esContinuo: false,
-      estaTerminado: false,
-      superficie: superficie,
-      precioAplicado: tratamiento.costo,
-    );
-    setState(() {
-      _odontograma = _odontograma.copyWith(
-        dientes: _odontograma.dientes
-            .map(
-              (d) => d.fdiCode == diente.fdiCode
-                  ? d.copyWith(tratamientos: [...d.tratamientos, aplicado])
-                  : d,
-            )
-            .toList(),
-      );
-    });
+    context.read<ConsultaCubit>().aplicarTratamiento(diente, superficie, tratamiento);
+    
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '"${tratamiento.nombre}" asignado al diente ${diente.fdiCode}.',
-        ),
+        content: Text('"${tratamiento.nombre}" asignado al diente ${diente.fdiCode}.'),
         backgroundColor: context.appColors.teal,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -130,297 +98,284 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   }
 
   void _onToggleAusente(Diente diente, bool ausente) {
-    setState(() {
-      _odontograma = _odontograma.copyWith(
-        dientes: _odontograma.dientes
-            .map(
-              (d) => d.fdiCode == diente.fdiCode
-                  ? d.copyWith(estaAusente: ausente)
-                  : d,
-            )
-            .toList(),
-      );
-    });
+    context.read<ConsultaCubit>().toggleDienteAusente(diente, ausente);
   }
-
-  int get _totalTratamientos =>
-      _odontograma.dientes.fold(0, (sum, d) => sum + d.tratamientos.length);
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: ac.teal,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                '02',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Consulta en curso',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: ac.textPrimary,
-                      letterSpacing: -0.5,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Registra tratamientos en el odontograma y añade tus notas',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: ac.textMuted,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_totalTratamientos > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: ac.teal.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: ac.teal.withValues(alpha: 0.25),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.healing_rounded, size: 12, color: ac.teal),
-                    const SizedBox(width: 5),
-                    Text(
-                      '$_totalTratamientos tratamiento${_totalTratamientos > 1 ? 's' : ''}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: ac.teal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 24),
+    return BlocBuilder<ConsultaCubit, ConsultaState>(
+      buildWhen: (previous, current) => 
+          current is ConsultaIniciada || current is ConsultaGuardando || current is ConsultaError,
+      builder: (context, state) {
+        if (state is! ConsultaIniciada && state is! ConsultaGuardando) {
+          return Center(
+            child: CircularProgressIndicator(color: ac.primaryBlue),
+          );
+        }
 
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: ac.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
-            boxShadow: [ac.cardShadow],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
+        final consulta = state is ConsultaIniciada 
+            ? state.consulta 
+            : (state as ConsultaGuardando).consulta;
+            
+        if (consulta == null || consulta.odontograma == null) {
+          return const Center(child: Text('Odontograma no disponible'));
+        }
+        
+        final odontograma = consulta.odontograma!;
+        final totalTratamientos = odontograma.dientes.fold(0, (sum, d) => sum + d.tratamientos.length);
+        final cargando = state is ConsultaGuardando;
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: ac.teal,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '02',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Consulta en curso',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: ac.textPrimary,
+                          letterSpacing: -0.5,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Registra tratamientos en el odontograma y añade tus notas',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ac.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (totalTratamientos > 0)
                   Container(
-                    width: 34,
-                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: ac.teal.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: ac.teal.withValues(alpha: 0.25), width: 1),
                     ),
-                    child: Icon(
-                      Icons.grid_view_rounded,
-                      size: 17,
-                      color: ac.teal,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.healing_rounded, size: 12, color: ac.teal),
+                        const SizedBox(width: 5),
                         Text(
-                          'Odontograma',
+                          '$totalTratamientos tratamiento${totalTratamientos > 1 ? 's' : ''}',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: ac.textPrimary,
-                            height: 1,
+                            color: ac.teal,
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Toca un diente para asignar tratamientos',
-                          style: TextStyle(fontSize: 11, color: ac.textMuted),
                         ),
                       ],
                     ),
                   ),
-                  if (_cargandoCatalogo)
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: ac.teal,
-                      ),
-                    ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 24),
+    
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: ac.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
+                boxShadow: [ac.cardShadow],
               ),
-              const SizedBox(height: 16),
-              Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
-              const SizedBox(height: 16),
-              OdontogramWidget(
-                odontograma: _odontograma,
-                editMode: true,
-                onAddTratamiento: _onAddTratamiento,
-                onToggleAusente: _onToggleAusente,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: ac.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
-            boxShadow: [ac.cardShadow],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: ac.indigo.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.edit_note_rounded,
-                      size: 17,
-                      color: ac.indigo,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Text(
-                        'Notas clínicas',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: ac.textPrimary,
-                          height: 1,
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: ac.teal.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.grid_view_rounded, size: 17, color: ac.teal),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Odontograma',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: ac.textPrimary,
+                                height: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Toca un diente para asignar tratamientos',
+                              style: TextStyle(fontSize: 11, color: ac.textMuted),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Observaciones para el expediente',
-                        style: TextStyle(fontSize: 11, color: ac.textMuted),
+                      if (_cargandoCatalogo)
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: ac.teal),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
+                  const SizedBox(height: 16),
+                  OdontogramWidget(
+                    odontograma: odontograma,
+                    editMode: true,
+                    onAddTratamiento: _onAddTratamiento,
+                    onToggleAusente: _onToggleAusente,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+    
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: ac.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
+                boxShadow: [ac.cardShadow],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: ac.indigo.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.edit_note_rounded, size: 17, color: ac.indigo),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Notas clínicas',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: ac.textPrimary,
+                              height: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Observaciones para el expediente',
+                            style: TextStyle(fontSize: 11, color: ac.textMuted),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: cargando ? null : () => context.read<ConsultaCubit>().guardarParcial(),
+                        icon: const Icon(Icons.save_outlined, size: 16),
+                        label: const Text('Guardar avance'),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _notasController,
+                    minLines: 4,
+                    maxLines: 7,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: ac.textPrimary,
+                      height: 1.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Observaciones, hallazgos adicionales, indicaciones…',
+                      hintStyle: TextStyle(
+                        color: ac.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      filled: true,
+                      fillColor: ac.bgPage,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: ac.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: ac.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: ac.indigo, width: 1.5),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _notasController,
-                minLines: 4,
-                maxLines: 7,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: ac.textPrimary,
-                  height: 1.5,
-                ),
-                decoration: InputDecoration(
-                  hintText:
-                      'Observaciones, hallazgos adicionales, indicaciones…',
-                  hintStyle: TextStyle(
-                    color: ac.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  filled: true,
-                  fillColor: ac.bgPage,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 13,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ac.divider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ac.divider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ac.indigo, width: 1.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        _ProximamenteCard(ac),
-        const SizedBox(height: 28),
-
-        BlocBuilder<ConsultaCubit, ConsultaState>(
-          builder: (context, state) {
-            final cargando = state is ConsultaLoading;
-            return _TerminarButton(
+            ),
+            const SizedBox(height: 16),
+    
+            _ProximamenteCard(ac),
+            const SizedBox(height: 28),
+    
+            _TerminarButton(
               cargando: cargando,
               onTap: cargando
                   ? null
-                  : () => context.read<ConsultaCubit>().terminarConsulta(
-                      citaId: widget.citaId,
-                      odontograma: _odontograma,
-                      notas: _notasController.text,
-                    ),
+                  : () => context.read<ConsultaCubit>().terminarConsulta(citaId: widget.citaId),
               ac: ac,
-            );
-          },
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

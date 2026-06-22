@@ -127,7 +127,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   }
 
   void _onConsultaState(BuildContext context, ConsultaState state) {
-    if (state is ConsultaCreada) {
+    if (state is ConsultaIniciada || state is ConsultaGuardando) {
       setState(() => _enWorkspace = true);
     } else if (state is ConsultaTerminada) {
       ScaffoldMessenger.of(context).showSnackBar(

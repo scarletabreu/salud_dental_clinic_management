@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'core/di/service_locator.dart' as di;
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
@@ -20,7 +19,7 @@ Future<void> main() async {
   );
 
   await di.init();
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

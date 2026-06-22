@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 
-class TratamientoFormDialog extends ConsumerStatefulWidget {
+class TratamientoFormDialog extends StatefulWidget {
   final Tratamiento? tratamiento;
   const TratamientoFormDialog({super.key, this.tratamiento});
 
   @override
-  ConsumerState<TratamientoFormDialog> createState() =>
-      _TratamientoFormDialogState();
+  State<TratamientoFormDialog> createState() => _TratamientoFormDialogState();
 }
 
-class _TratamientoFormDialogState extends ConsumerState<TratamientoFormDialog> {
+class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
@@ -57,8 +56,8 @@ class _TratamientoFormDialogState extends ConsumerState<TratamientoFormDialog> {
       contraindicaciones: widget.tratamiento?.contraindicaciones ?? [],
     );
 
-    final exito = await ref
-        .read(tratamientoProvider.notifier)
+    final exito = await context
+        .read<TratamientoCubit>()
         .guardarTratamiento(tratamiento);
     if (mounted) {
       setState(() => _saving = false);

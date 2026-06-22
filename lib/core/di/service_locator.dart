@@ -126,6 +126,7 @@ import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/
 import '../../features/tratamiento/data/datasources/tratamiento_remote_datasource.dart';
 import '../../features/tratamiento/data/repositories/tratamiento_repository_impl.dart';
 import '../../features/tratamiento/domain/repositories/tratamiento_repository.dart';
+import '../../features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -329,5 +330,8 @@ Future<void> init() async {
 
   sl.registerFactory<PersonalPerfilesCubit>(
     () => PersonalPerfilesCubit(usuarioRepository: sl<UsuarioRepository>()),
+  );
+  sl.registerFactory<TratamientoCubit>(
+    () => TratamientoCubit(sl<TratamientoRepository>()),
   );
 }

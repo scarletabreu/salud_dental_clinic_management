@@ -49,29 +49,46 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
             .eq('id', consultaId);
       }
 
-      if (tratamientosPorFdi.isNotEmpty) {
-        final odontograma = await supabaseClient
-            .from('odontogramas')
-            .select('id, dientes(id, fdi_code)')
-            .eq('consulta_id', consultaId)
-            .isFilter('deleted_at', null)
-            .maybeSingle();
-        if (odontograma == null) {
-          throw Exception('No se encontró el odontograma de la consulta.');
-        }
-        final dienteIdPorFdi = <int, String>{
-          for (final d in (odontograma['dientes'] as List))
-            (d['fdi_code'] as num).toInt(): d['id'] as String,
-        };
+      final odontograma = await supabaseClient
+          .from('odontogramas')
+          .select('id, dientes(id, fdi_code, tratamientos_aplicados_ids)')
+          .eq('consulta_id', consultaId)
+          .isFilter('deleted_at', null)
+          .maybeSingle();
+      if (odontograma == null) {
+        // Sin odontograma no hay dónde colgar tratamientos. Si tampoco hay
+        // nada que guardar, terminamos en silencio (p. ej. guardar solo notas).
+        if (tratamientosPorFdi.isEmpty) return;
+        throw Exception('No se encontró el odontograma de la consulta.');
+      }
 
-        for (final entry in tratamientosPorFdi.entries) {
-          final dienteId = dienteIdPorFdi[entry.key];
-          if (dienteId == null) continue;
+      final dientes = odontograma['dientes'] as List;
 
+      // Reemplazo idempotente: borramos los tratamientos aplicados de ESTA
+      // consulta y los reinsertamos desde el estado en memoria (fuente de
+      // verdad). Así guardar avance N veces no duplica filas ni deja huérfanos.
+      await supabaseClient
+          .from('tratamientos_aplicados')
+          .delete()
+          .eq('consulta_id', consultaId);
+
+      for (final d in dientes) {
+        final fdi = (d['fdi_code'] as num).toInt();
+        final dienteId = d['id'] as String;
+        final actualesIds =
+            (d['tratamientos_aplicados_ids'] as List?)?.cast<String>() ??
+                const [];
+        final filas = tratamientosPorFdi[fdi] ?? const [];
+
+        // Nada que poner ni que limpiar en este diente: no lo tocamos.
+        if (filas.isEmpty && actualesIds.isEmpty) continue;
+
+        var nuevosIds = const <String>[];
+        if (filas.isNotEmpty) {
           final insertados = await supabaseClient
               .from('tratamientos_aplicados')
               .insert([
-                for (final fila in entry.value)
+                for (final fila in filas)
                   {
                     ...fila,
                     'diente_id': dienteId,
@@ -81,17 +98,18 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
                   },
               ])
               .select('id');
-
-          await supabaseClient
-              .from('dientes')
-              .update({
-                'tratamientos_aplicados_ids': [
-                  for (final row in insertados as List) row['id'] as String,
-                ],
-                'updated_at': now,
-              })
-              .eq('id', dienteId);
+          nuevosIds = [
+            for (final row in insertados as List) row['id'] as String,
+          ];
         }
+
+        await supabaseClient
+            .from('dientes')
+            .update({
+              'tratamientos_aplicados_ids': nuevosIds,
+              'updated_at': now,
+            })
+            .eq('id', dienteId);
       }
     } on PostgrestException catch (e) {
       throw Exception(

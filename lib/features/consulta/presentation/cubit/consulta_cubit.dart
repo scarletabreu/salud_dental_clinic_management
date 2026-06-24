@@ -162,6 +162,51 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  /// Quita el tratamiento en [index] del diente (solo en memoria; nada se ha
+  /// persistido aún mientras la consulta sigue activa).
+  void quitarTratamiento(Diente diente, int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odonto = actual.odontograma;
+    if (odonto == null) return;
+
+    final nuevoOdontograma = odonto.copyWith(
+      dientes: odonto.dientes.map((d) {
+        if (d.fdiCode != diente.fdiCode) return d;
+        if (index < 0 || index >= d.tratamientos.length) return d;
+        final nuevos = [...d.tratamientos]..removeAt(index);
+        return d.copyWith(tratamientos: nuevos);
+      }).toList(),
+    );
+
+    emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+  }
+
+  /// Marca el tratamiento en [index] como terminado o en proceso.
+  void marcarTratamientoTerminado(Diente diente, int index, bool terminado) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odonto = actual.odontograma;
+    if (odonto == null) return;
+
+    final nuevoOdontograma = odonto.copyWith(
+      dientes: odonto.dientes.map((d) {
+        if (d.fdiCode != diente.fdiCode) return d;
+        if (index < 0 || index >= d.tratamientos.length) return d;
+        final nuevos = [
+          for (var i = 0; i < d.tratamientos.length; i++)
+            if (i == index)
+              d.tratamientos[i].copyWith(estaTerminado: terminado)
+            else
+              d.tratamientos[i],
+        ];
+        return d.copyWith(tratamientos: nuevos);
+      }).toList(),
+    );
+
+    emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+  }
+
   void toggleDienteAusente(Diente diente, bool ausente) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;

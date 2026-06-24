@@ -25,6 +25,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   final _notasController = TextEditingController();
 
   List<Tratamiento> _catalogo = const [];
+  Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
 
   @override
@@ -56,6 +57,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       if (!mounted) return;
       setState(() {
         _catalogo = catalogo;
+        _nombrePorId = {
+          for (final t in catalogo)
+            if (t.id != null) t.id!: t.nombre,
+        };
         _cargandoCatalogo = false;
       });
     } catch (_) {
@@ -99,6 +104,45 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
   void _onToggleAusente(Diente diente, bool ausente) {
     context.read<ConsultaCubit>().toggleDienteAusente(diente, ausente);
+  }
+
+  String _nombreTratamiento(String tratamientoId) =>
+      _nombrePorId[tratamientoId] ?? 'Tratamiento';
+
+  void _onToggleTerminado(Diente diente, int index, bool terminado) {
+    context.read<ConsultaCubit>().marcarTratamientoTerminado(
+          diente,
+          index,
+          terminado,
+        );
+  }
+
+  Future<void> _onQuitarTratamiento(Diente diente, int index) async {
+    final ac = context.appColors;
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Quitar tratamiento'),
+        content: Text(
+          '¿Quitar este tratamiento del diente ${diente.fdiCode}?',
+          style: TextStyle(color: ac.textSecondary, fontSize: 13, height: 1.3),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: ac.red),
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+    context.read<ConsultaCubit>().quitarTratamiento(diente, index);
   }
 
   @override
@@ -266,6 +310,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     editMode: true,
                     onAddTratamiento: _onAddTratamiento,
                     onToggleAusente: _onToggleAusente,
+                    onQuitarTratamiento: _onQuitarTratamiento,
+                    onToggleTratamientoTerminado: _onToggleTerminado,
+                    nombreTratamiento: _nombreTratamiento,
                   ),
                 ],
               ),

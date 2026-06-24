@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/s
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'tooth_geometry.dart';
 
 // ─────────────────────────────────────────────
@@ -50,6 +51,20 @@ ToothStatus statusForDiente(Diente? d) {
   }
   if (d.superficies.any((s) => s.diagnosisId != null)) return ToothStatus.mild;
   return ToothStatus.empty;
+}
+
+/// Indicador de los tratamientos aplicados en vivo sobre un diente:
+/// ámbar si hay alguno en proceso, verde si todos están terminados.
+enum TratamientoIndicador { ninguno, enProceso, finalizado }
+
+TratamientoIndicador indicadorTratamiento(Diente? d) {
+  if (d == null || d.estaAusente || d.tratamientos.isEmpty) {
+    return TratamientoIndicador.ninguno;
+  }
+  final hayEnProceso = d.tratamientos.any((t) => !t.estaTerminado);
+  return hayEnProceso
+      ? TratamientoIndicador.enProceso
+      : TratamientoIndicador.finalizado;
 }
 
 // ─────────────────────────────────────────────
@@ -190,6 +205,21 @@ class _OdontogramPainter extends CustomPainter {
         canvas,
         p.labelPos.translate(-tp.width / 2, -tp.height / 2),
       );
+
+      final indic = indicadorTratamiento(d);
+      if (indic != TratamientoIndicador.ninguno) {
+        final dotColor = indic == TratamientoIndicador.enProceso
+            ? _kToothAmber
+            : _kToothGreen;
+        final dotCenter = p.center.translate(
+          p.size.width * 0.34,
+          -p.size.height * 0.34,
+        );
+        final r = (p.size.width * 0.12).clamp(2.2, 5.0);
+        // Halo blanco para que el punto resalte sobre el contorno del diente.
+        canvas.drawCircle(dotCenter, r + 1.2, Paint()..color = Colors.white);
+        canvas.drawCircle(dotCenter, r, Paint()..color = dotColor);
+      }
     });
   }
 
@@ -213,6 +243,9 @@ class _ToothDetailPanel extends StatefulWidget {
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, bool)? onToggleAusente;
+  final void Function(Diente, int index)? onQuitarTratamiento;
+  final void Function(Diente, int index, bool terminado)? onToggleTerminado;
+  final String Function(String tratamientoId)? nombreTratamiento;
 
   const _ToothDetailPanel({
     super.key,
@@ -223,6 +256,9 @@ class _ToothDetailPanel extends StatefulWidget {
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
+    this.onQuitarTratamiento,
+    this.onToggleTerminado,
+    this.nombreTratamiento,
   });
 
   @override
@@ -339,6 +375,9 @@ class _ToothDetailPanelState extends State<_ToothDetailPanel> {
             selectedSurface: _selectedSurface,
             onAddDiagnosis: widget.onAddDiagnosis,
             onAddTratamiento: widget.onAddTratamiento,
+            onQuitarTratamiento: widget.onQuitarTratamiento,
+            onToggleTerminado: widget.onToggleTerminado,
+            nombreTratamiento: widget.nombreTratamiento,
           ),
         ],
       ),
@@ -557,6 +596,9 @@ class _ToothInfoPanel extends StatelessWidget {
   final TipoSuperficie? selectedSurface;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
+  final void Function(Diente, int index)? onQuitarTratamiento;
+  final void Function(Diente, int index, bool terminado)? onToggleTerminado;
+  final String Function(String tratamientoId)? nombreTratamiento;
 
   const _ToothInfoPanel({
     required this.diente,
@@ -564,6 +606,9 @@ class _ToothInfoPanel extends StatelessWidget {
     required this.selectedSurface,
     required this.onAddDiagnosis,
     required this.onAddTratamiento,
+    this.onQuitarTratamiento,
+    this.onToggleTerminado,
+    this.nombreTratamiento,
   });
 
   @override
@@ -646,27 +691,18 @@ class _ToothInfoPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          ...d.tratamientos.map(
-            (t) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    t.estaTerminado
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.pending_outlined,
-                    size: 14,
-                    color: t.estaTerminado ? _kToothGreen : _kToothAmber,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      t.esContinuo ? 'Tratamiento continuo' : 'Tratamiento puntual',
-                      style: TextStyle(fontSize: 12, color: ac.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
+          ...d.tratamientos.asMap().entries.map(
+            (e) => _TratamientoAplicadoRow(
+              nombre: nombreTratamiento?.call(e.value.tratamientoId) ??
+                  'Tratamiento',
+              tratamiento: e.value,
+              editMode: editMode,
+              onToggleTerminado: onToggleTerminado == null
+                  ? null
+                  : () => onToggleTerminado!(d, e.key, !e.value.estaTerminado),
+              onQuitar: onQuitarTratamiento == null
+                  ? null
+                  : () => onQuitarTratamiento!(d, e.key),
             ),
           ),
         ],
@@ -731,6 +767,99 @@ class _ToothInfoPanel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
+//  Applied treatment row (name · estado · quitar)
+// ─────────────────────────────────────────────
+
+class _TratamientoAplicadoRow extends StatelessWidget {
+  final String nombre;
+  final TratamientoAplicado tratamiento;
+  final bool editMode;
+  final VoidCallback? onToggleTerminado;
+  final VoidCallback? onQuitar;
+
+  const _TratamientoAplicadoRow({
+    required this.nombre,
+    required this.tratamiento,
+    required this.editMode,
+    this.onToggleTerminado,
+    this.onQuitar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final terminado = tratamiento.estaTerminado;
+    final estadoColor = terminado ? _kToothGreen : _kToothAmber;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(
+            terminado
+                ? Icons.check_circle_outline_rounded
+                : Icons.pending_outlined,
+            size: 14,
+            color: estadoColor,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              nombre,
+              style: TextStyle(fontSize: 12, color: ac.textSecondary),
+            ),
+          ),
+          if (editMode) ...[
+            GestureDetector(
+              onTap: onToggleTerminado,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: estadoColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  terminado ? 'Terminado' : 'En proceso',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: estadoColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: onQuitar,
+              child: Icon(
+                Icons.delete_outline_rounded,
+                size: 16,
+                color: _kToothRed.withValues(alpha: 0.75),
+              ),
+            ),
+          ] else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: estadoColor.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                terminado ? 'Terminado' : 'En proceso',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: estadoColor,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
 //  Main widget
 // ─────────────────────────────────────────────
 
@@ -741,6 +870,9 @@ class OdontogramWidget extends StatefulWidget {
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, bool ausente)? onToggleAusente;
+  final void Function(Diente, int index)? onQuitarTratamiento;
+  final void Function(Diente, int index, bool terminado)? onToggleTratamientoTerminado;
+  final String Function(String tratamientoId)? nombreTratamiento;
 
   const OdontogramWidget({
     super.key,
@@ -750,6 +882,9 @@ class OdontogramWidget extends StatefulWidget {
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
+    this.onQuitarTratamiento,
+    this.onToggleTratamientoTerminado,
+    this.nombreTratamiento,
   });
 
   @override
@@ -833,6 +968,9 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
         onAddDiagnosis: widget.onAddDiagnosis,
         onAddTratamiento: widget.onAddTratamiento,
         onToggleAusente: widget.onToggleAusente,
+        onQuitarTratamiento: widget.onQuitarTratamiento,
+        onToggleTerminado: widget.onToggleTratamientoTerminado,
+        nombreTratamiento: widget.nombreTratamiento,
       );
 
   @override

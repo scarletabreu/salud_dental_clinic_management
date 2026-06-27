@@ -6,15 +6,17 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_card.dart';
+// Importación de la página de creación
+import 'package:salud_dental_clinic_management/features/personal/presentation/pages/crear_usuario_page.dart';
 
-class PerfilesListPage extends StatefulWidget {
-  const PerfilesListPage({super.key});
+class UsuariosListPage extends StatefulWidget {
+  const UsuariosListPage({super.key});
 
   @override
-  State<PerfilesListPage> createState() => _PerfilesListPageState();
+  State<UsuariosListPage> createState() => _UsuariosListPageState();
 }
 
-class _PerfilesListPageState extends State<PerfilesListPage> {
+class _UsuariosListPageState extends State<UsuariosListPage> {
   final _searchController = TextEditingController();
   Timer? _debounce;
 
@@ -40,6 +42,18 @@ class _PerfilesListPageState extends State<PerfilesListPage> {
     });
   }
 
+  // Método auxiliar para navegar limpiamente a la página de creación
+  void _navegarACrearUsuario() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<PersonalPerfilesCubit>(),
+          child: const CrearUsuarioPage(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -47,6 +61,15 @@ class _PerfilesListPageState extends State<PerfilesListPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
+      // Botón flotante para acceder rápidamente a la creación
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navegarACrearUsuario,
+        backgroundColor: ac.primaryBlue,
+        foregroundColor: Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.person_add_alt_1_rounded),
+      ),
       body: SafeArea(
         child: BlocBuilder<PersonalPerfilesCubit, PersonalPerfilesState>(
           builder: (context, state) {
@@ -75,13 +98,28 @@ class _PerfilesListPageState extends State<PerfilesListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Control de Perfiles',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-              letterSpacing: -0.6,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Control de Usuarios',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                  letterSpacing: -0.6,
+                ),
+              ),
+              // Botón alternativo directo en la cabecera
+              IconButton(
+                onPressed: _navegarACrearUsuario,
+                icon: Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: ac.primaryBlue,
+                  size: 28,
+                ),
+                tooltip: 'Crear nuevo usuario',
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(

@@ -19,7 +19,7 @@ import 'package:salud_dental_clinic_management/features/medicina/presentation/pa
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
-import 'package:salud_dental_clinic_management/features/personal/presentation/pages/perfiles_list_page.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
@@ -133,7 +133,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       label: 'Perfiles',
       builder: (_) => BlocProvider(
         create: (_) => sl<PersonalPerfilesCubit>(),
-        child: const PerfilesListPage(),
+        child: const UsuariosListPage(),
       ),
     ),
     ShellDestination(

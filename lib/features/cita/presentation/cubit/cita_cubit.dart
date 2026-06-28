@@ -27,6 +27,17 @@ class CitaCubit extends Cubit<CitaCubitState> {
     }
   }
 
+  bool _tieneConflictoHorario(Cita nuevaCita, List<Cita> todasLasCitas) {
+    return todasLasCitas.any((c) {
+      if (c.id == nuevaCita.id) return false;
+      if (c.doctor.id != nuevaCita.doctor.id) return false;
+      if (c.estado == EstadoCita.cancelada) return false;
+
+      return nuevaCita.date.isBefore(c.fechaFin) &&
+          c.date.isBefore(nuevaCita.fechaFin);
+    });
+  }
+
   Future<void> createCita(Cita cita) async {
     final current = state;
     if (current is! CitaCubitLoaded) return;
@@ -34,10 +45,18 @@ class CitaCubit extends Cubit<CitaCubitState> {
     try {
       emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
 
-      // 1. AGREGA ESTO PARA INSPECCIONAR EL CONTENIDO:
-      // (Asegúrate de tener un método toMap() o toJson() en tu entidad Cita)
-      print('Datos enviados a Supabase: $cita');
+      if (_tieneConflictoHorario(cita, current.citas)) {
+        emit(
+          current.copyWith(
+            isSubmitting: false,
+            errorMessage: () =>
+                'El odontólogo elegido ya tiene una cita programada en ese horario.',
+          ),
+        );
+        return;
+      }
 
+      print('Datos enviados a Supabase: $cita');
       await _repository.createCita(cita);
       await load();
     } catch (e) {
@@ -82,7 +101,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
       current.copyWith(
         selectedDay: selectedDay,
         focusedDay: focusedDay,
-        errorMessage: () => null, // Limpiamos errores al interactuar
+        errorMessage: () => null,
       ),
     );
   }

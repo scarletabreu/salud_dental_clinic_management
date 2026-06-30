@@ -8,6 +8,12 @@ class Diente {
   final List<Superficie> superficies;
   final List<TratamientoAplicado> tratamientos;
 
+  /// Tratamientos aplicados en consultas ANTERIORES del paciente, proyectados
+  /// sobre este odontograma para dar contexto clínico acumulado. Es una capa de
+  /// solo lectura: nunca se persiste desde aquí (el guardado solo toca
+  /// [tratamientos], la capa "esta consulta").
+  final List<TratamientoAplicado> tratamientosHistoricos;
+
   /// Ids de `tratamientos_aplicados` vinculados en la BD
   /// (`dientes.tratamientos_aplicados_ids`); las entidades completas se
   /// cargan aparte cuando hacen falta.
@@ -22,6 +28,7 @@ class Diente {
     required this.odontogramaId,
     required this.superficies,
     this.tratamientos = const [],
+    this.tratamientosHistoricos = const [],
     this.tratamientosAplicadosIds = const [],
     this.diagnosis = const [],
     required this.fdiCode,
@@ -33,6 +40,7 @@ class Diente {
     String? odontogramaId,
     List<Superficie>? superficies,
     List<TratamientoAplicado>? tratamientos,
+    List<TratamientoAplicado>? tratamientosHistoricos,
     List<String>? tratamientosAplicadosIds,
     List<DiagnosticoAplicado>? diagnosis,
     int? fdiCode,
@@ -44,6 +52,8 @@ class Diente {
       odontogramaId: odontogramaId ?? this.odontogramaId,
       superficies: superficies ?? this.superficies,
       tratamientos: tratamientos ?? this.tratamientos,
+      tratamientosHistoricos:
+          tratamientosHistoricos ?? this.tratamientosHistoricos,
       tratamientosAplicadosIds:
           tratamientosAplicadosIds ?? this.tratamientosAplicadosIds,
       diagnosis: diagnosis ?? this.diagnosis,

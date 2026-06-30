@@ -9,6 +9,7 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
@@ -28,10 +29,15 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
 
+  /// Condiciones estructuradas del paciente (catálogo `condiciones`), ya
+  /// formateadas para mostrarse en el diálogo de contraindicaciones (SD-85).
+  String _condicionesEstructuradas = '';
+
   @override
   void initState() {
     super.initState();
     _cargarCatalogo();
+    _cargarCondicionesPaciente();
     
     final state = context.read<ConsultaCubit>().state;
     if (state is ConsultaIniciada && state.consulta.notas != null) {
@@ -69,7 +75,32 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
+  /// Carga las condiciones registradas en el expediente del paciente para
+  /// alimentar la verificación de contraindicaciones. Si falla (p. ej. paciente
+  /// de prueba), se queda vacío y el diálogo cae al texto libre del record.
+  Future<void> _cargarCondicionesPaciente() async {
+    final state = context.read<PacienteCubit>().state;
+    if (state is! PacienteDetailLoaded) return;
+    final pacienteId = state.paciente.id;
+    if (pacienteId == null) return;
+
+    try {
+      final condiciones = await sl<GetCondicionesPaciente>()(pacienteId);
+      if (!mounted) return;
+      setState(() {
+        _condicionesEstructuradas = condiciones
+            .map((c) => '${c.nombre} (${c.tipo.displayName})')
+            .join(' · ');
+      });
+    } catch (_) {
+      // Se mantiene vacío: el diálogo usará el texto libre como respaldo.
+    }
+  }
+
   String _condicionesPaciente() {
+    if (_condicionesEstructuradas.isNotEmpty) {
+      return _condicionesEstructuradas;
+    }
     final state = context.read<PacienteCubit>().state;
     if (state is PacienteDetailLoaded) {
       return state.paciente.record.condiciones;

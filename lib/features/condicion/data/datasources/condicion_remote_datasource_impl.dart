@@ -38,12 +38,19 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
   }
 
   @override
-  Future<void> createCondicion(Map<String, dynamic> condicionData) async {
+  Future<Map<String, dynamic>> createCondicion(
+    Map<String, dynamic> condicionData,
+  ) async {
     try {
       condicionData.remove('id');
       condicionData['created_at'] = DateTime.now().toIso8601String();
       condicionData['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('condiciones').insert(condicionData);
+      final inserted = await supabaseClient
+          .from('condiciones')
+          .insert(condicionData)
+          .select()
+          .single();
+      return Map<String, dynamic>.from(inserted);
     } on PostgrestException catch (e) {
       throw Exception('Error al crear condición: ${e.message}');
     }

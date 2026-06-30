@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/core/data/models/contacto_model.d
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 
@@ -21,6 +22,38 @@ class PacienteModel extends Paciente {
     required super.citas,
     required super.tipoPaciente,
   });
+
+  PacienteModel copyWithModel({
+    String? id,
+    String? nombre,
+    String? apellido,
+    DateTime? birthDate,
+    String? govID,
+    List<ContactoModel>? contactos,
+    EstatusPersona? estatus,
+    Genero? genero,
+    RecordModel? record,
+    String? trabajo,
+    String? referencia,
+    List<Cita>? citas,
+    TipoPaciente? tipoPaciente,
+  }) {
+    return PacienteModel(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      apellido: apellido ?? this.apellido,
+      birthDate: birthDate ?? this.birthDate,
+      govID: govID ?? this.govID,
+      contactos: contactos ?? this.contactos,
+      estatus: estatus ?? this.estatus,
+      genero: genero ?? this.genero,
+      record: record ?? this.record as RecordModel,
+      trabajo: trabajo ?? this.trabajo,
+      referencia: referencia ?? this.referencia,
+      citas: citas ?? this.citas,
+      tipoPaciente: tipoPaciente ?? this.tipoPaciente,
+    );
+  }
 
   factory PacienteModel.fromJson(Map<String, dynamic> json) {
     final persona = json['personas'] as Map<String, dynamic>? ?? {};

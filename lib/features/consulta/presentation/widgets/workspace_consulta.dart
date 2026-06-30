@@ -5,6 +5,8 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
@@ -80,18 +82,33 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
   Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? superficie) async {
     if (_cargandoCatalogo) return;
+    final consultaCubit = context.read<ConsultaCubit>();
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
     if (tratamiento == null || !mounted) return;
 
-    final ok = await confirmarRiesgoContraindicaciones(
-      context,
-      tratamiento,
-      _condicionesPaciente(),
+    final conflictos = VerificarContraindicacionesUseCase().call(
+      condicionesPaciente: _condicionesPaciente(),
+      tratamiento: tratamiento,
     );
-    if (!ok || !mounted) return;
 
-    context.read<ConsultaCubit>().aplicarTratamiento(diente, superficie, tratamiento);
-    
+    if (conflictos.isNotEmpty) {
+      final justificacion = await mostrarContraindicacionDialog(
+        context,
+        tratamiento.nombre,
+        conflictos,
+      );
+      if (justificacion == null) return;
+
+      consultaCubit.aplicarTratamiento(
+        diente,
+        superficie,
+        tratamiento,
+        justificacionClinica: justificacion,
+      );
+    } else {
+      consultaCubit.aplicarTratamiento(diente, superficie, tratamiento);
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

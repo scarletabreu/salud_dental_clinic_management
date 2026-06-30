@@ -64,7 +64,42 @@ class MisCitasDelDiaPage extends StatelessWidget {
     final ac = context.appColors;
     return Scaffold(
       backgroundColor: ac.bgPage,
-      body: BlocBuilder<CitaCubit, CitaCubitState>(builder: _buildState),
+      body: BlocListener<CitaCubit, CitaCubitState>(
+        listener: (context, state) {
+          if (state is CitaCubitLoaded && state.errorMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        state.errorMessage!,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: ac.red,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        },
+        child: BlocBuilder<CitaCubit, CitaCubitState>(builder: _buildState),
+      ),
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
@@ -113,7 +148,6 @@ class _CalendarioView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Padding uniforme alrededor de todo el contenido — igual que el dashboard
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
@@ -143,7 +177,6 @@ class _ControlBar extends StatelessWidget {
         .where((c) => c.estado == EstadoCita.programada)
         .length;
 
-    // Tarjeta flotante — mismo estilo que el dashboard
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
@@ -399,12 +432,10 @@ class _CalendarioBody extends StatelessWidget {
       );
     }
 
-    // Vista mensual — layout responsivo
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 600;
         if (isWide) {
-          // Desktop: dos tarjetas flotantes lado a lado
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -417,7 +448,6 @@ class _CalendarioBody extends StatelessWidget {
             ],
           );
         }
-        // Mobile: apiladas con scroll
         return SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 80),
           child: Column(
@@ -683,7 +713,6 @@ class _DayCell extends StatelessWidget {
 
 class _DetailPanel extends StatelessWidget {
   final CitaCubitLoaded state;
-  // En mobile no necesita scroll propio — el padre ya scrollea
   final bool mobileMode;
   const _DetailPanel({required this.state, this.mobileMode = false});
 
@@ -705,7 +734,6 @@ class _DetailPanel extends StatelessWidget {
     final dayLabel = isToday ? 'Hoy' : _kWeekdays[d.weekday - 1];
     final dateLabel = '${d.day} de ${_kMonthsShort[d.month - 1]} ${d.year}';
 
-    // Header de la tarjeta
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
@@ -816,7 +844,6 @@ class _DetailPanel extends StatelessWidget {
           );
 
     if (mobileMode) {
-      // Mobile: tarjeta estática sin altura fija
       return Container(
         decoration: BoxDecoration(
           color: ac.cardBg,
@@ -841,7 +868,6 @@ class _DetailPanel extends StatelessWidget {
       );
     }
 
-    // Desktop: tarjeta con scroll interno
     return Container(
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -1155,7 +1181,10 @@ class _CitaCard extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: ac.primaryBlue,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           icon: const Icon(Icons.medical_services_outlined, size: 16),
           label: const Text('Efectuar Consulta'),

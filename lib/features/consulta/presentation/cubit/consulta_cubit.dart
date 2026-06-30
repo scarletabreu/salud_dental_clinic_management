@@ -95,7 +95,22 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
       }
 
-      // 3. Generamos el odontograma en memoria que acompañará la sesión
+      // 3. Cargamos los tratamientos de consultas anteriores para proyectar el
+      //    estado dental acumulado (capa "histórico"). Si falla, la consulta
+      //    arranca igual con la boca en blanco: el historial es contexto, no
+      //    debe bloquear la atención.
+      var historicoPorFdi = const <int, List<TratamientoAplicado>>{};
+      try {
+        historicoPorFdi = await _consultaRepository
+            .getTratamientosHistoricosPorDiente(
+          pacienteId,
+          excluyendoConsultaId: consultaId,
+        );
+      } catch (e) {
+        if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
+      }
+
+      // 4. Generamos el odontograma en memoria que acompañará la sesión.
       final odontograma = Odontograma(
         consultaId: consultaId,
         dientes: kFdiPermanentes.map((fdi) {
@@ -105,6 +120,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             superficies: superficiesParaFdi(fdi)
                 .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
                 .toList(),
+            tratamientosHistoricos: historicoPorFdi[fdi] ?? const [],
           );
         }).toList(),
       );

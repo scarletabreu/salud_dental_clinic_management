@@ -20,6 +20,15 @@ abstract class ConsultaRemoteDatasource {
     List<String> ids,
   );
 
+  /// Tratamientos aplicados en consultas ANTERIORES del paciente, con el
+  /// `fdi_code` del diente embebido (clave `diente`). Excluye, si se indica, la
+  /// consulta en curso. Usado para proyectar el historial sobre un odontograma
+  /// recién creado.
+  Future<List<Map<String, dynamic>>> fetchTratamientosHistoricosPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  });
+
   Future<void> updateConsulta(String id, Map<String, dynamic> consultaData);
   Future<void> deleteConsulta(String id);
 }

@@ -32,7 +32,7 @@ class CondicionRepositoryImpl implements CondicionRepository {
   }
 
   @override
-  Future<void> registrarNuevaCondicion(Condicion condicion) async {
+  Future<Condicion> registrarNuevaCondicion(Condicion condicion) async {
     try {
       final model = CondicionModel(
         id: condicion.id,
@@ -40,7 +40,8 @@ class CondicionRepositoryImpl implements CondicionRepository {
         tipo: condicion.tipo,
         categoria: condicion.categoria,
       );
-      await remoteDataSource.createCondicion(model.toJson());
+      final creada = await remoteDataSource.createCondicion(model.toJson());
+      return CondicionModel.fromJson(creada);
     } catch (e) {
       throw Exception('Error en el repositorio al registrar condición: $e');
     }

@@ -11,6 +11,7 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
@@ -31,10 +32,15 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
 
+  /// Condiciones estructuradas del paciente cargadas async desde `record_condicion`.
+  /// Si están vacías se usan las del record embebido como respaldo.
+  List<Condicion> _condicionesAsync = const [];
+
   @override
   void initState() {
     super.initState();
     _cargarCatalogo();
+    _cargarCondicionesPaciente();
     
     final state = context.read<ConsultaCubit>().state;
     if (state is ConsultaIniciada && state.consulta.notas != null) {
@@ -72,7 +78,25 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
+  /// Carga las condiciones desde `record_condicion` (tabla puente real).
+  /// Si falla, se usa el fallback del record embebido en `_condicionesPaciente`.
+  Future<void> _cargarCondicionesPaciente() async {
+    final state = context.read<PacienteCubit>().state;
+    if (state is! PacienteDetailLoaded) return;
+    final pacienteId = state.paciente.id;
+    if (pacienteId == null) return;
+
+    try {
+      final condiciones = await sl<GetCondicionesPaciente>()(pacienteId);
+      if (!mounted) return;
+      setState(() => _condicionesAsync = condiciones);
+    } catch (_) {
+      // Se mantiene vacío: _condicionesPaciente() cae al record embebido.
+    }
+  }
+
   List<Condicion> _condicionesPaciente() {
+    if (_condicionesAsync.isNotEmpty) return _condicionesAsync;
     final state = context.read<PacienteCubit>().state;
     if (state is PacienteDetailLoaded) {
       return state.paciente.record.condiciones;

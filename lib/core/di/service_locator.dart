@@ -114,6 +114,14 @@ import '../../features/receta/domain/repositories/receta_repository.dart';
 import '../../features/record/data/datasources/record_remote_datasource.dart';
 import '../../features/record/data/repositories/record_repository_impl.dart';
 import '../../features/record/domain/repositories/record_repository.dart';
+import '../../features/record/domain/usecases/agregar_condicion_paciente.dart';
+import '../../features/record/domain/usecases/get_condiciones_paciente.dart';
+import '../../features/record/domain/usecases/quitar_condicion_paciente.dart';
+import '../../features/record/presentation/cubit/condiciones_paciente_cubit.dart';
+import '../../features/condicion/data/datasources/condicion_remote_datasource.dart';
+import '../../features/condicion/data/datasources/condicion_remote_datasource_impl.dart';
+import '../../features/condicion/data/repositories/condicion_repository_impl.dart';
+import '../../features/condicion/domain/repositories/condicion_repository.dart';
 import '../../features/suplidor/data/datasources/suplidor_remote_datasource.dart';
 import '../../features/suplidor/data/repositories/suplidor_repository_impl.dart';
 import '../../features/suplidor/domain/repositories/suplidor_repository.dart';
@@ -192,6 +200,9 @@ Future<void> init() async {
   sl.registerLazySingleton<RecordRemoteDatasource>(
     () => RecordRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<CondicionRemoteDatasource>(
+    () => CondicionRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<SuplidorRemoteDatasource>(
     () => SuplidorRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -269,6 +280,9 @@ Future<void> init() async {
   sl.registerLazySingleton<RecordRepository>(
     () => RecordRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<CondicionRepository>(
+    () => CondicionRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton<SuplidorRepository>(
     () => SuplidorRepositoryImpl(remoteDataSource: sl()),
   );
@@ -333,5 +347,25 @@ Future<void> init() async {
   );
   sl.registerFactory<TratamientoCubit>(
     () => TratamientoCubit(sl<TratamientoRepository>()),
+  );
+
+  // Condiciones médicas del paciente (record_condicion)
+  sl.registerFactory<GetCondicionesPaciente>(
+    () => GetCondicionesPaciente(sl()),
+  );
+  sl.registerFactory<AgregarCondicionPaciente>(
+    () => AgregarCondicionPaciente(sl()),
+  );
+  sl.registerFactory<QuitarCondicionPaciente>(
+    () => QuitarCondicionPaciente(sl()),
+  );
+  sl.registerFactoryParam<CondicionesPacienteCubit, String, void>(
+    (pacienteId, _) => CondicionesPacienteCubit(
+      pacienteId: pacienteId,
+      getCondiciones: sl(),
+      agregarCondicion: sl(),
+      quitarCondicion: sl(),
+      catalogoRepository: sl(),
+    ),
   );
 }

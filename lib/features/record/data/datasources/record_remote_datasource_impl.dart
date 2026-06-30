@@ -74,4 +74,99 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
       throw Exception('Error inesperado al anular record: $e');
     }
   }
+
+  // ── Condiciones del paciente (puente record_condicion) ────────────────────
+
+  @override
+  Future<String?> fetchRecordId(String pacienteId) async {
+    try {
+      final res = await supabaseClient
+          .from('records')
+          .select('id')
+          .eq('paciente_id', pacienteId)
+          .filter('deleted_at', 'is', null)
+          .maybeSingle();
+      return res?['id'] as String?;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al ubicar el expediente: ${e.message}');
+    }
+  }
+
+  @override
+  Future<String> getOrCreateRecordId(String pacienteId) async {
+    final existente = await fetchRecordId(pacienteId);
+    if (existente != null) return existente;
+
+    try {
+      // Solo columnas garantizadas en la BD real: `paciente_id` y `tipo_sangre`
+      // son NOT NULL; el resto tiene default. (El `schema.sql` del repo está
+      // desfasado: no incluir `condiciones`, que no existe en la tabla real.)
+      final now = DateTime.now().toIso8601String();
+      final creado = await supabaseClient
+          .from('records')
+          .insert({
+            'paciente_id': pacienteId,
+            'tipo_sangre': 'desconocido',
+            'created_at': now,
+            'updated_at': now,
+          })
+          .select('id')
+          .single();
+      return creado['id'] as String;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al inicializar el expediente: ${e.message}');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchAflicciones(String recordId) async {
+    try {
+      final response = await supabaseClient
+          .from('record_condicion')
+          .select('record_id, condicion_id, fecha_deteccion, condiciones(*)')
+          .eq('record_id', recordId);
+
+      return List<Map<String, dynamic>>.from(response);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener condiciones del paciente: ${e.message}');
+    }
+  }
+
+  @override
+  Future<void> addAfliccion(String recordId, String condicionId) async {
+    try {
+      // `record_condicion` no tiene constraint única en (record_id, condicion_id)
+      // en la BD real (el dump miente), así que no se puede usar upsert/onConflict:
+      // se verifica existencia y solo se inserta si falta (la UI además ya excluye
+      // las condiciones ya asignadas del selector).
+      final existente = await supabaseClient
+          .from('record_condicion')
+          .select('condicion_id')
+          .eq('record_id', recordId)
+          .eq('condicion_id', condicionId)
+          .maybeSingle();
+      if (existente != null) return;
+
+      await supabaseClient.from('record_condicion').insert({
+        'record_id': recordId,
+        'condicion_id': condicionId,
+        'fecha_deteccion': DateTime.now().toIso8601String(),
+      });
+    } on PostgrestException catch (e) {
+      throw Exception('Error al agregar la condición al paciente: ${e.message}');
+    }
+  }
+
+  @override
+  Future<void> removeAfliccion(String recordId, String condicionId) async {
+    try {
+      await supabaseClient
+          .from('record_condicion')
+          .delete()
+          .eq('record_id', recordId)
+          .eq('condicion_id', condicionId);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al quitar la condición del paciente: ${e.message}');
+    }
+  }
 }

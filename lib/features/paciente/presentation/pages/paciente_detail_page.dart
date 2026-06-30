@@ -9,6 +9,7 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/enums/ti
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/condiciones_medicas_card.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 
 // ─────────────────────────────────────────────
@@ -143,6 +144,7 @@ class _PacienteDetailPageState
           _buildIdentityCard(p),
           const SizedBox(height: 16),
           _buildAlertasMedicas(p.record),
+          CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment:

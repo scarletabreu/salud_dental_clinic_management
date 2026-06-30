@@ -206,6 +206,38 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchTratamientosHistoricosPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    try {
+      // `!inner` en consultas → filtra por paciente; `!inner` en dientes →
+      // descarta tratamientos generales (sin diente) y trae el fdi_code para
+      // proyectar sobre el odontograma.
+      var query = supabaseClient
+          .from('tratamientos_aplicados')
+          .select(
+            '*, tratamiento:tratamientos(nombre), '
+            'diente:dientes!inner(fdi_code), '
+            'consulta:consultas!inner(paciente_id, fecha)',
+          )
+          .eq('consulta.paciente_id', pacienteId)
+          .isFilter('deleted_at', null);
+
+      if (excluyendoConsultaId != null) {
+        query = query.neq('consulta_id', excluyendoConsultaId);
+      }
+
+      final response = await query.order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Error al obtener historial de tratamientos del paciente: ${e.message}',
+      );
+    }
+  }
+
+  @override
   Future<void> updateConsulta(
     String id,
     Map<String, dynamic> consultaData,

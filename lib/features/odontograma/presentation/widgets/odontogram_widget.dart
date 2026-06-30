@@ -19,19 +19,23 @@ const _kToothAmber  = Color(0xFFF59E0B);
 const _kToothRed    = Color(0xFFEF4444);
 const _kToothGreen  = Color(0xFF10B981);
 const _kToothEmpty  = Color(0xFFCBD5E1);
+// Gris azulado para la capa "histórico" (tratamientos de consultas previas):
+// presente pero apagado, claramente distinto del teal de "esta consulta".
+const _kToothSlate  = Color(0xFF64748B);
 
 // ─────────────────────────────────────────────
 //  Tooth status
 // ─────────────────────────────────────────────
 
-enum ToothStatus { empty, treated, mild, moderate, critical }
+enum ToothStatus { empty, treated, historico, mild, moderate, critical }
 
 Color colorForStatus(ToothStatus s) => switch (s) {
-      ToothStatus.empty    => _kToothEmpty,
-      ToothStatus.treated  => _kToothTeal,
-      ToothStatus.mild     => _kToothIndigo,
-      ToothStatus.moderate => _kToothAmber,
-      ToothStatus.critical => _kToothRed,
+      ToothStatus.empty     => _kToothEmpty,
+      ToothStatus.treated   => _kToothTeal,
+      ToothStatus.historico => _kToothSlate,
+      ToothStatus.mild      => _kToothIndigo,
+      ToothStatus.moderate  => _kToothAmber,
+      ToothStatus.critical  => _kToothRed,
     };
 
 ToothStatus statusForDiente(Diente? d) {
@@ -49,6 +53,8 @@ ToothStatus statusForDiente(Diente? d) {
   if (d.tratamientos.isNotEmpty || d.tratamientosAplicadosIds.isNotEmpty) {
     return ToothStatus.treated;
   }
+  // Sin trabajo en esta consulta pero con antecedentes: capa histórica.
+  if (d.tratamientosHistoricos.isNotEmpty) return ToothStatus.historico;
   if (d.superficies.any((s) => s.diagnosisId != null)) return ToothStatus.mild;
   return ToothStatus.empty;
 }
@@ -219,6 +225,28 @@ class _OdontogramPainter extends CustomPainter {
         // Halo blanco para que el punto resalte sobre el contorno del diente.
         canvas.drawCircle(dotCenter, r + 1.2, Paint()..color = Colors.white);
         canvas.drawCircle(dotCenter, r, Paint()..color = dotColor);
+      }
+
+      // Marcador de la capa histórica: anillo hueco slate en la esquina opuesta
+      // al punto de "esta consulta". Hueco = ya hecho antes; relleno = en curso.
+      final tieneHistorico =
+          !(d?.estaAusente ?? false) &&
+          (d?.tratamientosHistoricos.isNotEmpty ?? false);
+      if (tieneHistorico) {
+        final markCenter = p.center.translate(
+          -p.size.width * 0.34,
+          p.size.height * 0.34,
+        );
+        final r = (p.size.width * 0.12).clamp(2.2, 5.0);
+        canvas.drawCircle(markCenter, r + 1.2, Paint()..color = Colors.white);
+        canvas.drawCircle(
+          markCenter,
+          r,
+          Paint()
+            ..color = _kToothSlate
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.4,
+        );
       }
     });
   }
@@ -615,7 +643,11 @@ class _ToothInfoPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final d = diente;
-    if (d == null || (d.diagnosis.isEmpty && d.tratamientos.isEmpty && !editMode)) {
+    if (d == null ||
+        (d.diagnosis.isEmpty &&
+            d.tratamientos.isEmpty &&
+            d.tratamientosHistoricos.isEmpty &&
+            !editMode)) {
       return Text(
         'Sin datos registrados',
         style: TextStyle(fontSize: 12, color: ac.textDisabled),
@@ -703,6 +735,37 @@ class _ToothInfoPanel extends StatelessWidget {
               onQuitar: onQuitarTratamiento == null
                   ? null
                   : () => onQuitarTratamiento!(d, e.key),
+            ),
+          ),
+        ],
+        if (d.tratamientosHistoricos.isNotEmpty) ...[
+          if (d.diagnosis.isNotEmpty || d.tratamientos.isNotEmpty)
+            const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.history_rounded, size: 13, color: _kToothSlate),
+              const SizedBox(width: 5),
+              Text(
+                'HISTÓRICO',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: _kToothSlate,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'consultas anteriores',
+                style: TextStyle(fontSize: 10, color: ac.textDisabled),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...d.tratamientosHistoricos.map(
+            (t) => _TratamientoHistoricoRow(
+              nombre: nombreTratamiento?.call(t.tratamientoId) ?? 'Tratamiento',
+              tratamiento: t,
             ),
           ),
         ],
@@ -853,6 +916,57 @@ class _TratamientoAplicadoRow extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Historic treatment row (read-only · capa histórico)
+// ─────────────────────────────────────────────
+
+class _TratamientoHistoricoRow extends StatelessWidget {
+  final String nombre;
+  final TratamientoAplicado tratamiento;
+
+  const _TratamientoHistoricoRow({
+    required this.nombre,
+    required this.tratamiento,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final terminado = tratamiento.estaTerminado;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(Icons.history_rounded, size: 14, color: _kToothSlate),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              nombre,
+              style: TextStyle(fontSize: 12, color: ac.textMuted),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _kToothSlate.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(
+              terminado ? 'Terminado' : 'En proceso',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: _kToothSlate,
+              ),
+            ),
+          ),
         ],
       ),
     );

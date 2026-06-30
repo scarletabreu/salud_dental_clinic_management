@@ -16,6 +16,7 @@ int _statusRank(Diente d) {
     ToothStatus.moderate => 3,
     ToothStatus.mild => 2,
     ToothStatus.treated => 1,
+    ToothStatus.historico => 1,
     ToothStatus.empty => 0,
   };
 }

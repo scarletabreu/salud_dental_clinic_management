@@ -3,6 +3,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/reposito
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 class ConsultaRepositoryImpl implements ConsultaRepository {
   final ConsultaRemoteDatasource remoteDataSource;
@@ -150,6 +152,34 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     } catch (e) {
       throw Exception(
         'Error en el repositorio al obtener historial clínico: $e',
+      );
+    }
+  }
+
+  @override
+  Future<Map<int, List<TratamientoAplicado>>>
+  getTratamientosHistoricosPorDiente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    try {
+      final filas = await remoteDataSource.fetchTratamientosHistoricosPaciente(
+        pacienteId,
+        excluyendoConsultaId: excluyendoConsultaId,
+      );
+
+      final porFdi = <int, List<TratamientoAplicado>>{};
+      for (final fila in filas) {
+        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+        if (fdi == null) continue;
+        porFdi
+            .putIfAbsent(fdi, () => [])
+            .add(TratamientoAplicadoModel.fromJson(fila));
+      }
+      return porFdi;
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener tratamientos históricos: $e',
       );
     }
   }

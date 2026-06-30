@@ -362,7 +362,7 @@ class _PacienteDetailPageState
     Record record,
   ) {
     final hasCondiciones =
-        record.condiciones.trim().isNotEmpty;
+        record.condiciones.isNotEmpty;
 
     final hasCirugias =
         record.cirugiasPrevias.isNotEmpty;
@@ -491,7 +491,9 @@ class _PacienteDetailPageState
                           ),
                           child: Text(
                             record
-                                .condiciones,
+                                .condiciones
+                                .map((c) => c.nombre)
+                                .join(', '),
                             style:
                                 TextStyle(
                               fontSize: 13,

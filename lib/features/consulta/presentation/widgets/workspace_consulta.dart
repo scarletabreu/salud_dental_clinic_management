@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -69,12 +70,12 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
-  String _condicionesPaciente() {
+  List<Condicion> _condicionesPaciente() {
     final state = context.read<PacienteCubit>().state;
     if (state is PacienteDetailLoaded) {
       return state.paciente.record.condiciones;
     }
-    return '';
+    return [];
   }
 
   Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? superficie) async {

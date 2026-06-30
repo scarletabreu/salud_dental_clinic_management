@@ -1,12 +1,13 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 
 class Record {
   final String? id;
   final String pacienteId;
   final TipoSangre tipoSangre;
   final List<Consulta> consultas;
-  final String condiciones;
+  final List<Condicion> condiciones;
   final int cantHijos;
   final List<String> cirugiasPrevias;
   final String historialFamiliar;
@@ -23,7 +24,7 @@ class Record {
   });
 
   String get bloodType => tipoSangre.name.toUpperCase();
-  String get conditions => condiciones;
+  List<Condicion> get conditions => condiciones;
   String get history => historialFamiliar;
   int get childrenCount => cantHijos;
   List<String> get surgeries => cirugiasPrevias;
@@ -33,7 +34,7 @@ class Record {
     String? pacienteId,
     TipoSangre? tipoSangre,
     List<Consulta>? consultas,
-    String? condiciones,
+    List<Condicion>? condiciones,
     int? cantHijos,
     List<String>? cirugiasPrevias,
     String? historialFamiliar,

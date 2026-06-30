@@ -4,6 +4,8 @@ import 'package:salud_dental_clinic_management/features/paciente/data/models/pac
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PacienteRemoteDatasource {
@@ -319,24 +321,20 @@ class PacienteRemoteDatasource {
   }
 
   Future<PacienteModel> getPacienteById(String id) async {
-    if (!_isValidUuid(id)) {
-      final local = _pacientesPrueba.where((p) => p.id == id).firstOrNull;
+    final normalizedId = _normalizeId(id);
+
+    final pacienteModel = await _fetchPacienteModel(normalizedId);
+    if (pacienteModel != null) {
+      final record = await _loadOrCreateRecord(pacienteModel.id!);
+      return pacienteModel.copyWithModel(record: record);
+    }
+
+    if (!_isValidUuid(normalizedId)) {
+      final local = _pacientesPrueba.where((p) => p.id == normalizedId).firstOrNull;
       if (local != null) return local;
-      throw Exception('Paciente de prueba con id "$id" no encontrado.');
     }
 
-    try {
-      final res = await client
-          .from('pacientes')
-          .select(_selectPaciente)
-          .eq('id', id)
-          .single();
-
-      final map = Map<String, dynamic>.from(res as Map);
-      return PacienteModel.fromJson(map);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener paciente: ${e.message}');
-    }
+    throw Exception('Paciente con id "$normalizedId" no encontrado.');
   }
 
   /// Devuelve el paciente cuya PK coincide con [personaId]; si la persona aún
@@ -344,26 +342,28 @@ class PacienteRemoteDatasource {
   /// fila de `pacientes` con valores por defecto. La PK de `pacientes` es la
   /// misma de `personas` (tabla de dos niveles).
   Future<PacienteModel> getOrCreateByPersonaId(String personaId) async {
-    if (!_isValidUuid(personaId)) {
-      // Citas de prueba referencian pacientes mock (p1-p6).
-      return getPacienteById(personaId);
+    final normalizedId = _normalizeId(personaId);
+    final pacienteModel = await _fetchPacienteModel(normalizedId);
+    if (pacienteModel != null) {
+      print("a");
+      final record = await _loadOrCreateRecord(pacienteModel.id!);
+      print(record.tipoSangre);
+      return pacienteModel.copyWithModel(record: record);
+    }
+
+    if (!_isValidUuid(normalizedId)) {
+      print("b");
+      final local = _pacientesPrueba.where((p) => p.id == normalizedId).firstOrNull;
+      if (local != null) return local;
     }
 
     try {
-      final existente = await client
-          .from('pacientes')
-          .select(_selectPaciente)
-          .eq('id', personaId)
-          .maybeSingle();
-      if (existente != null) {
-        return PacienteModel.fromJson(Map<String, dynamic>.from(existente));
-      }
-
+      print("c");
       final now = DateTime.now().toIso8601String();
       final creado = await client
           .from('pacientes')
           .insert({
-            'id': personaId,
+            'id': normalizedId,
             'genero': Genero.otro.name,
             'tipo_paciente': TipoPaciente.integrado.name,
             'trabajo': '',
@@ -373,13 +373,118 @@ class PacienteRemoteDatasource {
           })
           .select(_selectPaciente)
           .single();
-      return PacienteModel.fromJson(Map<String, dynamic>.from(creado));
+
+      final pacienteModel = PacienteModel.fromJson(Map<String, dynamic>.from(creado));
+      final record = await _loadOrCreateRecord(pacienteModel.id!);
+      return pacienteModel.copyWithModel(record: record);
     } on PostgrestException catch (e) {
       throw Exception('Error al preparar el paciente de la consulta: ${e.message}');
     }
   }
 
+  Future<RecordModel> _loadOrCreateRecord(String pacienteId) async {
+    try {
+      final data = await client
+          .from('records')
+          .select('*')
+          .eq('paciente_id', pacienteId)
+          .filter('deleted_at', 'is', null)
+          .maybeSingle();
+
+      if (data != null) {
+        final record = RecordModel.fromJson(Map<String, dynamic>.from(data as Map<String, dynamic>));
+        if (record.id != null) {
+          final condicionesRes = await client
+              .from('record_condicion')
+              .select('condiciones(*)')
+              .eq('record_id', record.id!);
+
+          final condiciones = <CondicionModel>[];
+          if (condicionesRes is List) {
+            for (final item in condicionesRes) {
+              if (item is Map<String, dynamic>) {
+                Map<String, dynamic>? condicionJson;
+                if (item['condicion'] is Map<String, dynamic>) {
+                  condicionJson = item['condicion'] as Map<String, dynamic>?;
+                } else if (item['condiciones'] is Map<String, dynamic>) {
+                  condicionJson = item['condiciones'] as Map<String, dynamic>?;
+                } else if (item.containsKey('id') && item.containsKey('nombre')) {
+                  condicionJson = Map<String, dynamic>.from(item);
+                }
+
+                if (condicionJson != null) {
+                  condiciones.add(CondicionModel.fromJson(condicionJson));
+                }
+              }
+            }
+          }
+
+          return RecordModel.fromEntity(
+            record.copyWith(condiciones: condiciones),
+          );
+        }
+
+        return record;
+      }
+
+      final emptyRecord = RecordModel(
+        pacienteId: pacienteId,
+        tipoSangre: TipoSangre.desconocido,
+        condiciones: const [],
+        cirugiasPrevias: const [],
+        historialFamiliar: '',
+      );
+      final insertData = emptyRecord.toJson();
+      final created = await client
+          .from('records')
+          .insert(insertData)
+          .select('*')
+          .single();
+
+      return RecordModel.fromJson(Map<String, dynamic>.from(created));
+    } on PostgrestException catch (e) {
+      throw Exception('Error al cargar o crear el expediente clínico: ${e.message}');
+    }
+  }
+
   bool _isValidUuid(dynamic id) {
     return id != null && id is String && id.length == 36 && id.contains('-');
+  }
+
+  String _normalizeId(String id) {
+    final trimmed = id.trim();
+    return _isValidUuid(trimmed) ? trimmed.toLowerCase() : trimmed;
+  }
+
+  Future<PacienteModel?> _fetchPacienteModel(String id) async {
+    try {
+      final pacienteRow = await client
+          .from('pacientes')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+      if (pacienteRow == null) return null;
+
+      final personaRow = await client
+          .from('personas')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+      if (personaRow == null) return null;
+
+      final personaContactos = await client
+          .from('persona_contactos')
+          .select('contactos(*)')
+          .eq('persona_id', id);
+
+      final map = Map<String, dynamic>.from(pacienteRow as Map<String, dynamic>);
+      map['personas'] = Map<String, dynamic>.from(personaRow as Map<String, dynamic>);
+      if (personaContactos is List && personaContactos.isNotEmpty) {
+        map['personas']!['persona_contacto'] = personaContactos;
+      }
+      return PacienteModel.fromJson(map);
+    } on PostgrestException catch (_) {
+      return null;
+    }
   }
 }

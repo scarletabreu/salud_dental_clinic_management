@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 
 /// Abre un bottom sheet con el catálogo de tratamientos y devuelve el elegido
 /// (o `null` si se cancela).
@@ -16,16 +17,28 @@ Future<Tratamiento?> seleccionarTratamiento(
   );
 }
 
-/// Si el tratamiento tiene contraindicaciones y el paciente tiene condiciones
-/// registradas, muestra una advertencia bloqueante. Devuelve `true` si se puede
-/// asignar (sin conflicto o el doctor confirmó el riesgo), `false` si se cancela.
+/// Si el tratamiento tiene contraindicaciones específicas que coincidan con las 
+/// condiciones registradas del paciente, muestra una advertencia bloqueante.
+/// Devuelve `true` si se puede asignar, `false` si se cancela.
 Future<bool> confirmarRiesgoContraindicaciones(
   BuildContext context,
   Tratamiento tratamiento,
-  String condicionesPaciente,
+  List<Condicion> condicionesPaciente,
 ) async {
-  final hayCondiciones = condicionesPaciente.trim().isNotEmpty;
-  if (tratamiento.contraindicaciones.isEmpty || !hayCondiciones) return true;
+  // Validación inicial: Si no hay contraindicaciones o el paciente no tiene condiciones, es seguro.
+  if (tratamiento.contraindicaciones.isEmpty || condicionesPaciente.isEmpty) {
+    return true;
+  }
+
+  // Filtrar únicamente las condiciones del paciente que generan conflicto con las contraindicaciones del tratamiento
+  final condicionesEnConflicto = condicionesPaciente.where((condicion) {
+    return tratamiento.contraindicaciones.any(
+      (ci) => ci.condicionId == condicion.id,
+    );
+  }).toList();
+
+  // Si no hay ninguna coincidencia real, el tratamiento no representa riesgo y se aprueba directamente
+  if (condicionesEnConflicto.isEmpty) return true;
 
   final c = context.appColors;
   final confirmado = await showDialog<bool>(
@@ -36,7 +49,7 @@ Future<bool> confirmarRiesgoContraindicaciones(
         children: [
           Icon(Icons.warning_amber_rounded, color: c.red),
           const SizedBox(width: 8),
-          const Expanded(child: Text('Posible contraindicación')),
+          const Expanded(child: Text('Contraindicación Detectada')),
         ],
       ),
       content: Column(
@@ -44,12 +57,16 @@ Future<bool> confirmarRiesgoContraindicaciones(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '"${tratamiento.nombre}" tiene contraindicaciones y el paciente '
-            'presenta condiciones registradas:',
+            '"${tratamiento.nombre}" está contraindicado para las siguientes condiciones actuales del paciente:',
             style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.3),
           ),
           const SizedBox(height: 12),
-          _Bloque(c, 'Condiciones del paciente', condicionesPaciente.trim()),
+          // Mostramos únicamente las condiciones del paciente que están en conflicto real
+          _Bloque(
+            c, 
+            'Condiciones de riesgo detectadas', 
+            condicionesEnConflicto.map((c) => c.nombre).join('\n'),
+          ),
           const SizedBox(height: 10),
           ...tratamiento.contraindicaciones.map(
             (ci) => Padding(

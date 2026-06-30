@@ -25,6 +25,54 @@ class ContraindicacionRepositoryImpl implements ContraindicacionRepository {
   }
 
   @override
+  Future<List<Contraindicacion>> getContraindicacionesPorProcedimiento(
+    String procedimientoId,
+  ) async {
+    try {
+      final data = await remoteDataSource.fetchContraindicacionesByProcedimiento(
+        procedimientoId,
+      );
+      return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener contraindicaciones: $e',
+      );
+    }
+  }
+
+  @override
+  Future<List<Contraindicacion>> getContraindicacionesPorTratamiento(
+    String tratamientoId,
+  ) async {
+    try {
+      final data = await remoteDataSource.fetchContraindicacionesByTratamiento(
+        tratamientoId,
+      );
+      return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener contraindicaciones: $e',
+      );
+    }
+  }
+
+  @override
+  Future<List<Contraindicacion>> getContraindicacionesPorMedicina(
+    String medicinaId,
+  ) async {
+    try {
+      final data = await remoteDataSource.fetchContraindicacionesByMedicina(
+        medicinaId,
+      );
+      return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener contraindicaciones: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> guardarContraindicacion(
     Contraindicacion contraindicacion,
   ) async {
@@ -33,7 +81,7 @@ class ContraindicacionRepositoryImpl implements ContraindicacionRepository {
         id: contraindicacion.id,
         condicionId: contraindicacion.condicionId,
         medicinaId: contraindicacion.medicinaId,
-        contraindicacionId: contraindicacion.contraindicacionId,
+        procedimientoId: contraindicacion.procedimientoId,
         tratamientoId: contraindicacion.tratamientoId,
         descripcion: contraindicacion.descripcion,
         tipoContraindicacion: contraindicacion.tipoContraindicacion,

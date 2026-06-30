@@ -14,7 +14,10 @@ class PanelPaciente extends StatelessWidget {
     final telefono = paciente.contactos.isNotEmpty
         ? paciente.contactos.first.numeroTelefono
         : 'Sin teléfono';
-    final condiciones = record.condiciones.trim();
+    final condiciones = record.condiciones
+        .map((c) => c.nombre)
+        .where((nombre) => nombre.trim().isNotEmpty)
+        .join(' · ');
     final cirugias = record.cirugiasPrevias
         .where((s) => s.trim().isNotEmpty)
         .toList();

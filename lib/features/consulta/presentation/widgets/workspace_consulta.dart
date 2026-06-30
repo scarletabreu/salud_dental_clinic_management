@@ -5,6 +5,8 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
@@ -13,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/record/domain/usecases/g
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -29,9 +32,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
 
-  /// Condiciones estructuradas del paciente (catálogo `condiciones`), ya
-  /// formateadas para mostrarse en el diálogo de contraindicaciones (SD-85).
-  String _condicionesEstructuradas = '';
+  /// Condiciones estructuradas del paciente cargadas async desde `record_condicion`.
+  /// Si están vacías se usan las del record embebido como respaldo.
+  List<Condicion> _condicionesAsync = const [];
 
   @override
   void initState() {
@@ -75,9 +78,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
-  /// Carga las condiciones registradas en el expediente del paciente para
-  /// alimentar la verificación de contraindicaciones. Si falla (p. ej. paciente
-  /// de prueba), se queda vacío y el diálogo cae al texto libre del record.
+  /// Carga las condiciones desde `record_condicion` (tabla puente real).
+  /// Si falla, se usa el fallback del record embebido en `_condicionesPaciente`.
   Future<void> _cargarCondicionesPaciente() async {
     final state = context.read<PacienteCubit>().state;
     if (state is! PacienteDetailLoaded) return;
@@ -87,41 +89,50 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     try {
       final condiciones = await sl<GetCondicionesPaciente>()(pacienteId);
       if (!mounted) return;
-      setState(() {
-        _condicionesEstructuradas = condiciones
-            .map((c) => '${c.nombre} (${c.tipo.displayName})')
-            .join(' · ');
-      });
+      setState(() => _condicionesAsync = condiciones);
     } catch (_) {
-      // Se mantiene vacío: el diálogo usará el texto libre como respaldo.
+      // Se mantiene vacío: _condicionesPaciente() cae al record embebido.
     }
   }
 
-  String _condicionesPaciente() {
-    if (_condicionesEstructuradas.isNotEmpty) {
-      return _condicionesEstructuradas;
-    }
+  List<Condicion> _condicionesPaciente() {
+    if (_condicionesAsync.isNotEmpty) return _condicionesAsync;
     final state = context.read<PacienteCubit>().state;
     if (state is PacienteDetailLoaded) {
       return state.paciente.record.condiciones;
     }
-    return '';
+    return [];
   }
 
   Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? superficie) async {
     if (_cargandoCatalogo) return;
+    final consultaCubit = context.read<ConsultaCubit>();
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
     if (tratamiento == null || !mounted) return;
 
-    final ok = await confirmarRiesgoContraindicaciones(
-      context,
-      tratamiento,
-      _condicionesPaciente(),
+    final conflictos = VerificarContraindicacionesUseCase().call(
+      condicionesPaciente: _condicionesPaciente(),
+      tratamiento: tratamiento,
     );
-    if (!ok || !mounted) return;
 
-    context.read<ConsultaCubit>().aplicarTratamiento(diente, superficie, tratamiento);
-    
+    if (conflictos.isNotEmpty) {
+      final justificacion = await mostrarContraindicacionDialog(
+        context,
+        tratamiento.nombre,
+        conflictos,
+      );
+      if (justificacion == null) return;
+
+      consultaCubit.aplicarTratamiento(
+        diente,
+        superficie,
+        tratamiento,
+        justificacionClinica: justificacion,
+      );
+    } else {
+      consultaCubit.aplicarTratamiento(diente, superficie, tratamiento);
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

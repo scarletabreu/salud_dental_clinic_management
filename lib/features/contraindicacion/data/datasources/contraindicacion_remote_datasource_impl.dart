@@ -27,6 +27,64 @@ class ContraindicacionRemoteDatasourceImpl
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchContraindicacionesByTratamiento(
+    String tratamientoId,
+  ) async {
+    try {
+      final response = await supabaseClient
+          .from('contraindicaciones')
+          .select('*')
+          .eq('tratamiento_id', tratamientoId)
+          .filter('deleted_at', 'is', null);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener contraindicaciones: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado: $e');
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchContraindicacionesByProcedimiento(
+    String procedimientoId,
+  ) async {
+    try {
+      final response = await supabaseClient
+          .from('contraindicaciones')
+          .select('*')
+          .eq('procedimiento_id', procedimientoId)
+          .filter('deleted_at', 'is', null);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener contraindicaciones: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado: $e');
+    }
+  }
+
+    @override
+  Future<List<Map<String, dynamic>>> fetchContraindicacionesByMedicina(
+    String medicinaId,
+  ) async {
+    try {
+      final response = await supabaseClient
+          .from('contraindicaciones')
+          .select('*')
+          .eq('medicina_id', medicinaId)
+          .filter('deleted_at', 'is', null);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener contraindicaciones: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado: $e');
+    }
+  }
+  
+
+  @override
   Future<void> registrarContraindicacion(Map<String, dynamic> data) async {
     try {
       data.remove('id');

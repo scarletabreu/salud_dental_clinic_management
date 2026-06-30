@@ -151,7 +151,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  void aplicarTratamiento(Diente diente, TipoSuperficie? superficie, Tratamiento tratamiento) {
+  void aplicarTratamiento(
+    Diente diente,
+    TipoSuperficie? superficie,
+    Tratamiento tratamiento, {
+    String? justificacionClinica,
+  }) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
       final odonto = actual.odontograma;
@@ -163,6 +168,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         estaTerminado: false,
         superficie: superficie,
         precioAplicado: tratamiento.costo,
+        notas: justificacionClinica,
       );
 
       final nuevoOdontograma = odonto.copyWith(

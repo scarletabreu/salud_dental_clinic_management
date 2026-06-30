@@ -716,7 +716,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
         id: widget.existing?.id,
         condicionId: 'TODO',
         medicinaId: widget.existing?.medicinaId ?? '',
-        contraindicacionId: widget.existing?.contraindicacionId ?? '',
+        procedimientoId: widget.existing?.procedimientoId ?? '',
         tratamientoId: widget.existing?.tratamientoId ?? '',
         descripcion: _descripcionController.text.trim(),
         tipoContraindicacion: _tipo,

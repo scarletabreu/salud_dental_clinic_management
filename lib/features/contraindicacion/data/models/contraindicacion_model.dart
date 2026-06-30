@@ -7,7 +7,7 @@ class ContraindicacionModel extends Contraindicacion {
     super.id,
     required super.condicionId,
     super.medicinaId,
-    super.contraindicacionId,
+    super.procedimientoId,
     super.tratamientoId,
     required super.descripcion,
     required super.tipoContraindicacion,
@@ -19,7 +19,7 @@ class ContraindicacionModel extends Contraindicacion {
       id: json['id'] as String?,
       condicionId: json['condicion_id'] as String? ?? '',
       medicinaId: json['medicina_id'] as String?,
-      contraindicacionId: json['contraindicacion_id'] as String?,
+      procedimientoId: json['procedimiento_id'] as String?,
       tratamientoId: json['tratamiento_id'] as String?,
       descripcion: json['descripcion'] as String? ?? '',
       tipoContraindicacion: TipoContraindicacion.fromKey(
@@ -42,7 +42,7 @@ class ContraindicacionModel extends Contraindicacion {
     final Map<String, dynamic> data = {
       'condicion_id': condicionId,
       'medicina_id': medicinaId,
-      'contraindicacion_id': contraindicacionId,
+      'procedimiento_id': procedimientoId,
       'tratamiento_id': tratamientoId,
       'descripcion': descripcion,
       'tipo_contraindicacion': tipoContraindicacion.key,

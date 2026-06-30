@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
 
 class RecordModel extends Record {
   RecordModel({
@@ -21,7 +22,12 @@ class RecordModel extends Record {
         (e) => e.name == (json['tipo_sangre'] ?? json['tipoSangre']),
         orElse: () => TipoSangre.desconocido,
       ),
-      condiciones: json['condiciones'] as String? ?? '',
+      condiciones: (json['condiciones'] as List?)
+              ?.map(
+                (e) => CondicionModel.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
       cantHijos:
           (json['cant_hijos'] ?? json['cantHijos'] as num?)?.toInt() ?? 0,
       cirugiasPrevias: List<String>.from(
@@ -37,7 +43,9 @@ class RecordModel extends Record {
     final Map<String, dynamic> data = {
       'paciente_id': pacienteId,
       'tipo_sangre': tipoSangre.name,
-      'condiciones': condiciones,
+      'condiciones': condiciones
+          .map((e) => e is CondicionModel ? e.toJson() : CondicionModel.fromEntity(e).toJson())
+          .toList(),
       'cant_hijos': cantHijos,
       'cirugias_previas': cirugiasPrevias,
       'historial_familiar': historialFamiliar,
@@ -56,7 +64,9 @@ class RecordModel extends Record {
       pacienteId: record.pacienteId,
       tipoSangre: record.tipoSangre,
       consultas: record.consultas,
-      condiciones: record.condiciones,
+      condiciones: record.condiciones
+          .map((e) => CondicionModel.fromEntity(e))
+          .toList(),
       cantHijos: record.cantHijos,
       cirugiasPrevias: record.cirugiasPrevias,
       historialFamiliar: record.historialFamiliar,
@@ -69,7 +79,7 @@ class RecordModel extends Record {
       pacienteId: '',
       tipoSangre: TipoSangre.desconocido,
       consultas: const [],
-      condiciones: '',
+      condiciones: const [],
       cantHijos: 0,
       cirugiasPrevias: const [],
       historialFamiliar: '',

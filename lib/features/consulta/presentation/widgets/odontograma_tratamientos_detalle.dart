@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 
 /// Odontograma read-only de la consulta y el desglose de tratamientos por
-/// diente (nombres cargados por [ConsultaDetalleCubit]).
+/// diente (nombre + precio congelado, cargados por [ConsultaDetalleCubit]).
 class OdontogramaTratamientosDetalle extends StatelessWidget {
   final Consulta consulta;
 
@@ -25,10 +26,11 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
       );
     }
 
-    final dientesConTratamientos = odontograma.dientes
-        .where((d) => d.tratamientosAplicadosIds.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
+    final dientesConTratamientos =
+        odontograma.dientes
+            .where((d) => d.tratamientosAplicadosIds.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,7 +76,7 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
   ) {
     final ac = context.appColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -97,22 +99,65 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final id in diente.tratamientosAplicadosIds)
-                  Chip(
-                    label: Text(state.nombreDe(id)),
-                    avatar: Icon(
-                      Icons.healing_rounded,
-                      size: 14,
-                      color: ac.teal,
-                    ),
-                    labelStyle: TextStyle(fontSize: 12, color: ac.textPrimary),
-                    visualDensity: VisualDensity.compact,
+                  _filaTratamiento(context, id, state),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filaTratamiento(
+    BuildContext context,
+    String id,
+    ConsultaDetalleListo state,
+  ) {
+    final ac = context.appColors;
+    final detalle = state.detalleDe(id);
+    final nombre = detalle?.nombre ?? 'Tratamiento';
+    final superficie = detalle?.tratamiento.superficie?.name;
+    final precio = detalle?.precio;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.healing_rounded, size: 15, color: ac.teal),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombre,
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (superficie != null)
+                  Text(
+                    'Superficie $superficie',
+                    style: TextStyle(color: ac.textMuted, fontSize: 11.5),
                   ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            precio != null ? formatMoneda(precio) : '—',
+            style: TextStyle(
+              color: precio != null ? ac.textSecondary : ac.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],

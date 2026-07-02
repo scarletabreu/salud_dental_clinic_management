@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
@@ -124,9 +125,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<Map<String, String>> getNombresTratamientosAplicados(
-    List<String> ids,
-  ) async {
+  Future<Map<String, TratamientoAplicadoDetalle>>
+  getDetalleTratamientosAplicados(List<String> ids) async {
     try {
       final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(
         ids,
@@ -134,8 +134,11 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       return {
         for (final fila in filas)
           if (fila['id'] != null)
-            fila['id'] as String:
-                (fila['tratamiento']?['nombre'] as String?) ?? 'Tratamiento',
+            fila['id'] as String: TratamientoAplicadoDetalle(
+              nombre:
+                  (fila['tratamiento']?['nombre'] as String?) ?? 'Tratamiento',
+              tratamiento: TratamientoAplicadoModel.fromJson(fila),
+            ),
       };
     } catch (e) {
       throw Exception(

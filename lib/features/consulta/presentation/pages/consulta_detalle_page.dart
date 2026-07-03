@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
@@ -9,7 +8,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
-import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/presentation/widgets/galeria_documentos.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 /// Resumen clínico de solo lectura de una consulta cerrada: datos del paciente,
@@ -117,11 +116,9 @@ class ConsultaDetallePage extends StatelessWidget {
                     'Documentos clínicos',
                     Icons.folder_open_rounded,
                     ac.indigo,
-                    Column(
-                      children: [
-                        for (final doc in consulta.documentosClinicos)
-                          _filaDocumento(context, doc),
-                      ],
+                    GaleriaDocumentos(
+                      documentos: consulta.documentosClinicos,
+                      mostrarFecha: false,
                     ),
                   ),
                 ],
@@ -458,79 +455,6 @@ class ConsultaDetallePage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Documentos
-  // ---------------------------------------------------------------------------
-
-  Widget _filaDocumento(BuildContext context, DocumentoClinico doc) {
-    final ac = context.appColors;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: ac.indigo.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          alignment: Alignment.center,
-          child: Icon(_iconoDocumento(doc.tipoDocumento.name), color: ac.indigo, size: 19),
-        ),
-        title: Text(
-          doc.descripcion,
-          style: TextStyle(
-            color: ac.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          _etiquetaTipoDoc(doc.tipoDocumento.name),
-          style: TextStyle(color: ac.textMuted, fontSize: 12),
-        ),
-        trailing: IconButton(
-          tooltip: 'Copiar enlace del documento',
-          icon: Icon(Icons.link_rounded, size: 18, color: ac.primaryBlue),
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: doc.urlArchivo));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Enlace copiado.')),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  IconData _iconoDocumento(String tipo) {
-    switch (tipo) {
-      case 'imagen':
-        return Icons.image_rounded;
-      case 'video':
-        return Icons.videocam_rounded;
-      case 'radiografia':
-        return Icons.medical_information_rounded;
-      default:
-        return Icons.description_rounded;
-    }
-  }
-
-  String _etiquetaTipoDoc(String tipo) {
-    switch (tipo) {
-      case 'imagen':
-        return 'Imagen';
-      case 'video':
-        return 'Video';
-      case 'radiografia':
-        return 'Radiografía';
-      default:
-        return tipo;
-    }
   }
 
   // ---------------------------------------------------------------------------

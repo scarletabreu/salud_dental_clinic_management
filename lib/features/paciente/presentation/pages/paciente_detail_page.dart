@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/presentation/widgets/galeria_documentos.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -167,6 +169,7 @@ class _PacienteDetailPageState
             consultas: sorted,
           ),
           const SizedBox(height: 16),
+          _buildDocumentosCard(sorted),
           _buildTimelineCard(sorted),
           const SizedBox(height: 24),
         ],
@@ -820,6 +823,44 @@ class _PacienteDetailPageState
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  //  4.5 Documentos e imágenes (todas las consultas)
+  // ─────────────────────────────────────────────
+
+  Widget _buildDocumentosCard(List<Consulta> sorted) {
+    // Aplanamos los documentos ya embebidos en cada consulta y los ordenamos
+    // por fecha (más reciente primero). No requiere consulta extra: el
+    // historial ya trae `documentos_clinicos(*)`.
+    final documentos = <DocumentoClinico>[
+      for (final c in sorted) ...c.documentosClinicos,
+    ]..sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
+
+    if (documentos.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _SectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const _SectionHeader(
+                  icon: Icons.perm_media_outlined,
+                  title: 'Documentos e Imágenes',
+                ),
+                const Spacer(),
+                _CountChip(documentos.length),
+              ],
+            ),
+            const SizedBox(height: 20),
+            GaleriaDocumentos(documentos: documentos),
+          ],
+        ),
       ),
     );
   }

@@ -324,7 +324,9 @@ Future<void> init() async {
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
-  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
+  sl.registerFactory<ConsultaCubit>(
+    () => ConsultaCubit(sl(), sl(), sl(), sl(), sl()),
+  );
   sl.registerFactory<ConsultaDetalleCubit>(
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
   );

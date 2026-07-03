@@ -32,12 +32,13 @@ class DocumentoClinicoModel extends DocumentoClinico {
   }
 
   Map<String, dynamic> toJson() {
+    // La tabla `documentos_clinicos` NO tiene columna `fecha_creacion`: la
+    // marca temporal la lleva `created_at` (la fija el datasource al insertar).
     final Map<String, dynamic> data = {
       'paciente_id': pacienteId,
       'consulta_id': consultaId,
       'descripcion': descripcion,
       'tipo_documento': tipoDocumento.name,
-      'fecha_creacion': fechaCreacion.toUtc().toIso8601String(),
       'url_archivo': urlArchivo,
     };
 

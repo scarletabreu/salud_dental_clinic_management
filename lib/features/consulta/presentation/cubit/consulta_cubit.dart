@@ -10,6 +10,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/usecases
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/domain/repositories/documento_clinico_repository.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
@@ -37,12 +38,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   final SupabaseStorageHelper _storage;
   final CitaRepository _citaRepository;
   final ConsultaRepository _consultaRepository;
+  final DocumentoClinicoRepository _documentoRepository;
 
   ConsultaCubit(
     this._crearConsulta,
     this._storage,
     this._citaRepository,
     this._consultaRepository,
+    this._documentoRepository,
   ) : super(const ConsultaInactiva());
 
   Future<void> iniciar({
@@ -252,6 +255,57 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
       emit(ConsultaIniciada(consulta: actual.copyWith(recetas: [...actual.recetas, receta])));
+    }
+  }
+
+  /// Adjunta un documento a la consulta EN CURSO: lo sube a Storage e inserta
+  /// la fila en `documentos_clinicos` con el `consulta_id` ya existente (creado
+  /// por el RPC al iniciar). A diferencia del odontograma, el documento queda
+  /// persistido de inmediato; luego refleja el nuevo documento en memoria para
+  /// que la galería lo muestre sin recargar.
+  Future<void> adjuntarDocumento({
+    required Uint8List bytes,
+    required String fileName,
+    required String descripcion,
+    required TipoDocumento tipo,
+  }) async {
+    if (state is! ConsultaIniciada) return;
+    final consulta = (state as ConsultaIniciada).consulta;
+    final consultaId = consulta.id;
+    if (consultaId == null) return;
+
+    try {
+      final url = await _storage.subirDocumento(
+        bytes: bytes,
+        fileName: fileName,
+        pacienteId: consulta.pacienteId,
+      );
+
+      final documento = DocumentoClinico(
+        pacienteId: consulta.pacienteId,
+        consultaId: consultaId,
+        descripcion: descripcion,
+        tipoDocumento: tipo,
+        fechaCreacion: DateTime.now(),
+        urlArchivo: url,
+      );
+
+      await _documentoRepository.registrarDocumento(documento);
+
+      emit(
+        ConsultaIniciada(
+          consulta: consulta.copyWith(
+            documentosClinicos: [...consulta.documentosClinicos, documento],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error al adjuntar documento: $e');
+      emit(ConsultaError(_mensajeError(
+        e,
+        fallback: 'No se pudo adjuntar el documento. Inténtalo de nuevo.',
+      )));
+      emit(ConsultaIniciada(consulta: consulta));
     }
   }
 

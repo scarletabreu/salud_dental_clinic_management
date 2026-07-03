@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -6,6 +7,10 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/presentation/util/documento_media.dart';
+import 'package:salud_dental_clinic_management/features/documento_clinico/presentation/widgets/galeria_documentos.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
@@ -27,6 +32,10 @@ class WorkspaceConsulta extends StatefulWidget {
 
 class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   final _notasController = TextEditingController();
+  final _docDescripcionController = TextEditingController();
+
+  TipoDocumento _tipoDoc = TipoDocumento.radiografia;
+  bool _subiendoDoc = false;
 
   List<Tratamiento> _catalogo = const [];
   Map<String, String> _nombrePorId = const {};
@@ -57,7 +66,38 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   @override
   void dispose() {
     _notasController.dispose();
+    _docDescripcionController.dispose();
     super.dispose();
+  }
+
+  /// Adjunta un documento a la consulta en curso: selecciona el archivo, lo
+  /// sube y persiste vía el cubit. El spinner es local para no bloquear el
+  /// resto del workspace.
+  Future<void> _adjuntarDocumento() async {
+    final consultaCubit = context.read<ConsultaCubit>();
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'dcm'],
+      withData: true,
+    );
+    if (result == null) return;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    final desc = _docDescripcionController.text.trim();
+    setState(() => _subiendoDoc = true);
+    await consultaCubit.adjuntarDocumento(
+      bytes: bytes,
+      fileName: file.name,
+      descripcion: desc.isEmpty ? file.name : desc,
+      tipo: _tipoDoc,
+    );
+    if (!mounted) return;
+    setState(() {
+      _subiendoDoc = false;
+      _docDescripcionController.clear();
+    });
   }
 
   Future<void> _cargarCatalogo() async {
@@ -185,6 +225,173 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     );
     if (confirmado != true || !mounted) return;
     context.read<ConsultaCubit>().quitarTratamiento(diente, index);
+  }
+
+  Widget _buildDocumentosCard(
+    AppColors ac,
+    List<DocumentoClinico> documentos,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
+        boxShadow: [ac.cardShadow],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: ac.indigo.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.perm_media_outlined, size: 17, color: ac.indigo),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Documentos clínicos',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: ac.textPrimary,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Adjunta radiografías u otros archivos durante la consulta',
+                      style: TextStyle(fontSize: 11, color: ac.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _docDescripcionController,
+                  style: TextStyle(fontSize: 14, color: ac.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Descripción del documento (opcional)',
+                    hintStyle: TextStyle(
+                      color: ac.textMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    filled: true,
+                    fillColor: ac.bgPage,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: ac.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: ac.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: ac.indigo, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _selectorTipoDoc(ac),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _subiendoDoc ? null : _adjuntarDocumento,
+              icon: _subiendoDoc
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ac.indigo,
+                      ),
+                    )
+                  : Icon(Icons.upload_file_outlined, size: 18, color: ac.indigo),
+              label: Text(_subiendoDoc ? 'Subiendo…' : 'Adjuntar documento'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ac.indigo,
+                side: BorderSide(color: ac.indigo.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (documentos.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            GaleriaDocumentos(documentos: documentos, mostrarFecha: false),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _selectorTipoDoc(AppColors ac) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 48,
+      decoration: BoxDecoration(
+        color: ac.bgPage,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.divider),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<TipoDocumento>(
+          value: _tipoDoc,
+          isDense: true,
+          borderRadius: BorderRadius.circular(12),
+          style: TextStyle(fontSize: 13, color: ac.textPrimary),
+          items: [
+            for (final tipo in TipoDocumento.values)
+              DropdownMenuItem(
+                value: tipo,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(iconoTipoDocumento(tipo), size: 15, color: ac.indigo),
+                    const SizedBox(width: 6),
+                    Text(etiquetaTipoDocumento(tipo)),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: (tipo) {
+            if (tipo != null) setState(() => _tipoDoc = tipo);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -451,7 +658,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               ),
             ),
             const SizedBox(height: 16),
-    
+
+            _buildDocumentosCard(ac, consulta.documentosClinicos),
+            const SizedBox(height: 16),
+
             _ProximamenteCard(ac),
             const SizedBox(height: 28),
     

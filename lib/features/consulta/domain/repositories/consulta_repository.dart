@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 abstract class ConsultaRepository {
@@ -11,21 +12,17 @@ abstract class ConsultaRepository {
 
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String pacienteId,
     required Odontograma odontograma,
+    required List<Receta> recetas,
     String? notas,
   });
-
-  /// Detalle (nombre del catálogo + precio congelado + superficie/notas) de los
-  /// tratamientos aplicados que el odontograma de la consulta referencia por id.
-  /// Devuelve un mapa `id de tratamiento_aplicado → detalle`.
   Future<Map<String, TratamientoAplicadoDetalle>>
   getDetalleTratamientosAplicados(List<String> ids);
   Future<List<Consulta>> getHistorialPaciente(String pacienteId);
 
-  /// Tratamientos aplicados en consultas anteriores del paciente, agrupados por
-  /// código FDI del diente. Sirve para pintar la capa "histórico" del
-  /// odontograma de una consulta nueva.
-  Future<Map<int, List<TratamientoAplicado>>> getTratamientosHistoricosPorDiente(
+  Future<Map<int, List<TratamientoAplicado>>>
+  getTratamientosHistoricosPorDiente(
     String pacienteId, {
     String? excluyendoConsultaId,
   });

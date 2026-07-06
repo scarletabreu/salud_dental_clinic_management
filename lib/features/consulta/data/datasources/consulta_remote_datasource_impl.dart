@@ -6,9 +6,6 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   ConsultaRemoteDatasourceImpl({required this.supabaseClient});
 
-  /// Embed común del listado/detalle. Solo relaciones con FK fiable hacia
-  /// `consultas`: recetas, documentos clínicos y el odontograma con sus
-  /// dientes (los tratamientos cuelgan de `dientes.tratamientos_aplicados_ids`).
   static const _selectConsulta =
       '*, recetas(*), documentos_clinicos(*), '
       'odontograma:odontogramas(id, consulta_id, '
@@ -33,20 +30,36 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
+    required List<Map<String, dynamic>> recetas,
     String? notas,
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
 
-      // Las notas van primero: si falla (p. ej. falta la migración de la
-      // columna `notas`), aún no se insertó ningún tratamiento y el doctor
-      // puede reintentar sin dejar filas duplicadas.
       if (notas != null && notas.trim().isNotEmpty) {
         await supabaseClient
             .from('consultas')
             .update({'notas': notas.trim(), 'updated_at': now})
             .eq('id', consultaId);
+      }
+
+      await supabaseClient
+          .from('recetas')
+          .delete()
+          .eq('consulta_id', consultaId);
+
+      if (recetas.isNotEmpty) {
+        await supabaseClient.from('recetas').insert([
+          for (final r in recetas)
+            {
+              ...r,
+              'consulta_id': consultaId,
+              'paciente_id': pacienteId,
+              'updated_at': now,
+            },
+        ]);
       }
 
       final odontograma = await supabaseClient
@@ -56,17 +69,12 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           .isFilter('deleted_at', null)
           .maybeSingle();
       if (odontograma == null) {
-        // Sin odontograma no hay dónde colgar tratamientos. Si tampoco hay
-        // nada que guardar, terminamos en silencio (p. ej. guardar solo notas).
         if (tratamientosPorFdi.isEmpty) return;
         throw Exception('No se encontró el odontograma de la consulta.');
       }
 
       final dientes = odontograma['dientes'] as List;
 
-      // Reemplazo idempotente: borramos los tratamientos aplicados de ESTA
-      // consulta y los reinsertamos desde el estado en memoria (fuente de
-      // verdad). Así guardar avance N veces no duplica filas ni deja huérfanos.
       await supabaseClient
           .from('tratamientos_aplicados')
           .delete()
@@ -77,10 +85,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         final dienteId = d['id'] as String;
         final actualesIds =
             (d['tratamientos_aplicados_ids'] as List?)?.cast<String>() ??
-                const [];
+            const [];
         final filas = tratamientosPorFdi[fdi] ?? const [];
 
-        // Nada que poner ni que limpiar en este diente: no lo tocamos.
         if (filas.isEmpty && actualesIds.isEmpty) continue;
 
         var nuevosIds = const <String>[];
@@ -149,9 +156,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
       return List<Map<String, dynamic>>.from(response as List);
     } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al obtener consultas del doctor: ${e.message}',
-      );
+      throw Exception('Error al obtener consultas del doctor: ${e.message}');
     }
   }
 
@@ -211,9 +216,6 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     String? excluyendoConsultaId,
   }) async {
     try {
-      // `!inner` en consultas → filtra por paciente; `!inner` en dientes →
-      // descarta tratamientos generales (sin diente) y trae el fdi_code para
-      // proyectar sobre el odontograma.
       var query = supabaseClient
           .from('tratamientos_aplicados')
           .select(

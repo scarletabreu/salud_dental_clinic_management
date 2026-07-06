@@ -4,6 +4,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/reposito
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
@@ -48,8 +50,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
           .map(
             (d) => {
               'fdi_code': d.fdiCode,
-              'superficies':
-                  d.superficies.map((s) => s.tipoSuperficie.name).toList(),
+              'superficies': d.superficies
+                  .map((s) => s.tipoSuperficie.name)
+                  .toList(),
             },
           )
           .toList();
@@ -92,7 +95,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String pacienteId,
     required Odontograma odontograma,
+    required List<Receta> recetas,
     String? notas,
   }) async {
     try {
@@ -105,16 +110,21 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'tratamiento_id': t.tratamientoId,
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
-                  // El enum tipo_superficie de la BD es en minúscula.
                   'superficie': t.superficie?.name.toLowerCase(),
                   'precio_aplicado': t.precioAplicado,
                 },
             ],
       };
 
+      final recetasJson = [
+        for (final r in recetas) RecetaModel.fromEntity(r).toJson(),
+      ];
+
       await remoteDataSource.guardarResultadoConsulta(
         consultaId: consultaId,
+        pacienteId: pacienteId,
         tratamientosPorFdi: tratamientosPorFdi,
+        recetas: recetasJson,
         notas: notas,
       );
     } catch (e) {

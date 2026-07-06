@@ -19,7 +19,6 @@ import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/dom
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
 
-/// Documento (radiografía) seleccionado en el formulario, aún sin subir.
 class DocumentoAdjunto {
   final Uint8List bytes;
   final String fileName;
@@ -56,7 +55,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   }) async {
     emit(const ConsultaGuardando());
     try {
-      // 1. Subir las radiografías a Storage y recolectar sus URLs.
       final documentos = <DocumentoClinico>[];
       for (final adj in adjuntos) {
         final url = await _storage.subirDocumento(
@@ -67,7 +65,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         documentos.add(
           DocumentoClinico(
             pacienteId: pacienteId,
-            consultaId: '', // lo asigna la BD dentro del RPC
+            consultaId: '',
             descripcion: adj.descripcion,
             tipoDocumento: TipoDocumento.radiografia,
             fechaCreacion: DateTime.now(),
@@ -76,7 +74,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         );
       }
 
-      // 2. Crear consulta en BD.
       final consultaInicial = Consulta(
         pacienteId: pacienteId,
         doctorId: doctorId,
@@ -90,15 +87,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       final consultaId = await _crearConsulta(consultaInicial);
 
-      // La cita pasa a EN_CONSULTA.
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
       }
-
-      // 3. Cargamos los tratamientos de consultas anteriores para proyectar el
-      //    estado dental acumulado (capa "histórico"). Si falla, la consulta
-      //    arranca igual con la boca en blanco: el historial es contexto, no
-      //    debe bloquear la atención.
       var historicoPorFdi = const <int, List<TratamientoAplicado>>{};
       try {
         historicoPorFdi = await _consultaRepository
@@ -110,7 +101,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
       }
 
-      // 4. Generamos el odontograma en memoria que acompañará la sesión.
       final odontograma = Odontograma(
         consultaId: consultaId,
         dientes: kFdiPermanentes.map((fdi) {
@@ -188,8 +178,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  /// Quita el tratamiento en [index] del diente (solo en memoria; nada se ha
-  /// persistido aún mientras la consulta sigue activa).
   void quitarTratamiento(Diente diente, int index) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
@@ -212,7 +200,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     );
   }
 
-  /// Marca el tratamiento en [index] como terminado o en proceso.
   void marcarTratamientoTerminado(Diente diente, int index, bool terminado) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
@@ -275,7 +262,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  /// Quita la receta en [index] (solo en memoria, igual que quitarTratamiento).
   void quitarItemReceta(int index) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
@@ -298,7 +284,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     try {
       await _consultaRepository.guardarResultadoConsulta(
         consultaId: consultaId,
+        pacienteId: consulta.pacienteId,
         odontograma: odontograma,
+        recetas: consulta.recetas,
         notas: consulta.notas,
       );
       emit(ConsultaIniciada(consulta: consulta));
@@ -325,7 +313,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     try {
       await _consultaRepository.guardarResultadoConsulta(
         consultaId: consultaId,
+        pacienteId: consulta.pacienteId,
         odontograma: odontograma,
+        recetas: consulta.recetas,
         notas: consulta.notas,
       );
       if (citaId != null) {

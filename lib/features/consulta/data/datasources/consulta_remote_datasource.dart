@@ -3,7 +3,9 @@ abstract class ConsultaRemoteDatasource {
 
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
+    required List<Map<String, dynamic>> recetas,
     String? notas,
   });
 
@@ -14,16 +16,10 @@ abstract class ConsultaRemoteDatasource {
   );
   Future<Map<String, dynamic>?> fetchConsultaById(String id);
 
-  /// Tratamientos aplicados por ids, con el nombre del tratamiento del
-  /// catálogo embebido (clave `tratamiento`).
   Future<List<Map<String, dynamic>>> fetchTratamientosAplicadosPorIds(
     List<String> ids,
   );
 
-  /// Tratamientos aplicados en consultas ANTERIORES del paciente, con el
-  /// `fdi_code` del diente embebido (clave `diente`). Excluye, si se indica, la
-  /// consulta en curso. Usado para proyectar el historial sobre un odontograma
-  /// recién creado.
   Future<List<Map<String, dynamic>>> fetchTratamientosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,

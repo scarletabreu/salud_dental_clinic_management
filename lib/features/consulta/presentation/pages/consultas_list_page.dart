@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consulta_detalle_page.dart';
@@ -477,10 +478,99 @@ class _ConsultaCard extends StatelessWidget {
     required this.onTap,
   });
 
+  void _mostrarDialogoEliminar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar Consulta'),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Esta consulta será eliminada junto con su odontograma, dientes, superficies y diagnósticos aplicados.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: colorScheme.error.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_rounded,
+                      size: 20,
+                      color: colorScheme.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Aviso Legal',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.error,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Solo se permite para consultas creadas por error hoy, sin tratamientos aplicados ni pre-factura (Ley 172-13).',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                              color: colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<ConsultasListCubit>().eliminarConsulta(consulta);
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Eliminar'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
+    final esEliminable = esConsultaEliminable(consulta);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -560,6 +650,22 @@ class _ConsultaCard extends StatelessWidget {
                     icon: Icons.receipt_long_rounded,
                     color: ac.primaryBlue,
                     tooltip: 'Tiene receta',
+                  ),
+                if (esEliminable)
+                  Tooltip(
+                    message: 'Eliminar consulta',
+                    child: InkWell(
+                      onTap: () => _mostrarDialogoEliminar(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: colorScheme.error.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
                   ),
                 const SizedBox(width: 4),
                 Icon(

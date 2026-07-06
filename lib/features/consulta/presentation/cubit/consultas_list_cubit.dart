@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/eliminar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
@@ -12,14 +13,17 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
   final ConsultaRepository _consultaRepository;
   final IPacienteRepository _pacienteRepository;
   final DoctorRepository _doctorRepository;
+  final EliminarConsultaUseCase _eliminarConsultaUseCase;
 
   ConsultasListCubit({
     required ConsultaRepository consultaRepository,
     required IPacienteRepository pacienteRepository,
     required DoctorRepository doctorRepository,
+    required EliminarConsultaUseCase eliminarConsultaUseCase,
   }) : _consultaRepository = consultaRepository,
        _pacienteRepository = pacienteRepository,
        _doctorRepository = doctorRepository,
+       _eliminarConsultaUseCase = eliminarConsultaUseCase,
        super(const ConsultasInitial());
 
   String? _restringidoADoctorId;
@@ -130,6 +134,19 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
         puedeFiltrarPorDoctor: current.puedeFiltrarPorDoctor,
       ),
     );
+  }
+
+  /// Elimina una consulta creada por error hoy, sin tratamientos ni pre-factura.
+  ///
+  /// El use case valida los guardrails antes de ejecutar.
+  Future<void> eliminarConsulta(Consulta consulta) async {
+    try {
+      await _eliminarConsultaUseCase(consulta);
+      // Recargar lista después de eliminación exitosa
+      await recargar();
+    } catch (e) {
+      emit(ConsultasError(_mensajeError(e)));
+    }
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

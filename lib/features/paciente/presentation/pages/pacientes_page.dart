@@ -730,7 +730,7 @@ class _PacientesPageState extends State<PacientesPage> {
           Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
           Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
           Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
-          SizedBox(width: 72),
+          SizedBox(width: 108),
         ],
       ),
     );
@@ -947,7 +947,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                     ),
                   ),
                   SizedBox(
-                    width: 72,
+                    width: 108,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -963,6 +963,13 @@ class _PacienteRowState extends State<_PacienteRow> {
                           tooltip: 'Editar',
                           color: colorScheme.onSurfaceVariant.withOpacity(0.5),
                           onTap: widget.onEdit,
+                        ),
+                        const SizedBox(width: 6),
+                        _ActionIcon(
+                          icon: Icons.delete_outline_rounded,
+                          tooltip: 'Eliminar',
+                          color: colorScheme.error.withOpacity(0.7),
+                          onTap: () => _showDeleteConfirmation(context, widget.paciente),
                         ),
                       ],
                     ),
@@ -1043,6 +1050,70 @@ class _PacienteRowState extends State<_PacienteRow> {
 
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  void _showDeleteConfirmation(BuildContext context, Paciente paciente) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar Paciente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Está seguro de que desea eliminar a ${paciente.fullName}?',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Esta acción eliminará el registro del paciente de forma lógica.',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<PacienteCubit>().deletePaciente(paciente.id!);
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Eliminar'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DetailItem extends StatelessWidget {

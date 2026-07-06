@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -8,9 +10,13 @@ import 'paciente_state.dart';
 class PacienteCubit extends Cubit<PacienteState> {
   final IPacienteRepository _repository;
   final ConsultaRepository _consultaRepository;
+  final CitaRepository _citaRepository;
 
-  PacienteCubit(this._repository, this._consultaRepository)
-      : super(const PacienteLoading());
+  PacienteCubit(
+    this._repository,
+    this._consultaRepository,
+    this._citaRepository,
+  ) : super(const PacienteLoading());
 
   Future<void> load() async {
     emit(const PacienteLoading());
@@ -107,5 +113,43 @@ class PacienteCubit extends Cubit<PacienteState> {
         load();
       },
     );
+  }
+
+  Future<void> deletePaciente(String id) async {
+    emit(const PacienteLoading());
+
+    try {
+      // Verificar si hay citas pendientes para este paciente
+      final citas = await _citaRepository.getCitasByPaciente(id);
+
+      // Estados terminales: completada, cancelada, no asistio
+      final citasPendientes = citas.where((cita) {
+        return cita.estado != EstadoCita.completada &&
+            cita.estado != EstadoCita.cancelada &&
+            cita.estado != EstadoCita.noAsistio;
+      }).toList();
+
+      if (citasPendientes.isNotEmpty) {
+        emit(
+          PacienteError(
+            'No se puede eliminar el paciente porque tiene ${citasPendientes.length} cita${citasPendientes.length != 1 ? 's' : ''} pendiente${citasPendientes.length != 1 ? 's' : ''}. '
+            'Por favor, complete, cancele o marque como no asistida todas las citas antes de eliminar.',
+          ),
+        );
+        return;
+      }
+
+      // Proceder con la eliminación
+      final result = await _repository.deletePaciente(id);
+      result.fold(
+        (failure) => emit(PacienteError(failure.message)),
+        (_) {
+          emit(const PacienteOperationSuccess());
+          load();
+        },
+      );
+    } catch (e) {
+      emit(PacienteError('Error al verificar citas: $e'));
+    }
   }
 }

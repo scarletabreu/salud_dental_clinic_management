@@ -308,7 +308,7 @@ Future<void> init() async {
   sl.registerLazySingleton<IAuthRepository>(() => AuthRepositoryImpl(sl()));
   sl.registerSingleton<AuthSessionCubit>(AuthSessionCubit(sl())..initialize());
 
-  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
+  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
   sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
   sl.registerFactory<ConsultaDetalleCubit>(() => ConsultaDetalleCubit(sl()));

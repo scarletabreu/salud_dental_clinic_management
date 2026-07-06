@@ -308,11 +308,20 @@ class PacienteRemoteDatasource {
 
   Future<void> deletePaciente(String id) async {
     try {
+      final now = DateTime.now().toIso8601String();
       await client
           .from('pacientes')
           .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
+            'deleted_at': now,
+            'updated_at': now,
+          })
+          .eq('id', id);
+      
+      await client
+          .from('personas')
+          .update({
+            'deleted_at': now,
+            'updated_at': now,
           })
           .eq('id', id);
     } on PostgrestException catch (e) {

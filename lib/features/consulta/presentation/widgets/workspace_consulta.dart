@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_receta.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
@@ -41,7 +42,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     super.initState();
     _cargarCatalogo();
     _cargarCondicionesPaciente();
-    
+
     final state = context.read<ConsultaCubit>().state;
     if (state is ConsultaIniciada && state.consulta.notas != null) {
       _notasController.text = state.consulta.notas!;
@@ -50,7 +51,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
 
     _notasController.addListener(() {
-      context.read<ConsultaCubit>().actualizarObservaciones(_notasController.text);
+      context.read<ConsultaCubit>().actualizarObservaciones(
+        _notasController.text,
+      );
     });
   }
 
@@ -62,7 +65,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
   Future<void> _cargarCatalogo() async {
     try {
-      final catalogo = await sl<TratamientoRepository>().getCatalogoTratamientos();
+      final catalogo = await sl<TratamientoRepository>()
+          .getCatalogoTratamientos();
       if (!mounted) return;
       setState(() {
         _catalogo = catalogo;
@@ -104,7 +108,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     return [];
   }
 
-  Future<void> _onAddTratamiento(Diente diente, TipoSuperficie? superficie) async {
+  Future<void> _onAddTratamiento(
+    Diente diente,
+    TipoSuperficie? superficie,
+  ) async {
     if (_cargandoCatalogo) return;
     final consultaCubit = context.read<ConsultaCubit>();
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
@@ -136,7 +143,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('"${tratamiento.nombre}" asignado al diente ${diente.fdiCode}.'),
+        content: Text(
+          '"${tratamiento.nombre}" asignado al diente ${diente.fdiCode}.',
+        ),
         backgroundColor: context.appColors.teal,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -153,10 +162,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
   void _onToggleTerminado(Diente diente, int index, bool terminado) {
     context.read<ConsultaCubit>().marcarTratamientoTerminado(
-          diente,
-          index,
-          terminado,
-        );
+      diente,
+      index,
+      terminado,
+    );
   }
 
   Future<void> _onQuitarTratamiento(Diente diente, int index) async {
@@ -192,8 +201,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     final ac = context.appColors;
 
     return BlocBuilder<ConsultaCubit, ConsultaState>(
-      buildWhen: (previous, current) => 
-          current is ConsultaIniciada || current is ConsultaGuardando || current is ConsultaError,
+      buildWhen: (previous, current) =>
+          current is ConsultaIniciada ||
+          current is ConsultaGuardando ||
+          current is ConsultaError,
       builder: (context, state) {
         if (state is! ConsultaIniciada && state is! ConsultaGuardando) {
           return Center(
@@ -201,16 +212,19 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           );
         }
 
-        final consulta = state is ConsultaIniciada 
-            ? state.consulta 
+        final consulta = state is ConsultaIniciada
+            ? state.consulta
             : (state as ConsultaGuardando).consulta;
-            
+
         if (consulta == null || consulta.odontograma == null) {
           return const Center(child: Text('Odontograma no disponible'));
         }
-        
+
         final odontograma = consulta.odontograma!;
-        final totalTratamientos = odontograma.dientes.fold(0, (sum, d) => sum + d.tratamientos.length);
+        final totalTratamientos = odontograma.dientes.fold(
+          0,
+          (sum, d) => sum + d.tratamientos.length,
+        );
         final cargando = state is ConsultaGuardando;
 
         return ListView(
@@ -266,11 +280,17 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                 ),
                 if (totalTratamientos > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: ac.teal.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: ac.teal.withValues(alpha: 0.25), width: 1),
+                      border: Border.all(
+                        color: ac.teal.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -291,7 +311,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               ],
             ),
             const SizedBox(height: 24),
-    
+
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -312,7 +332,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                           color: ac.teal.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.grid_view_rounded, size: 17, color: ac.teal),
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          size: 17,
+                          color: ac.teal,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -331,7 +355,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                             const SizedBox(height: 2),
                             Text(
                               'Toca un diente para asignar tratamientos',
-                              style: TextStyle(fontSize: 11, color: ac.textMuted),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: ac.textMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -340,7 +367,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                         SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: ac.teal),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: ac.teal,
+                          ),
                         ),
                     ],
                   ),
@@ -360,7 +390,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               ),
             ),
             const SizedBox(height: 16),
-    
+
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -381,7 +411,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                           color: ac.indigo.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.edit_note_rounded, size: 17, color: ac.indigo),
+                        child: Icon(
+                          Icons.edit_note_rounded,
+                          size: 17,
+                          color: ac.indigo,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Column(
@@ -405,7 +439,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                       ),
                       const Spacer(),
                       TextButton.icon(
-                        onPressed: cargando ? null : () => context.read<ConsultaCubit>().guardarParcial(),
+                        onPressed: cargando
+                            ? null
+                            : () => context
+                                  .read<ConsultaCubit>()
+                                  .guardarParcial(),
                         icon: const Icon(Icons.save_outlined, size: 16),
                         label: const Text('Guardar avance'),
                       ),
@@ -424,7 +462,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                       height: 1.5,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Observaciones, hallazgos adicionales, indicaciones…',
+                      hintText:
+                          'Observaciones, hallazgos adicionales, indicaciones…',
                       hintStyle: TextStyle(
                         color: ac.textMuted,
                         fontSize: 13,
@@ -432,7 +471,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                       ),
                       filled: true,
                       fillColor: ac.bgPage,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: ac.divider),
@@ -451,61 +493,25 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               ),
             ),
             const SizedBox(height: 16),
-    
-            _ProximamenteCard(ac),
+
+            SeccionReceta(
+              condicionesPaciente: _condicionesPaciente(),
+              recetas: consulta.recetas,
+            ),
             const SizedBox(height: 28),
-    
+
             _TerminarButton(
               cargando: cargando,
               onTap: cargando
                   ? null
-                  : () => context.read<ConsultaCubit>().terminarConsulta(citaId: widget.citaId),
+                  : () => context.read<ConsultaCubit>().terminarConsulta(
+                      citaId: widget.citaId,
+                    ),
               ac: ac,
             ),
           ],
         );
       },
-    );
-  }
-}
-
-class _ProximamenteCard extends StatelessWidget {
-  const _ProximamenteCard(this.ac);
-  final AppColors ac;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: ac.amber.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ac.amber.withValues(alpha: 0.28), width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: ac.amber.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.schedule_rounded, size: 15, color: ac.amber),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Próximamente: recetas y facturación al terminar la consulta.',
-              style: TextStyle(
-                color: ac.textSecondary,
-                fontSize: 12,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

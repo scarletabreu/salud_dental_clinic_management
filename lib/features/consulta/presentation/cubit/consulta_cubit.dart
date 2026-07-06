@@ -103,9 +103,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       try {
         historicoPorFdi = await _consultaRepository
             .getTratamientosHistoricosPorDiente(
-          pacienteId,
-          excluyendoConsultaId: consultaId,
-        );
+              pacienteId,
+              excluyendoConsultaId: consultaId,
+            );
       } catch (e) {
         if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
       }
@@ -180,7 +180,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         }).toList(),
       );
 
-      emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+      emit(
+        ConsultaIniciada(
+          consulta: actual.copyWith(odontograma: nuevoOdontograma),
+        ),
+      );
     }
   }
 
@@ -201,7 +205,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }).toList(),
     );
 
-    emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+    emit(
+      ConsultaIniciada(
+        consulta: actual.copyWith(odontograma: nuevoOdontograma),
+      ),
+    );
   }
 
   /// Marca el tratamiento en [index] como terminado o en proceso.
@@ -226,7 +234,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }).toList(),
     );
 
-    emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+    emit(
+      ConsultaIniciada(
+        consulta: actual.copyWith(odontograma: nuevoOdontograma),
+      ),
+    );
   }
 
   void toggleDienteAusente(Diente diente, bool ausente) {
@@ -244,24 +256,42 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         }).toList(),
       );
 
-      emit(ConsultaIniciada(consulta: actual.copyWith(odontograma: nuevoOdontograma)));
+      emit(
+        ConsultaIniciada(
+          consulta: actual.copyWith(odontograma: nuevoOdontograma),
+        ),
+      );
     }
   }
 
   void agregarItemReceta(Receta receta) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
-      emit(ConsultaIniciada(consulta: actual.copyWith(recetas: [...actual.recetas, receta])));
+      emit(
+        ConsultaIniciada(
+          consulta: actual.copyWith(recetas: [...actual.recetas, receta]),
+        ),
+      );
     }
+  }
+
+  /// Quita la receta en [index] (solo en memoria, igual que quitarTratamiento).
+  void quitarItemReceta(int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.recetas.length) return;
+
+    final nuevasRecetas = [...actual.recetas]..removeAt(index);
+    emit(ConsultaIniciada(consulta: actual.copyWith(recetas: nuevasRecetas)));
   }
 
   Future<void> guardarParcial() async {
     if (state is! ConsultaIniciada) return;
-    
+
     final consulta = (state as ConsultaIniciada).consulta;
     final consultaId = consulta.id;
     final odontograma = consulta.odontograma;
-    
+
     if (consultaId == null || odontograma == null) return;
 
     emit(ConsultaGuardando(consulta: consulta));
@@ -275,17 +305,17 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     } catch (e) {
       if (kDebugMode) debugPrint('Error en guardado parcial: $e');
       emit(ConsultaError(_mensajeError(e)));
-      emit(ConsultaIniciada(consulta: consulta)); 
+      emit(ConsultaIniciada(consulta: consulta));
     }
   }
 
   Future<void> terminarConsulta({String? citaId}) async {
     if (state is! ConsultaIniciada) return;
-    
+
     final consulta = (state as ConsultaIniciada).consulta;
     final consultaId = consulta.id;
     final odontograma = consulta.odontograma;
-    
+
     if (consultaId == null || odontograma == null) {
       emit(const ConsultaError('No hay una consulta activa con odontograma.'));
       return;
@@ -301,16 +331,27 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.completada);
       }
-      
+
       emit(const ConsultaTerminada());
     } catch (e) {
       if (kDebugMode) debugPrint('Error al terminar consulta: $e');
-      emit(ConsultaError(_mensajeError(e, fallback: 'No se pudo guardar el resultado de la consulta. Inténtalo de nuevo.')));
+      emit(
+        ConsultaError(
+          _mensajeError(
+            e,
+            fallback:
+                'No se pudo guardar el resultado de la consulta. Inténtalo de nuevo.',
+          ),
+        ),
+      );
       emit(ConsultaIniciada(consulta: consulta));
     }
   }
 
-  String _mensajeError(Object e, {String fallback = 'No se pudo registrar la consulta. Inténtalo de nuevo.'}) {
+  String _mensajeError(
+    Object e, {
+    String fallback = 'No se pudo registrar la consulta. Inténtalo de nuevo.',
+  }) {
     final raw = e.toString();
     if (raw.contains('SocketException') ||
         raw.contains('Failed host lookup') ||

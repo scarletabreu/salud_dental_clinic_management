@@ -16,6 +16,7 @@ class Consulta {
   final String? motivoConsulta;
   final String? notas;
   final SignosVitales? signosVitales;
+  final bool finalizada;
 
   final bool tienePreFactura;
 
@@ -32,10 +33,12 @@ class Consulta {
     this.motivoConsulta,
     this.notas,
     this.signosVitales,
+    this.finalizada = false,
     this.tienePreFactura = false,
   });
 
   bool get tieneRecetas => recetas.isNotEmpty;
+  bool get estaEnCurso => !finalizada;
   bool get tieneTratamientosAplicados =>
       odontograma?.dientes.any(
         (d) =>
@@ -56,6 +59,7 @@ class Consulta {
     String? motivoConsulta,
     String? notas,
     SignosVitales? signosVitales,
+    bool? finalizada,
     bool? tienePreFactura,
   }) {
     return Consulta(
@@ -72,6 +76,7 @@ class Consulta {
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
       notas: notas ?? this.notas,
       signosVitales: signosVitales ?? this.signosVitales,
+      finalizada: finalizada ?? this.finalizada,
       tienePreFactura: tienePreFactura ?? this.tienePreFactura,
     );
   }

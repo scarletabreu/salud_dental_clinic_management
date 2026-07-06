@@ -18,6 +18,7 @@ class ConsultaModel extends Consulta {
     super.motivoConsulta,
     super.notas,
     super.signosVitales,
+    super.finalizada,
     super.tienePreFactura,
   });
 
@@ -30,6 +31,7 @@ class ConsultaModel extends Consulta {
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       motivoConsulta: json['motivo_consulta'] ?? json['motivoConsulta'],
       notas: json['notas'] as String?,
+      finalizada: (json['finalizada'] ?? false) as bool,
       signosVitales: json['signos_vitales'] != null
           ? SignosVitales.fromJson(
               json['signos_vitales'] as Map<String, dynamic>,
@@ -72,6 +74,7 @@ class ConsultaModel extends Consulta {
       'motivo_consulta': motivoConsulta,
       'temp_condiciones': tempCondiciones,
       'signos_vitales': signosVitales?.toJson(),
+      'finalizada': finalizada,
       'tiene_pre_factura': tienePreFactura,
     };
 

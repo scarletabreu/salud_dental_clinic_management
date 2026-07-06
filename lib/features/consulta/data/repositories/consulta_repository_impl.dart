@@ -4,6 +4,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/reposito
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
@@ -92,8 +94,12 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String? pacienteId,
     required Odontograma odontograma,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
+    List<Receta>? recetas,
   }) async {
     try {
       final tratamientosPorFdi = <int, List<Map<String, dynamic>>>{
@@ -114,8 +120,20 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
 
       await remoteDataSource.guardarResultadoConsulta(
         consultaId: consultaId,
+        pacienteId: pacienteId,
         tratamientosPorFdi: tratamientosPorFdi,
         notas: notas,
+        signosVitales: signosVitales,
+        finalizada: finalizada,
+        recetas: recetas
+            ?.map((receta) {
+              final data = RecetaModel.fromEntity(receta).toJson();
+              if (pacienteId != null && pacienteId.isNotEmpty) {
+                data['paciente_id'] = pacienteId;
+              }
+              return data;
+            })
+            .toList(),
       );
     } catch (e) {
       throw Exception(

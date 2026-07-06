@@ -33,20 +33,44 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String? pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
+    List<Map<String, dynamic>>? recetas,
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
+      final consultaPayload = <String, dynamic>{'updated_at': now};
 
-      // Las notas van primero: si falla (p. ej. falta la migración de la
-      // columna `notas`), aún no se insertó ningún tratamiento y el doctor
-      // puede reintentar sin dejar filas duplicadas.
       if (notas != null && notas.trim().isNotEmpty) {
+        consultaPayload['notas'] = notas.trim();
+      }
+      if (signosVitales != null) {
+        consultaPayload['signos_vitales'] = signosVitales;
+      }
+      if (finalizada != null) {
+        consultaPayload['finalizada'] = finalizada;
+      }
+      if (consultaPayload.length > 1) {
         await supabaseClient
             .from('consultas')
-            .update({'notas': notas.trim(), 'updated_at': now})
+            .update(consultaPayload)
             .eq('id', consultaId);
+      }
+
+      if (recetas != null && recetas.isNotEmpty && pacienteId != null) {
+        await supabaseClient.from('recetas').insert(
+          recetas
+              .map((receta) => {
+                    ...receta,
+                    'paciente_id': pacienteId,
+                    'created_at': receta['created_at'] ?? now,
+                    'updated_at': now,
+                  })
+              .toList(),
+        );
       }
 
       final odontograma = await supabaseClient

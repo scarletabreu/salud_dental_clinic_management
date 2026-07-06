@@ -435,6 +435,7 @@ class PacienteRemoteDatasource {
         historialFamiliar: '',
       );
       final insertData = emptyRecord.toJson();
+      insertData.remove('condiciones');
       final created = await client
           .from('records')
           .insert(insertData)

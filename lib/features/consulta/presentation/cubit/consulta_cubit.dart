@@ -128,6 +128,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       final consultaActiva = consultaInicial.copyWith(
         id: consultaId,
         odontograma: odontograma,
+        finalizada: false,
       );
 
       emit(ConsultaIniciada(consulta: consultaActiva));
@@ -255,6 +256,50 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  Future<void> reanudarConsulta({required String consultaId}) async {
+    emit(const ConsultaGuardando());
+    try {
+      final consulta = await _consultaRepository.getDetalleConsulta(consultaId);
+      if (consulta == null) {
+        emit(const ConsultaError('No se encontró la consulta para reanudar.'));
+        return;
+      }
+
+      final consultaRehidratada = await _rehidratarTratamientos(consulta);
+
+      emit(ConsultaIniciada(consulta: consultaRehidratada));
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error al reanudar consulta: $e');
+      emit(ConsultaError(_mensajeError(e, fallback: 'No se pudo reanudar la consulta.')));
+    }
+  }
+
+  Future<Consulta> _rehidratarTratamientos(Consulta consulta) async {
+    final odonto = consulta.odontograma;
+    if (odonto == null) return consulta;
+
+    final ids = <String>{
+      for (final diente in odonto.dientes)
+        ...diente.tratamientosAplicadosIds,
+    };
+
+    if (ids.isEmpty) return consulta;
+
+    final detallePorId = await _consultaRepository.getDetalleTratamientosAplicados(
+      ids.toList(),
+    );
+
+    final dientes = odonto.dientes.map((diente) {
+      final tratamientos = diente.tratamientosAplicadosIds
+          .map((id) => detallePorId[id]?.tratamiento)
+          .whereType<TratamientoAplicado>()
+          .toList();
+      return diente.copyWith(tratamientos: tratamientos);
+    }).toList();
+
+    return consulta.copyWith(odontograma: odonto.copyWith(dientes: dientes));
+  }
+
   Future<void> guardarParcial() async {
     if (state is! ConsultaIniciada) return;
     
@@ -270,6 +315,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         consultaId: consultaId,
         odontograma: odontograma,
         notas: consulta.notas,
+        pacienteId: consulta.pacienteId,
       );
       emit(ConsultaIniciada(consulta: consulta));
     } catch (e) {
@@ -297,6 +343,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         consultaId: consultaId,
         odontograma: odontograma,
         notas: consulta.notas,
+        pacienteId: consulta.pacienteId,
       );
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.completada);

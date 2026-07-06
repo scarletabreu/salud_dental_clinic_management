@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 abstract class ConsultaRepository {
@@ -11,8 +12,12 @@ abstract class ConsultaRepository {
 
   Future<void> guardarResultadoConsulta({
     required String consultaId,
+    required String? pacienteId,
     required Odontograma odontograma,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
+    List<Receta>? recetas,
   });
 
   /// Detalle (nombre del catálogo + precio congelado + superficie/notas) de los

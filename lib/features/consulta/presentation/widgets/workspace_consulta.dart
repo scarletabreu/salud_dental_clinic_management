@@ -504,9 +504,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               cargando: cargando,
               onTap: cargando
                   ? null
-                  : () => context.read<ConsultaCubit>().terminarConsulta(
-                      citaId: widget.citaId,
-                    ),
+                  : () => context.read<ConsultaCubit>().terminarConsulta(),
               ac: ac,
             ),
           ],

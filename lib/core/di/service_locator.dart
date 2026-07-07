@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/consulta/data/datasource
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
@@ -308,6 +309,9 @@ Future<void> init() async {
   sl.registerFactory<CrearConsultaUseCase>(
     () => CrearConsultaUseCase(sl()),
   );
+  sl.registerFactory<FinalizarConsultaUseCase>(
+    () => FinalizarConsultaUseCase(sl()),
+  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -324,7 +328,9 @@ Future<void> init() async {
 
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
-  sl.registerFactory<ConsultaCubit>(() => ConsultaCubit(sl(), sl(), sl(), sl()));
+  sl.registerFactory<ConsultaCubit>(
+    () => ConsultaCubit(sl(), sl(), sl(), sl(), sl()),
+  );
   sl.registerFactory<ConsultaDetalleCubit>(
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
   );

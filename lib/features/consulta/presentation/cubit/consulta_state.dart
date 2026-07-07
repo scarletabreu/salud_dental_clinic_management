@@ -35,9 +35,15 @@ class ConsultaGuardando extends ConsultaState {
   List<Object?> get props => [consulta];
 }
 
-/// La consulta se finalizó con éxito.
+/// La consulta se finalizó con éxito. Lleva el id de la cuenta (pre-factura)
+/// generada, para poder navegar hacia el detalle financiero.
 class ConsultaTerminada extends ConsultaState {
-  const ConsultaTerminada();
+  final String? cuentaId;
+
+  const ConsultaTerminada({this.cuentaId});
+
+  @override
+  List<Object?> get props => [cuentaId];
 }
 
 /// Falló la operación u ocurrió un error.

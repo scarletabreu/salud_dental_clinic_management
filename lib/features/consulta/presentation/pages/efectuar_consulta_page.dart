@@ -11,15 +11,17 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 
 class EfectuarConsultaPage extends StatefulWidget {
-  final String citaId;
+  final String? citaId;
   final String pacienteId;
   final String doctorId;
+  final String? consultaId;
 
   const EfectuarConsultaPage({
     super.key,
     required this.citaId,
     required this.pacienteId,
     required this.doctorId,
+    this.consultaId,
   });
 
   @override
@@ -28,6 +30,13 @@ class EfectuarConsultaPage extends StatefulWidget {
 
 class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   bool _enWorkspace = false;
+  bool _hasInitialTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _enWorkspace = widget.consultaId != null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,60 +45,73 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) =>
-              sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
+          create: (_) => sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
         ),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
       ],
-      child: Scaffold(
-        backgroundColor: ac.bgPage,
-        body: BlocListener<ConsultaCubit, ConsultaState>(
-          listener: _onConsultaState,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _FloatingBar(enWorkspace: _enWorkspace),
-              const SizedBox(height: 12),
+      child: Builder( // <--- 1. ADD THIS BUILDER RIGHT HERE
+        builder: (innerContext) {
+          
+          // 2. Safely trigger the resume logic using innerContext
+          if (widget.consultaId != null && !_hasInitialTriggered) {
+            _hasInitialTriggered = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!innerContext.mounted) return;
+              innerContext.read<ConsultaCubit>().reanudarConsulta(consultaId: widget.consultaId!);
+            });
+          }
 
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildPanel(ac),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 280),
-                        switchInCurve: Curves.easeOut,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.03, 0),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
+          return Scaffold(
+            backgroundColor: ac.bgPage,
+            body: BlocListener<ConsultaCubit, ConsultaState>(
+              listener: _onConsultaState,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _FloatingBar(enWorkspace: _enWorkspace),
+                  const SizedBox(height: 12),
+
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildPanel(ac),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 280),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, animation) => FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0.03, 0),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            ),
+                            child: _enWorkspace
+                                ? WorkspaceConsulta(
+                                    key: const ValueKey('workspace'),
+                                    citaId: widget.citaId,
+                                  )
+                                : FormularioEvaluacion(
+                                    key: const ValueKey('formulario'),
+                                    pacienteId: widget.pacienteId,
+                                    doctorId: widget.doctorId,
+                                    citaId: widget.citaId,
+                                  ),
                           ),
                         ),
-                        child: _enWorkspace
-                            ? WorkspaceConsulta(
-                                key: const ValueKey('workspace'),
-                                citaId: widget.citaId,
-                              )
-                            : FormularioEvaluacion(
-                                key: const ValueKey('formulario'),
-                                pacienteId: widget.pacienteId,
-                                doctorId: widget.doctorId,
-                                citaId: widget.citaId,
-                              ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

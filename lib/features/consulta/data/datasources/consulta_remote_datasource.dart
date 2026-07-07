@@ -3,10 +3,12 @@ abstract class ConsultaRemoteDatasource {
 
   Future<void> guardarResultadoConsulta({
     required String consultaId,
-    required String pacienteId,
+    required String? pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
     required List<Map<String, dynamic>> recetas,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
   });
 
   Future<List<Map<String, dynamic>>> fetchConsultas();

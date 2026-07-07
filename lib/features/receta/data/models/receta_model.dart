@@ -16,7 +16,7 @@ class RecetaModel extends Receta {
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
     return RecetaModel(
       id: json['id'] as String?,
-      title: json['title'] as String,
+      title: json['titulo'] as String,
       createdAt: DateTime.parse(
         json['created_at'] ?? json['createdAt'],
       ).toLocal(),
@@ -31,12 +31,13 @@ class RecetaModel extends Receta {
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'title': title,
+      'titulo': title,
       'created_at': createdAt.toIso8601String(),
       'medicina_id': medicinaId,
       'dosis': dosis,
       'frecuencia': frecuencia,
       'indicaciones': indicaciones,
+      'notas': notas,
       'duracion': duracion,
     };
 

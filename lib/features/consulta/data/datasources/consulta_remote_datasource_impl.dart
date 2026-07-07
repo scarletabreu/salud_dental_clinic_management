@@ -57,19 +57,6 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
             .eq('id', consultaId);
       }
 
-      if (recetas != null && recetas.isNotEmpty && pacienteId != null) {
-        await supabaseClient.from('recetas').insert(
-          recetas
-              .map((receta) => {
-                    ...receta,
-                    'paciente_id': pacienteId,
-                    'created_at': receta['created_at'] ?? now,
-                    'updated_at': now,
-                  })
-              .toList(),
-        );
-      }
-
       await supabaseClient
           .from('recetas')
           .delete()
@@ -81,7 +68,6 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
             {
               ...r,
               'consulta_id': consultaId,
-              'paciente_id': pacienteId,
               'updated_at': now,
             },
         ]);

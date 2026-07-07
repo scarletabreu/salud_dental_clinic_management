@@ -333,6 +333,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         odontograma: odontograma,
         recetas: consulta.recetas,
         notas: consulta.notas,
+        finalizada: false,
       );
       emit(ConsultaIniciada(consulta: consulta));
     } catch (e) {
@@ -362,6 +363,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         odontograma: odontograma,
         recetas: consulta.recetas,
         notas: consulta.notas,
+        finalizada: true
       );
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.completada);

@@ -56,8 +56,8 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     }
   }
 
-  void _abrirDetalle(Consulta consulta, ConsultasLoaded state) {
-    Navigator.push(
+  void _abrirDetalle(Consulta consulta, ConsultasLoaded state) async {
+    final resultado = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ConsultaDetallePage(
@@ -67,6 +67,9 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         ),
       ),
     );
+    if (resultado == true && mounted) {
+      context.read<ConsultasListCubit>().recargar();
+    }
   }
 
   @override
@@ -698,23 +701,28 @@ class _ConsultaCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 if (!consulta.finalizada)
                   TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MultiBlocProvider(
-                          providers: [
-                            BlocProvider(create: (_) => sl<PacienteCubit>()..loadParaConsulta(consulta.pacienteId)),
-                            BlocProvider(create: (_) => sl<ConsultaCubit>()),
-                          ],
-                          child: EfectuarConsultaPage(
-                            citaId: consulta.citaId ?? '',
-                            pacienteId: consulta.pacienteId,
-                            doctorId: consulta.doctorId,
-                            consultaId: consulta.id,
+                    onPressed: () async {
+                      final resultado = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MultiBlocProvider(
+                            providers: [
+                              BlocProvider(create: (_) => sl<PacienteCubit>()..loadParaConsulta(consulta.pacienteId)),
+                              BlocProvider(create: (_) => sl<ConsultaCubit>()),
+                            ],
+                            child: EfectuarConsultaPage(
+                              citaId: consulta.citaId ?? '',
+                              pacienteId: consulta.pacienteId,
+                              doctorId: consulta.doctorId,
+                              consultaId: consulta.id,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                      if (resultado == true && context.mounted) {
+                        context.read<ConsultasListCubit>().recargar();
+                      }
+                    },
                     icon: const Icon(Icons.navigate_next_rounded, size: 16),
                     label: const Text('Continuar'),
                     style: TextButton.styleFrom(

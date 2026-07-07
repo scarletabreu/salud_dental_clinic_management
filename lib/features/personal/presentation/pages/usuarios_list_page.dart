@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_card.dart';
-// Importación de la página de creación
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/crear_usuario_page.dart';
 
 class UsuariosListPage extends StatefulWidget {
@@ -82,6 +82,17 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  void _navegarAEditarUsuario(Usuario usuario) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<PersonalPerfilesCubit>(),
+          child: CrearUsuarioPage(usuario: usuario),
         ),
       ),
     );
@@ -290,7 +301,11 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
               itemCount: state.filtrados.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                return PerfilCard(usuario: state.filtrados[index]);
+                final usuario = state.filtrados[index];
+                return PerfilCard(
+                  usuario: usuario,
+                  onTap: () => _navegarAEditarUsuario(usuario),
+                );
               },
             ),
           ),

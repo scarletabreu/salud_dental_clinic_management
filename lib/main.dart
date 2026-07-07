@@ -15,7 +15,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://xcuvywvltttephakzmwu.supabase.co',
     anonKey: 'sb_publishable_3VHcOI-RR6w4_E8GFSkj6A_w2qa5PBG',
-    authOptions: FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit),
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
 
   await di.init();

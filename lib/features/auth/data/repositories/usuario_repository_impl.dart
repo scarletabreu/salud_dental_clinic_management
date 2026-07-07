@@ -1,5 +1,6 @@
 // lib/features/auth/data/repositories/usuario_repository_impl.dart
 
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
@@ -147,4 +148,76 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   @override
   Stream<supabase.AuthState> get onAuthStateChange =>
       remoteDataSource.authStateChanges;
+
+  @override
+  Future<Usuario> crearUsuario({
+    required String email,
+    required String password,
+    required String nombre,
+    required String apellido,
+    required DateTime birthDate,
+    required String govID,
+    required String username,
+    String? telefono,
+    required RolUsuario rol,
+    String? especialidad,
+    String? departamento,
+    String? turno,
+  }) async {
+    final uuid = await remoteDataSource.crearUsuarioCompleto({
+      'email': email,
+      'password': password,
+      'nombre': nombre,
+      'apellido': apellido,
+      'telefono': telefono,
+      'fecha_nacimiento': birthDate.toIso8601String(),
+      'cedula': govID,
+      'contactos': [],
+      'username': username,
+      'rol': rol.name,
+      'especialidad': especialidad,
+      'departamento': departamento,
+      'turno': turno,
+    });
+
+    final perfil = await getPerfilPorUuid(uuid);
+    if (perfil == null) {
+      throw Exception('Usuario creado pero no se pudo cargar el perfil.');
+    }
+    return perfil;
+  }
+
+  @override
+  Future<void> actualizarUsuario({
+    required String personaId,
+    required String usuarioId,
+    required String nombre,
+    required String apellido,
+    required DateTime birthDate,
+    required String govID,
+    required String username,
+    String? telefono,
+  }) async {
+    await remoteDataSource.actualizarPersona(personaId, {
+      'nombre': nombre,
+      'apellido': apellido,
+      'fecha_nacimiento': birthDate.toIso8601String(),
+      'cedula': govID,
+    });
+    await remoteDataSource.actualizarUsuarioBasico(usuarioId, {
+      'username': username,
+      'telefono': telefono,
+    });
+  }
+
+  @override
+  Future<void> resetearPassword({
+    required String usuarioId,
+    required String nuevaPassword,
+  }) async {
+    await remoteDataSource.resetearPassword(
+      targetUuid: usuarioId,
+      nuevaPassword: nuevaPassword,
+    );
+  }
 }

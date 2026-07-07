@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'personal_perfiles_state.dart';
@@ -53,5 +54,60 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
         rolFiltro: () => nuevoRol,
       ),
     );
+  }
+
+  Future<void> guardarUsuario({
+    Usuario? existente,
+    required String nombre,
+    required String apellido,
+    required DateTime birthDate,
+    required String govID,
+    required String username,
+    String? telefono,
+    String? nuevaPassword,
+    String? email,
+    RolUsuario? rol,
+    String? especialidad,
+    String? departamento,
+    String? turno,
+  }) async {
+    emit(const PerfilLoading());
+    try {
+      if (existente == null) {
+        await _usuarioRepository.crearUsuario(
+          email: email!,
+          password: nuevaPassword!,
+          nombre: nombre,
+          apellido: apellido,
+          birthDate: birthDate,
+          govID: govID,
+          username: username,
+          rol: rol!,
+          telefono: telefono,
+          especialidad: especialidad,
+          departamento: departamento,
+          turno: turno,
+        );
+      } else {
+        await _usuarioRepository.actualizarUsuario(
+          personaId: existente.id!,
+          usuarioId: existente.id!,
+          nombre: nombre,
+          apellido: apellido,
+          birthDate: birthDate,
+          govID: govID,
+          username: username,
+        );
+        if (nuevaPassword != null && nuevaPassword.isNotEmpty) {
+          await _usuarioRepository.resetearPassword(
+            usuarioId: existente.id!,
+            nuevaPassword: nuevaPassword,
+          );
+        }
+      }
+      await cargarUsuarios();
+    } catch (e) {
+      emit(PerfilError(e.toString()));
+    }
   }
 }

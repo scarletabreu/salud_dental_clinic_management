@@ -839,7 +839,7 @@ class _DetailPanel extends StatelessWidget {
                 : const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
             itemCount: citas.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (ctx, i) => _CitaCard(cita: citas[i]),
           );
 

@@ -10,9 +10,11 @@ class CitaCubit extends Cubit<CitaCubitState> {
   CitaCubit(this._repository) : super(const CitaCubitLoading());
 
   Future<void> load() async {
+    if (isClosed) return;
     emit(const CitaCubitLoading());
     try {
       final citas = await _repository.getCitas();
+      if (isClosed) return;
       final now = DateTime.now();
       emit(
         CitaCubitLoaded(
@@ -23,6 +25,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
         ),
       );
     } catch (e) {
+      if (isClosed) return;
       emit(CitaCubitError(e.toString()));
     }
   }
@@ -43,16 +46,20 @@ class CitaCubit extends Cubit<CitaCubitState> {
     if (current is! CitaCubitLoaded) return;
 
     try {
-      emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
+      if (!isClosed) {
+        emit(current.copyWith(isSubmitting: true, errorMessage: () => null));
+      }
 
       if (_tieneConflictoHorario(cita, current.citas)) {
-        emit(
-          current.copyWith(
-            isSubmitting: false,
-            errorMessage: () =>
-                'El odontólogo elegido ya tiene una cita programada en ese horario.',
-          ),
-        );
+        if (!isClosed) {
+          emit(
+            current.copyWith(
+              isSubmitting: false,
+              errorMessage: () =>
+                  'El odontólogo elegido ya tiene una cita programada en ese horario.',
+            ),
+          );
+        }
         return;
       }
 
@@ -61,12 +68,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
       await load();
     } catch (e) {
       print('Error capturado en Cubit: $e');
-      emit(
-        current.copyWith(
-          isSubmitting: false,
-          errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
-        ),
-      );
+      if (!isClosed) {
+        emit(
+          current.copyWith(
+            isSubmitting: false,
+            errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
+          ),
+        );
+      }
     }
   }
 

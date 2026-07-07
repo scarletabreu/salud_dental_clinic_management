@@ -237,7 +237,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
     if (!mounted) return;
     setState(() => _guardando = true);
-    context.read<CitaCubit>().createCita(cita);
+    try {
+      await context.read<CitaCubit>().createCita(cita);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      _showError('Error al agendar la cita: $e');
+    }
   }
 
   Persona _buildNuevaPersona() {

@@ -216,7 +216,13 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ? state.consulta
             : (state as ConsultaGuardando).consulta;
 
-        if (consulta == null || consulta.odontograma == null) {
+        if (consulta == null) {
+          return Center(
+            child: CircularProgressIndicator(color: ac.primaryBlue),
+          );
+        }
+
+        if (consulta.odontograma == null) {
           return const Center(child: Text('Odontograma no disponible'));
         }
 
@@ -504,9 +510,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               cargando: cargando,
               onTap: cargando
                   ? null
-                  : () => context.read<ConsultaCubit>().terminarConsulta(
-                      citaId: widget.citaId,
-                    ),
+                  : () => context.read<ConsultaCubit>().terminarConsulta(),
               ac: ac,
             ),
           ],

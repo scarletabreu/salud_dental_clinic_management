@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
@@ -33,12 +34,14 @@ class DocumentoAdjunto {
 
 class ConsultaCubit extends Cubit<ConsultaState> {
   final CrearConsultaUseCase _crearConsulta;
+  final FinalizarConsultaUseCase _finalizarConsulta;
   final SupabaseStorageHelper _storage;
   final CitaRepository _citaRepository;
   final ConsultaRepository _consultaRepository;
 
   ConsultaCubit(
     this._crearConsulta,
+    this._finalizarConsulta,
     this._storage,
     this._citaRepository,
     this._consultaRepository,
@@ -343,7 +346,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  Future<void> terminarConsulta({String? citaId}) async {
+  Future<void> terminarConsulta() async {
     if (state is! ConsultaIniciada) return;
 
     final consulta = (state as ConsultaIniciada).consulta;
@@ -357,6 +360,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
     emit(ConsultaGuardando(consulta: consulta));
     try {
+      // 1. Persiste el trabajo clínico pendiente (tratamientos, recetas, notas).
       await _consultaRepository.guardarResultadoConsulta(
         consultaId: consultaId,
         pacienteId: consulta.pacienteId,
@@ -365,11 +369,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         notas: consulta.notas,
         finalizada: true
       );
-      if (citaId != null) {
-        await _citaRepository.updateCitaEstado(citaId, EstadoCita.completada);
-      }
 
-      emit(const ConsultaTerminada());
+      // 2. Handoff financiero atómico: la BD genera la pre-factura (cuenta +
+      //    ítems) y marca la cita como completada. Devuelve el id de la cuenta.
+      final cuentaId = await _finalizarConsulta(consultaId: consultaId);
+
+      emit(ConsultaTerminada(cuentaId: cuentaId));
     } catch (e) {
       if (kDebugMode) debugPrint('Error al terminar consulta: $e');
       emit(

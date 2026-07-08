@@ -754,7 +754,7 @@ class _MonthlyTrendChart extends StatelessWidget {
                 barWidth: 2.5,
                 dotData: FlDotData(
                   show: true,
-                  getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                  getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                     radius: 4,
                     color: Colors.white,
                     strokeWidth: 2,
@@ -786,7 +786,7 @@ class _MonthlyTrendChart extends StatelessWidget {
                 dashArray: [5, 4],
                 dotData: FlDotData(
                   show: true,
-                  getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                  getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                     radius: 3,
                     color: Colors.white,
                     strokeWidth: 2,

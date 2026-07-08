@@ -47,12 +47,14 @@ class PacienteRemoteDatasource {
       apellido: 'Alonso',
       birthDate: DateTime(1985, 4, 10),
       govID: '001-1000001-0',
-      contactos: [ContactoModel(
-        id: 'c-p1',
-        email: 'pedro.alonso@email.com',
-        numeroTelefono: '809-555-0001',
-        direccion: 'Calle Las Flores #1, Santo Domingo',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p1',
+          email: 'pedro.alonso@email.com',
+          numeroTelefono: '809-555-0001',
+          direccion: 'Calle Las Flores #1, Santo Domingo',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -67,12 +69,14 @@ class PacienteRemoteDatasource {
       apellido: 'Santos',
       birthDate: DateTime(1992, 8, 25),
       govID: '001-1000002-1',
-      contactos: [ContactoModel(
-        id: 'c-p2',
-        email: 'maria.santos@email.com',
-        numeroTelefono: '829-555-0002',
-        direccion: 'Av. Independencia #22, Santiago',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p2',
+          email: 'maria.santos@email.com',
+          numeroTelefono: '829-555-0002',
+          direccion: 'Av. Independencia #22, Santiago',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.femenino,
       record: RecordModel.empty(),
@@ -87,12 +91,14 @@ class PacienteRemoteDatasource {
       apellido: 'Méndez',
       birthDate: DateTime(1978, 2, 14),
       govID: '001-1000003-2',
-      contactos: [ContactoModel(
-        id: 'c-p3',
-        email: 'juan.mendez@email.com',
-        numeroTelefono: '849-555-0003',
-        direccion: 'Los Alcarrizos, Santo Domingo Oeste',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p3',
+          email: 'juan.mendez@email.com',
+          numeroTelefono: '849-555-0003',
+          direccion: 'Los Alcarrizos, Santo Domingo Oeste',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -107,12 +113,14 @@ class PacienteRemoteDatasource {
       apellido: 'Castillo',
       birthDate: DateTime(2000, 11, 3),
       govID: '001-1000004-3',
-      contactos: [ContactoModel(
-        id: 'c-p4',
-        email: 'laura.castillo@email.com',
-        numeroTelefono: '809-555-0004',
-        direccion: 'Bella Vista, Santo Domingo',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p4',
+          email: 'laura.castillo@email.com',
+          numeroTelefono: '809-555-0004',
+          direccion: 'Bella Vista, Santo Domingo',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.femenino,
       record: RecordModel.empty(),
@@ -127,12 +135,14 @@ class PacienteRemoteDatasource {
       apellido: 'García',
       birthDate: DateTime(1970, 6, 20),
       govID: '001-1000005-4',
-      contactos: [ContactoModel(
-        id: 'c-p5',
-        email: 'roberto.garcia@email.com',
-        numeroTelefono: '829-555-0005',
-        direccion: 'Naco, Santo Domingo',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p5',
+          email: 'roberto.garcia@email.com',
+          numeroTelefono: '829-555-0005',
+          direccion: 'Naco, Santo Domingo',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -147,12 +157,14 @@ class PacienteRemoteDatasource {
       apellido: 'Herrera',
       birthDate: DateTime(1995, 9, 8),
       govID: '001-1000006-5',
-      contactos: [ContactoModel(
-        id: 'c-p6',
-        email: 'sofia.herrera@email.com',
-        numeroTelefono: '849-555-0006',
-        direccion: 'Piantini, Santo Domingo',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-p6',
+          email: 'sofia.herrera@email.com',
+          numeroTelefono: '849-555-0006',
+          direccion: 'Piantini, Santo Domingo',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.femenino,
       record: RecordModel.empty(),
@@ -167,12 +179,14 @@ class PacienteRemoteDatasource {
       apellido: 'Méndez',
       birthDate: DateTime(1990, 3, 15),
       govID: '001-1234567-8',
-      contactos: [ContactoModel(
-        id: 'c-001',
-        email: 'carlos.mendez@email.com',
-        numeroTelefono: '809-555-0101',
-        direccion: 'Calle Primera #10, Santo Domingo',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-001',
+          email: 'carlos.mendez@email.com',
+          numeroTelefono: '809-555-0101',
+          direccion: 'Calle Primera #10, Santo Domingo',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -187,12 +201,14 @@ class PacienteRemoteDatasource {
       apellido: 'Rodríguez',
       birthDate: DateTime(1998, 7, 22),
       govID: '002-9876543-1',
-      contactos: [ContactoModel(
-        id: 'c-002',
-        email: 'maria.rodriguez@email.com',
-        numeroTelefono: '829-555-0202',
-        direccion: 'Av. Winston Churchill, Santiago',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-002',
+          email: 'maria.rodriguez@email.com',
+          numeroTelefono: '829-555-0202',
+          direccion: 'Av. Winston Churchill, Santiago',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.femenino,
       record: RecordModel.empty(),
@@ -207,12 +223,14 @@ class PacienteRemoteDatasource {
       apellido: 'Almonte',
       birthDate: DateTime(1975, 11, 5),
       govID: '003-1112223-4',
-      contactos: [ContactoModel(
-        id: 'c-003',
-        email: 'pedro.almonte@email.com',
-        numeroTelefono: '849-555-0303',
-        direccion: 'Los Prados, Santo Domingo Norte',
-      )],
+      contactos: [
+        ContactoModel(
+          id: 'c-003',
+          email: 'pedro.almonte@email.com',
+          numeroTelefono: '849-555-0303',
+          direccion: 'Los Prados, Santo Domingo Norte',
+        ),
+      ],
       estatus: EstatusPersona.activo,
       genero: Genero.masculino,
       record: RecordModel.empty(),
@@ -339,7 +357,9 @@ class PacienteRemoteDatasource {
     }
 
     if (!_isValidUuid(normalizedId)) {
-      final local = _pacientesPrueba.where((p) => p.id == normalizedId).firstOrNull;
+      final local = _pacientesPrueba
+          .where((p) => p.id == normalizedId)
+          .firstOrNull;
       if (local != null) return local;
     }
 
@@ -362,7 +382,9 @@ class PacienteRemoteDatasource {
 
     if (!_isValidUuid(normalizedId)) {
       print("b");
-      final local = _pacientesPrueba.where((p) => p.id == normalizedId).firstOrNull;
+      final local = _pacientesPrueba
+          .where((p) => p.id == normalizedId)
+          .firstOrNull;
       if (local != null) return local;
     }
 
@@ -383,11 +405,15 @@ class PacienteRemoteDatasource {
           .select(_selectPaciente)
           .single();
 
-      final pacienteModel = PacienteModel.fromJson(Map<String, dynamic>.from(creado));
+      final pacienteModel = PacienteModel.fromJson(
+        Map<String, dynamic>.from(creado),
+      );
       final record = await _loadOrCreateRecord(pacienteModel.id!);
       return pacienteModel.copyWithModel(record: record);
     } on PostgrestException catch (e) {
-      throw Exception('Error al preparar el paciente de la consulta: ${e.message}');
+      throw Exception(
+        'Error al preparar el paciente de la consulta: ${e.message}',
+      );
     }
   }
 
@@ -401,7 +427,7 @@ class PacienteRemoteDatasource {
           .maybeSingle();
 
       if (data != null) {
-        final record = RecordModel.fromJson(Map<String, dynamic>.from(data as Map<String, dynamic>));
+        final record = RecordModel.fromJson(Map<String, dynamic>.from(data));
         if (record.id != null) {
           final condicionesRes = await client
               .from('record_condicion')
@@ -409,21 +435,19 @@ class PacienteRemoteDatasource {
               .eq('record_id', record.id!);
 
           final condiciones = <CondicionModel>[];
-          if (condicionesRes is List) {
-            for (final item in condicionesRes) {
-              if (item is Map<String, dynamic>) {
-                Map<String, dynamic>? condicionJson;
-                if (item['condicion'] is Map<String, dynamic>) {
-                  condicionJson = item['condicion'] as Map<String, dynamic>?;
-                } else if (item['condiciones'] is Map<String, dynamic>) {
-                  condicionJson = item['condiciones'] as Map<String, dynamic>?;
-                } else if (item.containsKey('id') && item.containsKey('nombre')) {
-                  condicionJson = Map<String, dynamic>.from(item);
-                }
+          for (final item in condicionesRes) {
+            if (item is Map<String, dynamic>) {
+              Map<String, dynamic>? condicionJson;
+              if (item['condicion'] is Map<String, dynamic>) {
+                condicionJson = item['condicion'] as Map<String, dynamic>?;
+              } else if (item['condiciones'] is Map<String, dynamic>) {
+                condicionJson = item['condiciones'] as Map<String, dynamic>?;
+              } else if (item.containsKey('id') && item.containsKey('nombre')) {
+                condicionJson = Map<String, dynamic>.from(item);
+              }
 
-                if (condicionJson != null) {
-                  condiciones.add(CondicionModel.fromJson(condicionJson));
-                }
+              if (condicionJson != null) {
+                condiciones.add(CondicionModel.fromJson(condicionJson));
               }
             }
           }
@@ -453,7 +477,9 @@ class PacienteRemoteDatasource {
 
       return RecordModel.fromJson(Map<String, dynamic>.from(created));
     } on PostgrestException catch (e) {
-      throw Exception('Error al cargar o crear el expediente clínico: ${e.message}');
+      throw Exception(
+        'Error al cargar o crear el expediente clínico: ${e.message}',
+      );
     }
   }
 
@@ -487,9 +513,9 @@ class PacienteRemoteDatasource {
           .select('contactos(*)')
           .eq('persona_id', id);
 
-      final map = Map<String, dynamic>.from(pacienteRow as Map<String, dynamic>);
-      map['personas'] = Map<String, dynamic>.from(personaRow as Map<String, dynamic>);
-      if (personaContactos is List && personaContactos.isNotEmpty) {
+      final map = Map<String, dynamic>.from(pacienteRow);
+      map['personas'] = Map<String, dynamic>.from(personaRow);
+      if (personaContactos.isNotEmpty) {
         map['personas']!['persona_contacto'] = personaContactos;
       }
       return PacienteModel.fromJson(map);

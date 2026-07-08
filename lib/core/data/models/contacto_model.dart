@@ -10,10 +10,10 @@ class ContactoModel extends Contacto {
 
   factory ContactoModel.fromJson(Map<String, dynamic> json) {
     return ContactoModel(
-      id: json['id'],
-      email: json['email'],
-      numeroTelefono: json['numero_telefono'],
-      direccion: json['direccion'],
+      id: json['id'] as String?,
+      email: json['email'] as String? ?? '',
+      numeroTelefono: json['numero_telefono'] as String? ?? '',
+      direccion: json['direccion'] as String? ?? '',
     );
   }
 
@@ -32,11 +32,6 @@ class ContactoModel extends Contacto {
   }
 
   factory ContactoModel.empty() {
-    return ContactoModel(
-      id: '',
-      email: '',
-      numeroTelefono: '',
-      direccion: '',
-    );
+    return ContactoModel(id: '', email: '', numeroTelefono: '', direccion: '');
   }
 }

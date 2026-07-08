@@ -41,6 +41,8 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
 
   late final TextEditingController _nombreController;
   late final TextEditingController _apellidoController;
+  late DateTime _birthDate;
+  late final TextEditingController _telefonoController;
   late final TextEditingController _cedulaController;
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
@@ -56,10 +58,15 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     final u = widget.usuario;
     _nombreController = TextEditingController(text: u?.nombre ?? '');
     _apellidoController = TextEditingController(text: u?.apellido ?? '');
+    _birthDate = u?.birthDate ?? DateTime(2000, 1, 1);
     _cedulaController = TextEditingController(text: u?.govID ?? '');
+    _telefonoController = TextEditingController(
+      text: (u != null && u.contactos.isNotEmpty)
+          ? u.contactos.first.numeroTelefono
+          : '',
+    );
     _usernameController = TextEditingController(text: u?.username ?? '');
-    _passwordController =
-        TextEditingController(); // Contraseña usualmente vacía al iniciar
+    _passwordController = TextEditingController();
 
     if (u != null) {
       _rolUsuario = u.rol;
@@ -71,6 +78,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     _nombreController.dispose();
     _apellidoController.dispose();
     _cedulaController.dispose();
+    _telefonoController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -79,29 +87,23 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
-    // Aquí mapeas los datos de la UI al Cubit/Repositorio de tu dominio
-    // final usuario = Usuario(
-    //   id: widget.usuario?.id,
-    //   nombre: _nombreController.text.trim(),
-    //   apellido: _apellidoController.text.trim(),
-    //   govID: _cedulaController.text.trim(),
-    //   username: _usernameController.text.trim(),
-    //   rol: _rolUsuario,
-    // );
-
-    // Simulación del trigger para guardar (Adapta el método correspondiente de tu Cubit)
-    // final cubit = context.read<PersonalPerfilesCubit>();
-    // if (_isEditing) {
-    //   cubit.updateUsuario(usuario);
-    // } else {
-    //   cubit.addUsuario(usuario, _passwordController.text.trim());
-    // }
-
-    // Simulación temporal por compatibilidad con el Cubit de la lista
-    context.read<PersonalPerfilesCubit>().cargarUsuarios();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Operación realizada con éxito (Simulado)')),
+    context.read<PersonalPerfilesCubit>().guardarUsuario(
+      existente: widget.usuario,
+      nombre: _nombreController.text.trim(),
+      apellido: _apellidoController.text.trim(),
+      birthDate: _birthDate,
+      govID: _cedulaController.text.trim(),
+      username: _usernameController.text.trim(),
+      telefono: _telefonoController.text.trim(),
+      nuevaPassword: _passwordController.text.trim().isEmpty
+          ? null
+          : _passwordController.text.trim(),
+      email: _isEditing
+          ? null
+          : '${_usernameController.text.trim()}@saluddental.com',
+      rol: _isEditing ? null : _rolUsuario,
     );
+
     Navigator.pop(context);
   }
 
@@ -115,7 +117,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
             SnackBar(backgroundColor: ac.red, content: Text(state.message)),
           );
         }
-        // Puedes agregar aquí un estado de éxito específico para la creación de perfiles/usuarios si cuentas con uno
       },
       builder: (context, state) {
         final isSaving = state is PerfilLoading;
@@ -314,13 +315,55 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
               inputFormatters: [_CedulaInputFormatter()],
               decoration: _inputDeco(ac, hint: '000-0000000-0'),
               validator: (v) {
-                if (v == null || v.trim().isEmpty)
+                if (v == null || v.trim().isEmpty) {
                   return 'La cédula es obligatoria';
+                }
                 final demasked = v.replaceAll('-', '');
-                if (demasked.length != 11)
+                if (demasked.length != 11) {
                   return 'La cédula debe contener exactamente 11 dígitos';
+                }
                 return null;
               },
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.phone_android_rounded,
+            label: 'Teléfono *',
+            child: TextFormField(
+              controller: _telefonoController,
+              keyboardType: TextInputType.phone,
+              decoration: _inputDeco(ac, hint: 'Ej. 809-555-0199'),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'El teléfono es obligatorio'
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.cake_outlined,
+            label: 'Fecha de nacimiento *',
+            child: InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _birthDate,
+                  firstDate: DateTime(1930),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _birthDate = picked);
+              },
+              child: InputDecorator(
+                decoration: _inputDeco(ac),
+                child: Text(
+                  '${_birthDate.day.toString().padLeft(2, '0')}/'
+                  '${_birthDate.month.toString().padLeft(2, '0')}/'
+                  '${_birthDate.year}',
+                  style: TextStyle(fontSize: 14, color: ac.textPrimary),
+                ),
+              ),
             ),
           ),
         ],
@@ -342,13 +385,19 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
             ac: ac,
             icon: Icons.admin_panel_settings_outlined,
             label: 'Rol de sistema *',
-            child: _ChipSelector<RolUsuario>(
-              ac: ac,
-              options: RolUsuario.values,
-              selected: _rolUsuario,
-              labelOf: (rol) => rol.name.toUpperCase(),
-              activeColor: ac.primaryBlue,
-              onSelected: (rol) => setState(() => _rolUsuario = rol),
+            child: AbsorbPointer(
+              absorbing: _isEditing,
+              child: Opacity(
+                opacity: _isEditing ? 0.5 : 1.0,
+                child: _ChipSelector<RolUsuario>(
+                  ac: ac,
+                  options: RolUsuario.values,
+                  selected: _rolUsuario,
+                  labelOf: (rol) => rol.name.toUpperCase(),
+                  activeColor: ac.primaryBlue,
+                  onSelected: (rol) => setState(() => _rolUsuario = rol),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),

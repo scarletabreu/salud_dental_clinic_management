@@ -63,7 +63,7 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
     required DateTime birthDate,
     required String govID,
     required String username,
-    String? telefono,
+    required String telefono,
     String? nuevaPassword,
     String? email,
     RolUsuario? rol,
@@ -90,13 +90,12 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
         );
       } else {
         await _usuarioRepository.actualizarUsuario(
-          personaId: existente.id!,
           usuarioId: existente.id!,
           nombre: nombre,
           apellido: apellido,
           birthDate: birthDate,
           govID: govID,
-          username: username,
+          telefono: telefono,
         );
         if (nuevaPassword != null && nuevaPassword.isNotEmpty) {
           await _usuarioRepository.resetearPassword(

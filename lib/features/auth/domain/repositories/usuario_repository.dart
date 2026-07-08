@@ -19,21 +19,20 @@ abstract interface class UsuarioRepository {
     required DateTime birthDate,
     required String govID,
     required String username,
+    required String telefono,
     required RolUsuario rol,
-    String? telefono,
     String? especialidad,
     String? departamento,
     String? turno,
   });
 
   Future<void> actualizarUsuario({
-    required String personaId,
     required String usuarioId,
     required String nombre,
     required String apellido,
     required DateTime birthDate,
     required String govID,
-    required String username,
+    required String telefono,
   });
 
   Future<void> resetearPassword({

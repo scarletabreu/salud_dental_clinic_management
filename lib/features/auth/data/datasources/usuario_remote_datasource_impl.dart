@@ -107,6 +107,43 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   }
 
   @override
+  Future<void> actualizarTelefonoPersona({
+    required String personaId,
+    required String telefono,
+  }) async {
+    try {
+      final relacion = await supabase
+          .from('persona_contacto')
+          .select('contacto_id')
+          .eq('persona_id', personaId)
+          .eq('es_principal', true)
+          .maybeSingle();
+
+      if (relacion != null) {
+        await supabase
+            .from('contactos')
+            .update({'numero_telefono': telefono})
+            .eq('id', relacion['contacto_id']);
+      } else {
+        final nuevoContacto = await supabase
+            .from('contactos')
+            .insert({'numero_telefono': telefono, 'email': '', 'direccion': ''})
+            .select('id')
+            .single();
+
+        await supabase.from('persona_contacto').insert({
+          'persona_id': personaId,
+          'contacto_id': nuevoContacto['id'],
+          'tipo_contacto': 'personal',
+          'es_principal': true,
+        });
+      }
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar el teléfono: ${e.message}');
+    }
+  }
+
+  @override
   Future<void> actualizarUsuarioBasico(
     String usuarioId,
     Map<String, dynamic> data,

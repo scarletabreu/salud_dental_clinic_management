@@ -30,4 +30,9 @@ abstract class UsuarioRemoteDataSource {
     String usuarioId,
     Map<String, dynamic> data,
   );
+
+  Future<void> actualizarTelefonoPersona({
+    required String personaId,
+    required String telefono,
+  });
 }

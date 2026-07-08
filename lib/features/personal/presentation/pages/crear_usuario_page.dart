@@ -61,7 +61,9 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     _birthDate = u?.birthDate ?? DateTime(2000, 1, 1);
     _cedulaController = TextEditingController(text: u?.govID ?? '');
     _telefonoController = TextEditingController(
-      text: u?.contactos.first.numeroTelefono ?? '',
+      text: (u != null && u.contactos.isNotEmpty)
+          ? u.contactos.first.numeroTelefono
+          : '',
     );
     _usernameController = TextEditingController(text: u?.username ?? '');
     _passwordController = TextEditingController();
@@ -76,7 +78,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     _nombreController.dispose();
     _apellidoController.dispose();
     _cedulaController.dispose();
-    _birthDate = DateTime.now();
     _telefonoController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -116,7 +117,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
             SnackBar(backgroundColor: ac.red, content: Text(state.message)),
           );
         }
-        // Puedes agregar aquí un estado de éxito específico para la creación de perfiles/usuarios si cuentas con uno
       },
       builder: (context, state) {
         final isSaving = state is PerfilLoading;

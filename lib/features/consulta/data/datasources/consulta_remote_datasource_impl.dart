@@ -30,7 +30,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   @override
   Future<String> finalizarConsulta({
     required String consultaId,
-    String metodoPago = 'Contado',
+    String metodoPago = 'contado',
     String? nota,
   }) async {
     try {

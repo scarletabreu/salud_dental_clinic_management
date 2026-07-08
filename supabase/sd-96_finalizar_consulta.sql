@@ -22,6 +22,7 @@
 -- ============================================================================
 
 alter table cuentas
+  add column if not exists paciente_id uuid          references personas(id),
   add column if not exists estado      text          not null default 'abierta',
   add column if not exists monto_total numeric(12,2) not null default 0;
 

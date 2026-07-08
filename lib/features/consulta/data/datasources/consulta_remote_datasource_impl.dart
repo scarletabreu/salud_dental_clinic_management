@@ -53,18 +53,30 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
-    required String pacienteId,
+    required String? pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
     required List<Map<String, dynamic>> recetas,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
+      final consultaPayload = <String, dynamic>{'updated_at': now};
 
       if (notas != null && notas.trim().isNotEmpty) {
+        consultaPayload['notas'] = notas.trim();
+      }
+      if (signosVitales != null) {
+        consultaPayload['signos_vitales'] = signosVitales;
+      }
+      if (finalizada != null) {
+        consultaPayload['finalizada'] = finalizada;
+      }
+      if (consultaPayload.length > 1) {
         await supabaseClient
             .from('consultas')
-            .update({'notas': notas.trim(), 'updated_at': now})
+            .update(consultaPayload)
             .eq('id', consultaId);
       }
 
@@ -79,7 +91,6 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
             {
               ...r,
               'consulta_id': consultaId,
-              'paciente_id': pacienteId,
               'updated_at': now,
             },
         ]);

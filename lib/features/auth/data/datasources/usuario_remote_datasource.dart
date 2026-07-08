@@ -20,4 +20,19 @@ abstract class UsuarioRemoteDataSource {
     required String uuid,
     String selectColumns = '*',
   });
+  Future<String> crearUsuarioCompleto(Map<String, dynamic> payload);
+  Future<void> resetearPassword({
+    required String targetUuid,
+    required String nuevaPassword,
+  });
+  Future<void> actualizarPersona(String personaId, Map<String, dynamic> data);
+  Future<void> actualizarUsuarioBasico(
+    String usuarioId,
+    Map<String, dynamic> data,
+  );
+
+  Future<void> actualizarTelefonoPersona({
+    required String personaId,
+    required String telefono,
+  });
 }

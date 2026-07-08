@@ -37,6 +37,7 @@ class RecetaModel extends Receta {
       'dosis': dosis,
       'frecuencia': frecuencia,
       'indicaciones': indicaciones,
+      'notas': notas,
       'duracion': duracion,
     };
 

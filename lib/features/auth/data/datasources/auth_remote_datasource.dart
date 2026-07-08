@@ -17,7 +17,9 @@ class AuthRemoteDataSource {
 
     final user = response.user;
     if (user == null) {
-      throw Exception('Error de autenticación: usuario nulo tras el inicio de sesión.');
+      throw Exception(
+        'Error de autenticación: usuario nulo tras el inicio de sesión.',
+      );
     }
 
     return AuthUsuario(

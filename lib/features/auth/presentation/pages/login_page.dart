@@ -1,5 +1,3 @@
-// lib/features/auth/presentation/pages/login_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
@@ -35,9 +33,9 @@ class _LoginPageState extends State<LoginPage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthCubit>().login(
-          _usernameCtrl.text.trim(),
-          _passwordCtrl.text,
-        );
+      _usernameCtrl.text.trim(),
+      _passwordCtrl.text,
+    );
   }
 
   @override
@@ -81,7 +79,11 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
           ),
-          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 34),
+          child: const Icon(
+            Icons.local_hospital_rounded,
+            color: Colors.white,
+            size: 34,
+          ),
         ),
         const SizedBox(height: 18),
         const Text(
@@ -138,13 +140,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13.5,
-          fontWeight: FontWeight.w600,
-          color: _textPrimary,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 13.5,
+      fontWeight: FontWeight.w600,
+      color: _textPrimary,
+    ),
+  );
 
   Widget _usernameField() {
     return TextFormField(
@@ -152,10 +154,15 @@ class _LoginPageState extends State<LoginPage> {
       textInputAction: TextInputAction.next,
       autocorrect: false,
       style: const TextStyle(fontSize: 15, color: _textPrimary),
-      decoration: _deco(hint: 'pruebadoctor', icon: Icons.person_outline_rounded),
+      decoration: _deco(
+        hint: 'pruebadoctor',
+        icon: Icons.person_outline_rounded,
+      ),
       validator: (v) {
-        if (v == null || v.trim().isEmpty) return 'Ingresa tu nombre de usuario.';
-        if (v.trim().length < 3) return 'El usuario debe tener al menos 3 caracteres.';
+        if (v == null || v.trim().isEmpty)
+          return 'Ingresa tu nombre de usuario.';
+        if (v.trim().length < 3)
+          return 'El usuario debe tener al menos 3 caracteres.';
         return null;
       },
       onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
@@ -173,7 +180,9 @@ class _LoginPageState extends State<LoginPage> {
         icon: Icons.lock_outline_rounded,
         suffix: IconButton(
           icon: Icon(
-            _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _obscure
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: _textMuted,
             size: 20,
           ),
@@ -182,7 +191,8 @@ class _LoginPageState extends State<LoginPage> {
       ),
       validator: (v) {
         if (v == null || v.isEmpty) return 'Ingresa tu contraseña.';
-        if (v.length < 4) return 'La contraseña debe tener al menos 4 caracteres.';
+        if (v.length < 4)
+          return 'La contraseña debe tener al menos 4 caracteres.';
         return null;
       },
       onFieldSubmitted: (_) => _submit(),
@@ -202,22 +212,35 @@ class _LoginPageState extends State<LoginPage> {
       filled: true,
       fillColor: _surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _blue, width: 1.8)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFF87171))),
-      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _blue, width: 1.8),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFF87171)),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+      ),
     );
   }
 
   Widget _submitButton() {
     return BlocBuilder<AuthCubit, AuthState>(
-      buildWhen: (p, c) => p.isAuthenticated != c.isAuthenticated || (p.error != c.error),
+      buildWhen: (p, c) =>
+          p.isAuthenticated != c.isAuthenticated || (p.error != c.error),
       builder: (context, state) {
-        // Detectamos loading: el cubit no tiene estado intermedio explícito,
-        // así que usamos una variable local con _isLoading en el cubit.
-        // Por ahora mostramos un indicador cuando no hay usuario ni error tras submit.
-        final loading = false; // Conectar a un flag si añades AuthLoading en el futuro
+        final loading = false;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -230,7 +253,11 @@ class _LoginPageState extends State<LoginPage> {
             ),
             borderRadius: BorderRadius.circular(13),
             boxShadow: [
-              BoxShadow(color: _blue.withOpacity(0.32), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: _blue.withOpacity(0.32),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
           child: Material(
@@ -257,7 +284,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-/// Banner de error inline — separado para reconstruirse solo cuando cambia el error.
 class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -276,7 +302,11 @@ class _ErrorBanner extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline_rounded, color: Color(0xFFE11D48), size: 18),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFE11D48),
+                  size: 18,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(

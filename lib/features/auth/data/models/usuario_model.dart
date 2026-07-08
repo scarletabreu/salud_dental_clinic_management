@@ -16,7 +16,9 @@ class UsuarioModel extends Usuario {
   });
 
   @override
-  RolUsuario get rol => throw UnimplementedError('El rol debe ser implementado por la clase hija');
+  RolUsuario get rol => throw UnimplementedError(
+    'El rol debe ser implementado por la clase hija',
+  );
 
   factory UsuarioModel.fromJson(Map<String, dynamic> json) {
     return UsuarioModel(
@@ -32,23 +34,18 @@ class UsuarioModel extends Usuario {
     );
   }
 
-    static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
     final raw = json['contactos'];
 
-    // Caso 1: Si viene como una Lista (lo ideal)
     if (raw is List) {
       return raw
-          .whereType<Map<String, dynamic>>() // Filtra y asegura que cada item sea un Map
+          .whereType<Map<String, dynamic>>()
           .map((item) => ContactoModel.fromJson(item))
           .toList();
     }
-
-    // Caso 2: Por si acaso el backend viejo o un fallback envía un solo objeto Map
     if (raw is Map<String, dynamic>) {
       return [ContactoModel.fromJson(raw)];
     }
-
-    // Caso 3: Si es nulo o no es un formato válido, devolvemos una lista vacía
     return [];
   }
 
@@ -57,23 +54,6 @@ class UsuarioModel extends Usuario {
       'username': username,
       'passwordHash': passwordHash,
     };
-
-  Map<String, dynamic> parentToJson() {
-    final Map<String, dynamic> data = {
-      'nombre': nombre,
-      'apellido': apellido,
-      'fecha_nacimiento': birthDate.toIso8601String(),
-      'cedula': govID,
-      'estatus': estatus.name,
-      'contactos': (contactos as ContactoModel).toJson(),
-    };
-
-    if (id != null && id!.contains('-') && id!.length == 36) {
-      data['id'] = id;
-    }
-
-    return data;
-  }
 
     if (id != null && id!.contains('-') && id!.length == 36) {
       data['id'] = id;

@@ -20,16 +20,12 @@ class DoctorModel extends Doctor {
   });
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
-    // 1. Entramos al primer nivel (usuarios)
     final usuarioData = json['usuarios'] as Map<String, dynamic>? ?? {};
-    
-    // 2. Entramos al segundo nivel (personas) desde usuarios
     final personaData = usuarioData['personas'] as Map<String, dynamic>? ?? {};
 
     return DoctorModel(
       id: json['id'] as String?,
-      
-      // Datos que vienen del fondo: de la tabla 'personas'
+
       nombre: personaData['nombre'] as String? ?? '',
       apellido: personaData['apellido'] as String? ?? '',
       birthDate: personaData['fecha_nacimiento'] != null
@@ -37,17 +33,16 @@ class DoctorModel extends Doctor {
           : DateTime.now(),
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
-      
-      // Datos que vienen del medio: de la tabla 'usuarios'
+
       estatus: _parseEstatus(personaData['estatus'] as String?),
       username: usuarioData['username'] as String? ?? '',
       passwordHash: usuarioData['password_hash'] as String? ?? '',
-      
-      // Datos de la raíz: de la tabla 'doctores'
+
       specialty: json['especialidad'] as String? ?? '',
       isAvailable: json['esta_disponible'] as bool? ?? true,
-      
-      assistants: (json['assistants'] as List?)
+
+      assistants:
+          (json['assistants'] as List?)
               ?.map((e) => AsistenteModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -55,28 +50,34 @@ class DoctorModel extends Doctor {
   }
 
   static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo; // Fallback por defecto
-    
+    if (estatusStr == null) return EstatusPersona.activo;
+
     return EstatusPersona.values.firstWhere(
       (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo, // Por si en DB guardas algo raro
+      orElse: () => EstatusPersona.activo,
     );
   }
 
   static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
-    final raw = json['contactos'];
-
-    if (raw is List) {
-      return raw
+    final directos = json['contactos'];
+    if (directos is List) {
+      return directos
           .whereType<Map<String, dynamic>>()
           .map((item) => ContactoModel.fromJson(item))
           .toList();
     }
-
-    if (raw is Map<String, dynamic>) {
-      return [ContactoModel.fromJson(raw)];
+    if (directos is Map<String, dynamic>) {
+      return [ContactoModel.fromJson(directos)];
     }
 
+    final relaciones = json['persona_contactos'];
+    if (relaciones is List) {
+      return relaciones
+          .map((rel) => rel is Map ? rel['contactos'] : null)
+          .whereType<Map<String, dynamic>>()
+          .map(ContactoModel.fromJson)
+          .toList();
+    }
     return [];
   }
 

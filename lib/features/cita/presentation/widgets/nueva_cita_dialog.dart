@@ -237,7 +237,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
     if (!mounted) return;
     setState(() => _guardando = true);
-    context.read<CitaCubit>().createCita(cita);
+    try {
+      await context.read<CitaCubit>().createCita(cita);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      _showError('Error al agendar la cita: $e');
+    }
   }
 
   Persona _buildNuevaPersona() {
@@ -288,8 +294,11 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             SnackBar(
               content: const Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded,
-                      color: Colors.white, size: 18),
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Text('Cita agendada correctamente.'),
                 ],
@@ -298,7 +307,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(16),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
         } else if (state is CitaCubitError) {
@@ -340,14 +350,15 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
   Widget _buildHeader(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final titulo =
-        _step == _Step.buscarPersona ? 'Nueva Cita' : 'Detalles de la Cita';
+    final titulo = _step == _Step.buscarPersona
+        ? 'Nueva Cita'
+        : 'Detalles de la Cita';
 
     final subtitulo = _step == _Step.buscarPersona
         ? 'Busca un paciente existente o regístralo'
         : _esNuevaPersona
-            ? 'Nuevo paciente — completa los datos'
-            : '${_personaSeleccionada!.nombre} ${_personaSeleccionada!.apellido}';
+        ? 'Nuevo paciente — completa los datos'
+        : '${_personaSeleccionada!.nombre} ${_personaSeleccionada!.apellido}';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 12, 16),
@@ -363,23 +374,33 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
               color: cs.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.calendar_month_rounded,
-                size: 20, color: cs.primary),
+            child: Icon(
+              Icons.calendar_month_rounded,
+              size: 20,
+              color: cs.primary,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(titulo,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                Text(
+                  titulo,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+                ),
                 const SizedBox(height: 1),
-                Text(subtitulo,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  subtitulo,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -469,16 +490,15 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                 ),
               )
             : _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _resultados = []);
-                    },
-                  )
-                : null,
-        border:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _resultados = []);
+                },
+              )
+            : null,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         filled: true,
       ),
       onChanged: _buscar,
@@ -495,18 +515,21 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           child: Text(
             '${_resultados.length} resultado${_resultados.length != 1 ? 's' : ''}',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _resultados.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 6),
+          separatorBuilder: (_, _) => const SizedBox(height: 6),
           itemBuilder: (_, i) {
             final p = _resultados[i];
             return _PersonaTile(
-                persona: p, onTap: () => _seleccionarPersona(p));
+              persona: p,
+              onTap: () => _seleccionarPersona(p),
+            );
           },
         ),
         const SizedBox(height: 8),
@@ -523,11 +546,12 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             Expanded(child: Divider(color: cs.outlineVariant)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('o',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant)),
+              child: Text(
+                'o',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
             ),
             Expanded(child: Divider(color: cs.outlineVariant)),
           ],
@@ -543,7 +567,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 )
               : FilledButton.tonalIcon(
@@ -553,7 +578,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
         ),
@@ -583,9 +609,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                 children: [
                   Icon(Icons.person_outlined, size: 15, color: cs.primary),
                   const SizedBox(width: 6),
-                  Text('Datos del nuevo paciente',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: cs.primary, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Datos del nuevo paciente',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -600,9 +630,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                       label: 'Nombre',
                       required: true,
                       capitalization: TextCapitalization.words,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -612,9 +641,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                       label: 'Apellido',
                       required: true,
                       capitalization: TextCapitalization.words,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Requerido'
-                          : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ),
                   ),
                 ],
@@ -652,7 +680,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -692,31 +721,34 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   ),
                 )
               : DropdownButtonFormField<Doctor>(
-                  value: _doctorSeleccionado,
+                  initialValue: _doctorSeleccionado,
                   decoration: InputDecoration(
                     hintText: 'Seleccionar odontólogo',
-                    prefixIcon:
-                        const Icon(Icons.person_search_outlined, size: 20),
+                    prefixIcon: const Icon(
+                      Icons.person_search_outlined,
+                      size: 20,
+                    ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     filled: true,
                   ),
                   items: _doctores
-                      .map((d) => DropdownMenuItem(
-                            value: d,
-                            child: Text('Dr. ${d.nombre} ${d.apellido}'),
-                          ))
+                      .map(
+                        (d) => DropdownMenuItem(
+                          value: d,
+                          child: Text('Dr. ${d.nombre} ${d.apellido}'),
+                        ),
+                      )
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => _doctorSeleccionado = v),
+                  onChanged: (v) => setState(() => _doctorSeleccionado = v),
                   validator: (v) =>
                       v == null ? 'Selecciona un odontólogo' : null,
                 ),
           const SizedBox(height: 20),
 
           // ── Fecha y Hora ────────────────────────────────────────────────
-          _SectionLabel(
-              icon: Icons.schedule_outlined, label: 'Fecha y Hora'),
+          _SectionLabel(icon: Icons.schedule_outlined, label: 'Fecha y Hora'),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -749,7 +781,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
           // ── Motivo ──────────────────────────────────────────────────────
           _SectionLabel(
-              icon: Icons.notes_outlined, label: 'Motivo de consulta'),
+            icon: Icons.notes_outlined,
+            label: 'Motivo de consulta',
+          ),
           const SizedBox(height: 8),
           TextFormField(
             controller: _motivoCtrl,
@@ -759,7 +793,8 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             decoration: InputDecoration(
               hintText: 'Describe brevemente el motivo de la visita...',
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               filled: true,
               alignLabelWithHint: true,
             ),
@@ -771,7 +806,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
               color: _esEmergencia
-                  ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.5)
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.errorContainer.withOpacity(0.5)
                   : Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
@@ -789,13 +826,16 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   fontSize: 14,
                 ),
               ),
-              subtitle: const Text('Se marcará con prioridad alta en la agenda.',
-                  style: TextStyle(fontSize: 12)),
+              subtitle: const Text(
+                'Se marcará con prioridad alta en la agenda.',
+                style: TextStyle(fontSize: 12),
+              ),
               value: _esEmergencia,
               onChanged: (v) => setState(() => _esEmergencia = v),
-              activeColor: cs.error,
+              activeThumbColor: cs.error,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               dense: true,
             ),
           ),
@@ -806,12 +846,14 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed:
-                      _guardando ? null : () => Navigator.of(context).pop(),
+                  onPressed: _guardando
+                      ? null
+                      : () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: const Text('Cancelar'),
                 ),
@@ -826,15 +868,20 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Icon(Icons.check_circle_outline_rounded,
-                          size: 18),
+                      : const Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 18,
+                        ),
                   label: const Text('Confirmar Cita'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -858,7 +905,12 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
     final telefono = _esNuevaPersona ? _telefonoCtrl.text.trim() : null;
 
-    final iniciales = nombre.split(' ').take(2).map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
+    final iniciales = nombre
+        .split(' ')
+        .take(2)
+        .map((w) => w.isNotEmpty ? w[0] : '')
+        .join()
+        .toUpperCase();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -872,28 +924,40 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           CircleAvatar(
             radius: 22,
             backgroundColor: cs.primaryContainer,
-            child: Text(iniciales,
-                style: TextStyle(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15)),
+            child: Text(
+              iniciales,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(nombre.isEmpty ? 'Paciente nuevo' : nombre,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700)),
+                Text(
+                  nombre.isEmpty ? 'Paciente nuevo' : nombre,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 if (cedula.isNotEmpty)
-                  Text('Cédula: $cedula',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant)),
+                  Text(
+                    'Cédula: $cedula',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                 if (telefono != null && telefono.isNotEmpty)
-                  Text('Tel: $telefono',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant)),
+                  Text(
+                    'Tel: $telefono',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
               ],
             ),
           ),
@@ -904,10 +968,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                 color: cs.secondaryContainer,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Nuevo',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSecondaryContainer,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                'Nuevo',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: cs.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
         ],
       ),
@@ -993,11 +1060,14 @@ class _StepDot extends StatelessWidget {
       child: Center(
         child: completed
             ? Icon(Icons.check_rounded, size: 14, color: fg)
-            : Text(number.toString(),
+            : Text(
+                number.toString(),
                 style: TextStyle(
-                    color: fg,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
       ),
     );
   }
@@ -1037,10 +1107,8 @@ class _FormField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
         hintText: hint,
-        prefixIcon:
-            prefixIcon != null ? Icon(prefixIcon, size: 18) : null,
-        border:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 18) : null,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         isDense: true,
         filled: true,
       ),
@@ -1068,8 +1136,7 @@ class _PersonaTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             border: Border.all(color: cs.outlineVariant),
             borderRadius: BorderRadius.circular(10),
@@ -1079,11 +1146,14 @@ class _PersonaTile extends StatelessWidget {
               CircleAvatar(
                 radius: 19,
                 backgroundColor: cs.primaryContainer,
-                child: Text(iniciales,
-                    style: TextStyle(
-                        color: cs.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold)),
+                child: Text(
+                  iniciales,
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1091,23 +1161,26 @@ class _PersonaTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                        '${persona.nombre} ${persona.apellido}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                      '${persona.nombre} ${persona.apellido}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     if (persona.govID.isNotEmpty)
-                      Text('Cédula: ${persona.govID}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                  color: cs.onSurfaceVariant)),
+                      Text(
+                        'Cédula: ${persona.govID}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: cs.onSurfaceVariant, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -1129,9 +1202,13 @@ class _SectionLabel extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: cs.primary),
         const SizedBox(width: 6),
-        Text(label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700, letterSpacing: 0.1)),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.1,
+          ),
+        ),
       ],
     );
   }
@@ -1159,20 +1236,20 @@ class _DateTimeButton extends StatelessWidget {
     final borderColor = error
         ? cs.error
         : hasValue
-            ? cs.primary
-            : cs.outlineVariant;
+        ? cs.primary
+        : cs.outlineVariant;
 
     final iconColor = error
         ? cs.error
         : hasValue
-            ? cs.primary
-            : cs.onSurfaceVariant;
+        ? cs.primary
+        : cs.onSurfaceVariant;
 
     final textColor = error
         ? cs.error
         : hasValue
-            ? cs.primary
-            : cs.onSurfaceVariant;
+        ? cs.primary
+        : cs.onSurfaceVariant;
 
     return OutlinedButton.icon(
       onPressed: onTap,
@@ -1183,11 +1260,9 @@ class _DateTimeButton extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       style: OutlinedButton.styleFrom(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
         side: BorderSide(color: borderColor),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         alignment: Alignment.centerLeft,
       ),
     );

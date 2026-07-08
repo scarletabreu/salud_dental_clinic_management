@@ -110,10 +110,12 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
-    required String pacienteId,
+    required String? pacienteId,
     required Odontograma odontograma,
     required List<Receta> recetas,
     String? notas,
+    Map<String, dynamic>? signosVitales,
+    bool? finalizada,
   }) async {
     try {
       final tratamientosPorFdi = <int, List<Map<String, dynamic>>>{
@@ -141,6 +143,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         tratamientosPorFdi: tratamientosPorFdi,
         recetas: recetasJson,
         notas: notas,
+        signosVitales: signosVitales,
+        finalizada: finalizada,
       );
     } catch (e) {
       throw Exception(

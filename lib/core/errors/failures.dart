@@ -1,12 +1,18 @@
 import 'package:equatable/equatable.dart';
 
-abstract class Failure extends Equatable {
+/// Implementa [Exception] para que los `catch`/`on Exception catch` existentes
+/// capturen los Failures que lanza `runGuarded`. `toString` devuelve el mensaje
+/// para que la depuración y cualquier inspección heredada sean legibles.
+abstract class Failure extends Equatable implements Exception {
   final String message;
 
   const Failure([this.message = 'Ha ocurrido un error inesperado']);
 
   @override
   List<Object> get props => [message];
+
+  @override
+  String toString() => message;
 }
 
 class ServerFailure extends Failure {

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'auth_state.dart';
 
@@ -56,7 +57,7 @@ class AuthCubit extends Cubit<AuthState> {
       emit(state.copyWith(isAuthenticated: true, usuario: usuario));
     } catch (e) {
       // Re-emite el mismo estado limpio con el error para que la UI lo muestre
-      emit(AuthState(error: _parseError(e.toString())));
+      emit(AuthState(error: _parseError(e)));
     }
   }
 
@@ -66,15 +67,18 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState());
   }
 
-  String _parseError(String raw) {
-    if (raw.contains('Invalid login credentials') || raw.contains('invalid_credentials')) {
+  String _parseError(Object e) {
+    // El fallo de red llega tipado desde el repositorio migrado.
+    if (e is NetworkFailure) return e.message;
+    // Para el resto se inspecciona el mensaje ya limpio (ServerFailure.message
+    // o el texto de una validación de dominio), no un stacktrace.
+    final raw = e is Failure ? e.message : e.toString();
+    if (raw.contains('Invalid login credentials') ||
+        raw.contains('invalid_credentials')) {
       return 'Usuario o contraseña incorrectos.';
     }
     if (raw.contains('no tiene un perfil operativo')) {
       return 'El usuario no tiene un rol asignado. Contacta al administrador.';
-    }
-    if (raw.contains('network') || raw.contains('SocketException')) {
-      return 'Sin conexión. Verifica tu red e intenta de nuevo.';
     }
     return 'Ocurrió un error inesperado. Intenta de nuevo.';
   }

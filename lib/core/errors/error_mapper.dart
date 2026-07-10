@@ -9,6 +9,9 @@ import 'failures.dart';
 /// código donde se decide si un error es de red o de servidor: los repositorios
 /// lo usan a través del guard y ningún cubit debe volver a inspeccionar strings.
 Failure mapExceptionToFailure(Object error, {String? context}) {
+  // 0. Ya es un Failure tipado (p. ej. re-entró desde un guard anidado): tal cual.
+  if (error is Failure) return error;
+
   // 1. Fallos de red evidentes por su tipo.
   if (error is SocketException || error is TimeoutException) {
     return error is TimeoutException

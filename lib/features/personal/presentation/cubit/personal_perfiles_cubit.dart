@@ -11,6 +11,9 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
     : _usuarioRepository = usuarioRepository,
       super(const PerfilInitial());
 
+  /// Id del usuario autenticado; se usa para impedir que se elimine a sí mismo.
+  String? get usuarioActualId => _usuarioRepository.getCurrentUserId();
+
   Future<void> cargarUsuarios() async {
     emit(const PerfilLoading());
     try {
@@ -104,6 +107,16 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
           );
         }
       }
+      await cargarUsuarios();
+    } catch (e) {
+      emit(PerfilError(e.toString()));
+    }
+  }
+
+  Future<void> eliminarUsuario(String usuarioId) async {
+    emit(const PerfilLoading());
+    try {
+      await _usuarioRepository.eliminarUsuario(usuarioId: usuarioId);
       await cargarUsuarios();
     } catch (e) {
       emit(PerfilError(e.toString()));

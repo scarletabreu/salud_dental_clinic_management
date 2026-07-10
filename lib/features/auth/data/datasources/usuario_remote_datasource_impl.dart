@@ -155,4 +155,24 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
       throw Exception('Error al actualizar usuario: ${e.message}');
     }
   }
+
+  /// Eliminación lógica: se marca la persona como inactiva y se sella con
+  /// deleted_at. El perfil sigue visible como INACTIVO y el login queda
+  /// bloqueado (ver [UsuarioRepositoryImpl.loginUsuario]).
+  @override
+  Future<void> eliminarUsuario(String usuarioId) async {
+    try {
+      final now = DateTime.now().toIso8601String();
+      await supabase
+          .from('personas')
+          .update({
+            'estatus': 'inactivo',
+            'deleted_at': now,
+            'updated_at': now,
+          })
+          .eq('id', usuarioId);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al eliminar usuario: ${e.message}');
+    }
+  }
 }

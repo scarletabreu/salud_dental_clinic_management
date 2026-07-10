@@ -35,4 +35,6 @@ abstract class UsuarioRemoteDataSource {
     required String personaId,
     required String telefono,
   });
+
+  Future<void> eliminarUsuario(String usuarioId);
 }

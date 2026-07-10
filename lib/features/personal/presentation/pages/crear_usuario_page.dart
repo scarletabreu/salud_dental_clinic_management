@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
@@ -51,6 +52,14 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
   bool _obscurePassword = true;
 
   bool get _isEditing => widget.usuario != null;
+
+  /// Solo se puede eliminar un usuario existente, activo y distinto al que
+  /// tiene la sesión abierta (un admin no puede eliminarse a sí mismo).
+  bool get _puedeEliminar {
+    final u = widget.usuario;
+    if (u == null || u.estatus == EstatusPersona.inactivo) return false;
+    return u.id != context.read<PersonalPerfilesCubit>().usuarioActualId;
+  }
 
   @override
   void initState() {
@@ -133,6 +142,10 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   _buildDatosPersonalesCard(ac),
                   const SizedBox(height: 16),
                   _buildCredencialesCard(ac),
+                  if (_puedeEliminar) ...[
+                    const SizedBox(height: 16),
+                    _buildEliminarCard(ac, isSaving),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -446,6 +459,104 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                 return null;
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEliminarCard(AppColors ac, bool isSaving) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.red,
+      iconBg: ac.red.withOpacity(0.10),
+      icon: Icons.warning_amber_rounded,
+      title: 'Zona de peligro',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Al eliminar el usuario se desactiva su acceso al sistema. Su '
+            'historial se conserva, pero ya no podrá iniciar sesión.',
+            style: TextStyle(fontSize: 13, color: ac.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: isSaving ? null : _showEliminarConfirmation,
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Eliminar usuario'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ac.red,
+              side: BorderSide(color: ac.red.withOpacity(0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEliminarConfirmation() {
+    final ac = context.appColors;
+    final usuario = widget.usuario!;
+    final cubit = context.read<PersonalPerfilesCubit>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar usuario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Está seguro de que desea eliminar a '
+              '${usuario.nombre} ${usuario.apellido}?',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ac.red.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: ac.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'El usuario quedará inactivo y no podrá iniciar sesión. '
+                      'Su historial se conserva.',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: ac.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              cubit.eliminarUsuario(usuario.id!);
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Eliminar'),
+            style: FilledButton.styleFrom(backgroundColor: ac.red),
           ),
         ],
       ),

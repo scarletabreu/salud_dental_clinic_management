@@ -39,4 +39,6 @@ abstract interface class UsuarioRepository {
     required String usuarioId,
     required String nuevaPassword,
   });
+
+  Future<void> eliminarUsuario({required String usuarioId});
 }

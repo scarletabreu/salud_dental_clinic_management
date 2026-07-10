@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
@@ -58,6 +59,12 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       if (perfil == null) {
         throw Exception(
           'El usuario autenticado no tiene un perfil operativo asignado.',
+        );
+      }
+      if (perfil.estatus == EstatusPersona.inactivo) {
+        await remoteDataSource.signOut();
+        throw Exception(
+          'Este usuario ha sido deshabilitado. Contacte al administrador.',
         );
       }
       return perfil;
@@ -211,6 +218,11 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       targetUuid: usuarioId,
       nuevaPassword: nuevaPassword,
     );
+  }
+
+  @override
+  Future<void> eliminarUsuario({required String usuarioId}) async {
+    await remoteDataSource.eliminarUsuario(usuarioId);
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource.dart';
@@ -9,20 +10,16 @@ class CuentaRepositoryImpl implements CuentaRepository {
   CuentaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Cuenta>> getHistorialFinanciero(String pacienteId) async {
-    try {
+  Future<List<Cuenta>> getHistorialFinanciero(String pacienteId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCuentasByPaciente(pacienteId);
       return data.map((json) => CuentaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener historial financiero: $e',
-      );
-    }
+    }, context: 'obtener el historial financiero');
   }
 
   @override
-  Future<void> crearFactura(Cuenta cuenta) async {
-    try {
+  Future<void> crearFactura(Cuenta cuenta) {
+    return runGuarded(() async {
       final model = CuentaModel(
         id: cuenta.id,
         consultaId: cuenta.consultaId,
@@ -32,17 +29,14 @@ class CuentaRepositoryImpl implements CuentaRepository {
         nota: cuenta.nota,
       );
       await remoteDataSource.registrarCuenta(model.toJson());
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear factura: $e');
-    }
+    }, context: 'crear la factura');
   }
 
   @override
-  Future<void> eliminarCuenta(String id) async {
-    try {
-      await remoteDataSource.deleteCuenta(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar cuenta: $e');
-    }
+  Future<void> eliminarCuenta(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteCuenta(id),
+      context: 'eliminar la cuenta',
+    );
   }
 }

@@ -10,33 +10,21 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchCuentasByPaciente(
     String pacienteId,
   ) async {
-    try {
-      final response = await supabaseClient
-          .from('cuentas')
-          .select('*, pagos(*), item_cuentas(*)')
-          .eq('paciente_id', pacienteId)
-          .filter('deleted_at', 'is', null)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener historial financiero: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al cargar historial financiero: $e');
-    }
+    final response = await supabaseClient
+        .from('cuentas')
+        .select('*, pagos(*), item_cuentas(*)')
+        .eq('paciente_id', pacienteId)
+        .filter('deleted_at', 'is', null)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override
   Future<void> registrarCuenta(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['created_at'] = DateTime.now().toIso8601String();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('cuentas').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar nueva cuenta: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al crear cuenta: $e');
-    }
+    data.remove('id');
+    data['created_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('cuentas').insert(data);
   }
 
   @override
@@ -44,33 +32,21 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
     String cuentaId,
     Map<String, dynamic> pagoData,
   ) async {
-    try {
-      pagoData['cuenta_id'] = cuentaId;
-      pagoData.remove('id');
-      pagoData['created_at'] = DateTime.now().toIso8601String();
-      pagoData['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('pagos').insert(pagoData);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar pago: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al registrar pago: $e');
-    }
+    pagoData['cuenta_id'] = cuentaId;
+    pagoData.remove('id');
+    pagoData['created_at'] = DateTime.now().toIso8601String();
+    pagoData['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('pagos').insert(pagoData);
   }
 
   @override
   Future<void> deleteCuenta(String id) async {
-    try {
-      await supabaseClient
-          .from('cuentas')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar cuenta: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al eliminar cuenta: $e');
-    }
+    await supabaseClient
+        .from('cuentas')
+        .update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

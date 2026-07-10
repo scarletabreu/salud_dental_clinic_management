@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
 import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource.dart';
@@ -9,27 +10,24 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
   ConsumibleRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Consumible>> getInventario() async {
-    try {
+  Future<List<Consumible>> getInventario() {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchConsumibles();
       return data.map((json) => ConsumibleModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener inventario: $e');
-    }
+    }, context: 'obtener el inventario');
   }
 
   @override
-  Future<void> actualizarExistencia(String id, int nuevoStock) async {
-    try {
-      await remoteDataSource.updateStock(id, nuevoStock);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar existencia: $e');
-    }
+  Future<void> actualizarExistencia(String id, int nuevoStock) {
+    return runGuarded(
+      () => remoteDataSource.updateStock(id, nuevoStock),
+      context: 'actualizar la existencia',
+    );
   }
 
   @override
-  Future<void> guardarConsumible(Consumible consumible) async {
-    try {
+  Future<void> guardarConsumible(Consumible consumible) {
+    return runGuarded(() async {
       final model = ConsumibleModel(
         id: consumible.id,
         nombre: consumible.nombre,
@@ -40,17 +38,14 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
       );
 
       await remoteDataSource.upsertConsumible(model.toJson());
-    } catch (e) {
-      throw Exception('Error en el repositorio al guardar consumible: $e');
-    }
+    }, context: 'guardar el consumible');
   }
 
   @override
-  Future<void> eliminarConsumible(String id) async {
-    try {
-      await remoteDataSource.deleteConsumible(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar consumible: $e');
-    }
+  Future<void> eliminarConsumible(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteConsumible(id),
+      context: 'eliminar el consumible',
+    );
   }
 }

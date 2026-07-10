@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/repositories/cuota_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource.dart';
@@ -10,30 +11,27 @@ class CuotaRepositoryImpl implements CuotaRepository {
   CuotaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async {
-    try {
+  Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCuotasByCuenta(cuentaId);
       return data.map((json) => CuotaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener cuotas: $e');
-    }
+    }, context: 'obtener las cuotas');
   }
 
   @override
-  Future<void> pagarCuota(String cuotaId) async {
-    try {
-      await remoteDataSource.actualizarEstadoCuota(
+  Future<void> pagarCuota(String cuotaId) {
+    return runGuarded(
+      () => remoteDataSource.actualizarEstadoCuota(
         cuotaId,
         EstadoCuota.pagada.name,
-      );
-    } catch (e) {
-      throw Exception('Error en el repositorio al registrar pago de cuota: $e');
-    }
+      ),
+      context: 'registrar el pago de la cuota',
+    );
   }
 
   @override
-  Future<void> generarPlanDePagos(List<Cuota> cuotas) async {
-    try {
+  Future<void> generarPlanDePagos(List<Cuota> cuotas) {
+    return runGuarded(() async {
       final cuotasData = cuotas.map((c) {
         return CuotaModel(
           id: c.id,
@@ -45,17 +43,14 @@ class CuotaRepositoryImpl implements CuotaRepository {
       }).toList();
 
       await remoteDataSource.crearCuotas(cuotasData);
-    } catch (e) {
-      throw Exception('Error en el repositorio al generar plan de pagos: $e');
-    }
+    }, context: 'generar el plan de pagos');
   }
 
   @override
-  Future<void> eliminarCuota(String id) async {
-    try {
-      await remoteDataSource.deleteCuota(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar cuota: $e');
-    }
+  Future<void> eliminarCuota(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteCuota(id),
+      context: 'eliminar la cuota',
+    );
   }
 }

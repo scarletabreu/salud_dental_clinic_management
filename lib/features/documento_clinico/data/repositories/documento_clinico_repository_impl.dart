@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/repositories/documento_clinico_repository.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/data/datasources/documento_clinico_datasource.dart';
@@ -9,8 +10,8 @@ class DocumentoClinicoRepositoryImpl implements DocumentoClinicoRepository {
   DocumentoClinicoRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> registrarDocumento(DocumentoClinico documento) async {
-    try {
+  Future<void> registrarDocumento(DocumentoClinico documento) {
+    return runGuarded(() async {
       final model = DocumentoClinicoModel(
         id: documento.id,
         consultaId: documento.consultaId,
@@ -21,35 +22,22 @@ class DocumentoClinicoRepositoryImpl implements DocumentoClinicoRepository {
         urlArchivo: documento.urlArchivo,
       );
       await remoteDataSource.subirDocumento(model.toJson());
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al registrar documento clínico: $e',
-      );
-    }
+    }, context: 'registrar el documento clínico');
   }
 
   @override
-  Future<List<DocumentoClinico>> getDocumentosPaciente(
-    String pacienteId,
-  ) async {
-    try {
+  Future<List<DocumentoClinico>> getDocumentosPaciente(String pacienteId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchDocumentosPaciente(pacienteId);
       return data.map((json) => DocumentoClinicoModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener documentos del paciente: $e',
-      );
-    }
+    }, context: 'obtener los documentos del paciente');
   }
 
   @override
-  Future<void> borrarDocumento(String id) async {
-    try {
-      await remoteDataSource.eliminarDocumento(id);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al borrar documento clínico: $e',
-      );
-    }
+  Future<void> borrarDocumento(String id) {
+    return runGuarded(
+      () => remoteDataSource.eliminarDocumento(id),
+      context: 'borrar el documento clínico',
+    );
   }
 }

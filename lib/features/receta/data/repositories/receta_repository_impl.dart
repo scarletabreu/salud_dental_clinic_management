@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/repositories/receta_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
@@ -9,47 +10,36 @@ class RecetaRepositoryImpl implements RecetaRepository {
   RecetaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> emitirReceta(Receta receta) async {
-    try {
-      final model = RecetaModel.fromEntity(receta);
-      final data = model.toJson();
+  Future<void> emitirReceta(Receta receta) {
+    return runGuarded(() async {
+      final data = RecetaModel.fromEntity(receta).toJson();
       data['deleted_at'] = null;
       await remoteDataSource.crearReceta(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al emitir receta: $e');
-    }
+    }, context: 'emitir la receta');
   }
 
   @override
-  Future<void> editarReceta(Receta receta) async {
-    try {
-      final model = RecetaModel.fromEntity(receta);
-      final data = model.toJson();
+  Future<void> editarReceta(Receta receta) {
+    return runGuarded(() async {
+      final data = RecetaModel.fromEntity(receta).toJson();
       data['updated_at'] = DateTime.now().toIso8601String();
       await remoteDataSource.actualizarReceta(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al editar receta: $e');
-    }
+    }, context: 'editar la receta');
   }
 
   @override
-  Future<void> cancelarReceta(String id) async {
-    try {
-      await remoteDataSource.anularReceta(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al cancelar receta: $e');
-    }
+  Future<void> cancelarReceta(String id) {
+    return runGuarded(
+      () => remoteDataSource.anularReceta(id),
+      context: 'cancelar la receta',
+    );
   }
 
   @override
-  Future<List<Receta>> getHistorialRecetas(String pacienteId) async {
-    try {
+  Future<List<Receta>> getHistorialRecetas(String pacienteId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchRecetasByPaciente(pacienteId);
       return data.map((json) => RecetaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al cargar historial de recetas: $e',
-      );
-    }
+    }, context: 'cargar el historial de recetas');
   }
 }

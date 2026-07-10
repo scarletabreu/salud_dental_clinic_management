@@ -8,65 +8,41 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
 
   @override
   Future<void> crearReceta(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['created_at'] = DateTime.now().toIso8601String();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('recetas').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar receta médica: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al crear receta: $e');
-    }
+    data.remove('id');
+    data['created_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('recetas').insert(data);
   }
 
   @override
   Future<void> actualizarReceta(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('recetas').upsert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar receta: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al actualizar receta: $e');
-    }
+    data.remove('id');
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('recetas').upsert(data);
   }
 
   @override
   Future<void> anularReceta(String id) async {
-    try {
-      await supabaseClient
-          .from('recetas')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al anular receta: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al anular receta: $e');
-    }
+    await supabaseClient
+        .from('recetas')
+        .update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchRecetasByPaciente(
     String pacienteId,
   ) async {
-    try {
-      final response = await supabaseClient
-          .from('recetas')
-          .select('*, medicina:medicinas(nombre)')
-          .eq('paciente_id', pacienteId)
-          .filter('deleted_at', 'is', null)
-          .order('created_at', ascending: false);
+    final response = await supabaseClient
+        .from('recetas')
+        .select('*, medicina:medicinas(nombre)')
+        .eq('paciente_id', pacienteId)
+        .filter('deleted_at', 'is', null)
+        .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar recetas del paciente: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al buscar recetas: $e');
-    }
+    return List<Map<String, dynamic>>.from(response as List);
   }
 }

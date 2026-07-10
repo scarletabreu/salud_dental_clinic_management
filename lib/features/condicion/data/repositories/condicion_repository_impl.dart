@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/enums/tipo_condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
@@ -10,30 +11,24 @@ class CondicionRepositoryImpl implements CondicionRepository {
   CondicionRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Condicion>> getCondiciones() async {
-    try {
+  Future<List<Condicion>> getCondiciones() {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCondiciones();
       return data.map((json) => CondicionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener condiciones: $e');
-    }
+    }, context: 'obtener las condiciones');
   }
 
   @override
-  Future<List<Condicion>> getCondicionesByTipo(TipoCondicion tipo) async {
-    try {
+  Future<List<Condicion>> getCondicionesByTipo(TipoCondicion tipo) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCondicionesByTipo(tipo.name);
       return data.map((json) => CondicionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al filtrar condiciones por tipo: $e',
-      );
-    }
+    }, context: 'filtrar las condiciones por tipo');
   }
 
   @override
-  Future<Condicion> registrarNuevaCondicion(Condicion condicion) async {
-    try {
+  Future<Condicion> registrarNuevaCondicion(Condicion condicion) {
+    return runGuarded(() async {
       final model = CondicionModel(
         id: condicion.id,
         nombre: condicion.nombre,
@@ -42,17 +37,14 @@ class CondicionRepositoryImpl implements CondicionRepository {
       );
       final creada = await remoteDataSource.createCondicion(model.toJson());
       return CondicionModel.fromJson(creada);
-    } catch (e) {
-      throw Exception('Error en el repositorio al registrar condición: $e');
-    }
+    }, context: 'registrar la condición');
   }
 
   @override
-  Future<void> eliminarCondicion(String id) async {
-    try {
-      await remoteDataSource.deleteCondicion(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar condición: $e');
-    }
+  Future<void> eliminarCondicion(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteCondicion(id),
+      context: 'eliminar la condición',
+    );
   }
 }

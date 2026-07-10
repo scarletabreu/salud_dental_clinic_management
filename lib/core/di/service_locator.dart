@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/core/network/connectivity_check.dart';
+import 'package:salud_dental_clinic_management/core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
@@ -150,6 +151,9 @@ Future<void> init() async {
   sl.registerLazySingleton<ConnectivityCheck>(() => ConnectivityCheckImpl());
   // El guard falla rapido ante ausencia de red sin esperar el timeout.
   guardConnectivityCheck = () => sl<ConnectivityCheck>().hasConnection;
+  sl.registerFactory<ConnectivityCubit>(
+    () => ConnectivityCubit(sl())..start(),
+  );
 
   // --- Remote Data Sources ---
   sl.registerLazySingleton<MedicinaRemoteDatasource>(

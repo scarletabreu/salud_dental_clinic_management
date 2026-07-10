@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/shell/widgets/connectivity_banner.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
@@ -215,30 +216,37 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
             : '',
         compact: layout == _ShellLayout.mobile,
       ),
-      body: SafeArea(
-        top: false,
-        child: layout == _ShellLayout.mobile
-            ? content
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Row(
-                  children: [
-                    _SideRail(
-                      extended: layout == _ShellLayout.desktop,
-                      destinations: _visibleDestinations,
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: _onDestinationSelected,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: content,
+      body: Column(
+        children: [
+          const ConnectivityBanner(),
+          Expanded(
+            child: SafeArea(
+              top: false,
+              child: layout == _ShellLayout.mobile
+                  ? content
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: Row(
+                        children: [
+                          _SideRail(
+                            extended: layout == _ShellLayout.desktop,
+                            destinations: _visibleDestinations,
+                            selectedIndex: _selectedIndex,
+                            onDestinationSelected: _onDestinationSelected,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: content,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: layout == _ShellLayout.mobile
           ? NavigationBar(

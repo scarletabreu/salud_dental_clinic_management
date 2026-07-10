@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/auth/presentation/pages/login_page.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'core/presentation/app_theme.dart';
+import 'core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
@@ -33,6 +34,9 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider<AuthCubit>(create: (_) => di.sl<AuthCubit>()),
         BlocProvider<SettingsCubit>(create: (_) => di.sl<SettingsCubit>()),
+        BlocProvider<ConnectivityCubit>(
+          create: (_) => di.sl<ConnectivityCubit>(),
+        ),
       ],
 
       child: BlocBuilder<SettingsCubit, SettingsState>(

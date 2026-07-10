@@ -20,23 +20,19 @@ class PacienteRemoteDatasource {
       'persona_contacto:persona_contactos(contactos(*)))';
 
   Future<List<PacienteModel>> getPacientes() async {
-    try {
-      final pacientesRes = await client
-          .from('pacientes')
-          .select(_selectPaciente)
-          .filter('deleted_at', 'is', null);
+    final pacientesRes = await client
+        .from('pacientes')
+        .select(_selectPaciente)
+        .filter('deleted_at', 'is', null);
 
-      final lista = (pacientesRes as List)
-          .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-      // Only include local mock patients when the backend returns no results,
-      // so we don't mix test data with real data in production.
-      if (lista.isEmpty) lista.addAll(_pacientesPrueba);
-      lista.sort((a, b) => a.nombre.compareTo(b.nombre));
-      return lista;
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener lista de pacientes: ${e.message}');
-    }
+    final lista = (pacientesRes as List)
+        .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+    // Only include local mock patients when the backend returns no results,
+    // so we don't mix test data with real data in production.
+    if (lista.isEmpty) lista.addAll(_pacientesPrueba);
+    lista.sort((a, b) => a.nombre.compareTo(b.nombre));
+    return lista;
   }
 
   // IDs p1-p6 must match CitaRemoteDataSource._citasPrueba so mock flows work end-to-end.
@@ -295,9 +291,10 @@ class PacienteRemoteDatasource {
         ..['created_at'] = DateTime.now().toIso8601String()
         ..['updated_at'] = DateTime.now().toIso8601String();
       await client.from('pacientes').insert(data);
-    } on PostgrestException catch (e) {
+    } on PostgrestException {
       // Rollback best-effort para no dejar filas huérfanas si algo falla
-      // a mitad de camino.
+      // a mitad de camino. Se re-lanza la excepción tipada para que el guard
+      // la clasifique (red vs. servidor).
       if (personaId != null) {
         await client
             .from('persona_contactos')
@@ -308,43 +305,35 @@ class PacienteRemoteDatasource {
       if (contactoId != null) {
         await client.from('contactos').delete().eq('id', contactoId);
       }
-      throw Exception('Error al registrar nuevo paciente: ${e.message}');
+      rethrow;
     }
   }
 
   Future<void> updatePaciente(PacienteModel paciente) async {
-    try {
-      final data = paciente.toJson();
-      data.remove('id');
-      data['genero'] = _generoDb(paciente.genero);
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await client.from('pacientes').update(data).eq('id', paciente.id!);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar paciente: ${e.message}');
-    }
+    final data = paciente.toJson();
+    data.remove('id');
+    data['genero'] = _generoDb(paciente.genero);
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await client.from('pacientes').update(data).eq('id', paciente.id!);
   }
 
   Future<void> deletePaciente(String id) async {
-    try {
-      final now = DateTime.now().toIso8601String();
-      await client
-          .from('pacientes')
-          .update({
-            'deleted_at': now,
-            'updated_at': now,
-          })
-          .eq('id', id);
-      
-      await client
-          .from('personas')
-          .update({
-            'deleted_at': now,
-            'updated_at': now,
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar paciente: ${e.message}');
-    }
+    final now = DateTime.now().toIso8601String();
+    await client
+        .from('pacientes')
+        .update({
+          'deleted_at': now,
+          'updated_at': now,
+        })
+        .eq('id', id);
+
+    await client
+        .from('personas')
+        .update({
+          'deleted_at': now,
+          'updated_at': now,
+        })
+        .eq('id', id);
   }
 
   Future<PacienteModel> getPacienteById(String id) async {
@@ -388,33 +377,27 @@ class PacienteRemoteDatasource {
       if (local != null) return local;
     }
 
-    try {
-      print("c");
-      final now = DateTime.now().toIso8601String();
-      final creado = await client
-          .from('pacientes')
-          .insert({
-            'id': normalizedId,
-            'genero': Genero.otro.name,
-            'tipo_paciente': TipoPaciente.integrado.name,
-            'trabajo': '',
-            'referencia': '',
-            'created_at': now,
-            'updated_at': now,
-          })
-          .select(_selectPaciente)
-          .single();
+    print("c");
+    final now = DateTime.now().toIso8601String();
+    final creado = await client
+        .from('pacientes')
+        .insert({
+          'id': normalizedId,
+          'genero': Genero.otro.name,
+          'tipo_paciente': TipoPaciente.integrado.name,
+          'trabajo': '',
+          'referencia': '',
+          'created_at': now,
+          'updated_at': now,
+        })
+        .select(_selectPaciente)
+        .single();
 
-      final pacienteModel = PacienteModel.fromJson(
-        Map<String, dynamic>.from(creado),
-      );
-      final record = await _loadOrCreateRecord(pacienteModel.id!);
-      return pacienteModel.copyWithModel(record: record);
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al preparar el paciente de la consulta: ${e.message}',
-      );
-    }
+    final creadoModel = PacienteModel.fromJson(
+      Map<String, dynamic>.from(creado),
+    );
+    final record = await _loadOrCreateRecord(creadoModel.id!);
+    return creadoModel.copyWithModel(record: record);
   }
 
   Future<RecordModel> _loadOrCreateRecord(String pacienteId) async {
@@ -476,10 +459,9 @@ class PacienteRemoteDatasource {
           .single();
 
       return RecordModel.fromJson(Map<String, dynamic>.from(created));
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al cargar o crear el expediente clínico: ${e.message}',
-      );
+    } on PostgrestException {
+      // Se re-lanza la excepción tipada para que el guard la clasifique.
+      rethrow;
     }
   }
 

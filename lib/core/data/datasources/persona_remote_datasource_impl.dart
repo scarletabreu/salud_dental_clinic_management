@@ -10,77 +10,59 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
 
   @override
   Future<List<PersonaModel>> fetchActivePersonas() async {
-    try {
-      final response = await supabase
-          .from('personas')
-          .select()
-          .eq('estatus', 'activo')
-          .filter('deleted_at', 'is', null);
+    final response = await supabase
+        .from('personas')
+        .select()
+        .eq('estatus', 'activo')
+        .filter('deleted_at', 'is', null);
 
-      return (response as List)
-          .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar personas activas: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado: $e');
-    }
+    return (response as List)
+        .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
-    @override
+  @override
   Future<List<PersonaModel>> searchPersonas(String query) async {
     if (query.trim().isEmpty) return [];
-    try {
-      // Busca por nombre O apellido usando ilike (case-insensitive).
-      // Supabase no soporta OR entre columnas distintas con un solo .ilike(),
-      // así que usamos el filtro `or` explícito.
-      final response = await supabase
-          .from('personas')
-          // La tabla puente es `persona_contactos` (plural); se usa el alias
-          // `persona_contacto` porque PersonaModel.fromJson lee esa clave.
-          .select('*, persona_contacto:persona_contactos(*, contactos(*))')
-          .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
-          .eq('estatus', 'activo')
-          .filter('deleted_at', 'is', null)
-          .limit(10);
- 
-      return (response as List)
-          .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      throw Exception('Error al buscar personas: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al buscar personas: $e');
-    }
+    // Busca por nombre O apellido usando ilike (case-insensitive).
+    // Supabase no soporta OR entre columnas distintas con un solo .ilike(),
+    // así que usamos el filtro `or` explícito.
+    final response = await supabase
+        .from('personas')
+        // La tabla puente es `persona_contactos` (plural); se usa el alias
+        // `persona_contacto` porque PersonaModel.fromJson lee esa clave.
+        .select('*, persona_contacto:persona_contactos(*, contactos(*))')
+        .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
+        .eq('estatus', 'activo')
+        .filter('deleted_at', 'is', null)
+        .limit(10);
+
+    return (response as List)
+        .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   @override
   Future<PersonaModel> fetchPersonaById(String id) async {
-    try {
-      final response = await supabase
-          .from('personas')
-          .select('*, persona_contacto:persona_contactos(*, contactos(*))')
-          .eq('id', id)
-          .single();
+    final response = await supabase
+        .from('personas')
+        .select('*, persona_contacto:persona_contactos(*, contactos(*))')
+        .eq('id', id)
+        .single();
 
-      return PersonaModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar persona: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado: $e');
-    }
+    return PersonaModel.fromJson(response);
   }
 
-@override
+  @override
   Future<PersonaModel> createPersona(PersonaModel persona) async {
+    if (persona.contactos.isEmpty) {
+      throw Exception('La persona debe tener al menos un contacto.');
+    }
+
     String? contactoId;
     String? personaId;
 
     try {
-      if (persona.contactos.isEmpty) {
-        throw Exception('La persona debe tener al menos un contacto.');
-      }
-
       final primerContacto = persona.contactos.first as ContactoModel;
 
       final contactoResponse = await supabase
@@ -107,19 +89,18 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
 
       return PersonaModel.fromJson({
         ...personaResponse,
-        'contactos': persona.contactos.map((c) => (c as ContactoModel).toJson()).toList(),
+        'contactos':
+            persona.contactos.map((c) => (c as ContactoModel).toJson()).toList(),
       });
-
-    } on PostgrestException catch (e) {
+    } on PostgrestException {
+      // Rollback best-effort; se re-lanza la excepción tipada para el guard.
       if (contactoId != null) {
         await supabase.from('contactos').delete().eq('id', contactoId);
       }
       if (personaId != null) {
         await supabase.from('personas').delete().eq('id', personaId);
       }
-      throw Exception('Error al registrar persona en Supabase: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al crear persona: $e');
+      rethrow;
     }
   }
 
@@ -129,32 +110,20 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
       throw Exception('No se puede actualizar una persona sin un ID válido.');
     }
 
-    try {
-      final data = persona.toJson();
-      data.remove('id');
+    final data = persona.toJson();
+    data.remove('id');
 
-      await supabase.from('personas').update(data).eq('id', persona.id!);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar persona: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al actualizar: $e');
-    }
+    await supabase.from('personas').update(data).eq('id', persona.id!);
   }
 
   @override
   Future<void> deactivatePersona(String id) async {
-    try {
-      await supabase
-          .from('personas')
-          .update({
-            'estatus': 'inactivo',
-            'deleted_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al desactivar persona: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al desactivar: $e');
-    }
+    await supabase
+        .from('personas')
+        .update({
+          'estatus': 'inactivo',
+          'deleted_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

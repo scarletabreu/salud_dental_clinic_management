@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/core/domain/repositories/contacto
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/contacto_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 
 class ContactoRepositoryImpl implements ContactoRepository {
   final ContactoRemoteDataSource remoteDataSource;
@@ -9,41 +10,35 @@ class ContactoRepositoryImpl implements ContactoRepository {
   ContactoRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<Contacto?> getContactoByPersonaId(String personaId) async {
-    try {
-      return await remoteDataSource.fetchContactoByPersonaId(personaId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener contacto: $e');
-    }
+  Future<Contacto?> getContactoByPersonaId(String personaId) {
+    return runGuarded(
+      () => remoteDataSource.fetchContactoByPersonaId(personaId),
+      context: 'obtener el contacto',
+    );
   }
 
   @override
-  Future<void> createContacto(String personaId, Contacto contacto) async {
-    try {
-      final model = _toModel(contacto);
-      await remoteDataSource.createContacto(personaId, model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear contacto: $e');
-    }
+  Future<void> createContacto(String personaId, Contacto contacto) {
+    return runGuarded(
+      () => remoteDataSource.createContacto(personaId, _toModel(contacto)),
+      context: 'crear el contacto',
+    );
   }
 
   @override
-  Future<void> updateContacto(Contacto contacto) async {
-    try {
-      final model = _toModel(contacto);
-      await remoteDataSource.updateContacto(model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar contacto: $e');
-    }
+  Future<void> updateContacto(Contacto contacto) {
+    return runGuarded(
+      () => remoteDataSource.updateContacto(_toModel(contacto)),
+      context: 'actualizar el contacto',
+    );
   }
 
   @override
-  Future<void> deleteContacto(String id) async {
-    try {
-      await remoteDataSource.deleteContacto(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar contacto: $e');
-    }
+  Future<void> deleteContacto(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteContacto(id),
+      context: 'eliminar el contacto',
+    );
   }
 
   ContactoModel _toModel(Contacto contacto) {

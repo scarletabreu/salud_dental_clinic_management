@@ -34,3 +34,28 @@ Future<Either<Failure, T>> guard<T>(
     return Left(mapExceptionToFailure(e, context: context));
   }
 }
+
+/// Variante para repositorios que devuelven `Future<T>` crudo (sin dartz) y
+/// propagan el error lanzando. Aplica el mismo pre-check de conectividad,
+/// timeout y mapeo, pero en vez de un [Left] **lanza** el [Failure] tipado
+/// ([NetworkFailure] / [ServerFailure]). Así los cubits pueden hacer
+/// `catch (e) { if (e is NetworkFailure) ... }` sin string-matching.
+///
+/// Envolver SOLO la llamada remota: dejar fuera las validaciones de dominio
+/// (fechas, transiciones de estado) para no perder sus mensajes específicos.
+Future<T> runGuarded<T>(
+  Future<T> Function() action, {
+  String? context,
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final check = guardConnectivityCheck;
+  if (check != null && !(await check())) {
+    throw const NetworkFailure();
+  }
+
+  try {
+    return await action().timeout(timeout);
+  } catch (e) {
+    throw mapExceptionToFailure(e, context: context);
+  }
+}

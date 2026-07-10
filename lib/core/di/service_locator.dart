@@ -1,4 +1,6 @@
 import 'package:get_it/get_it.dart';
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
+import 'package:salud_dental_clinic_management/core/network/connectivity_check.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
@@ -143,6 +145,11 @@ final sl = GetIt.instance;
 Future<void> init() async {
   // Supabase Client
   sl.registerSingleton<SupabaseClient>(Supabase.instance.client);
+
+  // --- Red / conectividad ---
+  sl.registerLazySingleton<ConnectivityCheck>(() => ConnectivityCheckImpl());
+  // El guard falla rapido ante ausencia de red sin esperar el timeout.
+  guardConnectivityCheck = () => sl<ConnectivityCheck>().hasConnection;
 
   // --- Remote Data Sources ---
   sl.registerLazySingleton<MedicinaRemoteDatasource>(

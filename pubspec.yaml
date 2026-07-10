@@ -43,6 +43,7 @@ dependencies:
   path_drawing: ^1.0.1
   file_picker: ^8.1.4
   fl_chart: ^1.2.0
+  connectivity_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:

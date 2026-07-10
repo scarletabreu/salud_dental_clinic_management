@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/repositories/contraindicacion_repository.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource.dart';
@@ -11,72 +12,53 @@ class ContraindicacionRepositoryImpl implements ContraindicacionRepository {
   @override
   Future<List<Contraindicacion>> getContraindicacionesPorCondicion(
     String condicionId,
-  ) async {
-    try {
+  ) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchContraindicacionesByCondicion(
         condicionId,
       );
       return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener contraindicaciones: $e',
-      );
-    }
+    }, context: 'obtener las contraindicaciones');
   }
 
   @override
   Future<List<Contraindicacion>> getContraindicacionesPorProcedimiento(
     String procedimientoId,
-  ) async {
-    try {
-      final data = await remoteDataSource.fetchContraindicacionesByProcedimiento(
-        procedimientoId,
-      );
+  ) {
+    return runGuarded(() async {
+      final data = await remoteDataSource
+          .fetchContraindicacionesByProcedimiento(procedimientoId);
       return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener contraindicaciones: $e',
-      );
-    }
+    }, context: 'obtener las contraindicaciones');
   }
 
   @override
   Future<List<Contraindicacion>> getContraindicacionesPorTratamiento(
     String tratamientoId,
-  ) async {
-    try {
+  ) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchContraindicacionesByTratamiento(
         tratamientoId,
       );
       return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener contraindicaciones: $e',
-      );
-    }
+    }, context: 'obtener las contraindicaciones');
   }
 
   @override
   Future<List<Contraindicacion>> getContraindicacionesPorMedicina(
     String medicinaId,
-  ) async {
-    try {
+  ) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchContraindicacionesByMedicina(
         medicinaId,
       );
       return data.map((json) => ContraindicacionModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener contraindicaciones: $e',
-      );
-    }
+    }, context: 'obtener las contraindicaciones');
   }
 
   @override
-  Future<void> guardarContraindicacion(
-    Contraindicacion contraindicacion,
-  ) async {
-    try {
+  Future<void> guardarContraindicacion(Contraindicacion contraindicacion) {
+    return runGuarded(() async {
       final model = ContraindicacionModel(
         id: contraindicacion.id,
         condicionId: contraindicacion.condicionId,
@@ -88,21 +70,14 @@ class ContraindicacionRepositoryImpl implements ContraindicacionRepository {
         efectosAdversos: contraindicacion.efectosAdversos,
       );
       await remoteDataSource.registrarContraindicacion(model.toJson());
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al guardar contraindicación: $e',
-      );
-    }
+    }, context: 'guardar la contraindicación');
   }
 
   @override
-  Future<void> eliminarContraindicacion(String id) async {
-    try {
-      await remoteDataSource.deleteContraindicacion(id);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al eliminar contraindicación: $e',
-      );
-    }
+  Future<void> eliminarContraindicacion(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteContraindicacion(id),
+      context: 'eliminar la contraindicación',
+    );
   }
 }

@@ -1,6 +1,14 @@
 abstract class ConsultaRemoteDatasource {
   Future<String> crearConsultaCompleta(Map<String, dynamic> params);
 
+  /// Cierra la consulta y genera su pre-factura (cuenta + ítems) de forma
+  /// atómica vía RPC. Devuelve el id de la cuenta creada.
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String metodoPago,
+    String? nota,
+  });
+
   Future<void> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,

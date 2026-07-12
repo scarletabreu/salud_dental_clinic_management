@@ -11,6 +11,13 @@ abstract class ConsultaRepository {
 
   Future<String> crearConsultaCompleta(Consulta consulta);
 
+  /// Genera la pre-factura de la consulta (cuenta ABIERTA + ítems) y marca la
+  /// cita como completada. Devuelve el id de la cuenta creada.
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String? nota,
+  });
+
   Future<void> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,

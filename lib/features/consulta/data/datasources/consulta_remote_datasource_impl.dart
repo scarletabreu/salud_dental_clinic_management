@@ -28,6 +28,29 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String metodoPago = 'contado',
+    String? nota,
+  }) async {
+    try {
+      final res = await supabaseClient.rpc(
+        'finalizar_consulta',
+        params: {
+          'p_consulta_id': consultaId,
+          'p_metodo_pago': metodoPago,
+          'p_nota': nota,
+        },
+      );
+      return res as String;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al finalizar la consulta: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al finalizar la consulta: $e');
+    }
+  }
+
+  @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,

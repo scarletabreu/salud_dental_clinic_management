@@ -93,6 +93,21 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String? nota,
+  }) async {
+    try {
+      return await remoteDataSource.finalizarConsulta(
+        consultaId: consultaId,
+        nota: nota,
+      );
+    } catch (e) {
+      throw Exception('Error en el repositorio al finalizar la consulta: $e');
+    }
+  }
+
+  @override
   Future<void> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,

@@ -316,6 +316,9 @@ Future<void> init() async {
     () => ConsultaRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerFactory<CrearConsultaUseCase>(() => CrearConsultaUseCase(sl()));
+  sl.registerFactory<FinalizarConsultaUseCase>(
+    () => FinalizarConsultaUseCase(sl()),
+  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -335,7 +338,13 @@ Future<void> init() async {
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl(), sl()));
   sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
   sl.registerFactory<ConsultaCubit>(
-    () => ConsultaCubit(sl(), sl(), sl(), sl()),
+    () => ConsultaCubit(
+      sl<CrearConsultaUseCase>(),
+      sl<FinalizarConsultaUseCase>(),
+      sl<SupabaseStorageHelper>(),
+      sl<CitaRepository>(),
+      sl<ConsultaRepository>(),
+    ),
   );
   sl.registerFactory<ConsultaDetalleCubit>(
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
@@ -382,7 +391,6 @@ Future<void> init() async {
       catalogoRepository: sl(),
     ),
   );
-
   sl.registerFactory<GetInventarioEquiposUseCase>(
     () => GetInventarioEquiposUseCase(repository: sl()),
   );

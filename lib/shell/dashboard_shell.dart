@@ -24,6 +24,8 @@ import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
 
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
@@ -137,6 +139,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      icon: Icons.build_outlined,
+      selectedIcon: Icons.build_rounded,
+      label: 'Equipos',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<EquipoCubit>(),
+        child: const EquipoListPage(),
+      ),
+    ),
+    ShellDestination(
       icon: Icons.medication_outlined,
       selectedIcon: Icons.medication_rounded,
       label: 'Medicinas',
@@ -176,7 +187,12 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       if (roles.isEmpty) return false;
       switch (destination.label) {
         case 'Configuración':
+          return roles.contains(RolUsuario.admin) ||
+              roles.contains(RolUsuario.doctor) ||
+              roles.contains(RolUsuario.asistente);
         case 'Perfiles':
+          return roles.contains(RolUsuario.admin);
+        case 'Equipos':
           return roles.contains(RolUsuario.admin);
         case 'Consultas':
         case 'Medicinas':

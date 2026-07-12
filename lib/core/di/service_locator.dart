@@ -146,6 +146,10 @@ import '../../features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuentas_por_cobrar_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 
+// Módulo Historial Financiero
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_cubit.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init() async {
@@ -380,6 +384,13 @@ Future<void> init() async {
   );
   sl.registerFactory<CuentasPorCobrarCubit>(
     () => CuentasPorCobrarCubit(getCuentas: sl(), repository: sl()),
+  );
+
+  sl.registerFactory<GetHistorialFinancieroUseCase>(
+    () => GetHistorialFinancieroUseCase(repository: sl()),
+  );
+  sl.registerFactory<HistorialFinancieroCubit>(
+    () => HistorialFinancieroCubit(getHistorial: sl()),
   );
 
   sl.registerFactory<GetCondicionesPaciente>(

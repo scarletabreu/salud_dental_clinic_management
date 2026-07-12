@@ -142,6 +142,10 @@ import '../../features/tratamiento/data/repositories/tratamiento_repository_impl
 import '../../features/tratamiento/domain/repositories/tratamiento_repository.dart';
 import '../../features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 
+// Módulo Cuentas por Cobrar
+import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuentas_por_cobrar_usecase.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init() async {
@@ -371,8 +375,13 @@ Future<void> init() async {
   sl.registerFactory<TratamientoCubit>(
     () => TratamientoCubit(sl<TratamientoRepository>()),
   );
+  sl.registerFactory<GetCuentasPorCobrarUseCase>(
+    () => GetCuentasPorCobrarUseCase(repository: sl()),
+  );
+  sl.registerFactory<CuentasPorCobrarCubit>(
+    () => CuentasPorCobrarCubit(getCuentas: sl(), repository: sl()),
+  );
 
-  // ── Condiciones médicas del paciente ─────────────────────────────────────
   sl.registerFactory<GetCondicionesPaciente>(
     () => GetCondicionesPaciente(sl()),
   );

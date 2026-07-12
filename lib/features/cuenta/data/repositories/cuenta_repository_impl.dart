@@ -1,12 +1,24 @@
-import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
-import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/models/cuenta_model.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 
 class CuentaRepositoryImpl implements CuentaRepository {
   final CuentaRemoteDatasource remoteDataSource;
 
   CuentaRepositoryImpl({required this.remoteDataSource});
+
+  @override
+  Future<List<Cuenta>> getCuentasPorCobrar() async {
+    try {
+      final data = await remoteDataSource.fetchTodasLasCuentas();
+      return data.map((json) => CuentaModel.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(
+        'Error en el repositorio al obtener cuentas por cobrar: $e',
+      );
+    }
+  }
 
   @override
   Future<List<Cuenta>> getHistorialFinanciero(String pacienteId) async {

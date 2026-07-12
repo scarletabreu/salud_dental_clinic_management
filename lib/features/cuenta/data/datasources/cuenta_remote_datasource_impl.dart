@@ -7,13 +7,29 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   CuentaRemoteDatasourceImpl({required this.supabaseClient});
 
   @override
+  Future<List<Map<String, dynamic>>> fetchTodasLasCuentas() async {
+    try {
+      final response = await supabaseClient
+          .from('cuentas')
+          .select('*, pagos(*)')
+          .filter('deleted_at', 'is', null)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener cuentas por cobrar: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al cargar cuentas por cobrar: $e');
+    }
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchCuentasByPaciente(
     String pacienteId,
   ) async {
     try {
       final response = await supabaseClient
           .from('cuentas')
-          .select('*, pagos(*), item_cuentas(*)')
+          .select('*, pagos(*)')
           .eq('paciente_id', pacienteId)
           .filter('deleted_at', 'is', null)
           .order('created_at', ascending: false);

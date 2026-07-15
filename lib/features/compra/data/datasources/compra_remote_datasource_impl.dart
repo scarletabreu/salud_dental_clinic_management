@@ -31,51 +31,39 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
 
   @override
   Future<void> createCompra(CompraModel compra) async {
-    try {
-      final Map<String, dynamic> compraData = compra.toJson();
+    final Map<String, dynamic> compraData = compra.toJson();
 
-      compraData['created_at'] = DateTime.now().toIso8601String();
-      compraData['updated_at'] = DateTime.now().toIso8601String();
+    compraData['created_at'] = DateTime.now().toIso8601String();
+    compraData['updated_at'] = DateTime.now().toIso8601String();
 
-      final compraResponse = await supabaseClient
-          .from('compras')
-          .insert(compraData)
-          .select('id')
-          .single();
+    final compraResponse = await supabaseClient
+        .from('compras')
+        .insert(compraData)
+        .select('id')
+        .single();
 
-      final String compraId = compraResponse['id'];
+    final String compraId = compraResponse['id'];
 
-      final itemsData = compra.items.map((item) {
-        final model = item as ConsumibleCompraModel;
-        final json = model.toJson();
-        json['compra_id'] = compraId;
-        json.remove('id');
-        return json;
-      }).toList();
+    final itemsData = compra.items.map((item) {
+      final model = item as ConsumibleCompraModel;
+      final json = model.toJson();
+      json['compra_id'] = compraId;
+      json.remove('id');
+      return json;
+    }).toList();
 
-      await supabaseClient.from('consumibles_compra').insert(itemsData);
-    } catch (e) {
-      throw Exception('Error al registrar la compra: $e');
-    }
+    await supabaseClient.from('consumibles_compra').insert(itemsData);
   }
 
   @override
   Future<void> updateCompraEstado(String id, String nuevoEstado) async {
-    try {
-      await supabaseClient
-          .from('compras')
-          .update({
-            'estado': nuevoEstado,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al actualizar el estado de la compra: ${e.message}',
-      );
-    } catch (e) {
-      throw Exception('Error inesperado: $e');
-    }
+    await supabaseClient
+        .from('compras')
+        .update({
+          'estado': nuevoEstado,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 
   @override

@@ -8,68 +8,50 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchCondiciones() async {
-    try {
-      final response = await supabaseClient
-          .from('condiciones')
-          .select()
-          .isFilter('deleted_at', null)
-          .order('nombre', ascending: true);
+    final response = await supabaseClient
+        .from('condiciones')
+        .select()
+        .isFilter('deleted_at', null)
+        .order('nombre', ascending: true);
 
-      return List<Map<String, dynamic>>.from(response);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener condiciones: ${e.message}');
-    }
+    return List<Map<String, dynamic>>.from(response);
   }
 
   @override
   Future<List<Map<String, dynamic>>> fetchCondicionesByTipo(String tipo) async {
-    try {
-      final response = await supabaseClient
-          .from('condiciones')
-          .select()
-          .eq('tipo', tipo)
-          .isFilter('deleted_at', null)
-          .order('nombre', ascending: true);
+    final response = await supabaseClient
+        .from('condiciones')
+        .select()
+        .eq('tipo', tipo)
+        .isFilter('deleted_at', null)
+        .order('nombre', ascending: true);
 
-      return List<Map<String, dynamic>>.from(response);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener condiciones por tipo: ${e.message}');
-    }
+    return List<Map<String, dynamic>>.from(response);
   }
 
   @override
   Future<Map<String, dynamic>> createCondicion(
     Map<String, dynamic> condicionData,
   ) async {
-    try {
-      condicionData.remove('id');
-      condicionData['created_at'] = DateTime.now().toIso8601String();
-      condicionData['updated_at'] = DateTime.now().toIso8601String();
-      final inserted = await supabaseClient
-          .from('condiciones')
-          .insert(condicionData)
-          .select()
-          .single();
-      return Map<String, dynamic>.from(inserted);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al crear condición: ${e.message}');
-    }
+    condicionData.remove('id');
+    condicionData['created_at'] = DateTime.now().toIso8601String();
+    condicionData['updated_at'] = DateTime.now().toIso8601String();
+    final inserted = await supabaseClient
+        .from('condiciones')
+        .insert(condicionData)
+        .select()
+        .single();
+    return Map<String, dynamic>.from(inserted);
   }
 
   @override
   Future<void> deleteCondicion(String id) async {
-    try {
-      await supabaseClient
-          .from('condiciones')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al borrar condición: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al borrar: $e');
-    }
+    await supabaseClient
+        .from('condiciones')
+        .update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

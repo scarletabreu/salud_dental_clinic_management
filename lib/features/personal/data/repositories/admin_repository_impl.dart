@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/admin.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/admin_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/datasources/admin_remote_datasource.dart';
@@ -9,39 +10,34 @@ class AdminRepositoryImpl implements AdminRepository {
   AdminRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<Admin?> getAdminByUserId(String userId) async {
-    try {
+  Future<Admin?> getAdminByUserId(String userId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchAdminById(userId);
       return data == null ? null : AdminModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener admin: $e');
-    }
+    }, context: 'obtener el admin');
   }
 
   @override
-  Future<void> createAdmin(String userId) async {
-    try {
-      await remoteDataSource.createAdmin(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear admin: $e');
-    }
+  Future<void> createAdmin(String userId) {
+    return runGuarded(
+      () => remoteDataSource.createAdmin(userId),
+      context: 'crear el admin',
+    );
   }
 
   @override
-  Future<void> updateAdmin(String userId, String newUserId) async {
-    try {
-      await remoteDataSource.updateAdmin(userId, newUserId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar admin: $e');
-    }
+  Future<void> updateAdmin(String userId, String newUserId) {
+    return runGuarded(
+      () => remoteDataSource.updateAdmin(userId, newUserId),
+      context: 'actualizar el admin',
+    );
   }
 
   @override
-  Future<void> deleteAdmin(String userId) async {
-    try {
-      await remoteDataSource.deactivateAdmin(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al desactivar admin: $e');
-    }
+  Future<void> deleteAdmin(String userId) {
+    return runGuarded(
+      () => remoteDataSource.deactivateAdmin(userId),
+      context: 'desactivar el admin',
+    );
   }
 }

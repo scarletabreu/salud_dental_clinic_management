@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
@@ -394,13 +395,13 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     Object e, {
     String fallback = 'No se pudo registrar la consulta. Inténtalo de nuevo.',
   }) {
-    final raw = e.toString();
-    if (raw.contains('SocketException') ||
-        raw.contains('Failed host lookup') ||
-        raw.contains('network') ||
-        raw.contains('connection')) {
+    // El fallo de red llega tipado desde los repositorios migrados: sin
+    // string-matching frágil.
+    if (e is NetworkFailure) {
       return 'Sin conexión. No se guardó la operación; verifica tu red e inténtalo de nuevo.';
     }
+    // Caso especial: la validación de paciente de prueba se lanza como Exception.
+    final raw = e.toString();
     if (raw.contains('paciente de prueba')) {
       return raw.replaceFirst('Exception: ', '');
     }

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource.dart';
@@ -9,45 +10,36 @@ class PagoRepositoryImpl implements PagoRepository {
   PagoRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> procesarPago(Pago pago) async {
-    try {
-      final model = PagoModel.fromEntity(pago);
-      final data = model.toJson();
+  Future<void> procesarPago(Pago pago) {
+    return runGuarded(() async {
+      final data = PagoModel.fromEntity(pago).toJson();
       data['deleted_at'] = null;
       await remoteDataSource.registrarPago(data);
-    } catch (e) {
-      throw Exception('Error al procesar el pago: $e');
-    }
+    }, context: 'procesar el pago');
   }
 
   @override
-  Future<void> editarPago(Pago pago) async {
-    try {
-      final model = PagoModel.fromEntity(pago);
-      final data = model.toJson();
+  Future<void> editarPago(Pago pago) {
+    return runGuarded(() async {
+      final data = PagoModel.fromEntity(pago).toJson();
       data['updated_at'] = DateTime.now().toIso8601String();
       await remoteDataSource.actualizarPago(data);
-    } catch (e) {
-      throw Exception('Error al editar el pago: $e');
-    }
+    }, context: 'editar el pago');
   }
 
   @override
-  Future<void> cancelarPago(String id) async {
-    try {
-      await remoteDataSource.anularPago(id);
-    } catch (e) {
-      throw Exception('Error al cancelar el pago: $e');
-    }
+  Future<void> cancelarPago(String id) {
+    return runGuarded(
+      () => remoteDataSource.anularPago(id),
+      context: 'cancelar el pago',
+    );
   }
 
   @override
-  Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) async {
-    try {
+  Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchPagosPorCuenta(cuentaId);
       return data.map((json) => PagoModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error al obtener el historial de pagos: $e');
-    }
+    }, context: 'obtener el historial de pagos');
   }
 }

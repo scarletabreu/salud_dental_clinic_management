@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
@@ -11,112 +12,97 @@ class CitaRepositoryImpl implements CitaRepository {
   CitaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Cita>> getCitas() async {
-    try {
-      return await remoteDataSource.fetchCitas();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener citas: $e');
-    }
+  Future<List<Cita>> getCitas() {
+    return runGuarded(
+      () => remoteDataSource.fetchCitas(),
+      context: 'obtener las citas',
+    );
   }
 
   @override
-  Future<void> createCita(Cita cita) async {
-    try {
-      if (cita.date.isBefore(DateTime.now())) {
-        throw Exception("No se puede programar una cita en el pasado");
-      }
-
-      final model = CitaModel(
-        id: cita.id,
-        doctor: cita.doctor,
-        persona: cita.persona,
-        date: cita.date,
-        duracionMinutos: cita.duracionMinutos,
-        esEmergencia: cita.esEmergencia,
-        estado: cita.estado,
-      );
-
-      await remoteDataSource.addCita(model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear cita: $e');
+  Future<void> createCita(Cita cita) {
+    // Validación de dominio fuera del guard para conservar su mensaje.
+    if (cita.date.isBefore(DateTime.now())) {
+      throw Exception('No se puede programar una cita en el pasado');
     }
+    return runGuarded(
+      () => remoteDataSource.addCita(_toModel(cita)),
+      context: 'crear la cita',
+    );
   }
 
   @override
-  Future<List<Cita>> getCitasByPaciente(String pacienteId) async {
-    try {
-      return await remoteDataSource.fetchCitasByPaciente(pacienteId);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener citas del paciente: $e',
-      );
-    }
+  Future<List<Cita>> getCitasByPaciente(String pacienteId) {
+    return runGuarded(
+      () => remoteDataSource.fetchCitasByPaciente(pacienteId),
+      context: 'obtener las citas del paciente',
+    );
   }
 
   @override
-  Future<List<Cita>> getCitasByDoctor(String doctorId) async {
-    try {
-      return await remoteDataSource.fetchCitasByDoctor(doctorId);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener citas del doctor: $e',
-      );
-    }
+  Future<List<Cita>> getCitasByDoctor(String doctorId) {
+    return runGuarded(
+      () => remoteDataSource.fetchCitasByDoctor(doctorId),
+      context: 'obtener las citas del doctor',
+    );
   }
 
   @override
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
-    final actual = await remoteDataSource.fetchEstadoCita(id);
+    final actual = await runGuarded(
+      () => remoteDataSource.fetchEstadoCita(id),
+      context: 'consultar el estado de la cita',
+    );
     // `actual == null` => la cita no existe en BD (datos de prueba): no validamos.
     if (actual != null && !actual.puedeTransicionarA(nuevoEstado)) {
       throw TransicionEstadoInvalida(actual, nuevoEstado);
     }
-    try {
-      await remoteDataSource.updateCitaEstado(id, nuevoEstado);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al actualizar el estado de la cita: $e',
-      );
-    }
+    await runGuarded(
+      () => remoteDataSource.updateCitaEstado(id, nuevoEstado),
+      context: 'actualizar el estado de la cita',
+    );
   }
 
   @override
-  Future<void> deleteCita(String id) async {
-    try {
-      await remoteDataSource.deleteCita(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar cita: $e');
-    }
+  Future<void> deleteCita(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteCita(id),
+      context: 'eliminar la cita',
+    );
   }
 
   @override
   Future<void> updateCita(Cita cita) async {
     if (cita.id == null) {
-      throw Exception("No se puede actualizar una cita sin un ID válido");
+      throw Exception('No se puede actualizar una cita sin un ID válido');
     }
 
     // Si la actualización cambia el estado, validar la transición.
-    final actual = await remoteDataSource.fetchEstadoCita(cita.id!);
+    final actual = await runGuarded(
+      () => remoteDataSource.fetchEstadoCita(cita.id!),
+      context: 'consultar el estado de la cita',
+    );
     if (actual != null &&
         actual != cita.estado &&
         !actual.puedeTransicionarA(cita.estado)) {
       throw TransicionEstadoInvalida(actual, cita.estado);
     }
 
-    try {
-      final model = CitaModel(
-        id: cita.id,
-        doctor: cita.doctor,
-        persona: cita.persona,
-        date: cita.date,
-        duracionMinutos: cita.duracionMinutos,
-        esEmergencia: cita.esEmergencia,
-        estado: cita.estado,
-      );
+    await runGuarded(
+      () => remoteDataSource.updateCita(_toModel(cita)),
+      context: 'actualizar la cita',
+    );
+  }
 
-      await remoteDataSource.updateCita(model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar la cita: $e');
-    }
+  CitaModel _toModel(Cita cita) {
+    return CitaModel(
+      id: cita.id,
+      doctor: cita.doctor,
+      persona: cita.persona,
+      date: cita.date,
+      duracionMinutos: cita.duracionMinutos,
+      esEmergencia: cita.esEmergencia,
+      estado: cita.estado,
+    );
   }
 }

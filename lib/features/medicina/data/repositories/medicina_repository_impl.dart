@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import '../datasources/medicina_remote_datasource.dart';
@@ -9,15 +10,11 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
   MedicinaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Medicina>> getCatalogoMedicinas() async {
-    try {
+  Future<List<Medicina>> getCatalogoMedicinas() {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchMedicinas();
       return data.map((json) => MedicinaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener catálogo de medicinas: $e',
-      );
-    }
+    }, context: 'obtener el catálogo de medicinas');
   }
 
   @override
@@ -26,26 +23,20 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
   }
 
   @override
-  Future<void> guardarMedicina(Medicina medicina) async {
-    try {
-      final model = MedicinaModel.fromEntity(medicina);
-      final data = model.toJson();
-
+  Future<void> guardarMedicina(Medicina medicina) {
+    return runGuarded(() async {
+      final data = MedicinaModel.fromEntity(medicina).toJson();
       data['deleted_at'] = null;
       data['updated_at'] = DateTime.now().toIso8601String();
-
       await remoteDataSource.upsertMedicina(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al guardar medicina: $e');
-    }
+    }, context: 'guardar la medicina');
   }
 
   @override
-  Future<void> eliminarMedicina(String id) async {
-    try {
-      await remoteDataSource.softDeleteMedicina(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar medicina: $e');
-    }
+  Future<void> eliminarMedicina(String id) {
+    return runGuarded(
+      () => remoteDataSource.softDeleteMedicina(id),
+      context: 'eliminar la medicina',
+    );
   }
 }

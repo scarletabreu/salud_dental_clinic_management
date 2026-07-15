@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/asistente_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/datasources/asistente_remote_datasource.dart';
@@ -9,39 +10,34 @@ class AsistenteRepositoryImpl implements AsistenteRepository {
   AsistenteRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<void> createAsistente(String userId) async {
-    try {
-      await remoteDataSource.createAsistente(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear asistente: $e');
-    }
+  Future<void> createAsistente(String userId) {
+    return runGuarded(
+      () => remoteDataSource.createAsistente(userId),
+      context: 'crear el asistente',
+    );
   }
 
   @override
-  Future<void> deleteAsistente(String userId) async {
-    try {
-      await remoteDataSource.deactivateAsistente(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al desactivar asistente: $e');
-    }
+  Future<void> deleteAsistente(String userId) {
+    return runGuarded(
+      () => remoteDataSource.deactivateAsistente(userId),
+      context: 'desactivar el asistente',
+    );
   }
 
   @override
-  Future<Asistente?> getAsistenteByUserId(String userId) async {
-    try {
+  Future<Asistente?> getAsistenteByUserId(String userId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchAsistenteById(userId);
       return data == null ? null : AsistenteModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener asistente: $e');
-    }
+    }, context: 'obtener el asistente');
   }
 
   @override
-  Future<void> updateAsistente(String userId, String newUserId) async {
-    try {
-      await remoteDataSource.updateAsistente(userId, newUserId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar asistente: $e');
-    }
+  Future<void> updateAsistente(String userId, String newUserId) {
+    return runGuarded(
+      () => remoteDataSource.updateAsistente(userId, newUserId),
+      context: 'actualizar el asistente',
+    );
   }
 }

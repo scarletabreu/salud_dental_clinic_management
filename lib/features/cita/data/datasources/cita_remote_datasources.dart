@@ -36,31 +36,23 @@ class CitaRemoteDataSource {
   }
 
   Future<List<CitaModel>> fetchCitasByPaciente(String pacienteId) async {
-    try {
-      final citasRes = await supabase
-          .from('citas')
-          .select('*')
-          .eq('persona_id', pacienteId)
-          .filter('deleted_at', 'is', null);
+    final citasRes = await supabase
+        .from('citas')
+        .select('*')
+        .eq('persona_id', pacienteId)
+        .filter('deleted_at', 'is', null);
 
-      return _assembleCitas(citasRes as List);
-    } catch (e) {
-      throw Exception('Error al obtener citas del paciente: $e');
-    }
+    return _assembleCitas(citasRes as List);
   }
 
   Future<List<CitaModel>> fetchCitasByDoctor(String doctorId) async {
-    try {
-      final citasRes = await supabase
-          .from('citas')
-          .select('*')
-          .eq('doctor_id', doctorId)
-          .filter('deleted_at', 'is', null);
+    final citasRes = await supabase
+        .from('citas')
+        .select('*')
+        .eq('doctor_id', doctorId)
+        .filter('deleted_at', 'is', null);
 
-      return _assembleCitas(citasRes as List);
-    } catch (e) {
-      throw Exception('Error al obtener citas del doctor: $e');
-    }
+    return _assembleCitas(citasRes as List);
   }
 
   Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
@@ -171,58 +163,44 @@ class CitaRemoteDataSource {
   }
 
   Future<void> addCita(CitaModel cita) async {
-    try {
-      final data = cita.toJson();
+    final data = cita.toJson();
 
-      if (!_isValidUuid(data['id'])) {
-        data.remove('id');
-      }
-
-      final now = DateTime.now().toIso8601String();
-      data['created_at'] = now;
-      data['updated_at'] = now;
-
-      await supabase.from('citas').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al agregar cita: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al agregar cita: $e');
+    if (!_isValidUuid(data['id'])) {
+      data.remove('id');
     }
+
+    final now = DateTime.now().toIso8601String();
+    data['created_at'] = now;
+    data['updated_at'] = now;
+
+    await supabase.from('citas').insert(data);
   }
 
   Future<void> updateCita(CitaModel cita) async {
     if (cita.id == null) {
       throw Exception('No se puede actualizar una cita sin ID.');
     }
-    try {
-      final data = <String, dynamic>{
-        'doctor_id': cita.doctor.id,
-        'persona_id': cita.persona.id,
-        'fecha_hora': cita.date.toUtc().toIso8601String(),
-        'duracion_minutos': cita.duracionMinutos,
-        'es_emergencia': cita.esEmergencia,
-        'estado': cita.estado.dbValue,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      debugPrint('updateCita payload: $data para id=${cita.id}');
-      await supabase.from('citas').update(data).eq('id', cita.id!);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar cita: ${e.message}');
-    }
+    final data = <String, dynamic>{
+      'doctor_id': cita.doctor.id,
+      'persona_id': cita.persona.id,
+      'fecha_hora': cita.date.toUtc().toIso8601String(),
+      'duracion_minutos': cita.duracionMinutos,
+      'es_emergencia': cita.esEmergencia,
+      'estado': cita.estado.dbValue,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    debugPrint('updateCita payload: $data para id=${cita.id}');
+    await supabase.from('citas').update(data).eq('id', cita.id!);
   }
 
   Future<void> deleteCita(String id) async {
-    try {
-      await supabase
-          .from('citas')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } catch (e) {
-      throw Exception('Error al borrar cita: $e');
-    }
+    await supabase
+        .from('citas')
+        .update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 
   /// Devuelve el estado actual de la cita en la BD, o `null` si no existe
@@ -242,23 +220,13 @@ class CitaRemoteDataSource {
   }
 
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
-    try {
-      await supabase
-          .from('citas')
-          .update({
-            'estado': nuevoEstado.dbValue,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al actualizar el estado en Supabase: ${e.message}',
-      );
-    } catch (e) {
-      throw Exception(
-        'Error inesperado al actualizar el estado de la cita: $e',
-      );
-    }
+    await supabase
+        .from('citas')
+        .update({
+          'estado': nuevoEstado.dbValue,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 
   bool _isValidUuid(dynamic id) =>

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
@@ -15,37 +16,35 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   ConsultaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Consulta>> getConsultas() async {
-    try {
+  Future<List<Consulta>> getConsultas() {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultas();
       return data.map((json) => ConsultaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener consultas: $e');
-    }
+    }, context: 'obtener las consultas');
   }
 
   @override
-  Future<List<Consulta>> getConsultasByDoctor(String doctorId) async {
-    try {
+  Future<List<Consulta>> getConsultasByDoctor(String doctorId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultasByDoctor(doctorId);
       return data.map((json) => ConsultaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener consultas: $e');
-    }
+    }, context: 'obtener las consultas');
   }
 
   bool _isValidUuid(String? id) =>
       id != null && id.length == 36 && id.contains('-');
 
   @override
-  Future<String> crearConsultaCompleta(Consulta consulta) async {
+  Future<String> crearConsultaCompleta(Consulta consulta) {
+    // Validación de dominio fuera del guard: el cubit detecta este mensaje
+    // ('paciente de prueba') como caso especial.
     if (!_isValidUuid(consulta.pacienteId)) {
       throw Exception(
         'No se puede crear una consulta para un paciente de prueba. '
         'Registra un paciente real en el sistema.',
       );
     }
-    try {
+    return runGuarded(() async {
       final dientes = (consulta.odontograma?.dientes ?? [])
           .map(
             (d) => {
@@ -87,24 +86,21 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         });
       }
       return id;
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear consulta completa: $e');
-    }
+    }, context: 'crear la consulta completa');
   }
 
   @override
   Future<String> finalizarConsulta({
     required String consultaId,
     String? nota,
-  }) async {
-    try {
-      return await remoteDataSource.finalizarConsulta(
+  }) {
+    return runGuarded(
+      () => remoteDataSource.finalizarConsulta(
         consultaId: consultaId,
         nota: nota,
-      );
-    } catch (e) {
-      throw Exception('Error en el repositorio al finalizar la consulta: $e');
-    }
+      ),
+      context: 'finalizar la consulta',
+    );
   }
 
   @override
@@ -116,8 +112,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     String? notas,
     Map<String, dynamic>? signosVitales,
     bool? finalizada,
-  }) async {
-    try {
+  }) {
+    return runGuarded(() async {
       final tratamientosPorFdi = <int, List<Map<String, dynamic>>>{
         for (final diente in odontograma.dientes)
           if (diente.tratamientos.isNotEmpty)
@@ -146,20 +142,14 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         signosVitales: signosVitales,
         finalizada: finalizada,
       );
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al guardar el resultado de la consulta: $e',
-      );
-    }
+    }, context: 'guardar el resultado de la consulta');
   }
 
   @override
   Future<Map<String, TratamientoAplicadoDetalle>>
-  getDetalleTratamientosAplicados(List<String> ids) async {
-    try {
-      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(
-        ids,
-      );
+  getDetalleTratamientosAplicados(List<String> ids) {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(ids);
       return {
         for (final fila in filas)
           if (fila['id'] != null)
@@ -169,23 +159,15 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
               tratamiento: TratamientoAplicadoModel.fromJson(fila),
             ),
       };
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener tratamientos aplicados: $e',
-      );
-    }
+    }, context: 'obtener los tratamientos aplicados');
   }
 
   @override
-  Future<List<Consulta>> getHistorialPaciente(String pacienteId) async {
-    try {
+  Future<List<Consulta>> getHistorialPaciente(String pacienteId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultasByPaciente(pacienteId);
       return data.map((json) => ConsultaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener historial clínico: $e',
-      );
-    }
+    }, context: 'obtener el historial clínico');
   }
 
   @override
@@ -193,8 +175,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   getTratamientosHistoricosPorDiente(
     String pacienteId, {
     String? excluyendoConsultaId,
-  }) async {
-    try {
+  }) {
+    return runGuarded(() async {
       final filas = await remoteDataSource.fetchTratamientosHistoricosPaciente(
         pacienteId,
         excluyendoConsultaId: excluyendoConsultaId,
@@ -209,31 +191,22 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
             .add(TratamientoAplicadoModel.fromJson(fila));
       }
       return porFdi;
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener tratamientos históricos: $e',
-      );
-    }
+    }, context: 'obtener los tratamientos históricos');
   }
 
   @override
-  Future<Consulta?> getDetalleConsulta(String id) async {
-    try {
+  Future<Consulta?> getDetalleConsulta(String id) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultaById(id);
       return data != null ? ConsultaModel.fromJson(data) : null;
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener detalle de consulta: $e',
-      );
-    }
+    }, context: 'obtener el detalle de la consulta');
   }
 
   @override
-  Future<void> eliminarConsulta(String id) async {
-    try {
-      await remoteDataSource.deleteConsulta(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar consulta: $e');
-    }
+  Future<void> eliminarConsulta(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteConsulta(id),
+      context: 'eliminar la consulta',
+    );
   }
 }

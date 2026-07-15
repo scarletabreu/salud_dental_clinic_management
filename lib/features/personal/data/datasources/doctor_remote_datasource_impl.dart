@@ -9,38 +9,29 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
 
   @override
   Future<void> createDoctor(String userId) async {
-    try {
-      await supabaseClient.from('doctors').insert({
-        'user_id': userId,
-        'estatus': 'activo',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar doctor: ${e.message}');
-    }
+    await supabaseClient.from('doctors').insert({
+      'user_id': userId,
+      'estatus': 'activo',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    });
   }
 
   @override
   Future<List<String>> fetchDoctorUserIds() async {
-    try {
-      final response = await supabaseClient
-          .from('doctors')
-          .select('user_id')
-          .eq('estatus', 'activo')
-          .filter('deleted_at', 'is', null);
+    final response = await supabaseClient
+        .from('doctors')
+        .select('user_id')
+        .eq('estatus', 'activo')
+        .filter('deleted_at', 'is', null);
 
-      return List<String>.from(
-        (response as List).map((item) => item['user_id']),
-      );
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar lista de doctores: ${e.message}');
-    }
+    return List<String>.from(
+      (response as List).map((item) => item['user_id']),
+    );
   }
 
   @override
   Future<List<DoctorModel>> fetchActiveDoctores() async {
-  try {
     final response = await supabaseClient
         .from('doctores')
         .select('*, usuarios(*, personas(*))')
@@ -49,11 +40,6 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
     return (response as List)
         .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
         .toList();
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar doctores activos: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado: $e');
-    }
   }
 
   @override
@@ -74,63 +60,46 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
 
   @override
   Future<void> updateDoctor(String userId, String newUserId) async {
-    try {
-      await supabaseClient
-          .from('doctors')
-          .update({
-            'user_id': newUserId,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('user_id', userId);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar doctor: ${e.message}');
-    }
+    await supabaseClient
+        .from('doctors')
+        .update({
+          'user_id': newUserId,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('user_id', userId);
   }
 
   @override
   Future<void> deactivateDoctor(String userId) async {
-    try {
-      await supabaseClient
-          .from('doctors')
-          .update({
-            'estatus': 'inactivo',
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('user_id', userId);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al desactivar doctor: ${e.message}');
-    }
+    await supabaseClient
+        .from('doctors')
+        .update({
+          'estatus': 'inactivo',
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('user_id', userId);
   }
 
   @override
   Future<void> reactivateDoctor(String userId) async {
-    try {
-      await supabaseClient
-          .from('doctors')
-          .update({
-            'estatus': 'activo',
-            'deleted_at': null,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('user_id', userId);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al reactivar doctor: ${e.message}');
-    }
+    await supabaseClient
+        .from('doctors')
+        .update({
+          'estatus': 'activo',
+          'deleted_at': null,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('user_id', userId);
   }
 
   @override
   Future<Map<String, dynamic>?> fetchDoctorById(String userId) async {
-    try {
-      final response = await supabaseClient
-          .from('doctors')
-          .select('*')
-          .eq('user_id', userId)
-          .filter('deleted_at', 'is', null)
-          .maybeSingle();
-      return response;
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener datos del doctor: ${e.message}');
-    }
+    return await supabaseClient
+        .from('doctors')
+        .select('*')
+        .eq('user_id', userId)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
   }
 }

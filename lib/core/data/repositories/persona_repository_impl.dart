@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/core/domain/repositories/persona_
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/models/persona_model.dart';
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 
 class PersonaRepositoryImpl implements PersonaRepository {
   final PersonaRemoteDataSource remoteDataSource;
@@ -9,63 +10,51 @@ class PersonaRepositoryImpl implements PersonaRepository {
   PersonaRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<List<Persona>> getPersonas() async {
-    try {
-      return await remoteDataSource.fetchActivePersonas();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener personas: $e');
-    }
-  }
-
-    @override
-  Future<List<Persona>> searchPersonas(String query) async {
-    try {
-      return await remoteDataSource.searchPersonas(query);
-    } catch (e) {
-      throw Exception('Error en el repositorio al buscar personas: $e');
-    }
-  }
-
-
-  @override
-  Future<Persona> getPersonaById(String id) async {
-    try {
-      return await remoteDataSource.fetchPersonaById(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener persona por ID: $e');
-    }
+  Future<List<Persona>> getPersonas() {
+    return runGuarded(
+      () => remoteDataSource.fetchActivePersonas(),
+      context: 'obtener las personas',
+    );
   }
 
   @override
-  Future<Persona> createPersona(Persona persona) async {
-    try {
-      final model = _toModel(persona);
-      final personaCreada = await remoteDataSource.createPersona(model);
-      return personaCreada; 
-      
-    } catch (e) {
-      // Propagamos el error con un mensaje claro hacia el Cubit/UI
-      throw Exception('Error en el repositorio al crear persona: $e');
-    }
+  Future<List<Persona>> searchPersonas(String query) {
+    return runGuarded(
+      () => remoteDataSource.searchPersonas(query),
+      context: 'buscar personas',
+    );
   }
 
   @override
-  Future<void> updatePersona(Persona persona) async {
-    try {
-      final model = _toModel(persona);
-      await remoteDataSource.updatePersona(model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar persona: $e');
-    }
+  Future<Persona> getPersonaById(String id) {
+    return runGuarded(
+      () => remoteDataSource.fetchPersonaById(id),
+      context: 'obtener la persona',
+    );
   }
 
   @override
-  Future<void> deletePersona(String id) async {
-    try {
-      await remoteDataSource.deactivatePersona(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar persona: $e');
-    }
+  Future<Persona> createPersona(Persona persona) {
+    return runGuarded(
+      () => remoteDataSource.createPersona(_toModel(persona)),
+      context: 'crear la persona',
+    );
+  }
+
+  @override
+  Future<void> updatePersona(Persona persona) {
+    return runGuarded(
+      () => remoteDataSource.updatePersona(_toModel(persona)),
+      context: 'actualizar la persona',
+    );
+  }
+
+  @override
+  Future<void> deletePersona(String id) {
+    return runGuarded(
+      () => remoteDataSource.deactivatePersona(id),
+      context: 'eliminar la persona',
+    );
   }
 
   PersonaModel _toModel(Persona persona) {
@@ -79,5 +68,4 @@ class PersonaRepositoryImpl implements PersonaRepository {
       estatus: persona.estatus,
     );
   }
-
 }

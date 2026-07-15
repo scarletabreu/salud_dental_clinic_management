@@ -8,44 +8,29 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchMedicinas() async {
-    try {
-      final response = await supabaseClient
-          .from('medicinas')
-          .select('*')
-          .filter('deleted_at', 'is', null);
+    final response = await supabaseClient
+        .from('medicinas')
+        .select('*')
+        .filter('deleted_at', 'is', null);
 
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener catálogo de medicinas: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al cargar medicinas: $e');
-    }
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override
   Future<void> insertMedicina(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-
-      data['created_at'] = DateTime.now().toIso8601String();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('medicinas').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar medicina: ${e.message}');
-    }
+    data.remove('id');
+    data['created_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('medicinas').insert(data);
   }
 
   @override
   Future<void> upsertMedicina(Map<String, dynamic> data) async {
-    try {
-      if (!(_isValidUuid(data['id']))) {
-        data.remove('id');
-      }
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('medicinas').upsert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar medicina: ${e.message}');
+    if (!(_isValidUuid(data['id']))) {
+      data.remove('id');
     }
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('medicinas').upsert(data);
   }
 
   bool _isValidUuid(dynamic id) {
@@ -54,18 +39,12 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
 
   @override
   Future<void> softDeleteMedicina(String id) async {
-    try {
-      await supabaseClient
-          .from('medicinas')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar medicina: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al eliminar medicina: $e');
-    }
+    await supabaseClient
+        .from('medicinas')
+        .update({
+          'deleted_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

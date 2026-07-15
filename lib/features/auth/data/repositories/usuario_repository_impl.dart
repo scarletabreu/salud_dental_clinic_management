@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
@@ -34,69 +35,66 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   }
 
   @override
-  Future<void> signOut() async {
-    try {
-      await remoteDataSource.signOut();
-    } catch (e) {
-      throw Exception('Error al cerrar sesión: $e');
-    }
+  Future<void> signOut() {
+    return runGuarded(() => remoteDataSource.signOut(), context: 'cerrar sesión');
   }
 
   @override
   Future<Usuario> loginUsuario(String username, String password) async {
-    try {
-      final response = await remoteDataSource.signInWithPassword(
+    final response = await runGuarded(
+      () => remoteDataSource.signInWithPassword(
         email: '$username@saluddental.com',
         password: password,
-      );
-      final userUuid = response.user?.id;
-      if (userUuid == null) {
-        throw Exception('Usuario no encontrado en la autenticación.');
-      }
-
-      final perfil = await getPerfilPorUuid(userUuid);
-      if (perfil == null) {
-        throw Exception(
-          'El usuario autenticado no tiene un perfil operativo asignado.',
-        );
-      }
-      return perfil;
-    } catch (e) {
-      rethrow;
+      ),
+      context: 'iniciar sesión',
+    );
+    final userUuid = response.user?.id;
+    if (userUuid == null) {
+      throw Exception('Usuario no encontrado en la autenticación.');
     }
+
+    final perfil = await getPerfilPorUuid(userUuid);
+    if (perfil == null) {
+      throw Exception(
+        'El usuario autenticado no tiene un perfil operativo asignado.',
+      );
+    }
+    return perfil;
   }
 
   @override
-  Future<Usuario?> getPerfilPorUuid(String uuid) async {
-    final doctorData = await remoteDataSource.getPerfilPorTabla(
-      tabla: 'doctores',
-      uuid: uuid,
-      selectColumns: _selectPerfilCompleto,
-    );
-    if (doctorData != null) return DoctorModel.fromJson(doctorData);
+  Future<Usuario?> getPerfilPorUuid(String uuid) {
+    return runGuarded(() async {
+      final doctorData = await remoteDataSource.getPerfilPorTabla(
+        tabla: 'doctores',
+        uuid: uuid,
+        selectColumns: _selectPerfilCompleto,
+      );
+      if (doctorData != null) return DoctorModel.fromJson(doctorData);
 
-    final adminData = await remoteDataSource.getPerfilPorTabla(
-      tabla: 'admins',
-      uuid: uuid,
-      selectColumns: _selectPerfilCompleto,
-    );
-    if (adminData != null) return AdminModel.fromJson(adminData);
+      final adminData = await remoteDataSource.getPerfilPorTabla(
+        tabla: 'admins',
+        uuid: uuid,
+        selectColumns: _selectPerfilCompleto,
+      );
+      if (adminData != null) return AdminModel.fromJson(adminData);
 
-    final asistenteData = await remoteDataSource.getPerfilPorTabla(
-      tabla: 'asistentes',
-      uuid: uuid,
-      selectColumns: _selectPerfilCompleto,
-    );
-    if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
+      final asistenteData = await remoteDataSource.getPerfilPorTabla(
+        tabla: 'asistentes',
+        uuid: uuid,
+        selectColumns: _selectPerfilCompleto,
+      );
+      if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
 
-    return null;
+      return null;
+    }, context: 'cargar el perfil');
   }
 
   @override
-  Future<List<Usuario>> getUsuarios() async {
-    final List<Usuario> usuariosConsolidados = [];
+  Future<List<Usuario>> getUsuarios() {
+    return runGuarded(() async {
+      final List<Usuario> usuariosConsolidados = [];
 
-    try {
       final List<dynamic>? listDoctores = await remoteDataSource
           .getPerfilesPorTabla(
             tabla: 'doctores',
@@ -137,9 +135,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       }
 
       return usuariosConsolidados;
-    } catch (e) {
-      throw Exception('Error al consolidar el listado de perfiles: $e');
-    }
+    }, context: 'consolidar el listado de perfiles');
   }
 
   @override
@@ -157,22 +153,25 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
     String? departamento,
     String? turno,
   }) async {
-    final uuid = await remoteDataSource.crearUsuarioCompleto({
-      'email': email,
-      'password': password,
-      'nombre': nombre,
-      'apellido': apellido,
-      'fecha_nacimiento': birthDate.toIso8601String(),
-      'cedula': govID,
-      'contactos': [
-        {'numero_telefono': telefono},
-      ],
-      'username': username,
-      'rol': rol.name,
-      'especialidad': especialidad,
-      'departamento': departamento,
-      'turno': turno,
-    });
+    final uuid = await runGuarded(
+      () => remoteDataSource.crearUsuarioCompleto({
+        'email': email,
+        'password': password,
+        'nombre': nombre,
+        'apellido': apellido,
+        'fecha_nacimiento': birthDate.toIso8601String(),
+        'cedula': govID,
+        'contactos': [
+          {'numero_telefono': telefono},
+        ],
+        'username': username,
+        'rol': rol.name,
+        'especialidad': especialidad,
+        'departamento': departamento,
+        'turno': turno,
+      }),
+      context: 'crear el usuario',
+    );
 
     final perfil = await getPerfilPorUuid(uuid);
     if (perfil == null) {
@@ -189,27 +188,32 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
     required DateTime birthDate,
     required String govID,
     required String telefono,
-  }) async {
-    await remoteDataSource.actualizarPersona(usuarioId, {
-      'nombre': nombre,
-      'apellido': apellido,
-      'fecha_nacimiento': birthDate.toIso8601String(),
-      'cedula': govID,
-    });
-    await remoteDataSource.actualizarTelefonoPersona(
-      personaId: usuarioId,
-      telefono: telefono,
-    );
+  }) {
+    return runGuarded(() async {
+      await remoteDataSource.actualizarPersona(usuarioId, {
+        'nombre': nombre,
+        'apellido': apellido,
+        'fecha_nacimiento': birthDate.toIso8601String(),
+        'cedula': govID,
+      });
+      await remoteDataSource.actualizarTelefonoPersona(
+        personaId: usuarioId,
+        telefono: telefono,
+      );
+    }, context: 'actualizar el usuario');
   }
 
   @override
   Future<void> resetearPassword({
     required String usuarioId,
     required String nuevaPassword,
-  }) async {
-    await remoteDataSource.resetearPassword(
-      targetUuid: usuarioId,
-      nuevaPassword: nuevaPassword,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.resetearPassword(
+        targetUuid: usuarioId,
+        nuevaPassword: nuevaPassword,
+      ),
+      context: 'restablecer la contraseña',
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
@@ -9,28 +10,28 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
   CajaDiariaRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<CajaDiaria?> getCajaActual() async {
-    try {
+  Future<CajaDiaria?> getCajaActual() {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCajaAbierta();
       return data == null ? null : CajaDiariaModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Error al obtener la caja actual: $e');
-    }
+    }, context: 'obtener la caja actual');
   }
 
   @override
   Future<void> abrirCaja(double montoApertura) async {
-    try {
-      final estaAbierta = await remoteDataSource.isCajaAbierta();
-      if (estaAbierta) {
-        throw Exception(
-          'Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.',
-        );
-      }
-      await remoteDataSource.abrirCaja(montoApertura);
-    } catch (e) {
-      throw Exception('Error al abrir la caja: $e');
+    final estaAbierta = await runGuarded(
+      () => remoteDataSource.isCajaAbierta(),
+      context: 'verificar la caja',
+    );
+    if (estaAbierta) {
+      throw Exception(
+        'Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.',
+      );
     }
+    await runGuarded(
+      () => remoteDataSource.abrirCaja(montoApertura),
+      context: 'abrir la caja',
+    );
   }
 
   @override
@@ -38,8 +39,8 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
     required double montoReal,
     required double montoCierre,
     String? observaciones,
-  }) async {
-    try {
+  }) {
+    return runGuarded(() async {
       final montoEsperado = await remoteDataSource.getBalanceActual();
       final datosCierre = {
         'monto_real': montoReal,
@@ -48,9 +49,7 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
         'observaciones': observaciones ?? 'Cierre sin observaciones',
       };
       await remoteDataSource.cerrarCaja(datosCierre);
-    } catch (e) {
-      throw Exception('Error al cerrar la caja: $e');
-    }
+    }, context: 'cerrar la caja');
   }
 
   @override
@@ -63,11 +62,10 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
   }
 
   @override
-  Future<double> getMontoEsperado() async {
-    try {
-      return await remoteDataSource.getBalanceActual();
-    } catch (e) {
-      throw Exception('Error al calcular el balance esperado: $e');
-    }
+  Future<double> getMontoEsperado() {
+    return runGuarded(
+      () => remoteDataSource.getBalanceActual(),
+      context: 'calcular el balance esperado',
+    );
   }
 }

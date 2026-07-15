@@ -25,6 +25,10 @@ import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
 
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
@@ -129,12 +133,30 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
+      icon: Icons.account_balance_wallet_outlined,
+      selectedIcon: Icons.account_balance_wallet_rounded,
+      label: 'Cuentas por Cobrar',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<CuentasPorCobrarCubit>(),
+        child: const CuentasPorCobrarPage(),
+      ),
+    ),
+    ShellDestination(
       icon: Icons.admin_panel_settings_outlined,
       selectedIcon: Icons.admin_panel_settings_rounded,
       label: 'Perfiles',
       builder: (_) => BlocProvider(
         create: (_) => sl<PersonalPerfilesCubit>(),
         child: const UsuariosListPage(),
+      ),
+    ),
+    ShellDestination(
+      icon: Icons.build_outlined,
+      selectedIcon: Icons.build_rounded,
+      label: 'Equipos',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<EquipoCubit>(),
+        child: const EquipoListPage(),
       ),
     ),
     ShellDestination(
@@ -177,7 +199,12 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       if (roles.isEmpty) return false;
       switch (destination.label) {
         case 'Configuración':
+          return roles.contains(RolUsuario.admin) ||
+              roles.contains(RolUsuario.doctor) ||
+              roles.contains(RolUsuario.asistente);
         case 'Perfiles':
+          return roles.contains(RolUsuario.admin);
+        case 'Equipos':
           return roles.contains(RolUsuario.admin);
         case 'Consultas':
         case 'Medicinas':
@@ -186,6 +213,10 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
               roles.contains(RolUsuario.doctor);
         case 'Pacientes':
         case 'Mis Citas del Día':
+        case 'Cuentas por Cobrar':
+          return roles.contains(RolUsuario.admin) ||
+              roles.contains(RolUsuario.doctor) ||
+              roles.contains(RolUsuario.asistente);
         case 'Inicio':
           return true;
         default:

@@ -1,4 +1,4 @@
-import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
 
 class Pago {

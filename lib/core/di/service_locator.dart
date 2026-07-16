@@ -150,6 +150,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/g
 import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuentas_por_cobrar_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/usecases/registrar_pago.dart';
 
 // Módulo Historial Financiero
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
@@ -402,8 +403,9 @@ Future<void> init() async {
   sl.registerFactory<GetCuentaByIdUseCase>(
     () => GetCuentaByIdUseCase(repository: sl()),
   );
+  sl.registerFactory<RegistrarPago>(() => RegistrarPago(sl()));
   sl.registerFactory<PreFacturaCubit>(
-    () => PreFacturaCubit(getCuenta: sl()),
+    () => PreFacturaCubit(getCuenta: sl(), registrarPago: sl()),
   );
 
   sl.registerFactory<GetHistorialFinancieroUseCase>(

@@ -1,6 +1,6 @@
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
-import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart';
 
 class PagoModel extends Pago {
   PagoModel({
@@ -22,9 +22,8 @@ class PagoModel extends Pago {
         (e) => e.name == json['estado'],
         orElse: () => EstadoPago.pendiente,
       ),
-      metodoPago: MetodoPago.values.firstWhere(
-        (e) => e.name == json['metodo_pago'] || e.name == json['metodoPago'],
-        orElse: () => MetodoPago.contado,
+      metodoPago: MetodoPago.fromDbValue(
+        (json['metodo_pago'] ?? json['metodoPago']) as String?,
       ),
     );
   }
@@ -35,7 +34,7 @@ class PagoModel extends Pago {
       'monto': monto,
       'fecha': fecha.toUtc().toIso8601String(),
       'estado': estado.name,
-      'metodo_pago': metodoPago.name,
+      'metodo_pago': metodoPago.dbValue,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

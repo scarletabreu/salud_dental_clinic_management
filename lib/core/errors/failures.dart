@@ -38,3 +38,11 @@ class TimeoutFailure extends NetworkFailure {
 class CacheFailure extends Failure {
   const CacheFailure([super.message = 'Error al acceder a los datos locales']);
 }
+
+/// Regla de negocio violada antes de tocar el backend (p. ej. un monto de pago
+/// mayor que el saldo pendiente). Su mensaje describe la regla concreta y es
+/// apto para mostrarse tal cual al usuario. A diferencia de [ServerFailure], no
+/// implica un fallo remoto: la operación nunca llegó a intentarse.
+class ValidationFailure extends Failure {
+  const ValidationFailure([super.message = 'Los datos no son válidos.']);
+}

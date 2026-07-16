@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/models/cuenta_model.dart';
@@ -23,6 +24,19 @@ class CuentaRepositoryImpl implements CuentaRepository {
       final data = await remoteDataSource.fetchCuentasByPaciente(pacienteId);
       return data.map((json) => CuentaModel.fromJson(json)).toList();
     }, context: 'obtener el historial financiero');
+  }
+
+  @override
+  Future<Cuenta> getCuentaById(String id) {
+    return runGuarded(() async {
+      final data = await remoteDataSource.fetchCuentaById(id);
+      if (data == null) {
+        // Se lanza un Failure tipado directamente: el mapper de errores lo
+        // respeta tal cual (case 0) y conserva este mensaje para el usuario.
+        throw const ServerFailure('No se encontró la cuenta solicitada.');
+      }
+      return CuentaModel.fromJson(data);
+    }, context: 'obtener la cuenta');
   }
 
   @override

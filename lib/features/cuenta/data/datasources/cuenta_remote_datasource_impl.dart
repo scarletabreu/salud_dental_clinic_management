@@ -30,6 +30,17 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   }
 
   @override
+  Future<Map<String, dynamic>?> fetchCuentaById(String id) async {
+    final response = await supabaseClient
+        .from('cuentas')
+        .select('*, pagos(*), item_cuentas(*)')
+        .eq('id', id)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    return response;
+  }
+
+  @override
   Future<void> registrarCuenta(Map<String, dynamic> data) async {
     data.remove('id');
     data['created_at'] = DateTime.now().toIso8601String();

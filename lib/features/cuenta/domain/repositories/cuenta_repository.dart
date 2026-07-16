@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/c
 abstract class CuentaRepository {
   Future<List<Cuenta>> getCuentasPorCobrar();
   Future<List<Cuenta>> getHistorialFinanciero(String pacienteId);
+  Future<Cuenta> getCuentaById(String id);
   Future<void> crearFactura(Cuenta cuenta);
   Future<void> eliminarCuenta(String id);
 }

@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/pa
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/condiciones_medicas_card.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 
 class PacienteDetailPage extends StatefulWidget {
   final String pacienteId;
@@ -130,7 +131,17 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           _buildIdentityCard(p),
           const SizedBox(height: 16),
           _buildAlertasMedicas(p.record),
-          ResumenFinancieroPaciente(pacienteId: p.id ?? widget.pacienteId),
+          ResumenFinancieroPaciente(
+            pacienteId: p.id ?? widget.pacienteId,
+            onVerDetalle: (cuenta) {
+              if (cuenta.id == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PreFacturaPage(cuentaId: cuenta.id!),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 16),
           CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
           IntrinsicHeight(

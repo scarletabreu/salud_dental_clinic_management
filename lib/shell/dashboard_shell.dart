@@ -55,6 +55,28 @@ class _DashboardShellView extends StatefulWidget {
 class _DashboardShellViewState extends State<_DashboardShellView> {
   int _selectedIndex = 0;
 
+  final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
+
+  @override
+  void initState() {
+    super.initState();
+    final authState = context.read<AuthCubit>().state;
+    final usuario = authState.usuario;
+    if (authState.rol == RolUsuario.doctor &&
+        usuario is Doctor &&
+        usuario.id != null) {
+      _consultasListCubit.cargar(restringidoADoctorId: usuario.id);
+    } else {
+      _consultasListCubit.cargar();
+    }
+  }
+
+  @override
+  void dispose() {
+    _consultasListCubit.close();
+    super.dispose();
+  }
+
   late final List<ShellDestination> _allDestinations = [
     ShellDestination(
       icon: Icons.dashboard_outlined,
@@ -109,20 +131,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       icon: Icons.medical_information_outlined,
       selectedIcon: Icons.medical_information_rounded,
       label: 'Consultas',
-      builder: (_) => BlocProvider(
-        create: (context) {
-          final cubit = sl<ConsultasListCubit>();
-          final authState = context.read<AuthCubit>().state;
-          final usuario = authState.usuario;
-          if (authState.rol == RolUsuario.doctor &&
-              usuario is Doctor &&
-              usuario.id != null) {
-            cubit.cargar(restringidoADoctorId: usuario.id);
-          } else {
-            cubit.cargar();
-          }
-          return cubit;
-        },
+      builder: (_) => BlocProvider.value(
+        value: _consultasListCubit,
         child: const ConsultasListPage(),
       ),
     ),
@@ -184,6 +194,9 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   void _onDestinationSelected(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
+    if (_visibleDestinations[index].label == 'Consultas') {
+      _consultasListCubit.recargar();
+    }
   }
 
   void _navigateToLabel(String label) {

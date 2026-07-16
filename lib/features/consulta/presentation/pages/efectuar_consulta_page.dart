@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/formulario_evaluacion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/panel_paciente.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/workspace_consulta.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 
@@ -160,7 +161,19 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
           margin: const EdgeInsets.all(16),
         ),
       );
-      Navigator.of(context).pop(true);
+      final cuentaId = state.cuentaId;
+      if (cuentaId != null) {
+        // Se reemplaza la consulta ya cerrada por la pre-factura para que
+        // "atrás" no vuelva a ella. Se pasa `result: true` a la ruta que se
+        // reemplaza: así los llamadores que esperaban ese `true` (p. ej.
+        // consultas_list_page) refrescan su lista.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => PreFacturaPage(cuentaId: cuentaId)),
+          result: true,
+        );
+      } else {
+        Navigator.of(context).pop(true);
+      }
     } else if (state is ConsultaError) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

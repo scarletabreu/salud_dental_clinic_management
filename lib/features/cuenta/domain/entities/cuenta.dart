@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
@@ -31,6 +32,17 @@ class Cuenta {
   double get balancePendiente => montoTotal - montoPagado;
 
   bool get estaPagada => balancePendiente <= 0;
+
+  /// Estado derivado de la cuenta a partir de sus pagos. Centraliza la
+  /// derivación que hoy repiten `cuenta_card.dart`,
+  /// `resumen_financiero_paciente.dart` y `cuentas_por_cobrar_cubit.dart`.
+  /// Nunca produce [EstadoCuenta.cancelada]: no hay flag de cancelación en la
+  /// entidad todavía.
+  EstadoCuenta get estadoCuenta {
+    if (estaPagada) return EstadoCuenta.saldada;
+    if (montoPagado > 0) return EstadoCuenta.pendiente;
+    return EstadoCuenta.abierta;
+  }
 
   Cuenta copyWith({
     String? consultaId,

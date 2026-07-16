@@ -10,7 +10,7 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchTodasLasCuentas() async {
     final response = await supabaseClient
         .from('cuentas')
-        .select('*, pagos(*), item_cuentas(*)')
+        .select('*, pagos(*), items_cuenta(*)')
         .filter('deleted_at', 'is', null)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response as List);
@@ -22,11 +22,22 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   ) async {
     final response = await supabaseClient
         .from('cuentas')
-        .select('*, pagos(*), item_cuentas(*)')
+        .select('*, pagos(*), items_cuenta(*)')
         .eq('paciente_id', pacienteId)
         .filter('deleted_at', 'is', null)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> fetchCuentaById(String id) async {
+    final response = await supabaseClient
+        .from('cuentas')
+        .select('*, pagos(*), items_cuenta(*)')
+        .eq('id', id)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    return response;
   }
 
   @override

@@ -146,8 +146,10 @@ import '../../features/tratamiento/domain/repositories/tratamiento_repository.da
 import '../../features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 
 // Módulo Cuentas por Cobrar
+import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuenta_by_id_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuentas_por_cobrar_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
 
 // Módulo Historial Financiero
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
@@ -395,6 +397,13 @@ Future<void> init() async {
   );
   sl.registerFactory<CuentasPorCobrarCubit>(
     () => CuentasPorCobrarCubit(getCuentas: sl(), repository: sl()),
+  );
+
+  sl.registerFactory<GetCuentaByIdUseCase>(
+    () => GetCuentaByIdUseCase(repository: sl()),
+  );
+  sl.registerFactory<PreFacturaCubit>(
+    () => PreFacturaCubit(getCuenta: sl()),
   );
 
   sl.registerFactory<GetHistorialFinancieroUseCase>(

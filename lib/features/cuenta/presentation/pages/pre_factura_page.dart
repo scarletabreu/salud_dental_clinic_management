@@ -12,6 +12,8 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/meto
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_state.dart';
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
+    as pago_enums;
 
 /// Detalle de cuenta / pre-factura de una consulta. Punto de llegada al cerrar
 /// una consulta (SD-96) y accesible desde el expediente del paciente.
@@ -518,16 +520,22 @@ class _Acciones extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final saldada = cuenta.estaPagada;
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: () => _mostrarProximamente(context, 'Registrar pago'),
-            icon: const Icon(Icons.payments_rounded, size: 20),
-            label: const Text('Registrar pago'),
+            onPressed: saldada ? null : () => _mostrarDialogoPago(context, cuenta),
+            icon: Icon(
+              saldada ? Icons.check_circle_rounded : Icons.payments_rounded,
+              size: 20,
+            ),
+            label: Text(saldada ? 'Cuenta saldada' : 'Registrar pago'),
             style: FilledButton.styleFrom(
               backgroundColor: ac.primaryBlue,
+              disabledBackgroundColor: ac.green.withValues(alpha: 0.15),
+              disabledForegroundColor: ac.green,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
@@ -590,6 +598,331 @@ void _mostrarProximamente(BuildContext context, String accion) {
       ],
     ),
   );
+}
+
+/// Abre el diálogo de cobro pasándole el cubit de la pantalla (capturado antes
+/// de `showDialog`, ya que el diálogo se monta en otra rama del árbol). Al
+/// confirmar el cobro, el cubit recarga la cuenta y aquí se muestra el aviso.
+Future<void> _mostrarDialogoPago(BuildContext context, Cuenta cuenta) async {
+  final cubit = context.read<PreFacturaCubit>();
+  final messenger = ScaffoldMessenger.of(context);
+  final ac = context.appColors;
+
+  final registrado = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _DialogoRegistrarPago(cuenta: cuenta, cubit: cubit),
+  );
+
+  if (registrado == true) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Pago registrado correctamente.'),
+        backgroundColor: ac.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+/// Diálogo de cobro: monto prellenado con el saldo, selector de método y un
+/// resumen en vivo (monto, método y saldo tras el pago). Gestiona su propio
+/// estado de carga y error; delega la operación atómica en [PreFacturaCubit].
+class _DialogoRegistrarPago extends StatefulWidget {
+  final Cuenta cuenta;
+  final PreFacturaCubit cubit;
+
+  const _DialogoRegistrarPago({required this.cuenta, required this.cubit});
+
+  @override
+  State<_DialogoRegistrarPago> createState() => _DialogoRegistrarPagoState();
+}
+
+class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
+  late final TextEditingController _montoController;
+  pago_enums.MetodoPago _metodo = pago_enums.MetodoPago.efectivo;
+  bool _procesando = false;
+  String? _error;
+
+  double get _saldo => widget.cuenta.balancePendiente;
+
+  double? get _montoIngresado {
+    final texto = _montoController.text.trim().replaceAll(',', '');
+    if (texto.isEmpty) return null;
+    return double.tryParse(texto);
+  }
+
+  bool get _montoValido {
+    final m = _montoIngresado;
+    return m != null && m > 0 && m <= _saldo + 0.01;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _montoController = TextEditingController(
+      text: _saldo.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _montoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _registrar() async {
+    final monto = _montoIngresado;
+    if (monto == null || !_montoValido) return;
+
+    setState(() {
+      _procesando = true;
+      _error = null;
+    });
+
+    final error = await widget.cubit.registrarPago(
+      monto: monto,
+      metodo: _metodo,
+    );
+
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() {
+        _procesando = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final monto = _montoIngresado ?? 0;
+    final saldoRestante = _saldo - monto;
+
+    return AlertDialog(
+      backgroundColor: ac.cardBg,
+      title: Row(
+        children: [
+          Icon(Icons.payments_rounded, color: ac.primaryBlue, size: 22),
+          const SizedBox(width: 10),
+          Text('Registrar pago', style: TextStyle(color: ac.textPrimary)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Saldo pendiente: ${formatMoneda(_saldo)}',
+              style: TextStyle(color: ac.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _montoController,
+              autofocus: true,
+              enabled: !_procesando,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => setState(() => _error = null),
+              decoration: InputDecoration(
+                labelText: 'Monto a cobrar (RD\$)',
+                hintText: '0.00',
+                errorText: _error,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Método de pago',
+              style: TextStyle(
+                color: ac.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final metodo in pago_enums.MetodoPago.values)
+                  _ChipMetodoPago(
+                    metodo: metodo,
+                    activo: _metodo == metodo,
+                    onTap: _procesando
+                        ? null
+                        : () => setState(() => _metodo = metodo),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _ResumenPago(
+              monto: monto,
+              metodo: _metodo,
+              saldoRestante: saldoRestante < 0 ? 0 : saldoRestante,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _procesando ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: (_montoValido && !_procesando) ? _registrar : null,
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          child: _procesando
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text('Cobrar ${formatMoneda(monto)}'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChipMetodoPago extends StatelessWidget {
+  final pago_enums.MetodoPago metodo;
+  final bool activo;
+  final VoidCallback? onTap;
+
+  const _ChipMetodoPago({
+    required this.metodo,
+    required this.activo,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: activo ? ac.primaryBlue.withValues(alpha: 0.1) : ac.chipBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: activo
+                  ? ac.primaryBlue.withValues(alpha: 0.5)
+                  : ac.divider,
+              width: activo ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_iconoMetodo(metodo), size: 16, color: activo ? ac.primaryBlue : ac.textMuted),
+              const SizedBox(width: 7),
+              Text(
+                metodo.name,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: activo ? ac.textPrimary : ac.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResumenPago extends StatelessWidget {
+  final double monto;
+  final pago_enums.MetodoPago metodo;
+  final double saldoRestante;
+
+  const _ResumenPago({
+    required this.monto,
+    required this.metodo,
+    required this.saldoRestante,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ac.chipBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.divider),
+      ),
+      child: Column(
+        children: [
+          _FilaResumen(label: 'Monto', valor: formatMoneda(monto)),
+          const SizedBox(height: 8),
+          _FilaResumen(label: 'Método', valor: metodo.name),
+          const SizedBox(height: 8),
+          _FilaResumen(
+            label: 'Saldo tras el pago',
+            valor: formatMoneda(saldoRestante),
+            resaltado: saldoRestante <= 0,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilaResumen extends StatelessWidget {
+  final String label;
+  final String valor;
+  final bool resaltado;
+
+  const _FilaResumen({
+    required this.label,
+    required this.valor,
+    this.resaltado = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: ac.textSecondary, fontSize: 13),
+        ),
+        Text(
+          valor,
+          style: TextStyle(
+            color: resaltado ? ac.green : ac.textPrimary,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+IconData _iconoMetodo(pago_enums.MetodoPago metodo) {
+  return switch (metodo) {
+    pago_enums.MetodoPago.efectivo => Icons.payments_outlined,
+    pago_enums.MetodoPago.tarjetaCredito => Icons.credit_card_rounded,
+    pago_enums.MetodoPago.tarjetaDebito => Icons.credit_card_outlined,
+    pago_enums.MetodoPago.transferenciaBancaria => Icons.account_balance_rounded,
+  };
 }
 
 /// Diálogo de ajuste con gate de autorización por rol. La entrega de este ticket

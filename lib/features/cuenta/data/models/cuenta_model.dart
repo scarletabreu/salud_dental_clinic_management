@@ -3,6 +3,8 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/meto
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
+    as pago_enums;
 
 class CuentaModel extends Cuenta {
   CuentaModel({
@@ -83,11 +85,11 @@ class CuentaModel extends Cuenta {
               (p['estado'] as String? ?? '').toLowerCase(),
           orElse: () => EstadoPago.completado,
         ),
-        metodoPago: MetodoPago.values.firstWhere(
+        metodoPago: pago_enums.MetodoPago.values.firstWhere(
           (e) =>
               e.name.toLowerCase() ==
               (p['metodo_pago'] as String? ?? '').toLowerCase(),
-          orElse: () => MetodoPago.contado,
+          orElse: () => pago_enums.MetodoPago.efectivo,
         ),
       );
     } catch (_) {

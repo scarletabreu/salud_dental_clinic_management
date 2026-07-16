@@ -9,6 +9,10 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubi
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
+    as pago_enums;
+import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/usecases/registrar_pago.dart';
 
 /// Fake del repositorio: solo implementa lo que consume el use case bajo prueba.
 /// El proyecto no usa mocktail/mockito, así que se escribe a mano (ver
@@ -39,6 +43,39 @@ class _FakeCuentaRepository implements CuentaRepository {
       throw UnimplementedError();
 }
 
+/// Fake del repositorio de pagos: registra la última llamada para poder
+/// aseverar los argumentos y devuelve un id fijo.
+class _FakePagoRepository implements PagoRepository {
+  String? ultimaCuentaId;
+  double? ultimoMonto;
+  pago_enums.MetodoPago? ultimoMetodo;
+
+  @override
+  Future<String> registrarPago({
+    required String cuentaId,
+    required double monto,
+    required pago_enums.MetodoPago metodo,
+  }) async {
+    ultimaCuentaId = cuentaId;
+    ultimoMonto = monto;
+    ultimoMetodo = metodo;
+    return 'pago-1';
+  }
+
+  @override
+  Future<void> procesarPago(Pago pago) => throw UnimplementedError();
+
+  @override
+  Future<void> editarPago(Pago pago) => throw UnimplementedError();
+
+  @override
+  Future<void> cancelarPago(String id) => throw UnimplementedError();
+
+  @override
+  Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) =>
+      throw UnimplementedError();
+}
+
 Cuenta _cuenta({
   List<ItemCuenta> items = const [],
   List<Pago> pagos = const [],
@@ -65,7 +102,7 @@ Pago _pago(double monto) => Pago(
   monto: monto,
   fecha: DateTime(2026, 7, 15),
   estado: EstadoPago.completado,
-  metodoPago: MetodoPago.contado,
+  metodoPago: pago_enums.MetodoPago.efectivo,
 );
 
 void main() {
@@ -76,6 +113,7 @@ void main() {
         getCuenta: GetCuentaByIdUseCase(
           repository: _FakeCuentaRepository(resultado: cuenta),
         ),
+        registrarPago: RegistrarPago(_FakePagoRepository()),
       );
 
       final futuro = expectLater(
@@ -100,6 +138,7 @@ void main() {
         getCuenta: GetCuentaByIdUseCase(
           repository: _FakeCuentaRepository(error: Exception('boom')),
         ),
+        registrarPago: RegistrarPago(_FakePagoRepository()),
       );
 
       final futuro = expectLater(

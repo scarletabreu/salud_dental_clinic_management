@@ -45,4 +45,21 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
 
     return List<Map<String, dynamic>>.from(response as List);
   }
+
+  @override
+  Future<String> registrarPagoTransaccional({
+    required String cuentaId,
+    required double monto,
+    required String metodoPago,
+  }) async {
+    final res = await supabaseClient.rpc(
+      'registrar_pago',
+      params: {
+        'p_cuenta_id': cuentaId,
+        'p_monto': monto,
+        'p_metodo_pago': metodoPago,
+      },
+    );
+    return res as String;
+  }
 }

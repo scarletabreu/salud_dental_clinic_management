@@ -18,7 +18,7 @@ class CuentaModel extends Cuenta {
 
   factory CuentaModel.fromJson(Map<String, dynamic> json) {
     final pagosRaw = json['pagos'] as List<dynamic>? ?? [];
-    final itemsRaw = json['item_cuentas'] as List<dynamic>? ?? [];
+    final itemsRaw = json['items_cuenta'] as List<dynamic>? ?? [];
 
     final pagos = pagosRaw
         .whereType<Map<String, dynamic>>()

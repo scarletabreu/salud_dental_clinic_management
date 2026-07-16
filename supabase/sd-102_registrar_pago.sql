@@ -17,7 +17,9 @@
 --      (enum Dart EstadoPago; `Pago.fueExitoso` == completado).
 --
 --  Esquema real (verificado contra la app / datasources):
---    · pagos:   cuenta_id, monto, fecha, estado (text), metodo_pago (text),
+--    · pagos:   cuenta_id, monto, fecha, estado (enum estado_pago),
+--               metodo_pago (enum metodo_pago: efectivo, tarjeta_credito,
+--               tarjeta_debito, transferencia_bancaria),
 --               created_at, updated_at, deleted_at.
 --    · cuentas: monto_total (SD-96), estado (text), fecha_pago, deleted_at.
 -- ============================================================================
@@ -77,7 +79,8 @@ begin
     cuenta_id, monto, fecha, estado, metodo_pago, created_at, updated_at
   )
   values (
-    p_cuenta_id, p_monto, now(), 'completado', p_metodo_pago, now(), now()
+    p_cuenta_id, p_monto, now(), 'completado',
+    p_metodo_pago::metodo_pago, now(), now()
   )
   returning id into v_pago_id;
 

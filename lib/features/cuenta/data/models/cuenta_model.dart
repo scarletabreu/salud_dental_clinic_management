@@ -85,11 +85,8 @@ class CuentaModel extends Cuenta {
               (p['estado'] as String? ?? '').toLowerCase(),
           orElse: () => EstadoPago.completado,
         ),
-        metodoPago: pago_enums.MetodoPago.values.firstWhere(
-          (e) =>
-              e.name.toLowerCase() ==
-              (p['metodo_pago'] as String? ?? '').toLowerCase(),
-          orElse: () => pago_enums.MetodoPago.efectivo,
+        metodoPago: pago_enums.MetodoPago.fromDbValue(
+          p['metodo_pago'] as String?,
         ),
       );
     } catch (_) {

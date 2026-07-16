@@ -54,7 +54,7 @@ class PagoRepositoryImpl implements PagoRepository {
       () => remoteDataSource.registrarPagoTransaccional(
         cuentaId: cuentaId,
         monto: monto,
-        metodoPago: metodo.name,
+        metodoPago: metodo.dbValue,
       ),
       context: 'registrar el pago',
     );

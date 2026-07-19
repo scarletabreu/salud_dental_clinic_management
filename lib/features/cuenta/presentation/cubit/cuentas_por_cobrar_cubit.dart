@@ -22,6 +22,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
       final cuentas = await _getCuentas();
       emit(_buildLoaded(cuentas));
     } catch (e) {
+      print(e.toString());
       emit(CuentasPorCobrarError('No se pudieron cargar las cuentas.\n$e'));
     }
   }
@@ -40,7 +41,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
           (c.nota?.toLowerCase().contains(q) ?? false);
 
       final matchEstado =
-          nuevoEstado == null || _estadoDeCuenta(c) == nuevoEstado;
+          nuevoEstado == null || c.estado == nuevoEstado;
 
       return matchQuery && matchEstado;
     }).toList();
@@ -81,7 +82,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
 
   CuentasPorCobrarLoaded _buildLoaded(List<Cuenta> cuentas) {
     final totalPorCobrar = cuentas
-        .where((c) => !c.estaPagada)
+        .where((c) => c.estado != EstadoCuenta.saldada)
         .fold(0.0, (sum, c) => sum + c.balancePendiente);
     final totalCobrado = cuentas.fold(0.0, (sum, c) => sum + c.montoPagado);
 
@@ -93,9 +94,4 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
     );
   }
 
-  static EstadoCuenta _estadoDeCuenta(Cuenta c) {
-    if (c.estaPagada) return EstadoCuenta.saldada;
-    if (c.montoPagado > 0) return EstadoCuenta.pendiente;
-    return EstadoCuenta.abierta;
-  }
 }

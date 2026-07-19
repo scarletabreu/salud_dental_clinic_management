@@ -20,17 +20,24 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchCuentasByPaciente(
     String pacienteId,
   ) async {
-    final response = await supabaseClient
-        .from('cuentas')
-        .select('*, pagos(*), items_cuenta(*)')
-        .eq('paciente_id', pacienteId)
-        .filter('deleted_at', 'is', null)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response as List);
+    try {
+      final response = await supabaseClient
+          .from('cuentas')
+          .select('*, pagos(*), items_cuenta(*)')
+          .eq('paciente_id', pacienteId)
+          .filter('deleted_at', 'is', null)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response as List);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener historial financiero: ${e.message}');
+    } catch (e) {
+      throw Exception('Error inesperado al cargar historial financiero: $e');
+    }
   }
 
   @override
   Future<Map<String, dynamic>?> fetchCuentaById(String id) async {
+  try {
     final response = await supabaseClient
         .from('cuentas')
         .select('*, pagos(*), items_cuenta(*)')
@@ -38,7 +45,34 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
         .filter('deleted_at', 'is', null)
         .maybeSingle();
     return response;
+  } on PostgrestException catch (e) {
+    throw Exception('Error al obtener cuenta por consulta: ${e.message}');
   }
+}
+
+  @override
+  Future<Map<String, dynamic>?> fetchCuentaByConsultaId(String consultaId) async {
+  try {
+    final response = await supabaseClient
+        .from('cuentas')
+        .select('*, pagos(*), items_cuenta(*)')
+        .eq('consulta_id', consultaId)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    return response;
+  } on PostgrestException catch (e) {
+    throw Exception('Error al obtener cuenta por consulta: ${e.message}');
+  }
+}
+
+Future<void> updateCuenta(String id, Map<String, dynamic> data) async {
+  try {
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('cuentas').update(data).eq('id', id);
+  } on PostgrestException catch (e) {
+    throw Exception('Error al actualizar cuenta: ${e.message}');
+  }
+}
 
   @override
   Future<void> registrarCuenta(Map<String, dynamic> data) async {

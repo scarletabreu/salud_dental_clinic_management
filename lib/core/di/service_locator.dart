@@ -166,9 +166,7 @@ Future<void> init() async {
   sl.registerLazySingleton<ConnectivityCheck>(() => ConnectivityCheckImpl());
   // El guard falla rapido ante ausencia de red sin esperar el timeout.
   guardConnectivityCheck = () => sl<ConnectivityCheck>().hasConnection;
-  sl.registerFactory<ConnectivityCubit>(
-    () => ConnectivityCubit(sl())..start(),
-  );
+  sl.registerFactory<ConnectivityCubit>(() => ConnectivityCubit(sl())..start());
 
   // ── Remote Data Sources ──────────────────────────────────────────────────
   sl.registerLazySingleton<MedicinaRemoteDatasource>(

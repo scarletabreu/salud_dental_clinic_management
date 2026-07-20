@@ -85,20 +85,22 @@ void main() {
       usecase = RegistrarPago(repo);
     });
 
-    test('cobro válido delega en el repositorio con los argumentos correctos',
-        () async {
-      final id = await usecase(
-        cuenta: _cuenta(total: 1000),
-        monto: 400,
-        metodo: MetodoPago.efectivo,
-      );
+    test(
+      'cobro válido delega en el repositorio con los argumentos correctos',
+      () async {
+        final id = await usecase(
+          cuenta: _cuenta(total: 1000),
+          monto: 400,
+          metodo: MetodoPago.efectivo,
+        );
 
-      expect(id, 'pago-1');
-      expect(repo.invocado, isTrue);
-      expect(repo.cuentaId, 'c1');
-      expect(repo.monto, 400);
-      expect(repo.metodo, MetodoPago.efectivo);
-    });
+        expect(id, 'pago-1');
+        expect(repo.invocado, isTrue);
+        expect(repo.cuentaId, 'c1');
+        expect(repo.monto, 400);
+        expect(repo.metodo, MetodoPago.efectivo);
+      },
+    );
 
     test('permite saldar exactamente el saldo pendiente', () async {
       await usecase(
@@ -113,11 +115,7 @@ void main() {
 
     test('rechaza monto cero sin tocar el repositorio', () async {
       expect(
-        () => usecase(
-          cuenta: _cuenta(),
-          monto: 0,
-          metodo: MetodoPago.efectivo,
-        ),
+        () => usecase(cuenta: _cuenta(), monto: 0, metodo: MetodoPago.efectivo),
         throwsA(isA<ValidationFailure>()),
       );
       expect(repo.invocado, isFalse);
@@ -125,11 +123,8 @@ void main() {
 
     test('rechaza monto negativo', () async {
       expect(
-        () => usecase(
-          cuenta: _cuenta(),
-          monto: -50,
-          metodo: MetodoPago.efectivo,
-        ),
+        () =>
+            usecase(cuenta: _cuenta(), monto: -50, metodo: MetodoPago.efectivo),
         throwsA(isA<ValidationFailure>()),
       );
       expect(repo.invocado, isFalse);

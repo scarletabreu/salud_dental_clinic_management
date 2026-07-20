@@ -526,7 +526,9 @@ class _Acciones extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: saldada ? null : () => _mostrarDialogoPago(context, cuenta),
+            onPressed: saldada
+                ? null
+                : () => _mostrarDialogoPago(context, cuenta),
             icon: Icon(
               saldada ? Icons.check_circle_rounded : Icons.payments_rounded,
               size: 20,
@@ -545,7 +547,8 @@ class _Acciones extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _mostrarProximamente(context, 'Plan de cuotas'),
+                onPressed: () =>
+                    _mostrarProximamente(context, 'Plan de cuotas'),
                 icon: const Icon(Icons.calendar_month_rounded, size: 18),
                 label: const Text('Plan de cuotas'),
                 style: OutlinedButton.styleFrom(
@@ -660,9 +663,7 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
   @override
   void initState() {
     super.initState();
-    _montoController = TextEditingController(
-      text: _saldo.toStringAsFixed(2),
-    );
+    _montoController = TextEditingController(text: _saldo.toStringAsFixed(2));
   }
 
   @override
@@ -726,7 +727,9 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
               controller: _montoController,
               autofocus: true,
               enabled: !_procesando,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (_) => setState(() => _error = null),
               decoration: InputDecoration(
                 labelText: 'Monto a cobrar (RD\$)',
@@ -769,7 +772,9 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
       ),
       actions: [
         TextButton(
-          onPressed: _procesando ? null : () => Navigator.of(context).pop(false),
+          onPressed: _procesando
+              ? null
+              : () => Navigator.of(context).pop(false),
           child: const Text('Cancelar'),
         ),
         FilledButton(
@@ -826,7 +831,11 @@ class _ChipMetodoPago extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_iconoMetodo(metodo), size: 16, color: activo ? ac.primaryBlue : ac.textMuted),
+              Icon(
+                _iconoMetodo(metodo),
+                size: 16,
+                color: activo ? ac.primaryBlue : ac.textMuted,
+              ),
               const SizedBox(width: 7),
               Text(
                 metodo.name,
@@ -899,10 +908,7 @@ class _FilaResumen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(color: ac.textSecondary, fontSize: 13),
-        ),
+        Text(label, style: TextStyle(color: ac.textSecondary, fontSize: 13)),
         Text(
           valor,
           style: TextStyle(
@@ -921,7 +927,8 @@ IconData _iconoMetodo(pago_enums.MetodoPago metodo) {
     pago_enums.MetodoPago.efectivo => Icons.payments_outlined,
     pago_enums.MetodoPago.tarjetaCredito => Icons.credit_card_rounded,
     pago_enums.MetodoPago.tarjetaDebito => Icons.credit_card_outlined,
-    pago_enums.MetodoPago.transferenciaBancaria => Icons.account_balance_rounded,
+    pago_enums.MetodoPago.transferenciaBancaria =>
+      Icons.account_balance_rounded,
   };
 }
 
@@ -1012,9 +1019,7 @@ class _FormularioAjusteState extends State<_FormularioAjuste> {
           TextField(
             controller: _notaController,
             maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Motivo del ajuste',
-            ),
+            decoration: const InputDecoration(labelText: 'Motivo del ajuste'),
           ),
         ],
       ),

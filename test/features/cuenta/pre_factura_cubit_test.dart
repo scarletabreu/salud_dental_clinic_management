@@ -143,10 +143,7 @@ void main() {
 
       final futuro = expectLater(
         cubit.stream,
-        emitsInOrder([
-          isA<PreFacturaCargando>(),
-          isA<PreFacturaError>(),
-        ]),
+        emitsInOrder([isA<PreFacturaCargando>(), isA<PreFacturaError>()]),
       );
 
       await cubit.cargar('c1');

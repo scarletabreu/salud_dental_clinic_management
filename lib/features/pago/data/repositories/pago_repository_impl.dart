@@ -49,12 +49,14 @@ class PagoRepositoryImpl implements PagoRepository {
     required String cuentaId,
     required double monto,
     required MetodoPago metodo,
+    String? cuotaId,
   }) {
     return runGuarded(
       () => remoteDataSource.registrarPagoTransaccional(
         cuentaId: cuentaId,
         monto: monto,
         metodoPago: metodo.dbValue,
+        cuotaId: cuotaId,
       ),
       context: 'registrar el pago',
     );

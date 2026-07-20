@@ -13,5 +13,6 @@ abstract class PagoRepository {
     required String cuentaId,
     required double monto,
     required MetodoPago metodo,
+    String? cuotaId,
   });
 }

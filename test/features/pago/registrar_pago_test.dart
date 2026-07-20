@@ -4,6 +4,8 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/c
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart'
     as cuenta_enums;
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart';
@@ -17,17 +19,20 @@ class _FakePagoRepository implements PagoRepository {
   String? cuentaId;
   double? monto;
   MetodoPago? metodo;
+  String? cuotaId;
 
   @override
   Future<String> registrarPago({
     required String cuentaId,
     required double monto,
     required MetodoPago metodo,
+    String? cuotaId,
   }) async {
     invocado = true;
     this.cuentaId = cuentaId;
     this.monto = monto;
     this.metodo = metodo;
+    this.cuotaId = cuotaId;
     return 'pago-1';
   }
 
@@ -111,6 +116,49 @@ void main() {
 
       expect(repo.invocado, isTrue);
       expect(repo.monto, 400);
+    });
+
+    test('vincula un abono con la cuota indicada', () async {
+      final cuota = Cuota(
+        id: 'q1',
+        cuentaId: 'c1',
+        monto: 400,
+        montoPagado: 100,
+        fechaVencimiento: DateTime(2026, 8, 20),
+        estado: EstadoCuota.pendiente,
+      );
+
+      await usecase(
+        cuenta: _cuenta(total: 1000),
+        cuota: cuota,
+        monto: 150,
+        metodo: MetodoPago.efectivo,
+      );
+
+      expect(repo.cuotaId, 'q1');
+      expect(repo.monto, 150);
+    });
+
+    test('rechaza un abono mayor al saldo de la cuota', () {
+      final cuota = Cuota(
+        id: 'q1',
+        cuentaId: 'c1',
+        monto: 400,
+        montoPagado: 350,
+        fechaVencimiento: DateTime(2026, 8, 20),
+        estado: EstadoCuota.pendiente,
+      );
+
+      expect(
+        () => usecase(
+          cuenta: _cuenta(total: 1000),
+          cuota: cuota,
+          monto: 100,
+          metodo: MetodoPago.efectivo,
+        ),
+        throwsA(isA<ValidationFailure>()),
+      );
+      expect(repo.invocado, isFalse);
     });
 
     test('rechaza monto cero sin tocar el repositorio', () async {

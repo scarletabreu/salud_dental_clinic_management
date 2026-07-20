@@ -80,6 +80,7 @@ import '../../features/item_cuenta/domain/repositories/item_cuenta_repository.da
 import '../../features/cuota/data/datasources/cuota_remote_datasource.dart';
 import '../../features/cuota/data/repositories/cuota_repository_impl.dart';
 import '../../features/cuota/domain/repositories/cuota_repository.dart';
+import '../../features/cuota/domain/usecases/generar_plan_de_cuotas.dart';
 import '../../features/pago/data/datasources/pago_remote_datasource.dart';
 import '../../features/pago/data/repositories/pago_repository_impl.dart';
 import '../../features/pago/domain/repositories/pago_repository.dart';
@@ -402,8 +403,14 @@ Future<void> init() async {
     () => GetCuentaByIdUseCase(repository: sl()),
   );
   sl.registerFactory<RegistrarPago>(() => RegistrarPago(sl()));
+  sl.registerFactory<GenerarPlanDeCuotas>(() => GenerarPlanDeCuotas(sl()));
   sl.registerFactory<PreFacturaCubit>(
-    () => PreFacturaCubit(getCuenta: sl(), registrarPago: sl()),
+    () => PreFacturaCubit(
+      getCuenta: sl(),
+      registrarPago: sl(),
+      cuotaRepository: sl(),
+      generarPlan: sl(),
+    ),
   );
 
   sl.registerFactory<GetHistorialFinancieroUseCase>(

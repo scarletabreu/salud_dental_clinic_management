@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 
 sealed class PreFacturaState {
   const PreFacturaState();
@@ -14,7 +15,8 @@ class PreFacturaCargando extends PreFacturaState {
 
 class PreFacturaCargada extends PreFacturaState {
   final Cuenta cuenta;
-  const PreFacturaCargada(this.cuenta);
+  final List<Cuota> cuotas;
+  const PreFacturaCargada(this.cuenta, {this.cuotas = const []});
 }
 
 class PreFacturaError extends PreFacturaState {

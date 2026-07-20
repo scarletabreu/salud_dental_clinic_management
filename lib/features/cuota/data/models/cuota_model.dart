@@ -6,6 +6,7 @@ class CuotaModel extends Cuota {
     super.id,
     required super.cuentaId,
     required super.monto,
+    super.montoPagado,
     required super.fechaVencimiento,
     required super.estado,
   });
@@ -15,6 +16,7 @@ class CuotaModel extends Cuota {
       id: json['id'] as String?,
       cuentaId: json['cuenta_id'] as String,
       monto: (json['monto'] as num).toDouble(),
+      montoPagado: (json['monto_pagado'] as num?)?.toDouble() ?? 0,
       fechaVencimiento: DateTime.parse(json['fecha_vencimiento'] as String),
       estado: EstadoCuota.values.firstWhere(
         (e) => e.name == json['estado'],
@@ -27,6 +29,7 @@ class CuotaModel extends Cuota {
     final Map<String, dynamic> data = {
       'cuenta_id': cuentaId,
       'monto': monto,
+      'monto_pagado': montoPagado,
       'fecha_vencimiento': fechaVencimiento.toIso8601String(),
       'estado': estado.name,
     };

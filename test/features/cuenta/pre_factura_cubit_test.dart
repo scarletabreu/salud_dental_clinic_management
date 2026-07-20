@@ -7,6 +7,10 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/g
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_state.dart';
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/repositories/cuota_repository.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/usecases/generar_plan_de_cuotas.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
@@ -55,6 +59,7 @@ class _FakePagoRepository implements PagoRepository {
     required String cuentaId,
     required double monto,
     required pago_enums.MetodoPago metodo,
+    String? cuotaId,
   }) async {
     ultimaCuentaId = cuentaId;
     ultimoMonto = monto;
@@ -74,6 +79,17 @@ class _FakePagoRepository implements PagoRepository {
   @override
   Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) =>
       throw UnimplementedError();
+}
+
+class _FakeCuotaRepository implements CuotaRepository {
+  final List<Cuota> cuotas;
+  _FakeCuotaRepository({this.cuotas = const []});
+
+  @override
+  Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async => cuotas;
+
+  @override
+  Future<void> generarPlanDePagos(List<Cuota> cuotas) async {}
 }
 
 Cuenta _cuenta({
@@ -109,11 +125,21 @@ void main() {
   group('PreFacturaCubit', () {
     test('cargar OK emite Cargando y luego Cargada con la cuenta', () async {
       final cuenta = _cuenta(items: [_item(1000)]);
+      final cuota = Cuota(
+        id: 'q1',
+        cuentaId: 'c1',
+        monto: 1000,
+        fechaVencimiento: DateTime(2026, 8, 15),
+        estado: EstadoCuota.pendiente,
+      );
+      final cuotaRepository = _FakeCuotaRepository(cuotas: [cuota]);
       final cubit = PreFacturaCubit(
         getCuenta: GetCuentaByIdUseCase(
           repository: _FakeCuentaRepository(resultado: cuenta),
         ),
         registrarPago: RegistrarPago(_FakePagoRepository()),
+        cuotaRepository: cuotaRepository,
+        generarPlan: GenerarPlanDeCuotas(cuotaRepository),
       );
 
       final futuro = expectLater(
@@ -130,15 +156,19 @@ void main() {
 
       await cubit.cargar('c1');
       await futuro;
+      expect((cubit.state as PreFacturaCargada).cuotas, [cuota]);
       await cubit.close();
     });
 
     test('cargar con error emite Cargando y luego Error', () async {
+      final cuotaRepository = _FakeCuotaRepository();
       final cubit = PreFacturaCubit(
         getCuenta: GetCuentaByIdUseCase(
           repository: _FakeCuentaRepository(error: Exception('boom')),
         ),
         registrarPago: RegistrarPago(_FakePagoRepository()),
+        cuotaRepository: cuotaRepository,
+        generarPlan: GenerarPlanDeCuotas(cuotaRepository),
       );
 
       final futuro = expectLater(

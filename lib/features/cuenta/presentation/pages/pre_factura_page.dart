@@ -11,6 +11,9 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/esta
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_state.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/widgets/plan_cuotas_panel.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
     as pago_enums;
@@ -41,7 +44,10 @@ class PreFacturaPage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 760),
             child: BlocBuilder<PreFacturaCubit, PreFacturaState>(
               builder: (context, state) => switch (state) {
-                PreFacturaCargada(:final cuenta) => _Contenido(cuenta: cuenta),
+                PreFacturaCargada(:final cuenta, :final cuotas) => _Contenido(
+                  cuenta: cuenta,
+                  cuotas: cuotas,
+                ),
                 PreFacturaError(:final mensaje) => _EstadoError(
                   mensaje: mensaje,
                   onReintentar: () =>
@@ -115,7 +121,8 @@ class _EstadoError extends StatelessWidget {
 
 class _Contenido extends StatefulWidget {
   final Cuenta cuenta;
-  const _Contenido({required this.cuenta});
+  final List<Cuota> cuotas;
+  const _Contenido({required this.cuenta, required this.cuotas});
 
   @override
   State<_Contenido> createState() => _ContenidoState();
@@ -128,6 +135,14 @@ class _ContenidoState extends State<_Contenido> {
   void initState() {
     super.initState();
     _modalidad = widget.cuenta.metodoPago;
+  }
+
+  @override
+  void didUpdateWidget(covariant _Contenido oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cuenta.metodoPago != widget.cuenta.metodoPago) {
+      _modalidad = widget.cuenta.metodoPago;
+    }
   }
 
   Cuenta get cuenta => widget.cuenta;
@@ -148,7 +163,16 @@ class _ContenidoState extends State<_Contenido> {
         const SizedBox(height: 16),
         _Totales(cuenta: cuenta),
         const SizedBox(height: 16),
-        _Acciones(cuenta: cuenta),
+        if (_modalidad == MetodoPago.credito || widget.cuotas.isNotEmpty) ...[
+          PlanCuotasPanel(
+            cuotas: widget.cuotas,
+            onConfigurar: () => _mostrarDialogoPlan(context, cuenta),
+            onPagar: (cuota) =>
+                _mostrarDialogoPago(context, cuenta, cuota: cuota),
+          ),
+          const SizedBox(height: 16),
+        ],
+        _Acciones(cuenta: cuenta, cuotas: widget.cuotas),
         const SizedBox(height: 8),
       ],
     );
@@ -228,7 +252,8 @@ class _HeaderEstado extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Selector de modalidad (estado local, no persiste en este ticket)
+// Selector de modalidad. Crédito abre la configuración del calendario; al
+// confirmar el plan la modalidad se persiste junto con las cuotas.
 // ---------------------------------------------------------------------------
 
 class _SelectorModalidad extends StatelessWidget {
@@ -515,12 +540,20 @@ class _FilaTotal extends StatelessWidget {
 
 class _Acciones extends StatelessWidget {
   final Cuenta cuenta;
-  const _Acciones({required this.cuenta});
+  final List<Cuota> cuotas;
+  const _Acciones({required this.cuenta, required this.cuotas});
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final saldada = cuenta.estaPagada;
+    Cuota? proximaCuota;
+    for (final cuota in cuotas) {
+      if (cuota.saldoPendiente > 0 && cuota.estado != EstadoCuota.cancelada) {
+        proximaCuota = cuota;
+        break;
+      }
+    }
     return Column(
       children: [
         SizedBox(
@@ -528,12 +561,19 @@ class _Acciones extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: saldada
                 ? null
-                : () => _mostrarDialogoPago(context, cuenta),
+                : () =>
+                      _mostrarDialogoPago(context, cuenta, cuota: proximaCuota),
             icon: Icon(
               saldada ? Icons.check_circle_rounded : Icons.payments_rounded,
               size: 20,
             ),
-            label: Text(saldada ? 'Cuenta saldada' : 'Registrar pago'),
+            label: Text(
+              saldada
+                  ? 'Cuenta saldada'
+                  : proximaCuota != null
+                  ? 'Pagar próxima cuota'
+                  : 'Registrar pago',
+            ),
             style: FilledButton.styleFrom(
               backgroundColor: ac.primaryBlue,
               disabledBackgroundColor: ac.green.withValues(alpha: 0.15),
@@ -547,10 +587,13 @@ class _Acciones extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () =>
-                    _mostrarProximamente(context, 'Plan de cuotas'),
+                onPressed: cuotas.isEmpty
+                    ? () => _mostrarDialogoPlan(context, cuenta)
+                    : null,
                 icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                label: const Text('Plan de cuotas'),
+                label: Text(
+                  cuotas.isEmpty ? 'Plan de cuotas' : 'Plan configurado',
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ac.textSecondary,
                   side: BorderSide(color: ac.divider),
@@ -603,10 +646,34 @@ void _mostrarProximamente(BuildContext context, String accion) {
   );
 }
 
+Future<void> _mostrarDialogoPlan(BuildContext context, Cuenta cuenta) async {
+  final cubit = context.read<PreFacturaCubit>();
+  final messenger = ScaffoldMessenger.of(context);
+  final ac = context.appColors;
+  final creado = await mostrarDialogoPlanCuotas(
+    context: context,
+    cuenta: cuenta,
+    cubit: cubit,
+  );
+  if (creado == true) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Plan de cuotas creado correctamente.'),
+        backgroundColor: ac.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
 /// Abre el diálogo de cobro pasándole el cubit de la pantalla (capturado antes
 /// de `showDialog`, ya que el diálogo se monta en otra rama del árbol). Al
 /// confirmar el cobro, el cubit recarga la cuenta y aquí se muestra el aviso.
-Future<void> _mostrarDialogoPago(BuildContext context, Cuenta cuenta) async {
+Future<void> _mostrarDialogoPago(
+  BuildContext context,
+  Cuenta cuenta, {
+  Cuota? cuota,
+}) async {
   final cubit = context.read<PreFacturaCubit>();
   final messenger = ScaffoldMessenger.of(context);
   final ac = context.appColors;
@@ -614,13 +681,18 @@ Future<void> _mostrarDialogoPago(BuildContext context, Cuenta cuenta) async {
   final registrado = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => _DialogoRegistrarPago(cuenta: cuenta, cubit: cubit),
+    builder: (_) =>
+        _DialogoRegistrarPago(cuenta: cuenta, cubit: cubit, cuota: cuota),
   );
 
   if (registrado == true) {
     messenger.showSnackBar(
       SnackBar(
-        content: const Text('Pago registrado correctamente.'),
+        content: Text(
+          cuota == null
+              ? 'Pago registrado correctamente.'
+              : 'Abono a la cuota registrado correctamente.',
+        ),
         backgroundColor: ac.green,
         behavior: SnackBarBehavior.floating,
       ),
@@ -634,8 +706,13 @@ Future<void> _mostrarDialogoPago(BuildContext context, Cuenta cuenta) async {
 class _DialogoRegistrarPago extends StatefulWidget {
   final Cuenta cuenta;
   final PreFacturaCubit cubit;
+  final Cuota? cuota;
 
-  const _DialogoRegistrarPago({required this.cuenta, required this.cubit});
+  const _DialogoRegistrarPago({
+    required this.cuenta,
+    required this.cubit,
+    this.cuota,
+  });
 
   @override
   State<_DialogoRegistrarPago> createState() => _DialogoRegistrarPagoState();
@@ -648,6 +725,11 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
   String? _error;
 
   double get _saldo => widget.cuenta.balancePendiente;
+  double get _saldoACobrar {
+    final saldoCuota = widget.cuota?.saldoPendiente;
+    if (saldoCuota == null || saldoCuota <= _saldo) return saldoCuota ?? _saldo;
+    return _saldo;
+  }
 
   double? get _montoIngresado {
     final texto = _montoController.text.trim().replaceAll(',', '');
@@ -657,13 +739,15 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
 
   bool get _montoValido {
     final m = _montoIngresado;
-    return m != null && m > 0 && m <= _saldo + 0.01;
+    return m != null && m > 0 && m <= _saldoACobrar + 0.01;
   }
 
   @override
   void initState() {
     super.initState();
-    _montoController = TextEditingController(text: _saldo.toStringAsFixed(2));
+    _montoController = TextEditingController(
+      text: _saldoACobrar.toStringAsFixed(2),
+    );
   }
 
   @override
@@ -684,6 +768,7 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
     final error = await widget.cubit.registrarPago(
       monto: monto,
       metodo: _metodo,
+      cuota: widget.cuota,
     );
 
     if (!mounted) return;
@@ -710,7 +795,10 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
         children: [
           Icon(Icons.payments_rounded, color: ac.primaryBlue, size: 22),
           const SizedBox(width: 10),
-          Text('Registrar pago', style: TextStyle(color: ac.textPrimary)),
+          Text(
+            widget.cuota == null ? 'Registrar pago' : 'Pagar cuota',
+            style: TextStyle(color: ac.textPrimary),
+          ),
         ],
       ),
       content: SingleChildScrollView(
@@ -719,7 +807,10 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Saldo pendiente: ${formatMoneda(_saldo)}',
+              widget.cuota == null
+                  ? 'Saldo pendiente: ${formatMoneda(_saldo)}'
+                  : 'Vence ${fechaLargaEs(widget.cuota!.fechaVencimiento)} · '
+                        'Restan ${formatMoneda(_saldoACobrar)}',
               style: TextStyle(color: ac.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 14),

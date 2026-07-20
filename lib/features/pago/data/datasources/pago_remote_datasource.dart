@@ -11,5 +11,6 @@ abstract class PagoRemoteDatasource {
     required String cuentaId,
     required double monto,
     required String metodoPago,
+    String? cuotaId,
   });
 }

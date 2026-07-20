@@ -6,6 +6,7 @@ class PagoModel extends Pago {
   PagoModel({
     super.id,
     required super.cuentaId,
+    super.cuotaId,
     required super.monto,
     required super.fecha,
     required super.estado,
@@ -16,6 +17,7 @@ class PagoModel extends Pago {
     return PagoModel(
       id: json['id'] as String?,
       cuentaId: json['cuenta_id'] ?? json['cuentaId'] as String,
+      cuotaId: (json['cuota_id'] ?? json['cuotaId']) as String?,
       monto: (json['monto'] as num).toDouble(),
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       estado: EstadoPago.values.firstWhere(
@@ -31,6 +33,7 @@ class PagoModel extends Pago {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'cuenta_id': cuentaId,
+      'cuota_id': cuotaId,
       'monto': monto,
       'fecha': fecha.toUtc().toIso8601String(),
       'estado': estado.name,
@@ -48,6 +51,7 @@ class PagoModel extends Pago {
     return PagoModel(
       id: pago.id,
       cuentaId: pago.cuentaId,
+      cuotaId: pago.cuotaId,
       monto: pago.monto,
       fecha: pago.fecha,
       estado: pago.estado,

@@ -20,40 +20,26 @@ class CuotaRemoteDatasourceImpl implements CuotaRemoteDatasource {
   }
 
   @override
-  Future<void> actualizarEstadoCuota(String cuotaId, String nuevoEstado) async {
-    await supabaseClient
-        .from('cuotas')
-        .update({
-          'estado': nuevoEstado,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', cuotaId);
+  Future<void> marcarCuotasVencidas(String cuentaId) async {
+    await supabaseClient.rpc(
+      'marcar_cuotas_vencidas',
+      params: {'p_cuenta_id': cuentaId},
+    );
   }
 
   @override
   Future<void> crearCuotas(List<Map<String, dynamic>> cuotasData) async {
-    final String now = DateTime.now().toIso8601String();
-
-    final List<Map<String, dynamic>> cleanData = cuotasData.map((data) {
+    final cleanData = cuotasData.map((data) {
       final Map<String, dynamic> item = Map.from(data);
       item.remove('id');
-      item['created_at'] = now;
-      item['updated_at'] = now;
       return item;
     }).toList();
-
-    await supabaseClient.from('cuotas').insert(cleanData);
-  }
-
-  @override
-  Future<void> deleteCuota(String id) async {
-    await supabaseClient
-        .from('cuotas')
-        .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'estado': 'cancelada',
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+    await supabaseClient.rpc(
+      'generar_plan_cuotas',
+      params: {
+        'p_cuenta_id': cleanData.first['cuenta_id'],
+        'p_cuotas': cleanData,
+      },
+    );
   }
 }

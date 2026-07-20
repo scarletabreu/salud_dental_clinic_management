@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
@@ -17,19 +19,30 @@ import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo
     as pago_enums;
 import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/usecases/registrar_pago.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 /// Fake del repositorio: solo implementa lo que consume el use case bajo prueba.
 /// El proyecto no usa mocktail/mockito, así que se escribe a mano (ver
 /// `connectivity_cubit_test.dart`).
 class _FakeCuentaRepository implements CuentaRepository {
-  _FakeCuentaRepository({this.resultado, this.error});
+  _FakeCuentaRepository({this.resultado, this.resultados, this.error});
 
   final Cuenta? resultado;
+  final List<Cuenta>? resultados;
   final Object? error;
+  int _lecturas = 0;
 
   @override
   Future<Cuenta> getCuentaById(String id) async {
     if (error != null) throw error!;
+    final secuencia = resultados;
+    if (secuencia != null) {
+      final indice = _lecturas < secuencia.length
+          ? _lecturas
+          : secuencia.length - 1;
+      _lecturas++;
+      return secuencia[indice];
+    }
     return resultado!;
   }
 
@@ -92,6 +105,19 @@ class _FakeCuotaRepository implements CuotaRepository {
   Future<void> generarPlanDePagos(List<Cuota> cuotas) async {}
 }
 
+class _FakeConsultaRepository implements ConsultaRepository {
+  @override
+  Future<Consulta?> getDetalleConsulta(String id) async => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakePacienteRepository implements IPacienteRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Cuenta _cuenta({
   List<ItemCuenta> items = const [],
   List<Pago> pagos = const [],
@@ -113,7 +139,8 @@ ItemCuenta _item(double precio, {int cantidad = 1}) => ItemCuenta(
   cantidad: cantidad,
 );
 
-Pago _pago(double monto) => Pago(
+Pago _pago(double monto, {String? id}) => Pago(
+  id: id,
   cuentaId: 'c1',
   monto: monto,
   fecha: DateTime(2026, 7, 15),
@@ -140,6 +167,8 @@ void main() {
         registrarPago: RegistrarPago(_FakePagoRepository()),
         cuotaRepository: cuotaRepository,
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
+        consultaRepository: _FakeConsultaRepository(),
+        pacienteRepository: _FakePacienteRepository(),
       );
 
       final futuro = expectLater(
@@ -169,6 +198,8 @@ void main() {
         registrarPago: RegistrarPago(_FakePagoRepository()),
         cuotaRepository: cuotaRepository,
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
+        consultaRepository: _FakeConsultaRepository(),
+        pacienteRepository: _FakePacienteRepository(),
       );
 
       final futuro = expectLater(
@@ -178,6 +209,36 @@ void main() {
 
       await cubit.cargar('c1');
       await futuro;
+      await cubit.close();
+    });
+
+    test('conserva el pago recién creado después de recargar', () async {
+      final inicial = _cuenta(items: [_item(1000)]);
+      final actualizada = _cuenta(
+        items: [_item(1000)],
+        pagos: [_pago(400, id: 'pago-1')],
+      );
+      final cuotaRepository = _FakeCuotaRepository();
+      final cubit = PreFacturaCubit(
+        getCuenta: GetCuentaByIdUseCase(
+          repository: _FakeCuentaRepository(resultados: [inicial, actualizada]),
+        ),
+        registrarPago: RegistrarPago(_FakePagoRepository()),
+        cuotaRepository: cuotaRepository,
+        generarPlan: GenerarPlanDeCuotas(cuotaRepository),
+        consultaRepository: _FakeConsultaRepository(),
+        pacienteRepository: _FakePacienteRepository(),
+      );
+
+      await cubit.cargar('c1');
+      final error = await cubit.registrarPago(
+        monto: 400,
+        metodo: pago_enums.MetodoPago.efectivo,
+      );
+
+      expect(error, isNull);
+      expect(cubit.ultimoPagoRegistrado?.id, 'pago-1');
+      expect((cubit.state as PreFacturaCargada).cuenta.montoPagado, 400);
       await cubit.close();
     });
   });

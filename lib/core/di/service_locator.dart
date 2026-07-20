@@ -410,6 +410,8 @@ Future<void> init() async {
       registrarPago: sl(),
       cuotaRepository: sl(),
       generarPlan: sl(),
+      consultaRepository: sl(),
+      pacienteRepository: sl(),
     ),
   );
 

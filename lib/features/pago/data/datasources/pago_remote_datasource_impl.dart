@@ -51,6 +51,7 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
     required String cuentaId,
     required double monto,
     required String metodoPago,
+    String? cuotaId,
   }) async {
     final res = await supabaseClient.rpc(
       'registrar_pago',
@@ -58,6 +59,7 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
         'p_cuenta_id': cuentaId,
         'p_monto': monto,
         'p_metodo_pago': metodoPago,
+        'p_cuota_id': cuotaId,
       },
     );
     return res as String;

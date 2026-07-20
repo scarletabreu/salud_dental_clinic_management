@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
 
@@ -25,6 +26,7 @@ class RegistrarPago {
     required Cuenta cuenta,
     required double monto,
     required MetodoPago metodo,
+    Cuota? cuota,
   }) async {
     final cuentaId = cuenta.id;
     if (cuentaId == null) {
@@ -53,10 +55,26 @@ class RegistrarPago {
       );
     }
 
+    if (cuota != null) {
+      if (cuota.cuentaId != cuentaId || cuota.id == null) {
+        throw const ValidationFailure('La cuota no pertenece a esta cuenta.');
+      }
+      if (cuota.saldoPendiente <= 0) {
+        throw const ValidationFailure('Esta cuota ya está pagada.');
+      }
+      if (monto > cuota.saldoPendiente + 0.01) {
+        throw ValidationFailure(
+          'El monto (${monto.toStringAsFixed(2)}) excede el saldo de la cuota '
+          '(${cuota.saldoPendiente.toStringAsFixed(2)}).',
+        );
+      }
+    }
+
     return _repository.registrarPago(
       cuentaId: cuentaId,
       monto: monto,
       metodo: metodo,
+      cuotaId: cuota?.id,
     );
   }
 }

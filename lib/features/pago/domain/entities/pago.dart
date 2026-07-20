@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado
 class Pago {
   final String? id;
   final String cuentaId;
+  final String? cuotaId;
   final double monto;
   final DateTime fecha;
   final EstadoPago estado;
@@ -12,6 +13,7 @@ class Pago {
   Pago({
     this.id,
     required this.cuentaId,
+    this.cuotaId,
     required this.monto,
     required this.fecha,
     required this.estado,
@@ -22,6 +24,7 @@ class Pago {
 
   Pago copyWith({
     String? cuentaId,
+    String? cuotaId,
     double? monto,
     DateTime? fecha,
     EstadoPago? estado,
@@ -30,6 +33,7 @@ class Pago {
     return Pago(
       id: id,
       cuentaId: cuentaId ?? this.cuentaId,
+      cuotaId: cuotaId ?? this.cuotaId,
       monto: monto ?? this.monto,
       fecha: fecha ?? this.fecha,
       estado: estado ?? this.estado,

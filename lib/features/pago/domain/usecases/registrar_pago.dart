@@ -28,11 +28,15 @@ class RegistrarPago {
   }) async {
     final cuentaId = cuenta.id;
     if (cuentaId == null) {
-      throw const ValidationFailure('La cuenta no tiene un identificador válido.');
+      throw const ValidationFailure(
+        'La cuenta no tiene un identificador válido.',
+      );
     }
 
     if (monto <= 0) {
-      throw const ValidationFailure('El monto del pago debe ser mayor que cero.');
+      throw const ValidationFailure(
+        'El monto del pago debe ser mayor que cero.',
+      );
     }
 
     final saldo = cuenta.balancePendiente;

@@ -12,9 +12,9 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
   PreFacturaCubit({
     required GetCuentaByIdUseCase getCuenta,
     required RegistrarPago registrarPago,
-  })  : _getCuenta = getCuenta,
-        _registrarPago = registrarPago,
-        super(const PreFacturaInicial());
+  }) : _getCuenta = getCuenta,
+       _registrarPago = registrarPago,
+       super(const PreFacturaInicial());
 
   Future<void> cargar(String cuentaId) async {
     emit(const PreFacturaCargando());

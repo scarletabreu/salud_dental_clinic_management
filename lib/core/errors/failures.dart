@@ -23,7 +23,8 @@ class ServerFailure extends Failure {
 /// Su mensaje es fijo y apto para mostrarse tal cual al usuario.
 class NetworkFailure extends Failure {
   const NetworkFailure([
-    super.message = 'Sin conexión a internet. Verifica tu red e inténtalo de nuevo.',
+    super.message =
+        'Sin conexión a internet. Verifica tu red e inténtalo de nuevo.',
   ]);
 }
 

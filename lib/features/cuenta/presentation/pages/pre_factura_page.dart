@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
@@ -17,6 +18,10 @@ import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estad
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
     as pago_enums;
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/entities/recibo_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/presentation/pages/recibo_pago_page.dart';
 
 /// Detalle de cuenta / pre-factura de una consulta. Punto de llegada al cerrar
 /// una consulta (SD-96) y accesible desde el expediente del paciente.
@@ -44,10 +49,20 @@ class PreFacturaPage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 760),
             child: BlocBuilder<PreFacturaCubit, PreFacturaState>(
               builder: (context, state) => switch (state) {
-                PreFacturaCargada(:final cuenta, :final cuotas) => _Contenido(
-                  cuenta: cuenta,
-                  cuotas: cuotas,
-                ),
+                PreFacturaCargada(
+                  :final cuenta,
+                  :final cuotas,
+                  :final consulta,
+                  :final paciente,
+                  :final errorDatosRecibo,
+                ) =>
+                  _Contenido(
+                    cuenta: cuenta,
+                    cuotas: cuotas,
+                    consulta: consulta,
+                    paciente: paciente,
+                    errorDatosRecibo: errorDatosRecibo,
+                  ),
                 PreFacturaError(:final mensaje) => _EstadoError(
                   mensaje: mensaje,
                   onReintentar: () =>
@@ -122,7 +137,17 @@ class _EstadoError extends StatelessWidget {
 class _Contenido extends StatefulWidget {
   final Cuenta cuenta;
   final List<Cuota> cuotas;
-  const _Contenido({required this.cuenta, required this.cuotas});
+  final Consulta? consulta;
+  final Paciente? paciente;
+  final String? errorDatosRecibo;
+
+  const _Contenido({
+    required this.cuenta,
+    required this.cuotas,
+    required this.consulta,
+    required this.paciente,
+    required this.errorDatosRecibo,
+  });
 
   @override
   State<_Contenido> createState() => _ContenidoState();
@@ -163,6 +188,15 @@ class _ContenidoState extends State<_Contenido> {
         const SizedBox(height: 16),
         _Totales(cuenta: cuenta),
         const SizedBox(height: 16),
+        if (cuenta.pagos.isNotEmpty) ...[
+          _HistorialPagos(
+            cuenta: cuenta,
+            consulta: widget.consulta,
+            paciente: widget.paciente,
+            errorDatosRecibo: widget.errorDatosRecibo,
+          ),
+          const SizedBox(height: 16),
+        ],
         if (_modalidad == MetodoPago.credito || widget.cuotas.isNotEmpty) ...[
           PlanCuotasPanel(
             cuotas: widget.cuotas,
@@ -535,6 +569,143 @@ class _FilaTotal extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Recibos de pagos ya registrados
+// ---------------------------------------------------------------------------
+
+class _HistorialPagos extends StatelessWidget {
+  final Cuenta cuenta;
+  final Consulta? consulta;
+  final Paciente? paciente;
+  final String? errorDatosRecibo;
+
+  const _HistorialPagos({
+    required this.cuenta,
+    required this.consulta,
+    required this.paciente,
+    required this.errorDatosRecibo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final pagos = cuenta.pagos.where((pago) => pago.fueExitoso).toList()
+      ..sort((a, b) => b.fecha.compareTo(a.fecha));
+    if (pagos.isEmpty) return const SizedBox.shrink();
+
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TituloSeccion(
+            titulo: 'Recibos de pago',
+            icono: Icons.receipt_long_rounded,
+            color: ac.teal,
+          ),
+          const SizedBox(height: 6),
+          if (errorDatosRecibo != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                errorDatosRecibo!,
+                style: TextStyle(color: ac.red, fontSize: 12),
+              ),
+            ),
+          for (var i = 0; i < pagos.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: ac.divider),
+            _FilaPago(
+              pago: pagos[i],
+              habilitado: consulta != null && paciente != null,
+              onVer: () => _abrirRecibo(
+                context,
+                cuenta: cuenta,
+                pago: pagos[i],
+                consulta: consulta!,
+                paciente: paciente!,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FilaPago extends StatelessWidget {
+  final Pago pago;
+  final bool habilitado;
+  final VoidCallback onVer;
+
+  const _FilaPago({
+    required this.pago,
+    required this.habilitado,
+    required this.onVer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final pagoId = pago.id;
+    final numero = pagoId == null
+        ? 'Pago'
+        : 'Pago #${pagoId.substring(0, pagoId.length < 8 ? pagoId.length : 8).toUpperCase()}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: ac.green.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.check_rounded, color: ac.green, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  numero,
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${fechaCortaEs(pago.fecha.toLocal())} · ${pago.metodoPago.name}',
+                  style: TextStyle(color: ac.textMuted, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formatMoneda(pago.monto),
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: habilitado
+                ? 'Ver recibo'
+                : 'Datos del recibo no disponibles',
+            onPressed: habilitado ? onVer : null,
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            color: ac.primaryBlue,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Acciones
 // ---------------------------------------------------------------------------
 
@@ -676,6 +847,7 @@ Future<void> _mostrarDialogoPago(
 }) async {
   final cubit = context.read<PreFacturaCubit>();
   final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context);
   final ac = context.appColors;
 
   final registrado = await showDialog<bool>(
@@ -697,8 +869,57 @@ Future<void> _mostrarDialogoPago(
         behavior: SnackBarBehavior.floating,
       ),
     );
+
+    final estado = cubit.state;
+    final pago = cubit.ultimoPagoRegistrado;
+    if (estado is PreFacturaCargada &&
+        estado.puedeEmitirRecibo &&
+        pago != null &&
+        navigator.mounted) {
+      await navigator.push(
+        _rutaRecibo(
+          cuenta: estado.cuenta,
+          pago: pago,
+          consulta: estado.consulta!,
+          paciente: estado.paciente!,
+        ),
+      );
+    }
   }
 }
+
+Future<void> _abrirRecibo(
+  BuildContext context, {
+  required Cuenta cuenta,
+  required Pago pago,
+  required Consulta consulta,
+  required Paciente paciente,
+}) {
+  return Navigator.of(context).push(
+    _rutaRecibo(
+      cuenta: cuenta,
+      pago: pago,
+      consulta: consulta,
+      paciente: paciente,
+    ),
+  );
+}
+
+MaterialPageRoute<void> _rutaRecibo({
+  required Cuenta cuenta,
+  required Pago pago,
+  required Consulta consulta,
+  required Paciente paciente,
+}) => MaterialPageRoute<void>(
+  builder: (_) => ReciboPagoPage(
+    recibo: ReciboPago(
+      cuenta: cuenta,
+      pago: pago,
+      consulta: consulta,
+      paciente: paciente,
+    ),
+  ),
+);
 
 /// Diálogo de cobro: monto prellenado con el saldo, selector de método y un
 /// resumen en vivo (monto, método y saldo tras el pago). Gestiona su propio

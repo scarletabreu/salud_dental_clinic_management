@@ -17,6 +17,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 import 'package:salud_dental_clinic_management/features/record/presentation/cubit/condiciones_paciente_cubit.dart';
@@ -222,6 +223,41 @@ void main() {
       _app(
         const PacienteDetailPage(pacienteId: _pacienteId),
         PacienteDetailLoaded(_paciente()),
+        textScale: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  _viewports.forEach((nombre, tamano) {
+    testWidgets('el listado de pacientes se lee en $nombre', (tester) async {
+      _viewport(tester, tamano);
+      await tester.pumpWidget(
+        _app(
+          const Scaffold(body: PacientesPage()),
+          PacienteLoaded(todos: [_paciente()], filtrados: [_paciente()]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'el listado de pacientes no debe desbordar en $nombre',
+      );
+    });
+  });
+
+  testWidgets('el listado de pacientes resiste el texto ampliado en 320 px', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(320, 1600));
+    await tester.pumpWidget(
+      _app(
+        const Scaffold(body: PacientesPage()),
+        PacienteLoaded(todos: [_paciente()], filtrados: [_paciente()]),
         textScale: 2,
       ),
     );

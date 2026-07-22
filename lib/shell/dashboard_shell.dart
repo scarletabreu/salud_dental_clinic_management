@@ -238,9 +238,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         case 'Pacientes':
         case 'Mis Citas del Día':
         case 'Cuentas por Cobrar':
-        case 'Caja':
           return roles.contains(RolUsuario.admin) ||
               roles.contains(RolUsuario.doctor) ||
+              roles.contains(RolUsuario.asistente);
+        case 'Caja':
+          return roles.contains(RolUsuario.admin) ||
               roles.contains(RolUsuario.asistente);
         case 'Inicio':
           return true;

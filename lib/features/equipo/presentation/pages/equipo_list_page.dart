@@ -159,20 +159,15 @@ class _EquipoListPageState extends State<EquipoListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Equipos',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              // Creating an equipment item is offered by the floating action
-              // button; a second "+" in the header only duplicated it.
-            ],
+          // Crear equipo se ofrece desde el botón flotante; un segundo "+" en
+          // la cabecera solo lo duplicaba.
+          Text(
+            'Equipos',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.6,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -371,14 +366,17 @@ class _EquipoListPageState extends State<EquipoListPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              shown == total
-                  ? '$total equipo${total == 1 ? '' : 's'} en total'
-                  : '$shown de $total equipo${total == 1 ? '' : 's'}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ac.textSecondary,
+            Flexible(
+              child: Text(
+                shown == total
+                    ? '$total equipo${total == 1 ? '' : 's'} en total'
+                    : '$shown de $total equipo${total == 1 ? '' : 's'}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textSecondary,
+                ),
               ),
             ),
             if (shown != total) ...[

@@ -110,20 +110,15 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Control de Usuarios',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              // Creating a user is offered by the floating action button; a
-              // second "+" in the header only duplicated it.
-            ],
+          // Crear usuario se ofrece desde el botón flotante; un segundo "+"
+          // en la cabecera solo lo duplicaba.
+          Text(
+            'Control de Usuarios',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.6,
+            ),
           ),
           const SizedBox(height: 4),
           Text(

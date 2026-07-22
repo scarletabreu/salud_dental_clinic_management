@@ -156,8 +156,11 @@ class _PageHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              // El contador de secciones acompaña al título mientras quepa.
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 14,
+                runSpacing: 6,
                 children: [
                   Text(
                     'Configuración',
@@ -167,7 +170,6 @@ class _PageHeader extends StatelessWidget {
                       letterSpacing: -0.6,
                     ),
                   ),
-                  const SizedBox(width: 14),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -239,13 +241,15 @@ class _SectionCard extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: ac.primaryBlue),
               const SizedBox(width: 6),
-              Text(
-                title.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: ac.primaryBlue,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  fontSize: 10,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: ac.primaryBlue,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 10,
+                  ),
                 ),
               ),
             ],
@@ -292,50 +296,74 @@ class _SettingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    final descripcion = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+            fontSize: 15,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+    final avatar = Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: colorScheme.onSurface.withOpacity(0.04),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        icon,
+        size: 18,
+        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: colorScheme.onSurface.withOpacity(0.04),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // El control necesita ~150 px para seguir siendo usable; cuando no
+          // los tiene junto a la etiqueta, baja a su propia línea.
+          final apilar = constraints.maxWidth - 62 < 260;
+          if (apilar) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    fontSize: 15,
-                  ),
+                Row(
+                  children: [
+                    avatar,
+                    const SizedBox(width: 14),
+                    Expanded(child: descripcion),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerLeft, child: trailing),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          trailing,
-        ],
+            );
+          }
+          return Row(
+            children: [
+              avatar,
+              const SizedBox(width: 14),
+              Expanded(child: descripcion),
+              const SizedBox(width: 12),
+              trailing,
+            ],
+          );
+        },
       ),
     );
   }

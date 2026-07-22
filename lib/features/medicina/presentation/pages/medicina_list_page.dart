@@ -119,9 +119,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  // Título y contador: con texto ampliado el contador baja de
+                  // línea en vez de empujar el título fuera de la cabecera.
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         'Medicinas',
@@ -132,8 +135,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                           color: ac.textPrimary,
                         ),
                       ),
-                      if (totalMedicinas > 0) ...[
-                        const SizedBox(width: 12),
+                      if (totalMedicinas > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -163,7 +165,6 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                             ],
                           ),
                         ),
-                      ],
                     ],
                   ),
                   FilledButton.icon(
@@ -259,13 +260,15 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           children: [
             Icon(Icons.filter_list_rounded, size: 12, color: ac.textMuted),
             const SizedBox(width: 4),
-            Text(
-              'FILTRADO RÁPIDO POR EFECTO ADVERSO:',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: ac.textMuted,
-                letterSpacing: 0.5,
+            Expanded(
+              child: Text(
+                'FILTRADO RÁPIDO POR EFECTO ADVERSO:',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: ac.textMuted,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ],
@@ -411,14 +414,17 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              shown == total
-                  ? '$total medicinas en total'
-                  : '$shown de $total medicinas',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ac.textSecondary,
+            Flexible(
+              child: Text(
+                shown == total
+                    ? '$total medicinas en total'
+                    : '$shown de $total medicinas',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textSecondary,
+                ),
               ),
             ),
             if (shown != total) ...[

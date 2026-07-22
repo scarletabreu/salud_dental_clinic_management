@@ -105,12 +105,15 @@ class EquipoCard extends StatelessWidget {
                       children: [
                         Icon(statusIcon, size: 11, color: statusColor),
                         const SizedBox(width: 4),
-                        Text(
-                          'Mant. $statusLabel',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
+                        Flexible(
+                          child: Text(
+                            'Mant. $statusLabel',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
                           ),
                         ),
                       ],

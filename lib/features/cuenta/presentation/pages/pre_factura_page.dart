@@ -717,7 +717,7 @@ class _Acciones extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final saldada = cuenta.estaPagada;
+    final saldada = cuenta.estado == EstadoCuenta.saldada;
     Cuota? proximaCuota;
     for (final cuota in cuotas) {
       if (cuota.saldoPendiente > 0 && cuota.estado != EstadoCuota.cancelada) {

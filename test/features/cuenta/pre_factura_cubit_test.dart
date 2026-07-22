@@ -53,6 +53,12 @@ class _FakeCuentaRepository implements CuentaRepository {
   Future<void> eliminarCuenta(String id) => throw UnimplementedError();
 
   @override
+  Future<void> actualizarCuenta(Cuenta cuenta) => throw UnimplementedError();
+
+  @override
+  Future<Cuenta?> getCuentaByConsultaId(String consultaId) => throw UnimplementedError();
+
+  @override
   Future<List<Cuenta>> getCuentasPorCobrar() => throw UnimplementedError();
 
   @override
@@ -246,17 +252,17 @@ void main() {
   group('Cuenta.estadoCuenta', () {
     test('sin pagos -> abierta', () {
       final cuenta = _cuenta(items: [_item(1000)]);
-      expect(cuenta.estadoCuenta, EstadoCuenta.abierta);
+      expect(cuenta.estado, EstadoCuenta.abierta);
     });
 
     test('pago parcial -> pendiente', () {
       final cuenta = _cuenta(items: [_item(1000)], pagos: [_pago(400)]);
-      expect(cuenta.estadoCuenta, EstadoCuenta.pendiente);
+      expect(cuenta.estado, EstadoCuenta.pendiente);
     });
 
     test('pago total -> saldada', () {
       final cuenta = _cuenta(items: [_item(1000)], pagos: [_pago(1000)]);
-      expect(cuenta.estadoCuenta, EstadoCuenta.saldada);
+      expect(cuenta.estado, EstadoCuenta.saldada);
     });
   });
 }

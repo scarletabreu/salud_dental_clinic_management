@@ -224,7 +224,7 @@ class _HeaderEstado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final (color, label, icon) = _infoEstado(cuenta.estadoCuenta, ac);
+    final (color, label, icon) = _infoEstado(cuenta.estado, ac);
     final consultaCorta = cuenta.consultaId.length > 8
         ? cuenta.consultaId.substring(0, 8)
         : cuenta.consultaId;
@@ -518,7 +518,7 @@ class _Totales extends StatelessWidget {
           _FilaTotal(
             label: 'Balance pendiente',
             valor: formatMoneda(cuenta.balancePendiente),
-            color: cuenta.estaPagada ? ac.green : ac.red,
+            color: cuenta.estado == EstadoCuenta.saldada ? ac.green : ac.red,
             destacado: true,
           ),
         ],

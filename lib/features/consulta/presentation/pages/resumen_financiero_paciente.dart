@@ -342,7 +342,7 @@ class _FilaCuenta extends StatelessWidget {
     final ac = context.appColors;
     final currFmt = NumberFormat.currency(symbol: 'RD\$', decimalDigits: 2);
     final dateFmt = DateFormat('dd/MM/yyyy');
-    final estado = _estadoDeCuenta(cuenta);
+    final estado = cuenta.estado;
     final (statusColor, statusLabel) = _statusInfo(estado, ac);
 
     return Material(
@@ -403,7 +403,7 @@ class _FilaCuenta extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  if (!cuenta.estaPagada)
+                  if (cuenta.estado != EstadoCuenta.saldada)
                     Text(
                       '${currFmt.format(cuenta.balancePendiente)} pend.',
                       style: TextStyle(
@@ -445,12 +445,6 @@ class _FilaCuenta extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static EstadoCuenta _estadoDeCuenta(Cuenta c) {
-    if (c.estaPagada) return EstadoCuenta.saldada;
-    if (c.montoPagado > 0) return EstadoCuenta.pendiente;
-    return EstadoCuenta.abierta;
   }
 
   static (Color, String) _statusInfo(EstadoCuenta estado, AppColors ac) {

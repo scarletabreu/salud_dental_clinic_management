@@ -3,6 +3,8 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/meto
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/estado_pago.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
+
 import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
     as pago_enums;
 
@@ -13,6 +15,7 @@ class CuentaModel extends Cuenta {
     required super.fechaCreacion,
     super.fechaPago,
     required super.metodoPago,
+    required super.estado,
     super.pagos,
     super.nota,
     super.itemCuentas,
@@ -42,12 +45,19 @@ class CuentaModel extends Cuenta {
           _parseDate(json['created_at']) ??
           DateTime.now(),
       fechaPago: _parseDate(json['fecha_pago']),
-      metodoPago: switch ((json['metodo_pago'] as String? ?? '')
-          .toLowerCase()) {
-        'credito' => MetodoPago.credito,
-        _ => MetodoPago.contado,
-      },
+      metodoPago: MetodoPago.values.firstWhere(
+        (e) =>
+            e.name.toLowerCase() ==
+            (json['metodo_pago'] as String? ?? '').toLowerCase(),
+        orElse: () => MetodoPago.contado,
+      ),
       pagos: pagos,
+      estado: EstadoCuenta.values.firstWhere(
+        (e) =>
+            e.name.toLowerCase() ==
+            (json['estado'] as String? ?? '').toLowerCase(),
+        orElse: () => EstadoCuenta.abierta,
+      ),               
       itemCuentas: items,
       nota: json['nota'] as String?,
     );
@@ -58,10 +68,8 @@ class CuentaModel extends Cuenta {
       'consulta_id': consultaId,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_pago': fechaPago?.toIso8601String(),
-      'metodo_pago': switch (metodoPago) {
-        MetodoPago.contado => 'contado',
-        MetodoPago.credito => 'credito',
-      },
+      'metodo_pago': metodoPago.name,
+      'estado': estado.name,
       'nota': nota,
     };
     if (id != null && id!.contains('-') && id!.length == 36) {

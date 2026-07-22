@@ -18,8 +18,6 @@ import 'package:salud_dental_clinic_management/features/personal/presentation/cu
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_card.dart';
 
 class _EquipoCubitDoble extends Cubit<EquipoState> implements EquipoCubit {

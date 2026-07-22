@@ -382,22 +382,30 @@ class _StepRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _StepPill(
-          number: '01',
-          label: 'Evaluación',
-          active: !enWorkspace,
-          done: enWorkspace,
-          ac: ac,
+        Flexible(
+          child: _StepPill(
+            number: '01',
+            label: 'Evaluación',
+            active: !enWorkspace,
+            done: enWorkspace,
+            ac: ac,
+          ),
         ),
+        // El conector es lo primero que cede: nunca baja de 16 px.
         Expanded(
-          child: _StepConnector(done: enWorkspace, ac: ac),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 16),
+            child: _StepConnector(done: enWorkspace, ac: ac),
+          ),
         ),
-        _StepPill(
-          number: '02',
-          label: 'Consulta',
-          active: enWorkspace,
-          done: false,
-          ac: ac,
+        Flexible(
+          child: _StepPill(
+            number: '02',
+            label: 'Consulta',
+            active: enWorkspace,
+            done: false,
+            ac: ac,
+          ),
         ),
       ],
     );
@@ -464,12 +472,16 @@ class _StepPill extends StatelessWidget {
                 ),
         ),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: active || done ? FontWeight.w700 : FontWeight.w500,
-            color: textColor,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: active || done ? FontWeight.w700 : FontWeight.w500,
+              color: textColor,
+            ),
           ),
         ),
       ],

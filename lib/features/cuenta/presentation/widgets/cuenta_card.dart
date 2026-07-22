@@ -16,7 +16,10 @@ class CuentaCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final currFmt = NumberFormat.currency(symbol: 'RD\$', decimalDigits: 2);
     final dateFmt = DateFormat('dd/MM/yyyy');
-    final (statusColor, statusLabel, statusIcon) = _statusInfo(cuenta.estado, ac);
+    final (statusColor, statusLabel, statusIcon) = _statusInfo(
+      cuenta.estado,
+      ac,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -66,21 +69,25 @@ class CuentaCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
                   ),
                 ),
               ),
@@ -112,7 +119,9 @@ class CuentaCard extends StatelessWidget {
                 child: _MontoItem(
                   label: 'Balance',
                   value: currFmt.format(cuenta.balancePendiente),
-                  color: cuenta.estado == EstadoCuenta.saldada ? ac.green : ac.red,
+                  color: cuenta.estado == EstadoCuenta.saldada
+                      ? ac.green
+                      : ac.red,
                   ac: ac,
                 ),
               ),

@@ -38,7 +38,10 @@ class SiguientePacienteCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: cita != null
-                    ? _WithPatient(cita: cita!, onCambiarEstado: onCambiarEstado)
+                    ? _WithPatient(
+                        cita: cita!,
+                        onCambiarEstado: onCambiarEstado,
+                      )
                     : const _Empty(),
               ),
             ),
@@ -99,10 +102,7 @@ class _Empty extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'Cuando un paciente sea registrado en espera, aparecerá aquí.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: ac.textMuted,
-                ),
+                style: TextStyle(fontSize: 12, color: ac.textMuted),
               ),
             ],
           ),
@@ -147,7 +147,10 @@ class _WithPatient extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             Text(
               'SIGUIENTE PACIENTE',
@@ -158,8 +161,7 @@ class _WithPatient extends StatelessWidget {
                 letterSpacing: 1.0,
               ),
             ),
-            if (cita.esEmergencia) ...[
-              const SizedBox(width: 8),
+            if (cita.esEmergencia)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -176,7 +178,6 @@ class _WithPatient extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
           ],
         ),
         const SizedBox(height: 14),
@@ -189,11 +190,7 @@ class _WithPatient extends StatelessWidget {
                 color: ac.teal.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                Icons.person_rounded,
-                size: 26,
-                color: ac.teal,
-              ),
+              child: Icon(Icons.person_rounded, size: 26, color: ac.teal),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -212,32 +209,39 @@ class _WithPatient extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 5),
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 10,
+                    runSpacing: 2,
                     children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 12,
-                        color: ac.textDisabled,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 12,
+                            color: ac.textDisabled,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$h:$m',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ac.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$h:$m',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: ac.textMuted,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       Container(
                         width: 4,
                         height: 4,
+                        margin: const EdgeInsets.only(bottom: 2),
                         decoration: BoxDecoration(
                           color: ac.textDisabled,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 10),
                       Text(
                         _waitTime(),
                         style: TextStyle(

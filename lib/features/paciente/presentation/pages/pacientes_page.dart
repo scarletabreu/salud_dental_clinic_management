@@ -32,6 +32,7 @@ import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class DashboardShell extends StatefulWidget {
   const DashboardShell({super.key});
@@ -200,8 +201,7 @@ class _DashboardShellState extends State<DashboardShell> {
       _selectedIndex = 0;
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final layout = _ShellLayout.forWidth(width);
+    final layout = context.appLayout;
     final colorScheme = Theme.of(context).colorScheme;
 
     final content = IndexedStack(
@@ -217,16 +217,16 @@ class _DashboardShellState extends State<DashboardShell> {
         sectionTitle: _visibleDestinations.isNotEmpty
             ? _visibleDestinations[_selectedIndex].label
             : '',
-        compact: layout == _ShellLayout.mobile,
+        compact: layout.isCompact,
       ),
       body: SafeArea(
         top: false,
-        child: layout == _ShellLayout.mobile
+        child: layout.isCompact
             ? content
             : Row(
                 children: [
                   _SideRail(
-                    extended: layout == _ShellLayout.desktop,
+                    extended: layout.isDesktop,
                     destinations: _visibleDestinations,
                     selectedIndex: _selectedIndex,
                     onDestinationSelected: _onDestinationSelected,
@@ -235,7 +235,7 @@ class _DashboardShellState extends State<DashboardShell> {
                 ],
               ),
       ),
-      bottomNavigationBar: layout == _ShellLayout.mobile
+      bottomNavigationBar: layout.isCompact
           ? NavigationBar(
               selectedIndex: _selectedIndex,
               onDestinationSelected: _onDestinationSelected,
@@ -258,18 +258,6 @@ class _DashboardShellState extends State<DashboardShell> {
     'Tratamientos' => 'Servicios',
     _ => label,
   };
-}
-
-enum _ShellLayout {
-  desktop,
-  tablet,
-  mobile;
-
-  static _ShellLayout forWidth(double width) {
-    if (width >= 1024) return _ShellLayout.desktop;
-    if (width >= 600) return _ShellLayout.tablet;
-    return _ShellLayout.mobile;
-  }
 }
 
 class _SideRail extends StatelessWidget {
@@ -492,7 +480,7 @@ class _PacientesPageState extends State<PacientesPage> {
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+      padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -504,9 +492,10 @@ class _PacientesPageState extends State<PacientesPage> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 14,
+                runSpacing: 4,
                 children: [
                   Text(
                     'Pacientes',
@@ -516,8 +505,7 @@ class _PacientesPageState extends State<PacientesPage> {
                       letterSpacing: -0.6,
                     ),
                   ),
-                  if (state is PacienteLoaded) ...[
-                    const SizedBox(width: 14),
+                  if (state is PacienteLoaded)
                     Builder(
                       builder: (context) {
                         final ac = context.appColors;
@@ -552,7 +540,6 @@ class _PacientesPageState extends State<PacientesPage> {
                         );
                       },
                     ),
-                  ],
                 ],
               ),
               FilledButton.icon(
@@ -707,7 +694,7 @@ class _PacientesPageState extends State<PacientesPage> {
           else ...[
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+                padding: context.pageInsets(top: 4, bottom: 24),
                 itemCount: state.filtrados.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _PacienteRow(
@@ -789,14 +776,17 @@ Widget _buildFooter(BuildContext context, PacienteLoaded state) {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            shown == total
-                ? '$total paciente${total == 1 ? '' : 's'} en total'
-                : '$shown de $total paciente${total == 1 ? '' : 's'}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: ac.textSecondary,
+          Flexible(
+            child: Text(
+              shown == total
+                  ? '$total paciente${total == 1 ? '' : 's'} en total'
+                  : '$shown de $total paciente${total == 1 ? '' : 's'}',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ac.textSecondary,
+              ),
             ),
           ),
           if (shown != total) ...[

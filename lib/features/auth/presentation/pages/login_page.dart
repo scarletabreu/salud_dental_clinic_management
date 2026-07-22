@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,7 +46,10 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.appLayout.pageGutter,
+              vertical: context.appLayout.isCompact ? 24 : 40,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
@@ -117,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(context.appLayout.isNarrow ? 18 : 28),
       child: Form(
         key: _formKey,
         child: Column(

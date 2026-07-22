@@ -31,15 +31,17 @@ class DashboardCitasHoySection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               children: [
-                Text(
-                  'Citas de Hoy',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: ac.textPrimary,
+                Expanded(
+                  child: Text(
+                    'Citas de Hoy',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: ac.textPrimary,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -147,7 +149,7 @@ class _CitaRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 40,
+            width: 40 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2),
             child: Text(
               '$h:$m',
               textAlign: TextAlign.right,
@@ -188,22 +190,25 @@ class _CitaRow extends StatelessWidget {
                       ),
                     ),
                     if (cita.esEmergencia)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ac.emergencyBg,
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          'Emergencia',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: ac.red,
+                      Flexible(
+                        child: Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ac.emergencyBg,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            'Emergencia',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: ac.red,
+                            ),
                           ),
                         ),
                       ),
@@ -220,51 +225,70 @@ class _CitaRow extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (!_estadoEnLinea(context)) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _selectorEstado(context),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          if (canChange)
-            PopupMenuButton<EstadoCita>(
-              onSelected: (nuevoEstado) =>
-                  onCambiarEstado!(cita.id!, nuevoEstado),
-              itemBuilder: (context) => cita.estado.transicionesPermitidas
-                  .map(
-                    (e) => PopupMenuItem<EstadoCita>(
-                      value: e,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: e.color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            e.label,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-              tooltip: 'Cambiar estado',
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _StatusPill(
-                estado: cita.estado,
-                showArrow: true,
-              ),
-            )
+          // Con texto ampliado el estado no cabe en la misma línea que el
+          // nombre: baja bajo los datos de la cita.
+          if (!_estadoEnLinea(context)) const SizedBox.shrink(),
+          if (_estadoEnLinea(context)) const SizedBox(width: 10),
+          if (_estadoEnLinea(context))
+            _selectorEstado(context)
           else
-            _StatusPill(estado: cita.estado, showArrow: false),
+            const SizedBox.shrink(),
         ],
       ),
+    );
+  }
+
+  bool _estadoEnLinea(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+
+  Widget _selectorEstado(BuildContext context) {
+    final canChange = onCambiarEstado != null && cita.id != null;
+    return Builder(
+      builder: (context) {
+        if (canChange) {
+          return PopupMenuButton<EstadoCita>(
+            onSelected: (nuevoEstado) =>
+                onCambiarEstado!(cita.id!, nuevoEstado),
+            itemBuilder: (context) => cita.estado.transicionesPermitidas
+                .map(
+                  (e) => PopupMenuItem<EstadoCita>(
+                    value: e,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: e.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(e.label, style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+            tooltip: 'Cambiar estado',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: _StatusPill(estado: cita.estado, showArrow: true),
+          );
+        }
+        return _StatusPill(estado: cita.estado, showArrow: false);
+      },
     );
   }
 }
@@ -277,32 +301,40 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: estado.color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            estado.label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: estado.color,
+    // Píldora de estado: acompaña a cada fila de la lista, así que su rótulo
+    // no puede crecer sin límite ni empujar al nombre del paciente.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: estado.color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                estado.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: estado.color,
+                ),
+              ),
             ),
-          ),
-          if (showArrow) ...[
-            const SizedBox(width: 2),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 13,
-              color: estado.color,
-            ),
+            if (showArrow) ...[
+              const SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 13,
+                color: estado.color,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

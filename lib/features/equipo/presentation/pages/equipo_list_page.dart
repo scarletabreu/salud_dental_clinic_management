@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/equipo/presentation/cubi
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_state.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/crear_editar_equipo_page.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/widgets/equipo_card.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class EquipoListPage extends StatefulWidget {
   const EquipoListPage({super.key});
@@ -154,24 +155,19 @@ class _EquipoListPageState extends State<EquipoListPage> {
     AppColors ac,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+      padding: context.pageInsets(top: 24, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Equipos',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              // Creating an equipment item is offered by the floating action
-              // button; a second "+" in the header only duplicated it.
-            ],
+          // Crear equipo se ofrece desde el botón flotante; un segundo "+" en
+          // la cabecera solo lo duplicaba.
+          Text(
+            'Equipos',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.6,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -238,7 +234,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
     if (state is EquipoError) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: context.pageInsets(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -314,7 +310,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
             ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 12, 28, 100),
+              padding: context.pageInsets(top: 12, bottom: 100),
               itemCount: state.filtrados.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
@@ -370,14 +366,17 @@ class _EquipoListPageState extends State<EquipoListPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              shown == total
-                  ? '$total equipo${total == 1 ? '' : 's'} en total'
-                  : '$shown de $total equipo${total == 1 ? '' : 's'}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ac.textSecondary,
+            Flexible(
+              child: Text(
+                shown == total
+                    ? '$total equipo${total == 1 ? '' : 's'} en total'
+                    : '$shown de $total equipo${total == 1 ? '' : 's'}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textSecondary,
+                ),
               ),
             ),
             if (shown != total) ...[

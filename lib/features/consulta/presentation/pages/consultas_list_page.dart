@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
@@ -13,6 +14,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/pa
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class ConsultasListPage extends StatefulWidget {
   const ConsultasListPage({super.key});
@@ -98,19 +100,22 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     final total = state is ConsultasLoaded ? state.todas.length : 0;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+      padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                'Consultas',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.6,
+              Flexible(
+                child: Text(
+                  'Consultas',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.6,
+                  ),
                 ),
               ),
               if (state is ConsultasLoaded) ...[
@@ -334,7 +339,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+              padding: context.pageInsets(top: 4, bottom: 24),
               itemCount: state.filtradas.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
@@ -400,7 +405,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     final total = state.todas.length;
     return Container(
       color: context.appColors.cardBg,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      padding: context.pageInsets(top: 16, bottom: 16),
       child: Text(
         'Mostrando $shown de $total consulta${total == 1 ? '' : 's'}',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -507,66 +512,63 @@ class _ConsultaCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppDialog(
         title: const Text('Eliminar Consulta'),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        preferredWidth: 480,
         actionsPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Esta consulta será eliminada junto con su odontograma, dientes, superficies y diagnósticos aplicados.',
-                style: Theme.of(context).textTheme.bodyMedium,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Esta consulta será eliminada junto con su odontograma, dientes, superficies y diagnósticos aplicados.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.2),
+                ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.error.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: colorScheme.error.withValues(alpha: 0.2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_rounded,
+                    size: 20,
+                    color: colorScheme.error,
                   ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.warning_rounded,
-                      size: 20,
-                      color: colorScheme.error,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Aviso Legal',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.error,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Solo se permite para consultas creadas por error hoy, sin tratamientos aplicados ni pre-factura (Ley 172-13).',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: colorScheme.error),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Aviso Legal',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.error,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Solo se permite para consultas creadas por error hoy, sin tratamientos aplicados ni pre-factura (Ley 172-13).',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: colorScheme.error),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -627,6 +629,7 @@ class _ConsultaCard extends StatelessWidget {
                     children: [
                       Text(
                         nombrePaciente,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
@@ -660,109 +663,134 @@ class _ConsultaCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                if (!consulta.finalizada)
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ac.amber.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.play_circle_outline_rounded,
-                          size: 13,
-                          color: ac.amber,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'En curso',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: ac.amber,
+                // Los indicadores y acciones se reparten en varias líneas
+                // cuando la ficha no da para tenerlos todos en fila.
+                Flexible(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 2,
+                    runSpacing: 2,
+                    children: [
+                      if (!consulta.finalizada)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ac.amber.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.play_circle_outline_rounded,
+                                size: 13,
+                                color: ac.amber,
+                              ),
+                              // Con texto ampliado el rótulo cede: el icono y el
+                              // color ya identifican el estado.
+                              if (MediaQuery.textScalerOf(context).scale(1) <=
+                                  1.3) ...[
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'En curso',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: ac.amber,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                if (tieneTratamientos)
-                  _IndicadorIcono(
-                    icon: Icons.healing_rounded,
-                    color: ac.teal,
-                    tooltip: 'El paciente tiene tratamientos aplicados',
-                  ),
-                if (consulta.tieneRecetas)
-                  _IndicadorIcono(
-                    icon: Icons.receipt_long_rounded,
-                    color: ac.primaryBlue,
-                    tooltip: 'Tiene receta',
-                  ),
-                if (esEliminable)
-                  Tooltip(
-                    message: 'Eliminar consulta',
-                    child: InkWell(
-                      onTap: () => _mostrarDialogoEliminar(context),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 18,
-                          color: colorScheme.error.withValues(alpha: 0.7),
+                      if (tieneTratamientos)
+                        _IndicadorIcono(
+                          icon: Icons.healing_rounded,
+                          color: ac.teal,
+                          tooltip: 'El paciente tiene tratamientos aplicados',
                         ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                if (!consulta.finalizada)
-                  TextButton.icon(
-                    onPressed: () async {
-                      final resultado = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MultiBlocProvider(
-                            providers: [
-                              BlocProvider(
-                                create: (_) =>
-                                    sl<PacienteCubit>()
-                                      ..loadParaConsulta(consulta.pacienteId),
+                      if (consulta.tieneRecetas)
+                        _IndicadorIcono(
+                          icon: Icons.receipt_long_rounded,
+                          color: ac.primaryBlue,
+                          tooltip: 'Tiene receta',
+                        ),
+                      if (esEliminable)
+                        Tooltip(
+                          message: 'Eliminar consulta',
+                          child: InkWell(
+                            onTap: () => _mostrarDialogoEliminar(context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 18,
+                                color: colorScheme.error.withValues(alpha: 0.7),
                               ),
-                              BlocProvider(create: (_) => sl<ConsultaCubit>()),
-                            ],
-                            child: EfectuarConsultaPage(
-                              citaId: consulta.citaId ?? '',
-                              pacienteId: consulta.pacienteId,
-                              doctorId: consulta.doctorId,
-                              consultaId: consulta.id,
                             ),
                           ),
                         ),
-                      );
-                      if (resultado == true && context.mounted) {
-                        context.read<ConsultasListCubit>().recargar();
-                      }
-                    },
-                    icon: const Icon(Icons.navigate_next_rounded, size: 16),
-                    label: const Text('Continuar'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: ac.primaryBlue,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 0,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      if (!consulta.finalizada)
+                        TextButton.icon(
+                          onPressed: () async {
+                            final resultado = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MultiBlocProvider(
+                                  providers: [
+                                    BlocProvider(
+                                      create: (_) => sl<PacienteCubit>()
+                                        ..loadParaConsulta(consulta.pacienteId),
+                                    ),
+                                    BlocProvider(
+                                      create: (_) => sl<ConsultaCubit>(),
+                                    ),
+                                  ],
+                                  child: EfectuarConsultaPage(
+                                    citaId: consulta.citaId ?? '',
+                                    pacienteId: consulta.pacienteId,
+                                    doctorId: consulta.doctorId,
+                                    consultaId: consulta.id,
+                                  ),
+                                ),
+                              ),
+                            );
+                            if (resultado == true && context.mounted) {
+                              context.read<ConsultasListCubit>().recargar();
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.navigate_next_rounded,
+                            size: 16,
+                          ),
+                          label: const Text('Continuar'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: ac.primaryBlue,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 0,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
@@ -779,6 +807,8 @@ class _DateBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    // La chapa de fecha es un cuadrado fijo: su contenido se ajusta al hueco
+    // en vez de reventarlo cuando el texto está ampliado.
     return Container(
       width: 54,
       height: 54,
@@ -786,27 +816,31 @@ class _DateBadge extends StatelessWidget {
         color: ac.primaryBlue.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${fecha.day}',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: ac.primaryBlue,
-              height: 1,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${fecha.day}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: ac.primaryBlue,
+                height: 1,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${mesAbrevEs(fecha)} ${fecha.year}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: ac.primaryBlue.withValues(alpha: 0.8),
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 2),
+            Text(
+              '${mesAbrevEs(fecha)} ${fecha.year}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: ac.primaryBlue.withValues(alpha: 0.8),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

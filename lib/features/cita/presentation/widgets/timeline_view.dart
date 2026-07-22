@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 /// Valor centinela para la opción "Efectuar Consulta" del menú de la cita.
 const _kEfectuarConsulta = 'efectuar_consulta';
@@ -62,57 +63,63 @@ class _TimelineScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: ac.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [ac.cardShadow],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final columnWidth = days.length == 1
-                ? (constraints.maxWidth - _kTimeAxisWidth)
-                : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
+    // El alto de cada franja lo fija el reloj, no la tipografía: por encima de
+    // 1.3 el texto dejaría de caber en su hueco, así que se acota aquí en vez
+    // de recortar el contenido.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: Padding(
+        padding: EdgeInsets.all(context.appLayout.isCompact ? 8 : 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: ac.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [ac.cardShadow],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columnWidth = days.length == 1
+                  ? (constraints.maxWidth - _kTimeAxisWidth)
+                  : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
 
-            return Column(
-              children: [
-                _DayHeaders(days: days, columnWidth: columnWidth),
-                Divider(height: 1, color: ac.divider),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: SizedBox(
-                      height: (_kHourEnd - _kHourStart) * _kHourHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _HourAxis(),
-                          ...days.map((day) {
-                            final dayCitas = citas
-                                .where(
-                                  (c) =>
-                                      c.date.year == day.year &&
-                                      c.date.month == day.month &&
-                                      c.date.day == day.day,
-                                )
-                                .toList();
-                            return _DayColumn(
-                              day: day,
-                              citas: dayCitas,
-                              width: columnWidth,
-                              isLast: day == days.last,
-                            );
-                          }),
-                        ],
+              return Column(
+                children: [
+                  _DayHeaders(days: days, columnWidth: columnWidth),
+                  Divider(height: 1, color: ac.divider),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        height: (_kHourEnd - _kHourStart) * _kHourHeight,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _HourAxis(),
+                            ...days.map((day) {
+                              final dayCitas = citas
+                                  .where(
+                                    (c) =>
+                                        c.date.year == day.year &&
+                                        c.date.month == day.month &&
+                                        c.date.day == day.day,
+                                  )
+                                  .toList();
+                              return _DayColumn(
+                                day: day,
+                                citas: dayCitas,
+                                width: columnWidth,
+                                isLast: day == days.last,
+                              );
+                            }),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -142,17 +149,27 @@ class _DayHeaders extends StatelessWidget {
         children: [
           SizedBox(width: _kTimeAxisWidth),
           ...days.map((day) {
-            final isToday = day.year == today.year &&
+            final isToday =
+                day.year == today.year &&
                 day.month == today.month &&
                 day.day == today.day;
             final isWeekend = day.weekday >= 6;
+            // En una semana de 320 px cada columna baja de 40 px: el círculo
+            // del día se encoge para no romper la cabecera.
+            final diametro = columnWidth < 40 ? 28.0 : 36.0;
             return SizedBox(
               width: columnWidth,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     _kDayLabels[day.weekday - 1],
+                    // Con la columna estrecha la etiqueta se partía en dos
+                    // líneas y reventaba el alto fijo de la cabecera.
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    softWrap: false,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -160,14 +177,14 @@ class _DayHeaders extends StatelessWidget {
                       color: isToday
                           ? ac.primaryBlue
                           : isWeekend
-                              ? ac.red.withValues(alpha: 0.7)
-                              : ac.textMuted,
+                          ? ac.red.withValues(alpha: 0.7)
+                          : ac.textMuted,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: diametro,
+                    height: diametro,
                     decoration: BoxDecoration(
                       color: isToday ? ac.primaryBlue : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
@@ -181,8 +198,8 @@ class _DayHeaders extends StatelessWidget {
                         color: isToday
                             ? Colors.white
                             : isWeekend
-                                ? ac.red.withValues(alpha: 0.7)
-                                : ac.textPrimary,
+                            ? ac.red.withValues(alpha: 0.7)
+                            : ac.textPrimary,
                         height: 1,
                       ),
                     ),
@@ -256,9 +273,8 @@ class _DayColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final now = DateTime.now();
-    final isToday = day.year == now.year &&
-        day.month == now.month &&
-        day.day == now.day;
+    final isToday =
+        day.year == now.year && day.month == now.month && day.day == now.day;
 
     final totalHeight = (_kHourEnd - _kHourStart) * _kHourHeight;
 
@@ -328,9 +344,7 @@ class _DayColumn extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                   ),
-                  Expanded(
-                    child: Container(height: 2, color: ac.primaryBlue),
-                  ),
+                  Expanded(child: Container(height: 2, color: ac.primaryBlue)),
                 ],
               ),
             ),
@@ -345,8 +359,10 @@ class _DayColumn extends StatelessWidget {
     for (final cita in sorted) {
       bool placed = false;
       for (final group in groups) {
-        final overlaps = group.any((c) =>
-            c.date.isBefore(cita.fechaFin) && cita.date.isBefore(c.fechaFin));
+        final overlaps = group.any(
+          (c) =>
+              c.date.isBefore(cita.fechaFin) && cita.date.isBefore(c.fechaFin),
+        );
         if (overlaps) {
           group.add(cita);
           placed = true;
@@ -429,7 +445,8 @@ class _CitaBlock extends StatelessWidget {
     final doctorId = cita.doctor.id;
     // Solo se efectúan citas en espera; al efectuarse pasan a EN_CONSULTA.
     final esEfectuable = cita.estado == EstadoCita.enEspera;
-    final puedeEfectuar = esEfectuable &&
+    final puedeEfectuar =
+        esEfectuable &&
         pacienteId != null &&
         doctorId != null &&
         cita.id != null;
@@ -527,8 +544,9 @@ class _CitaBlock extends StatelessWidget {
       builder: (dialogCtx) {
         final ac = dialogCtx.appColors;
         return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: ac.red),
@@ -587,23 +605,27 @@ class _CitaBlock extends StatelessWidget {
     final isCompact = height < 44;
     final isFull = height >= 56;
 
-    final nombreRow = Row(
-      children: [
-        Expanded(
-          child: Text(
-            cita.persona.fullName,
-            style: TextStyle(
-              fontSize: isCompact ? 10 : 11,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1.1,
+    final nombreRow = LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              cita.persona.fullName,
+              style: TextStyle(
+                fontSize: isCompact ? 10 : 11,
+                fontWeight: FontWeight.w700,
+                color: ac.textPrimary,
+                height: 1.1,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        if (cita.esEmergencia)
-          Icon(Icons.priority_high_rounded, size: 10, color: ac.red),
-      ],
+          // Por debajo de 28 px el bloque no da ni para el nombre: el aviso
+          // de emergencia se apoya en el color del borde.
+          if (cita.esEmergencia && constraints.maxWidth >= 28)
+            Icon(Icons.priority_high_rounded, size: 10, color: ac.red),
+        ],
+      ),
     );
 
     final horaText = Text(
@@ -634,11 +656,7 @@ class _CitaBlock extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-            style: TextStyle(
-              fontSize: 10,
-              color: ac.textMuted,
-              height: 1.1,
-            ),
+            style: TextStyle(fontSize: 10, color: ac.textMuted, height: 1.1),
             overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),

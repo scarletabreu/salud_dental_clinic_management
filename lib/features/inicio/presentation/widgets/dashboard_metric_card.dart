@@ -46,26 +46,34 @@ class DashboardMetricCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(9),
+              // Con la tarjeta muy estrecha el icono sobra: la métrica y su
+              // etiqueta son lo que hay que poder leer.
+              if (MediaQuery.textScalerOf(context).scale(1) <= 1.4) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, size: 16, color: accentColor),
                 ),
-                child: Icon(icon, size: 16, color: accentColor),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w700,
+                color: ac.textPrimary,
+                height: 1,
+              ),
             ),
           ),
         ],

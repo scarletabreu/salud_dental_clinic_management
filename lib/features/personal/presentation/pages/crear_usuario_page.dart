@@ -6,6 +6,8 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -175,26 +177,43 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Usuarios',
-                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 13,
-                          color: ac.textMuted,
-                        ),
-                        Text(
-                          _isEditing ? 'Editar usuario' : 'Nuevo usuario',
-                          style: TextStyle(fontSize: 11, color: ac.textMuted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
+                    // La miga de pan repite el título que va justo debajo:
+                    // en móvil se omite para no robarle ancho ni alto.
+                    if (!context.appLayout.isCompact) ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Usuarios',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: ac.primaryBlue,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 13,
+                            color: ac.textMuted,
+                          ),
+                          Flexible(
+                            child: Text(
+                              _isEditing ? 'Editar usuario' : 'Nuevo usuario',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: ac.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       _isEditing ? 'Editar usuario' : 'Registro de usuario',
+                      // La barra tiene alto fijo: el título se recorta antes
+                      // que partirse en varias líneas y desbordarla.
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -204,26 +223,30 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   ],
                 ),
               ),
-              OutlinedButton(
-                onPressed: isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
+              // En pantallas estrechas la flecha de la cabecera ya cancela; un
+              // segundo botón solo empujaría "Guardar" fuera de la barra.
+              if (!context.appLayout.isCompact) ...[
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  child: const Text('Cancelar'),
                 ),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
@@ -269,37 +292,32 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
       title: 'Datos personales del usuario',
       child: Column(
         children: [
-          Row(
+          AppFormRow(
             children: [
-              Expanded(
-                child: _FormField(
-                  ac: ac,
-                  icon: Icons.badge_outlined,
-                  label: 'Nombre *',
-                  child: TextFormField(
-                    controller: _nombreController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _inputDeco(ac, hint: 'Ej. Carlos'),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'El nombre es obligatorio'
-                        : null,
-                  ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Nombre *',
+                child: TextFormField(
+                  controller: _nombreController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Carlos'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El nombre es obligatorio'
+                      : null,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _FormField(
-                  ac: ac,
-                  icon: Icons.badge_outlined,
-                  label: 'Apellido *',
-                  child: TextFormField(
-                    controller: _apellidoController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _inputDeco(ac, hint: 'Ej. Mendoza'),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'El apellido es obligatorio'
-                        : null,
-                  ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Apellido *',
+                child: TextFormField(
+                  controller: _apellidoController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Mendoza'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El apellido es obligatorio'
+                      : null,
                 ),
               ),
             ],

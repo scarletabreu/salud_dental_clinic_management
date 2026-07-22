@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
@@ -69,8 +70,8 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return AppDialog(
+      preferredWidth: 380,
       title: Row(
         children: [
           Icon(Icons.medication_rounded, size: 20, color: ac.primaryBlue),
@@ -83,35 +84,33 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
           ),
         ],
       ),
-      content: SizedBox(
-        width: 380,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _campo(ac, _dosisController, 'Dosis', 'Ej. 500mg'),
-                const SizedBox(height: 12),
-                _campo(
-                  ac,
-                  _frecuenciaController,
-                  'Frecuencia',
-                  'Ej. Cada 8 horas',
-                ),
-                const SizedBox(height: 12),
-                _campo(ac, _duracionController, 'Duración', 'Ej. 7 días'),
-                const SizedBox(height: 12),
-                _campo(
-                  ac,
-                  _indicacionesController,
-                  'Indicaciones',
-                  'Ej. Tomar con alimentos',
-                  requerido: false,
-                  maxLines: 3,
-                ),
-              ],
-            ),
+      scrollable: false,
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _campo(ac, _dosisController, 'Dosis', 'Ej. 500mg'),
+              const SizedBox(height: 12),
+              _campo(
+                ac,
+                _frecuenciaController,
+                'Frecuencia',
+                'Ej. Cada 8 horas',
+              ),
+              const SizedBox(height: 12),
+              _campo(ac, _duracionController, 'Duración', 'Ej. 7 días'),
+              const SizedBox(height: 12),
+              _campo(
+                ac,
+                _indicacionesController,
+                'Indicaciones',
+                'Ej. Tomar con alimentos',
+                requerido: false,
+                maxLines: 3,
+              ),
+            ],
           ),
         ),
       ),

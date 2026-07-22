@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/presentation
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class CajaDiariaPage extends StatefulWidget {
   const CajaDiariaPage({super.key});
@@ -118,11 +119,11 @@ class _AperturaView extends StatelessWidget {
     final ac = context.appColors;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(context.appLayout.isCompact ? 12 : 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(context.appLayout.isNarrow ? 18 : 32),
             decoration: BoxDecoration(
               color: ac.cardBg,
               borderRadius: BorderRadius.circular(24),
@@ -339,7 +340,10 @@ class _CajaAbiertaView extends StatelessWidget {
             },
           ),
           const SizedBox(height: 32),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 2,
             children: [
               Text(
                 'Movimientos',
@@ -347,7 +351,6 @@ class _CajaAbiertaView extends StatelessWidget {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(width: 8),
               Text(
                 'Se actualiza automáticamente',
                 style: TextStyle(color: ac.textMuted, fontSize: 13),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
@@ -433,159 +434,148 @@ class _DialogoPlanCuotasState extends State<_DialogoPlanCuotas> {
       preview = const [];
       previewError = e.message;
     }
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: ac.cardBg,
+      preferredWidth: 510,
       title: Row(
         children: [
           Icon(Icons.calendar_month_rounded, color: ac.indigo, size: 22),
           const SizedBox(width: 10),
-          Text('Configurar plan', style: TextStyle(color: ac.textPrimary)),
+          Expanded(
+            child: Text(
+              'Configurar plan',
+              style: TextStyle(color: ac.textPrimary),
+            ),
+          ),
         ],
       ),
-      content: SizedBox(
-        width: 510,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saldo a programar: ${formatMoneda(widget.cuenta.balancePendiente)}',
+            style: TextStyle(color: ac.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 15),
+          AppFormRow(
             children: [
-              Text(
-                'Saldo a programar: ${formatMoneda(widget.cuenta.balancePendiente)}',
-                style: TextStyle(color: ac.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _numCuotas,
-                      decoration: const InputDecoration(
-                        labelText: 'Cantidad de cuotas',
-                      ),
-                      items: [2, 3, 4, 6, 8, 10, 12, 18, 24, 36]
-                          .map(
-                            (n) => DropdownMenuItem(
-                              value: n,
-                              child: Text('$n cuotas'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _guardando
-                          ? null
-                          : (value) => setState(() {
-                              _numCuotas = value ?? 3;
-                              _error = null;
-                            }),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<FrecuenciaCuota>(
-                      initialValue: _frecuencia,
-                      decoration: const InputDecoration(
-                        labelText: 'Frecuencia',
-                      ),
-                      items: FrecuenciaCuota.values
-                          .map(
-                            (f) => DropdownMenuItem(
-                              value: f,
-                              child: Text(f.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _guardando
-                          ? null
-                          : (value) => setState(() {
-                              _frecuencia = value ?? FrecuenciaCuota.mensual;
-                              _error = null;
-                            }),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: _guardando ? null : _elegirFecha,
-                borderRadius: BorderRadius.circular(12),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Primera fecha de pago',
-                    suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
-                  ),
-                  child: Text(fechaLargaEs(_fechaPrimera)),
+              DropdownButtonFormField<int>(
+                initialValue: _numCuotas,
+                decoration: const InputDecoration(
+                  labelText: 'Cantidad de cuotas',
                 ),
+                items: [2, 3, 4, 6, 8, 10, 12, 18, 24, 36]
+                    .map(
+                      (n) =>
+                          DropdownMenuItem(value: n, child: Text('$n cuotas')),
+                    )
+                    .toList(),
+                onChanged: _guardando
+                    ? null
+                    : (value) => setState(() {
+                        _numCuotas = value ?? 3;
+                        _error = null;
+                      }),
               ),
-              const SizedBox(height: 18),
-              Text(
-                'Previsualización',
-                style: TextStyle(
-                  color: ac.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+              DropdownButtonFormField<FrecuenciaCuota>(
+                initialValue: _frecuencia,
+                decoration: const InputDecoration(labelText: 'Frecuencia'),
+                items: FrecuenciaCuota.values
+                    .map(
+                      (f) => DropdownMenuItem(value: f, child: Text(f.label)),
+                    )
+                    .toList(),
+                onChanged: _guardando
+                    ? null
+                    : (value) => setState(() {
+                        _frecuencia = value ?? FrecuenciaCuota.mensual;
+                        _error = null;
+                      }),
               ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: ac.chipBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ac.divider),
-                ),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < preview.length; i++) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 10,
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              '${i + 1}'.padLeft(2, '0'),
-                              style: TextStyle(
-                                color: ac.indigo,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                fechaCortaEs(preview[i].fechaVencimiento),
-                                style: TextStyle(
-                                  color: ac.textSecondary,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              formatMoneda(preview[i].monto),
-                              style: TextStyle(
-                                color: ac.textPrimary,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (i != preview.length - 1)
-                        Divider(height: 1, color: ac.divider),
-                    ],
-                  ],
-                ),
-              ),
-              if (_error != null || previewError != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error ?? previewError!,
-                  style: TextStyle(color: ac.red, fontSize: 12.5),
-                ),
-              ],
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _guardando ? null : _elegirFecha,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Primera fecha de pago',
+                suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+              ),
+              child: Text(fechaLargaEs(_fechaPrimera)),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Previsualización',
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: ac.chipBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ac.divider),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < preview.length; i++) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${i + 1}'.padLeft(2, '0'),
+                          style: TextStyle(
+                            color: ac.indigo,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            fechaCortaEs(preview[i].fechaVencimiento),
+                            style: TextStyle(
+                              color: ac.textSecondary,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          formatMoneda(preview[i].monto),
+                          style: TextStyle(
+                            color: ac.textPrimary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i != preview.length - 1)
+                    Divider(height: 1, color: ac.divider),
+                ],
+              ],
+            ),
+          ),
+          if (_error != null || previewError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error ?? previewError!,
+              style: TextStyle(color: ac.red, fontSize: 12.5),
+            ),
+          ],
+        ],
       ),
       actions: [
         TextButton(

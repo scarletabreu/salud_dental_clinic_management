@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/personal/presentation/cu
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_card.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/crear_usuario_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class UsuariosListPage extends StatefulWidget {
   const UsuariosListPage({super.key});
@@ -105,24 +106,19 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     AppColors ac,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+      padding: context.pageInsets(top: 24, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Control de Usuarios',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              // Creating a user is offered by the floating action button; a
-              // second "+" in the header only duplicated it.
-            ],
+          // Crear usuario se ofrece desde el botón flotante; un segundo "+"
+          // en la cabecera solo lo duplicaba.
+          Text(
+            'Control de Usuarios',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+              letterSpacing: -0.6,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -194,7 +190,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+      padding: context.pageInsets(top: 8, bottom: 8),
       child: Row(
         children: rolesAMostrar.map((item) {
           final isSelected = state.rolFiltro == item.rol;
@@ -289,7 +285,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 12, 28, 24),
+              padding: context.pageInsets(top: 12, bottom: 24),
               itemCount: state.filtrados.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

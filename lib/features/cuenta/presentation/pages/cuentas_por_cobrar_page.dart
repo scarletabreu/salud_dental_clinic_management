@@ -401,14 +401,17 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              shown == total
-                  ? '$total cuenta${total == 1 ? '' : 's'} en total'
-                  : '$shown de $total cuenta${total == 1 ? '' : 's'}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ac.textSecondary,
+            Flexible(
+              child: Text(
+                shown == total
+                    ? '$total cuenta${total == 1 ? '' : 's'} en total'
+                    : '$shown de $total cuenta${total == 1 ? '' : 's'}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textSecondary,
+                ),
               ),
             ),
             if (shown != total) ...[

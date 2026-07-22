@@ -210,13 +210,14 @@ class InicioPage extends StatelessWidget {
         ),
         if (secondRow.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Row(
-            children: [
-              for (int i = 0; i < secondRow.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
-                Expanded(child: secondRow[i]),
-              ],
-            ],
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.35,
+            children: secondRow,
           ),
         ],
       ],

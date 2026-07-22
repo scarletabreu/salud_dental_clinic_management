@@ -670,9 +670,10 @@ class _PacientesPageState extends State<PacientesPage> {
       );
     }
     if (state is PacienteLoaded) {
+      final compact = MediaQuery.sizeOf(context).width < 600;
       return Column(
         children: [
-          _buildTableHeader(context),
+          if (!compact) _buildTableHeader(context),
           if (state.filtrados.isEmpty)
             Expanded(
               child: Center(
@@ -852,6 +853,7 @@ class _PacienteRowState extends State<_PacienteRow> {
         ? ac.primaryBlue.withValues(alpha: 0.25)
         : colorScheme.outlineVariant.withOpacity(0.4);
 
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
@@ -875,107 +877,120 @@ class _PacienteRowState extends State<_PacienteRow> {
             hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Row(
+              child: compact
+                  ? _buildCompactRow(context, p, ac)
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: colorScheme.onSurface.withOpacity(0.04),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.person_outline_rounded,
-                            size: 18,
-                            color: colorScheme.onSurfaceVariant.withOpacity(
-                              0.6,
-                            ),
+                        Expanded(
+                          flex: 3,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.onSurface.withOpacity(
+                                    0.04,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 18,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withOpacity(0.6),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  p.fullName,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                        fontSize: 15,
+                                      ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 14),
                         Expanded(
+                          flex: 2,
                           child: Text(
-                            p.fullName,
+                            p.govID,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                  fontSize: 15,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withOpacity(0.8),
+                                  fontFamily: 'monospace',
+                                  fontSize: 13,
                                 ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      p.govID,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.8),
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      _contacto?.numeroTelefono.isNotEmpty == true
-                          ? _contacto!.numeroTelefono
-                          : '—',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.8),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      '${p.age} años',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 108,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _ActionIcon(
-                          icon: Icons.visibility_outlined,
-                          tooltip: 'Ver expediente',
-                          color: ac.primaryBlue,
-                          onTap: widget.onVerDetalle,
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            _contacto?.numeroTelefono.isNotEmpty == true
+                                ? _contacto!.numeroTelefono
+                                : '—',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant
+                                      .withOpacity(0.8),
+                                  fontSize: 13,
+                                ),
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        _ActionIcon(
-                          icon: Icons.edit_outlined,
-                          tooltip: 'Editar',
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                          onTap: widget.onEdit,
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            '${p.age} años',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        _ActionIcon(
-                          icon: Icons.delete_outline_rounded,
-                          tooltip: 'Eliminar',
-                          color: colorScheme.error.withOpacity(0.7),
-                          onTap: () => _showDeleteConfirmation(context, widget.paciente),
+                        SizedBox(
+                          width: 108,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              _ActionIcon(
+                                icon: Icons.visibility_outlined,
+                                tooltip: 'Ver expediente',
+                                color: ac.primaryBlue,
+                                onTap: widget.onVerDetalle,
+                              ),
+                              const SizedBox(width: 6),
+                              _ActionIcon(
+                                icon: Icons.edit_outlined,
+                                tooltip: 'Editar',
+                                color: colorScheme.onSurfaceVariant.withOpacity(
+                                  0.5,
+                                ),
+                                onTap: widget.onEdit,
+                              ),
+                              const SizedBox(width: 6),
+                              _ActionIcon(
+                                icon: Icons.delete_outline_rounded,
+                                tooltip: 'Eliminar',
+                                color: colorScheme.error.withOpacity(0.7),
+                                onTap: () => _showDeleteConfirmation(
+                                  context,
+                                  widget.paciente,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
           if (_expanded) _buildDetail(context, p),
@@ -983,6 +998,91 @@ class _PacienteRowState extends State<_PacienteRow> {
       ),
     );
   }
+
+  Widget _buildCompactRow(BuildContext context, Paciente p, AppColors ac) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withValues(alpha: 0.04),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_outline_rounded,
+                size: 18,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                p.fullName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            _ActionIcon(
+              icon: Icons.visibility_outlined,
+              tooltip: 'Ver expediente',
+              color: ac.primaryBlue,
+              onTap: widget.onVerDetalle,
+            ),
+            _ActionIcon(
+              icon: Icons.edit_outlined,
+              tooltip: 'Editar',
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              onTap: widget.onEdit,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 16,
+          runSpacing: 6,
+          children: [
+            _compactField('Cédula', p.govID),
+            _compactField(
+              'Teléfono',
+              _contacto?.numeroTelefono.isNotEmpty == true
+                  ? _contacto!.numeroTelefono
+                  : '—',
+            ),
+            _compactField('Edad', '${p.age} años'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _compactField(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+          letterSpacing: .5,
+        ),
+      ),
+      Text(
+        value,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+      ),
+    ],
+  );
 
   Widget _buildDetail(BuildContext context, Paciente p) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1106,9 +1206,7 @@ class _PacienteRowState extends State<_PacienteRow> {
             },
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
             label: const Text('Eliminar'),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
           ),
         ],
       ),

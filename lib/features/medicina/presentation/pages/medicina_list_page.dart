@@ -266,11 +266,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           ],
         ),
         const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: EfectoSecundario.values.map((efecto) {
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final chips = EfectoSecundario.values.map((efecto) {
               final isSelected = state.selectedEfectos.contains(efecto);
               return Padding(
                 padding: const EdgeInsets.only(right: 6),
@@ -299,8 +297,15 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                   ),
                 ),
               );
-            }).toList(),
-          ),
+            }).toList();
+            return constraints.maxWidth < 600
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(children: chips),
+                  )
+                : Wrap(spacing: 6, runSpacing: 6, children: chips);
+          },
         ),
       ],
     );
@@ -330,7 +335,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
 
     return Column(
       children: [
-        _buildTableHeader(ac),
+        if (MediaQuery.sizeOf(context).width >= 600) _buildTableHeader(ac),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
@@ -622,6 +627,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
         ? ac.primaryBlue.withValues(alpha: 0.25)
         : ac.divider.withValues(alpha: 0.4);
 
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
@@ -645,130 +651,138 @@ class _MedicinaRowState extends State<_MedicinaRow> {
             hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Row(
+              child: compact
+                  ? _buildCompactRow(context, ac, efectos, contras)
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.medication_outlined,
-                            size: 18,
-                            color: ac.primaryBlue,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
                         Expanded(
-                          child: Text(
-                            widget.medicina.nombre,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: ac.textPrimary,
-                            ),
+                          flex: 3,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: ac.primaryBlue.withValues(alpha: 0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.medication_outlined,
+                                  size: 18,
+                                  color: ac.primaryBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  widget.medicina.nombre,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: ac.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: efectos.isEmpty
-                        ? Text(
-                            'Sin efectos registrados',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontStyle: FontStyle.italic,
-                              color: ac.textMuted,
-                            ),
-                          )
-                        : Text(
-                            efectos.take(3).map((e) => e.label).join(', '),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: ac.textSecondary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: contras.isEmpty
-                        ? Text(
-                            'Sin contraindicaciones',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontStyle: FontStyle.italic,
-                              color: ac.textMuted,
-                            ),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: contras
-                                .take(2)
-                                .map(
-                                  (c) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Icon(
-                                          Icons.warning_amber_rounded,
-                                          size: 13,
-                                          color: ac.red,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            c.descripcion,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: ac.red,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        Expanded(
+                          flex: 3,
+                          child: efectos.isEmpty
+                              ? Text(
+                                  'Sin efectos registrados',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontStyle: FontStyle.italic,
+                                    color: ac.textMuted,
                                   ),
                                 )
-                                .toList(),
-                          ),
-                  ),
-                  SizedBox(
-                    width: 72,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _ActionIcon(
-                          icon: Icons.edit_outlined,
-                          tooltip: 'Editar',
-                          color: ac.textSecondary.withValues(alpha: 0.6),
-                          onTap: widget.onEdit,
+                              : Text(
+                                  efectos
+                                      .take(3)
+                                      .map((e) => e.label)
+                                      .join(', '),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: ac.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                         ),
-                        const SizedBox(width: 2),
-                        _ActionIcon(
-                          icon: Icons.delete_outline_rounded,
-                          tooltip: 'Eliminar',
-                          color: ac.red.withValues(alpha: 0.70),
-                          onTap: widget.onDelete,
+                        Expanded(
+                          flex: 3,
+                          child: contras.isEmpty
+                              ? Text(
+                                  'Sin contraindicaciones',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontStyle: FontStyle.italic,
+                                    color: ac.textMuted,
+                                  ),
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: contras
+                                      .take(2)
+                                      .map(
+                                        (c) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(
+                                                Icons.warning_amber_rounded,
+                                                size: 13,
+                                                color: ac.red,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  c.descripcion,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: ac.red,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                        ),
+                        SizedBox(
+                          width: 72,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              _ActionIcon(
+                                icon: Icons.edit_outlined,
+                                tooltip: 'Editar',
+                                color: ac.textSecondary.withValues(alpha: 0.6),
+                                onTap: widget.onEdit,
+                              ),
+                              const SizedBox(width: 2),
+                              _ActionIcon(
+                                icon: Icons.delete_outline_rounded,
+                                tooltip: 'Eliminar',
+                                color: ac.red.withValues(alpha: 0.70),
+                                onTap: widget.onDelete,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
           if (_expanded) _buildDetail(context, ac),
@@ -776,6 +790,98 @@ class _MedicinaRowState extends State<_MedicinaRow> {
       ),
     );
   }
+
+  Widget _buildCompactRow(
+    BuildContext context,
+    AppColors ac,
+    List efectos,
+    List contras,
+  ) {
+    final name = widget.medicina.nombre;
+    final effects = efectos.isEmpty
+        ? 'Sin efectos registrados'
+        : efectos.take(3).map((e) => e.label).join(', ');
+    final contraindications = contras.isEmpty
+        ? 'Sin contraindicaciones'
+        : contras.take(2).map((c) => c.descripcion).join(', ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: ac.primaryBlue.withValues(alpha: .08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.medication_outlined,
+                size: 18,
+                color: ac.primaryBlue,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: ac.textPrimary,
+                ),
+              ),
+            ),
+            _ActionIcon(
+              icon: Icons.edit_outlined,
+              tooltip: 'Editar',
+              color: ac.textSecondary.withValues(alpha: .6),
+              onTap: widget.onEdit,
+            ),
+            _ActionIcon(
+              icon: Icons.delete_outline_rounded,
+              tooltip: 'Eliminar',
+              color: ac.red.withValues(alpha: .7),
+              onTap: widget.onDelete,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _compactField(context, 'Efectos comunes', effects),
+        const SizedBox(height: 6),
+        _compactField(context, 'Contraindicaciones', contraindications),
+      ],
+    );
+  }
+
+  Widget _compactField(BuildContext context, String label, String value) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: context.appColors.textMuted,
+              letterSpacing: .5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color: context.appColors.textSecondary,
+            ),
+          ),
+        ],
+      );
 
   Widget _buildDetail(BuildContext context, AppColors ac) {
     final efectos = widget.medicina.efectosSecundarios;

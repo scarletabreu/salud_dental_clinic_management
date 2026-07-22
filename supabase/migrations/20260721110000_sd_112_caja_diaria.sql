@@ -72,32 +72,24 @@ drop policy if exists "authenticated_manage_cajas" on public.cajas;
 create policy "authenticated_manage_cajas" on public.cajas
   for all to authenticated
   using (
-    exists (
-      select 1 from public.usuarios
-      where id = auth.uid() and rol in ('admin', 'asistente')
-    )
+    exists (select 1 from public.admins where id = auth.uid())
+    or exists (select 1 from public.asistentes where id = auth.uid())
   )
   with check (
-    exists (
-      select 1 from public.usuarios
-      where id = auth.uid() and rol in ('admin', 'asistente')
-    )
+    exists (select 1 from public.admins where id = auth.uid())
+    or exists (select 1 from public.asistentes where id = auth.uid())
   );
 
 drop policy if exists "authenticated_manage_movimientos_caja" on public.movimientos_caja;
 create policy "authenticated_manage_movimientos_caja" on public.movimientos_caja
   for all to authenticated
   using (
-    exists (
-      select 1 from public.usuarios
-      where id = auth.uid() and rol in ('admin', 'asistente')
-    )
+    exists (select 1 from public.admins where id = auth.uid())
+    or exists (select 1 from public.asistentes where id = auth.uid())
   )
   with check (
-    exists (
-      select 1 from public.usuarios
-      where id = auth.uid() and rol in ('admin', 'asistente')
-    )
+    exists (select 1 from public.admins where id = auth.uid())
+    or exists (select 1 from public.asistentes where id = auth.uid())
   );
 
 alter publication supabase_realtime add table public.movimientos_caja;

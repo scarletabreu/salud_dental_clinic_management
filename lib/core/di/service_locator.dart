@@ -53,6 +53,11 @@ import 'package:salud_dental_clinic_management/features/equipo_mantenimiento/dat
 import 'package:salud_dental_clinic_management/features/item_cuenta/data/datasources/item_cuenta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/medicina/data/datasources/medicina_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/data/datasources/movimiento_caja_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/repositories/caja_diaria_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/datasources/odontograma_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/orden_medica/data/datasources/orden_medica_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/pago/data/datasources/pago_remote_datasource_impl.dart';
@@ -218,6 +223,9 @@ Future<void> init() async {
   sl.registerLazySingleton<MovimientoCajaRemoteDatasource>(
     () => MovimientoCajaRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<CajaDiariaDatasource>(
+    () => CajaDiariaDatasourceImpl(sl()),
+  );
   sl.registerLazySingleton<DocumentoClinicoDatasource>(
     () => DocumentoClinicoDatasourceImpl(supabaseClient: sl()),
   );
@@ -299,6 +307,9 @@ Future<void> init() async {
   sl.registerLazySingleton<MovimientoCajaRepository>(
     () => MovimientoCajaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<CajaDiariaRepository>(
+    () => CajaDiariaRepositoryImpl(sl()),
+  );
   sl.registerLazySingleton<DocumentoClinicoRepository>(
     () => DocumentoClinicoRepositoryImpl(remoteDataSource: sl()),
   );
@@ -371,6 +382,7 @@ Future<void> init() async {
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
   );
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
+  sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl()));
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),

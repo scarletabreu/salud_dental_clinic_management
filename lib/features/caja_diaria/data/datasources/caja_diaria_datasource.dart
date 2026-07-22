@@ -6,4 +6,5 @@ abstract class CajaDiariaDatasource {
   Future<bool> isCajaAbierta();
   Future<double> getBalanceActual();
   Future<Map<String, dynamic>?> fetchCajaAbierta();
+  Stream<List<Map<String, dynamic>>> watchMovimientos(String cajaDiariaId);
 }

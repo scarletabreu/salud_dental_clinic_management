@@ -29,7 +29,7 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
       throw Exception('No hay una caja abierta para registrar movimientos.');
     }
 
-    movimientoData['caja_id'] = caja['id'];
+    movimientoData['caja_diaria_id'] = caja['id'];
     movimientoData.remove('id');
 
     await supabase.from('movimientos_caja').insert(movimientoData);
@@ -43,7 +43,7 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     final response = await supabase
         .from('movimientos_caja')
         .select()
-        .eq('caja_id', caja['id'])
+        .eq('caja_diaria_id', caja['id'])
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response as List);
@@ -102,6 +102,28 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
   @override
   Future<Map<String, dynamic>?> fetchCajaAbierta() async =>
       await _getCajaAbiertaActual();
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchMovimientos(String cajaDiariaId) {
+    return supabase
+        .from('movimientos_caja')
+        .stream(primaryKey: ['id'])
+        .map(
+          (rows) =>
+              rows
+                  .where(
+                    (row) =>
+                        row['caja_diaria_id'] == cajaDiariaId &&
+                        row['deleted_at'] == null,
+                  )
+                  .map(Map<String, dynamic>.from)
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      (b['fecha'] as String).compareTo(a['fecha'] as String),
+                ),
+        );
+  }
 
   Future<Map<String, dynamic>?> _getCajaAbiertaActual() async {
     return await supabase

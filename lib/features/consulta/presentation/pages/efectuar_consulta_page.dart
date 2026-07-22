@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/formulario_evaluacion.dart';
@@ -46,52 +49,74 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
+          create: (_) =>
+              sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
         ),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
       ],
-      child: Builder( // <--- 1. ADD THIS BUILDER RIGHT HERE
+      child: Builder(
+        // <--- 1. ADD THIS BUILDER RIGHT HERE
         builder: (innerContext) {
-          
           // 2. Safely trigger the resume logic using innerContext
           if (widget.consultaId != null && !_hasInitialTriggered) {
             _hasInitialTriggered = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!innerContext.mounted) return;
-              innerContext.read<ConsultaCubit>().reanudarConsulta(consultaId: widget.consultaId!);
+              innerContext.read<ConsultaCubit>().reanudarConsulta(
+                consultaId: widget.consultaId!,
+              );
             });
           }
 
+          // Only the desktop layout can afford a 300 px patient card next to
+          // the workspace; everywhere else the odontogram needs the full width
+          // and the record moves into a drawer reachable from the header.
+          final panelInline = innerContext.appLayout.isDesktop;
+
           return Scaffold(
             backgroundColor: ac.bgPage,
+            endDrawer: panelInline
+                ? null
+                : Drawer(
+                    width: math.min(
+                      360,
+                      MediaQuery.sizeOf(innerContext).width * 0.92,
+                    ),
+                    backgroundColor: ac.cardBg,
+                    child: SafeArea(child: _buildPanel(ac, asSidebar: false)),
+                  ),
             body: BlocListener<ConsultaCubit, ConsultaState>(
               listener: _onConsultaState,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _FloatingBar(enWorkspace: _enWorkspace),
+                  _FloatingBar(
+                    enWorkspace: _enWorkspace,
+                    showPacienteAction: !panelInline,
+                  ),
                   const SizedBox(height: 12),
 
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildPanel(ac),
+                        if (panelInline) _buildPanel(ac),
                         Expanded(
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 280),
                             switchInCurve: Curves.easeOut,
                             switchOutCurve: Curves.easeIn,
-                            transitionBuilder: (child, animation) => FadeTransition(
-                              opacity: animation,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0.03, 0),
-                                  end: Offset.zero,
-                                ).animate(animation),
-                                child: child,
-                              ),
-                            ),
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0.03, 0),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                ),
                             child: _enWorkspace
                                 ? WorkspaceConsulta(
                                     key: const ValueKey('workspace'),
@@ -117,14 +142,14 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
     );
   }
 
-  Widget _buildPanel(AppColors ac) {
+  Widget _buildPanel(AppColors ac, {bool asSidebar = true}) {
     return BlocBuilder<PacienteCubit, PacienteState>(
       builder: (context, state) {
         if (state is PacienteDetailLoaded) {
-          return PanelPaciente(paciente: state.paciente);
+          return PanelPaciente(paciente: state.paciente, asSidebar: asSidebar);
         }
         return Container(
-          width: 300,
+          width: asSidebar ? 300 : null,
           decoration: BoxDecoration(
             color: ac.cardBg,
             border: Border(right: BorderSide(color: ac.divider)),
@@ -188,12 +213,17 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
 }
 
 class _FloatingBar extends StatelessWidget {
-  const _FloatingBar({required this.enWorkspace});
+  const _FloatingBar({
+    required this.enWorkspace,
+    this.showPacienteAction = false,
+  });
   final bool enWorkspace;
+  final bool showPacienteAction;
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final layout = context.appLayout;
 
     final subtitle = enWorkspace
         ? 'Registra tratamientos y notas clínicas'
@@ -201,13 +231,15 @@ class _FloatingBar extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        16,
+        layout.isNarrow ? 8 : 16,
         MediaQuery.of(context).padding.top + 12,
-        16,
+        layout.isNarrow ? 8 : 16,
         0,
       ),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 16, 14),
+        padding: layout.isCompact
+            ? const EdgeInsets.fromLTRB(12, 12, 10, 12)
+            : const EdgeInsets.fromLTRB(18, 16, 16, 14),
         decoration: BoxDecoration(
           color: ac.cardBg,
           borderRadius: BorderRadius.circular(20),
@@ -252,29 +284,63 @@ class _FloatingBar extends StatelessWidget {
                     ],
                   ),
                 ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: enWorkspace
-                      ? _StatusBadge(
-                          key: const ValueKey('ws'),
-                          icon: Icons.radio_button_checked_rounded,
-                          label: 'En curso',
-                          color: ac.green,
-                          ac: ac,
-                        )
-                      : _StatusBadge(
-                          key: const ValueKey('ev'),
-                          icon: Icons.assignment_outlined,
-                          label: 'Evaluación',
-                          color: ac.primaryBlue,
-                          ac: ac,
-                        ),
-                ),
+                // At 320 px the badge and the record button cannot both sit
+                // next to the title without squeezing it out of the bar.
+                if (!layout.isNarrow)
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: enWorkspace
+                        ? _StatusBadge(
+                            key: const ValueKey('ws'),
+                            icon: Icons.radio_button_checked_rounded,
+                            label: 'En curso',
+                            color: ac.green,
+                            ac: ac,
+                          )
+                        : _StatusBadge(
+                            key: const ValueKey('ev'),
+                            icon: Icons.assignment_outlined,
+                            label: 'Evaluación',
+                            color: ac.primaryBlue,
+                            ac: ac,
+                          ),
+                  ),
+                if (showPacienteAction) ...[
+                  const SizedBox(width: 6),
+                  _PanelPacienteButton(ac: ac),
+                ],
               ],
             ),
             const SizedBox(height: 12),
             _StepRow(enWorkspace: enWorkspace, ac: ac),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the patient record when it is not docked beside the workspace.
+class _PanelPacienteButton extends StatelessWidget {
+  const _PanelPacienteButton({required this.ac});
+  final AppColors ac;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Ficha del paciente',
+      child: InkWell(
+        key: const ValueKey('abrir-panel-paciente'),
+        onTap: Scaffold.of(context).openEndDrawer,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: ac.chipBg,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryBlue),
         ),
       ),
     );

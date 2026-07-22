@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
@@ -507,66 +508,63 @@ class _ConsultaCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppDialog(
         title: const Text('Eliminar Consulta'),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        preferredWidth: 480,
         actionsPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Esta consulta será eliminada junto con su odontograma, dientes, superficies y diagnósticos aplicados.',
-                style: Theme.of(context).textTheme.bodyMedium,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Esta consulta será eliminada junto con su odontograma, dientes, superficies y diagnósticos aplicados.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.2),
+                ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.error.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: colorScheme.error.withValues(alpha: 0.2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_rounded,
+                    size: 20,
+                    color: colorScheme.error,
                   ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.warning_rounded,
-                      size: 20,
-                      color: colorScheme.error,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Aviso Legal',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.error,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Solo se permite para consultas creadas por error hoy, sin tratamientos aplicados ni pre-factura (Ley 172-13).',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: colorScheme.error),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Aviso Legal',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.error,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Solo se permite para consultas creadas por error hoy, sin tratamientos aplicados ni pre-factura (Ley 172-13).',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: colorScheme.error),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           TextButton(

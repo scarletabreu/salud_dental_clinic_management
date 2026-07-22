@@ -5,7 +5,16 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/entities
 class PanelPaciente extends StatelessWidget {
   final Paciente paciente;
 
-  const PanelPaciente({super.key, required this.paciente});
+  /// `true` renders the fixed-width card used beside the workspace on desktop;
+  /// `false` fills whatever container it is given (a drawer on smaller
+  /// viewports), where a floating card with margins would only waste space.
+  final bool asSidebar;
+
+  const PanelPaciente({
+    super.key,
+    required this.paciente,
+    this.asSidebar = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,23 +31,31 @@ class PanelPaciente extends StatelessWidget {
         .where((s) => s.trim().isNotEmpty)
         .toList();
 
+    final radius = asSidebar ? 20.0 : 0.0;
+
     return Container(
-      width: 300,
-      margin: const EdgeInsets.fromLTRB(12, 12, 0, 12),
+      width: asSidebar ? 300 : null,
+      margin: asSidebar
+          ? const EdgeInsets.fromLTRB(12, 12, 0, 12)
+          : EdgeInsets.zero,
       decoration: BoxDecoration(
         color: ac.cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ac.divider.withValues(alpha: 0.5), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(radius),
+        border: asSidebar
+            ? Border.all(color: ac.divider.withValues(alpha: 0.5), width: 1)
+            : null,
+        boxShadow: asSidebar
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(radius),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -228,14 +245,26 @@ class _InfoGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 2.4,
-      children: items.map((item) => _InfoCell(item: item, ac: ac)).toList(),
+    // The cell height has to follow the text scale: with a fixed aspect ratio
+    // an accessibility text size overflows every cell at once.
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final cellHeight = (54 * textScale).clamp(54.0, 110.0);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 240 ? 1 : 2;
+        final cellWidth = (constraints.maxWidth - 8 * (columns - 1)) / columns;
+
+        return GridView.count(
+          crossAxisCount: columns,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: cellWidth / cellHeight,
+          children: items.map((item) => _InfoCell(item: item, ac: ac)).toList(),
+        );
+      },
     );
   }
 }
@@ -266,13 +295,19 @@ class _InfoCell extends StatelessWidget {
             children: [
               Icon(item.icon, size: 11, color: ac.textMuted),
               const SizedBox(width: 4),
-              Text(
-                item.label.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 9,
-                  color: ac.textMuted,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
+              // Etiquetas como "TIPO DE SANGRE" no caben en la celda: se
+              // recortan en vez de desbordar la fila.
+              Expanded(
+                child: Text(
+                  item.label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: ac.textMuted,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ],
@@ -433,12 +468,14 @@ class _StatsRow extends StatelessWidget {
       children: [
         Icon(Icons.history_rounded, size: 14, color: ac.textMuted),
         const SizedBox(width: 6),
-        Text(
-          '$consultas consulta${consultas == 1 ? '' : 's'} previas registradas',
-          style: TextStyle(
-            fontSize: 12,
-            color: ac.textMuted,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            '$consultas consulta${consultas == 1 ? '' : 's'} previas registradas',
+            style: TextStyle(
+              fontSize: 12,
+              color: ac.textMuted,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

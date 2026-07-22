@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/enums/categoria_condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/enums/tipo_condicion.dart';
@@ -26,8 +27,7 @@ class CondicionesMedicasCard extends StatelessWidget {
     }
 
     return BlocProvider<CondicionesPacienteCubit>(
-      create: (_) =>
-          sl<CondicionesPacienteCubit>(param1: pacienteId)..cargar(),
+      create: (_) => sl<CondicionesPacienteCubit>(param1: pacienteId)..cargar(),
       child: const _CondicionesView(),
     );
   }
@@ -106,8 +106,7 @@ class _CondicionesView extends StatelessWidget {
                   _Header(),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed:
-                        procesando ? null : () => _onAgregar(context),
+                    onPressed: procesando ? null : () => _onAgregar(context),
                     icon: const Icon(Icons.add_rounded, size: 18),
                     label: const Text('Agregar'),
                     style: TextButton.styleFrom(
@@ -177,7 +176,11 @@ class _Header extends StatelessWidget {
             color: ac.red.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(Icons.health_and_safety_outlined, size: 18, color: ac.red),
+          child: Icon(
+            Icons.health_and_safety_outlined,
+            size: 18,
+            color: ac.red,
+          ),
         ),
         const SizedBox(width: 12),
         Text(
@@ -345,13 +348,11 @@ class _AgregarResult {
   final String? existenteId;
   final Condicion? nueva;
 
-  const _AgregarResult.existente(String id)
-      : existenteId = id,
-        nueva = null;
+  const _AgregarResult.existente(String id) : existenteId = id, nueva = null;
 
   const _AgregarResult.crear(Condicion condicion)
-      : existenteId = null,
-        nueva = condicion;
+    : existenteId = null,
+      nueva = condicion;
 }
 
 class _AgregarCondicionDialog extends StatefulWidget {
@@ -404,108 +405,118 @@ class _AgregarCondicionDialogState extends State<_AgregarCondicionDialog> {
     final ac = context.appColors;
     final query = _busquedaController.text.trim().toLowerCase();
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    // The catalogue list has to give way when the keyboard takes the screen.
+    final alturaCatalogo =
+        ((MediaQuery.sizeOf(context).height -
+                    MediaQuery.viewInsetsOf(context).bottom) *
+                0.32)
+            .clamp(130.0, 220.0);
+
+    return AppDialog(
+      preferredWidth: 380,
       title: Text(_modoCrear ? 'Nueva condición' : 'Agregar condición'),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _busquedaController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: _modoCrear
-                    ? 'Nombre de la condición'
-                    : 'Buscar en el catálogo…',
-                prefixIcon: Icon(
-                  _modoCrear ? Icons.edit_outlined : Icons.search_rounded,
-                  size: 20,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _busquedaController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: _modoCrear
+                  ? 'Nombre de la condición'
+                  : 'Buscar en el catálogo…',
+              prefixIcon: Icon(
+                _modoCrear ? Icons.edit_outlined : Icons.search_rounded,
+                size: 20,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_modoCrear)
+            _FormularioCrear(
+              tipo: _tipo,
+              categoria: _categoria,
+              onTipo: (t) => setState(() => _tipo = t),
+              onCategoria: (c) => setState(() => _categoria = c),
+            )
+          else
+            SizedBox(
+              height: alturaCatalogo,
+              child: FutureBuilder<List<Condicion>>(
+                future: _catalogoFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: ac.primaryBlue,
+                        strokeWidth: 2,
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'No se pudo cargar el catálogo',
+                        style: TextStyle(fontSize: 13, color: ac.red),
+                      ),
+                    );
+                  }
+                  final items = (snapshot.data ?? [])
+                      .where((c) => !widget.yaAsignadas.contains(c.id))
+                      .where(
+                        (c) =>
+                            query.isEmpty ||
+                            c.nombre.toLowerCase().contains(query),
+                      )
+                      .toList();
+
+                  if (items.isEmpty) {
+                    return Center(
+                      child: Text(
+                        query.isEmpty
+                            ? 'No hay condiciones en el catálogo'
+                            : 'Ningún resultado. Usa "Crear nueva".',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: ac.textMuted),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, i) {
+                      final c = items[i];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: _colorTipo(ac, c.tipo),
+                        ),
+                        title: Text(
+                          c.nombre,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        trailing: _TipoPill(c.tipo),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).pop(_AgregarResult.existente(c.id!)),
+                      );
+                    },
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 12),
-            if (_modoCrear)
-              _FormularioCrear(
-                tipo: _tipo,
-                categoria: _categoria,
-                onTipo: (t) => setState(() => _tipo = t),
-                onCategoria: (c) => setState(() => _categoria = c),
-              )
-            else
-              SizedBox(
-                height: 220,
-                child: FutureBuilder<List<Condicion>>(
-                  future: _catalogoFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: CircularProgressIndicator(
-                          color: ac.primaryBlue,
-                          strokeWidth: 2,
-                        ),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'No se pudo cargar el catálogo',
-                          style: TextStyle(fontSize: 13, color: ac.red),
-                        ),
-                      );
-                    }
-                    final items = (snapshot.data ?? [])
-                        .where((c) => !widget.yaAsignadas.contains(c.id))
-                        .where((c) =>
-                            query.isEmpty ||
-                            c.nombre.toLowerCase().contains(query))
-                        .toList();
-
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Text(
-                          query.isEmpty
-                              ? 'No hay condiciones en el catálogo'
-                              : 'Ningún resultado. Usa "Crear nueva".',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: ac.textMuted),
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, i) {
-                        final c = items[i];
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.circle,
-                              size: 8, color: _colorTipo(ac, c.tipo)),
-                          title: Text(
-                            c.nombre,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          trailing: _TipoPill(c.tipo),
-                          onTap: () => Navigator.of(context)
-                              .pop(_AgregarResult.existente(c.id!)),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
       actions: [
         TextButton(
@@ -518,8 +529,7 @@ class _AgregarCondicionDialogState extends State<_AgregarCondicionDialog> {
         ),
         if (_modoCrear)
           FilledButton(
-            onPressed:
-                _busquedaController.text.trim().isEmpty ? null : _crear,
+            onPressed: _busquedaController.text.trim().isEmpty ? null : _crear,
             style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
             child: const Text('Crear y agregar'),
           ),
@@ -562,8 +572,7 @@ class _FormularioCrear extends StatelessWidget {
           initialValue: tipo,
           isExpanded: true,
           decoration: InputDecoration(
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             isDense: true,
           ),
           items: [
@@ -587,8 +596,7 @@ class _FormularioCrear extends StatelessWidget {
           initialValue: categoria,
           isExpanded: true,
           decoration: InputDecoration(
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             isDense: true,
           ),
           items: [

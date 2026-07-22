@@ -210,14 +210,29 @@ class InicioPage extends StatelessWidget {
         ),
         if (secondRow.isNotEmpty) ...[
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.35,
-            children: secondRow,
+          // La proporción sigue a la escala del texto: con un aspecto fijo la
+          // métrica y su etiqueta desbordan la celda al ampliar el tipo.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final escala = MediaQuery.textScalerOf(context).scale(1);
+              final anchoCelda = (constraints.maxWidth - 12) / 2;
+              // 1.35 es la proporción de escritorio; el alto crece con el texto
+              // y con un ancho de celda pequeño, donde la etiqueta parte líneas.
+              final holgura = anchoCelda < 150 ? 1.25 : 1.0;
+              final altoCelda = (anchoCelda / 1.35 * escala * holgura).clamp(
+                anchoCelda / 1.35,
+                anchoCelda * 2.2,
+              );
+              return GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: anchoCelda / altoCelda,
+                children: secondRow,
+              );
+            },
           ),
         ],
       ],
@@ -402,28 +417,32 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
                             }),
                           ),
                         ),
-                        // Centro: total
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '$total',
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: ac.textPrimary,
-                                height: 1,
+                        // Centro: total. El hueco del anillo es fijo, así que
+                        // el número se ajusta a él.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$total',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: ac.textPrimary,
+                                  height: 1,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'citas',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: ac.textSecondary,
-                                fontWeight: FontWeight.w500,
+                              Text(
+                                'citas',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: ac.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -835,10 +854,14 @@ class _ChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 140),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -920,12 +943,15 @@ class _LegendItem extends StatelessWidget {
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: ac.textSecondary,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              color: ac.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

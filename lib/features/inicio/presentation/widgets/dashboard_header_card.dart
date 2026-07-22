@@ -113,16 +113,26 @@ class DashboardHeaderCard extends StatelessWidget {
           Divider(height: 1, color: ac.divider),
           const SizedBox(height: 16),
 
-          Row(
+          // Los indicadores y el enlace comparten fila mientras quepan.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              if (citasHoy != null) ...[
-                _StatusChip(label: '$citasHoy citas hoy', color: ac.indigo),
-              ],
-              if (citasEnEspera != null && citasEnEspera! > 0) ...[
-                const SizedBox(width: 8),
-                _StatusChip(label: '$citasEnEspera en espera', color: ac.amber),
-              ],
-              const Spacer(),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (citasHoy != null)
+                    _StatusChip(label: '$citasHoy citas hoy', color: ac.indigo),
+                  if (citasEnEspera != null && citasEnEspera! > 0)
+                    _StatusChip(
+                      label: '$citasEnEspera en espera',
+                      color: ac.amber,
+                    ),
+                ],
+              ),
               if (onVerCitas != null)
                 GestureDetector(
                   onTap: onVerCitas,

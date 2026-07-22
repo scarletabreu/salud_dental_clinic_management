@@ -49,21 +49,24 @@ class DashboardQuickActionCard extends StatelessWidget {
                 ),
               ),
               if (badge != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ac.chipBg,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    badge!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: ac.textMuted,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ac.chipBg,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      badge!,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: ac.textMuted,
+                      ),
                     ),
                   ),
                 ),

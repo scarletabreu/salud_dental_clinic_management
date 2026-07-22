@@ -22,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/presentation
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
+import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
@@ -219,51 +220,28 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
 
-    _visibleDestinations = _allDestinations.where((destination) {
-      if (roles.isEmpty) return false;
-      switch (destination.label) {
-        case 'Configuración':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Perfiles':
-          return roles.contains(RolUsuario.admin);
-        case 'Equipos':
-          return roles.contains(RolUsuario.admin);
-        case 'Consultas':
-        case 'Medicinas':
-        case 'Tratamientos':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor);
-        case 'Pacientes':
-        case 'Mis Citas del Día':
-        case 'Cuentas por Cobrar':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Caja':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Inicio':
-          return true;
-        default:
-          return false;
-      }
-    }).toList();
+    _visibleDestinations = _allDestinations
+        .where(
+          (destination) =>
+              ShellDestinationAccess.allows(destination.label, roles),
+        )
+        .toList();
 
     if (_selectedIndex >= _visibleDestinations.length) {
       _selectedIndex = 0;
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final layout = _ShellLayout.forWidth(width);
+    final mediaQuery = MediaQuery.of(context);
+    final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
-    final content = IndexedStack(
-      index: _selectedIndex,
-      children: [
-        for (final d in _visibleDestinations) Builder(builder: d.builder),
-      ],
+    // Only mount the active module. Instantiating every module in an
+    // IndexedStack makes an administrator's shell eagerly fetch and retain
+    // eleven feature trees.
+    final selectedDestination = _visibleDestinations[_selectedIndex];
+    final content = KeyedSubtree(
+      key: ValueKey(selectedDestination.label),
+      child: Builder(builder: selectedDestination.builder),
     );
 
     return Scaffold(
@@ -272,7 +250,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         sectionTitle: _visibleDestinations.isNotEmpty
             ? _visibleDestinations[_selectedIndex].label
             : '',
-        compact: layout == _ShellLayout.mobile,
+        compact:
+            layout.usesBottomNavigation || mediaQuery.viewInsets.bottom > 0,
       ),
       body: Column(
         children: [
@@ -280,14 +259,17 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           Expanded(
             child: SafeArea(
               top: false,
-              child: layout == _ShellLayout.mobile
+              child: layout.usesBottomNavigation
                   ? content
                   : Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      padding: ShellLayoutResolution.contentPadding(
+                        mediaQuery,
+                        layout,
+                      ),
                       child: Row(
                         children: [
                           _SideRail(
-                            extended: layout == _ShellLayout.desktop,
+                            extended: layout.usesExtendedRail,
                             destinations: _visibleDestinations,
                             selectedIndex: _selectedIndex,
                             onDestinationSelected: _onDestinationSelected,
@@ -306,24 +288,120 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           ),
         ],
       ),
-      bottomNavigationBar: layout == _ShellLayout.mobile
-          ? NavigationBar(
+      bottomNavigationBar: layout.usesBottomNavigation
+          ? ShellMobileNavigation(
+              destinations: _visibleDestinations,
               selectedIndex: _selectedIndex,
               onDestinationSelected: _onDestinationSelected,
-              destinations: [
-                for (final d in _visibleDestinations)
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: _shortLabel(d.label),
-                  ),
-              ],
             )
           : null,
     );
   }
+}
 
-  String _shortLabel(String label) {
+class ShellMobileNavigation extends StatelessWidget {
+  const ShellMobileNavigation({
+    super.key,
+    required this.destinations,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  static const _primaryLimit = 3;
+  final List<ShellDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = destinations.take(_primaryLimit).toList();
+    final secondary = destinations.skip(_primaryLimit).toList();
+    final selectedIsSecondary = selectedIndex >= primary.length;
+    final hasMore = secondary.isNotEmpty;
+
+    return SafeArea(
+      top: false,
+      child: NavigationBar(
+        selectedIndex: selectedIsSecondary && hasMore
+            ? primary.length
+            : selectedIndex,
+        onDestinationSelected: (index) {
+          if (hasMore && index == primary.length) {
+            _showMoreDestinations(context, primary.length, secondary);
+          } else {
+            onDestinationSelected(index);
+          }
+        },
+        destinations: [
+          for (final destination in primary)
+            NavigationDestination(
+              icon: Icon(destination.icon),
+              selectedIcon: Icon(destination.selectedIcon),
+              label: _shortLabel(destination.label),
+            ),
+          if (hasMore)
+            const NavigationDestination(
+              icon: Icon(Icons.more_horiz_rounded),
+              selectedIcon: Icon(Icons.more_horiz_rounded),
+              label: 'Más',
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoreDestinations(
+    BuildContext context,
+    int offset,
+    List<ShellDestination> secondary,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('Más módulos', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (var index = 0; index < secondary.length; index++)
+              ListTile(
+                leading: Icon(
+                  selectedIndex == index + offset
+                      ? secondary[index].selectedIcon
+                      : secondary[index].icon,
+                ),
+                title: Text(secondary[index].label),
+                selected: selectedIndex == index + offset,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  onDestinationSelected(index + offset);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _shortLabel(String label) {
     switch (label) {
       case 'Mis Citas del Día':
         return 'Citas';
@@ -334,18 +412,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       default:
         return label;
     }
-  }
-}
-
-enum _ShellLayout {
-  desktop,
-  tablet,
-  mobile;
-
-  static _ShellLayout forWidth(double width) {
-    if (width >= 1024) return _ShellLayout.desktop;
-    if (width >= 600) return _ShellLayout.tablet;
-    return _ShellLayout.mobile;
   }
 }
 

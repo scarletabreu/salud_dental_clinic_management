@@ -15,14 +15,19 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(72);
+  Size get preferredSize => Size.fromHeight(compact ? 64 : 72);
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 8 : 16,
+        compact ? 8 : 12,
+        compact ? 8 : 16,
+        0,
+      ),
       child: Material(
         color: ac.cardBg,
         borderRadius: BorderRadius.circular(20),
@@ -34,7 +39,10 @@ class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
               width: 0.5,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 16,
+            vertical: compact ? 8 : 10,
+          ),
           child: Row(
             children: [
               Expanded(

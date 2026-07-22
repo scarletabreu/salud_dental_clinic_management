@@ -103,20 +103,29 @@ class _CondicionesView extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _Header(),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: procesando ? null : () => _onAgregar(context),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Agregar'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: ac.primaryBlue,
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                  Expanded(child: _Header()),
+                  // Con texto ampliado la etiqueta "Agregar" se come el título:
+                  // el botón se queda solo con su icono.
+                  if (MediaQuery.textScalerOf(context).scale(1) > 1.3)
+                    IconButton(
+                      onPressed: procesando ? null : () => _onAgregar(context),
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      color: ac.primaryBlue,
+                      tooltip: 'Agregar condición',
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: procesando ? null : () => _onAgregar(context),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Agregar'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: ac.primaryBlue,
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -183,12 +192,14 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Text(
-          'Condiciones Médicas',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: ac.textPrimary,
+        Expanded(
+          child: Text(
+            'Condiciones Médicas',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: ac.textPrimary,
+            ),
           ),
         ),
       ],
@@ -234,7 +245,7 @@ class _CondicionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            _TipoPill(condicion.tipo),
+            Flexible(child: _TipoPill(condicion.tipo)),
             const SizedBox(width: 4),
             IconButton(
               onPressed: deshabilitado ? null : onQuitar,

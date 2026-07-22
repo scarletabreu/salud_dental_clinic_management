@@ -247,14 +247,42 @@ class _HeaderEstado extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Consulta #$consultaCorta',
-                  style: TextStyle(
-                    color: ac.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
+                // El estado acompaña al título mientras haya ancho; con
+                // pantallas estrechas o texto ampliado baja de línea en vez de
+                // empujar el título fuera de la tarjeta.
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 6,
+                  children: [
+                    Text(
+                      'Consulta #$consultaCorta',
+                      style: TextStyle(
+                        color: ac.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -262,21 +290,6 @@ class _HeaderEstado extends StatelessWidget {
                   style: TextStyle(color: ac.textMuted, fontSize: 13),
                 ),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
             ),
           ),
         ],
@@ -376,15 +389,17 @@ class _OpcionModalidad extends StatelessWidget {
               children: [
                 Icon(icono, size: 20, color: color),
                 const SizedBox(width: 10),
-                Text(
-                  metodo.name,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: activa ? ac.textPrimary : ac.textSecondary,
+                Expanded(
+                  child: Text(
+                    metodo.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: activa ? ac.textPrimary : ac.textSecondary,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 if (activa)
                   Icon(
                     Icons.check_circle_rounded,
@@ -447,41 +462,55 @@ class _FilaItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final detalle = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.descripcion.isEmpty ? 'Tratamiento' : item.descripcion,
+          style: TextStyle(
+            color: ac.textPrimary,
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${item.cantidad} × ${formatMoneda(item.precioUnitario)}',
+          style: TextStyle(color: ac.textMuted, fontSize: 12.5),
+        ),
+      ],
+    );
+    final total = Text(
+      formatMoneda(item.precioTotal),
+      style: TextStyle(
+        color: ac.textPrimary,
+        fontSize: 14.5,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+
     return Padding(
       padding: EdgeInsets.only(bottom: esUltima ? 0 : 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // El importe nunca se recorta: si no cabe junto a la descripción,
+          // pasa a su propia línea.
+          final anchoTotal = _anchoTexto(context, total);
+          if (anchoTotal > constraints.maxWidth * 0.5) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.descripcion.isEmpty ? 'Tratamiento' : item.descripcion,
-                  style: TextStyle(
-                    color: ac.textPrimary,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${item.cantidad} × ${formatMoneda(item.precioUnitario)}',
-                  style: TextStyle(color: ac.textMuted, fontSize: 12.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            formatMoneda(item.precioTotal),
-            style: TextStyle(
-              color: ac.textPrimary,
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+              children: [detalle, const SizedBox(height: 4), total],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: detalle),
+              const SizedBox(width: 12),
+              total,
+            ],
+          );
+        },
       ),
     );
   }
@@ -543,27 +572,43 @@ class _FilaTotal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: destacado ? ac.textPrimary : ac.textSecondary,
-            fontSize: destacado ? 15 : 14,
-            fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-        Text(
-          valor,
-          style: TextStyle(
-            color: color,
-            fontSize: destacado ? 18 : 14.5,
-            fontWeight: destacado ? FontWeight.w800 : FontWeight.w700,
-            letterSpacing: destacado ? -0.4 : 0,
-          ),
-        ),
-      ],
+    final etiqueta = Text(
+      label,
+      style: TextStyle(
+        color: destacado ? ac.textPrimary : ac.textSecondary,
+        fontSize: destacado ? 15 : 14,
+        fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
+    final importe = Text(
+      valor,
+      style: TextStyle(
+        color: color,
+        fontSize: destacado ? 18 : 14.5,
+        fontWeight: destacado ? FontWeight.w800 : FontWeight.w700,
+        letterSpacing: destacado ? -0.4 : 0,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // El importe no se recorta nunca; si compite con la etiqueta, la
+        // etiqueta pasa a su propia línea.
+        if (_anchoTexto(context, importe) > constraints.maxWidth * 0.55) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [etiqueta, const SizedBox(height: 2), importe],
+          );
+        }
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(child: etiqueta),
+            const SizedBox(width: 12),
+            importe,
+          ],
+        );
+      },
     );
   }
 }
@@ -1406,12 +1451,14 @@ class _TituloSeccion extends StatelessWidget {
           child: Icon(icono, size: 17, color: color),
         ),
         const SizedBox(width: 10),
-        Text(
-          titulo,
-          style: TextStyle(
-            color: ac.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
+        Expanded(
+          child: Text(
+            titulo,
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -1434,4 +1481,14 @@ class _TituloSeccion extends StatelessWidget {
     ),
     EstadoCuenta.abierta => (ac.red, 'Sin pago', Icons.receipt_long_outlined),
   };
+}
+
+/// Mide un [Text] sin renderizarlo, para decidir si cabe junto a otro widget.
+double _anchoTexto(BuildContext context, Text texto) {
+  final painter = TextPainter(
+    text: TextSpan(text: texto.data, style: texto.style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  return painter.width;
 }

@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -322,29 +323,43 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Pacientes',
-                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 13,
-                          color: ac.textMuted,
-                        ),
-                        Flexible(
-                          child: Text(
-                            _isEditing ? 'Editar paciente' : 'Nuevo paciente',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11, color: ac.textMuted),
+                    // La miga de pan repite el título que va justo debajo:
+                    // en móvil se omite para no robarle ancho ni alto.
+                    if (!context.appLayout.isCompact) ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Pacientes',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: ac.primaryBlue,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 13,
+                            color: ac.textMuted,
+                          ),
+                          Flexible(
+                            child: Text(
+                              _isEditing ? 'Editar paciente' : 'Nuevo paciente',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: ac.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       _isEditing ? 'Editar paciente' : 'Registro de paciente',
+                      // La barra tiene alto fijo: el título se recorta antes
+                      // que partirse en varias líneas y desbordarla.
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -354,26 +369,30 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ],
                 ),
               ),
-              OutlinedButton(
-                onPressed: isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
+              // En pantallas estrechas la flecha de la cabecera ya cancela; un
+              // segundo botón solo empujaría "Guardar" fuera de la barra.
+              if (!context.appLayout.isCompact) ...[
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  child: const Text('Cancelar'),
                 ),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
@@ -929,13 +948,15 @@ class _FormField extends StatelessWidget {
           children: [
             Icon(icon, size: 13, color: ac.primaryBlue),
             const SizedBox(width: 5),
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: ac.textMuted,
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: ac.textMuted,
+                ),
               ),
             ),
           ],

@@ -144,15 +144,29 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
           CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _buildContactoCard(p)),
-                const SizedBox(width: 16),
-                Expanded(child: _buildInfoClinicaCard(p.record)),
-              ],
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final contacto = _buildContactoCard(p);
+              final clinica = _buildInfoClinicaCard(p.record);
+              // Dos tarjetas de datos densos necesitan ~300 px cada una; por
+              // debajo de eso se apilan en lugar de comprimirse.
+              if (constraints.maxWidth < 620) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [contacto, const SizedBox(height: 16), clinica],
+                );
+              }
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: contacto),
+                    const SizedBox(width: 16),
+                    Expanded(child: clinica),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           OdontogramArchWidget(consultas: sorted),
@@ -177,19 +191,22 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Las etiquetas del paciente y los botones de acción comparten fila
+          // mientras quepan; si no, las acciones bajan enteras.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [_TipoPill(p.tipoPaciente), _GenderChip(p.genero)],
-                ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [_TipoPill(p.tipoPaciente), _GenderChip(p.genero)],
               ),
-              const SizedBox(width: 12),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
                     onPressed: () {
@@ -346,12 +363,14 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Text(
-                            'Alertas Médicas',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: ac.red,
+                          Expanded(
+                            child: Text(
+                              'Alertas Médicas',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: ac.red,
+                              ),
                             ),
                           ),
                         ],
@@ -421,12 +440,16 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                                         color: ac.red.withValues(alpha: 0.70),
                                       ),
                                       const SizedBox(width: 5),
-                                      Text(
-                                        c,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: ac.red.withValues(alpha: 0.80),
+                                      Flexible(
+                                        child: Text(
+                                          c,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: ac.red.withValues(
+                                              alpha: 0.80,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -482,11 +505,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         children: [
           Row(
             children: [
-              const _SectionHeader(
-                icon: Icons.contacts_outlined,
-                title: 'Contactos',
+              const Expanded(
+                child: _SectionHeader(
+                  icon: Icons.contacts_outlined,
+                  title: 'Contactos',
+                ),
               ),
-              const Spacer(),
               _CountChip(contactos.length),
             ],
           ),
@@ -533,12 +557,14 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Text(
-                          'Contacto ${index + 1}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: ac.textPrimary,
+                        Expanded(
+                          child: Text(
+                            'Contacto ${index + 1}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: ac.textPrimary,
+                            ),
                           ),
                         ),
                       ],
@@ -659,11 +685,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         children: [
           Row(
             children: [
-              const _SectionHeader(
-                icon: Icons.history_edu_outlined,
-                title: 'Historial de Consultas',
+              const Expanded(
+                child: _SectionHeader(
+                  icon: Icons.history_edu_outlined,
+                  title: 'Historial de Consultas',
+                ),
               ),
-              const Spacer(),
               if (sorted.isNotEmpty) _CountChip(sorted.length),
             ],
           ),
@@ -866,12 +893,14 @@ class _SectionHeader extends StatelessWidget {
           child: Icon(icon, size: 18, color: ac.teal),
         ),
         const SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: ac.textPrimary,
+        Flexible(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: ac.textPrimary,
+            ),
           ),
         ),
       ],
@@ -1013,12 +1042,15 @@ class _MetaItem extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: ac.textMuted),
         const SizedBox(width: 5),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: ac.textSecondary,
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: ac.textSecondary,
+            ),
           ),
         ),
       ],

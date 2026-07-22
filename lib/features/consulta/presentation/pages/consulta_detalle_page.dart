@@ -215,9 +215,7 @@ class ConsultaDetallePage extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: _fila(context, 'Doctor', nombreDoctor),
-              ),
+              Expanded(child: _fila(context, 'Doctor', nombreDoctor)),
               Expanded(
                 child: _fila(
                   context,
@@ -229,7 +227,11 @@ class ConsultaDetallePage extends StatelessWidget {
           ),
           if ((consulta.motivoConsulta ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 14),
-            _fila(context, 'Motivo de consulta', consulta.motivoConsulta!.trim()),
+            _fila(
+              context,
+              'Motivo de consulta',
+              consulta.motivoConsulta!.trim(),
+            ),
           ],
           const SizedBox(height: 16),
           Wrap(
@@ -295,7 +297,9 @@ class ConsultaDetallePage extends StatelessWidget {
       tiles.add(_tileSigno(context, 'Temperatura', '${sv.temperatura}', '°C'));
     }
     if (sv.saturacionO2 != null) {
-      tiles.add(_tileSigno(context, 'Saturación O₂', '${sv.saturacionO2}', '%'));
+      tiles.add(
+        _tileSigno(context, 'Saturación O₂', '${sv.saturacionO2}', '%'),
+      );
     }
 
     return Wrap(spacing: 10, runSpacing: 10, children: tiles);
@@ -332,18 +336,24 @@ class ConsultaDetallePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                valor,
-                style: TextStyle(
-                  color: ac.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  valor,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
-                unidad,
-                style: TextStyle(color: ac.textMuted, fontSize: 12),
+              Flexible(
+                child: Text(
+                  unidad,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: ac.textMuted, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -479,7 +489,11 @@ class ConsultaDetallePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
-          child: Icon(_iconoDocumento(doc.tipoDocumento.name), color: ac.indigo, size: 19),
+          child: Icon(
+            _iconoDocumento(doc.tipoDocumento.name),
+            color: ac.indigo,
+            size: 19,
+          ),
         ),
         title: Text(
           doc.descripcion,
@@ -498,9 +512,9 @@ class ConsultaDetallePage extends StatelessWidget {
           icon: Icon(Icons.link_rounded, size: 18, color: ac.primaryBlue),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: doc.urlArchivo));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Enlace copiado.')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Enlace copiado.')));
           },
         ),
       ),
@@ -710,12 +724,14 @@ class ConsultaDetallePage extends StatelessWidget {
           child: Icon(icono, size: 17, color: colorIcono),
         ),
         const SizedBox(width: 10),
-        Text(
-          titulo,
-          style: TextStyle(
-            color: ac.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
+        Expanded(
+          child: Text(
+            titulo,
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -789,12 +805,15 @@ class ConsultaDetallePage extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: fg),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: fg,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fg,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

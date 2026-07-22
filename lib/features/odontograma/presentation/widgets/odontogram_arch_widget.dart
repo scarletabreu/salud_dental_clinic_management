@@ -33,10 +33,7 @@ Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
       }
     }
   }
-  return Odontograma(
-    consultaId: '',
-    dientes: worst.values.toList(),
-  );
+  return Odontograma(consultaId: '', dientes: worst.values.toList());
 }
 
 // ─────────────────────────────────────────────
@@ -59,7 +56,20 @@ class _NavRow extends StatelessWidget {
   });
 
   String _fmt(DateTime d) {
-    const m = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const m = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
     return '${d.day} ${m[d.month - 1]} ${d.year}';
   }
 
@@ -72,14 +82,22 @@ class _NavRow extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           '${current + 1} / $total',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ac.textPrimary),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: ac.textPrimary,
+          ),
         ),
         const SizedBox(width: 8),
         _NavBtn(icon: Icons.chevron_right_rounded, onTap: onNext),
         const SizedBox(width: 12),
         Text(
           _fmt(fecha),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: ac.textMuted),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: ac.textMuted,
+          ),
         ),
       ],
     );
@@ -143,13 +161,20 @@ class _Legend extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.20),
                 borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: color.withValues(alpha: 0.60), width: 1.2),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.60),
+                  width: 1.2,
+                ),
               ),
             ),
             const SizedBox(width: 5),
             Text(
               item.$2,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: ac.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: ac.textMuted,
+              ),
             ),
           ],
         );
@@ -166,7 +191,11 @@ class _TogglePill extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
-  const _TogglePill({required this.label, required this.active, required this.onTap});
+  const _TogglePill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -223,8 +252,8 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
     final Odontograma? currentOdo = withOdo.isEmpty
         ? null
         : _aggregate
-            ? _buildAggregateOdontograma(withOdo)
-            : withOdo[clampedIdx].odontograma;
+        ? _buildAggregateOdontograma(withOdo)
+        : withOdo[clampedIdx].odontograma;
 
     return Container(
       width: double.infinity,
@@ -246,14 +275,23 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
                   color: ac.teal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.medical_services_outlined, size: 18, color: ac.teal),
+                child: Icon(
+                  Icons.medical_services_outlined,
+                  size: 18,
+                  color: ac.teal,
+                ),
               ),
               const SizedBox(width: 12),
-              Text(
-                'Odontograma',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ac.textPrimary),
+              Expanded(
+                child: Text(
+                  'Odontograma',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: ac.textPrimary,
+                  ),
+                ),
               ),
-              const Spacer(),
               if (withOdo.length > 1)
                 _TogglePill(
                   label: 'Vista General',
@@ -272,13 +310,19 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
               onPrev: clampedIdx < withOdo.length - 1
                   ? () => setState(() => _idx = clampedIdx + 1)
                   : null,
-              onNext: clampedIdx > 0 ? () => setState(() => _idx = clampedIdx - 1) : null,
+              onNext: clampedIdx > 0
+                  ? () => setState(() => _idx = clampedIdx - 1)
+                  : null,
             ),
           ] else if (_aggregate && withOdo.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               '${withOdo.length} consulta${withOdo.length > 1 ? 's' : ''} consolidada${withOdo.length > 1 ? 's' : ''}',
-              style: TextStyle(fontSize: 11, color: ac.textMuted, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 11,
+                color: ac.textMuted,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
 
@@ -302,10 +346,7 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             const _Legend(),
             const SizedBox(height: 4),
 
-            OdontogramWidget(
-              odontograma: currentOdo,
-              editMode: false,
-            ),
+            OdontogramWidget(odontograma: currentOdo, editMode: false),
           ],
         ],
       ),

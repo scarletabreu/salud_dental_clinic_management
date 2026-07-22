@@ -505,12 +505,14 @@ class _Seccion extends StatelessWidget {
                 child: Icon(icono, size: 17, color: colorIcono),
               ),
               const SizedBox(width: 10),
-              Text(
-                titulo,
-                style: TextStyle(
-                  color: ac.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

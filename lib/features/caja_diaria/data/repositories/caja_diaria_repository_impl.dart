@@ -3,6 +3,8 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entit
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/models/caja_diaria_model.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/data/models/movimiento_caja_model.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 
 class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
   final CajaDiariaDatasource remoteDataSource;
@@ -67,5 +69,12 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
       () => remoteDataSource.getBalanceActual(),
       context: 'calcular el balance esperado',
     );
+  }
+
+  @override
+  Stream<List<MovimientoCaja>> watchMovimientos(String cajaDiariaId) {
+    return remoteDataSource
+        .watchMovimientos(cajaDiariaId)
+        .map((data) => data.map(MovimientoCajaModel.fromJson).toList());
   }
 }

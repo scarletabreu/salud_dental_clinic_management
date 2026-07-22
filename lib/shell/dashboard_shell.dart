@@ -29,6 +29,8 @@ import 'package:salud_dental_clinic_management/features/equipo/presentation/cubi
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
 
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
@@ -161,6 +163,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      icon: Icons.point_of_sale_outlined,
+      selectedIcon: Icons.point_of_sale_rounded,
+      label: 'Caja',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<CajaDiariaCubit>(),
+        child: const CajaDiariaPage(),
+      ),
+    ),
+    ShellDestination(
       icon: Icons.build_outlined,
       selectedIcon: Icons.build_rounded,
       label: 'Equipos',
@@ -227,6 +238,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         case 'Pacientes':
         case 'Mis Citas del Día':
         case 'Cuentas por Cobrar':
+        case 'Caja':
           return roles.contains(RolUsuario.admin) ||
               roles.contains(RolUsuario.doctor) ||
               roles.contains(RolUsuario.asistente);

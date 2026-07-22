@@ -14,22 +14,31 @@ class CajaDiariaModel extends CajaDiaria {
   factory CajaDiariaModel.fromJson(Map<String, dynamic> json) {
     return CajaDiariaModel(
       id: json['id'] as String?,
-      fecha: DateTime.parse(json['fecha'] as String),
-      montoApertura: (json['montoApertura'] as num).toDouble(),
-      montoCierre: (json['montoCierre'] as num).toDouble(),
-      montoEsperado: (json['montoEsperado'] as num).toDouble(),
-      montoReal: (json['montoReal'] as num).toDouble(),
+      fecha: DateTime.parse(json['fecha'] as String).toLocal(),
+      montoApertura: _monto(json, 'monto_apertura', 'montoApertura'),
+      montoCierre: _monto(json, 'monto_cierre', 'montoCierre'),
+      montoEsperado: _monto(json, 'monto_esperado', 'montoEsperado'),
+      montoReal: _monto(json, 'monto_real', 'montoReal'),
       cerrada: json['cerrada'] as bool? ?? false,
     );
+  }
+
+  static double _monto(
+    Map<String, dynamic> json,
+    String snakeCaseKey,
+    String camelCaseKey,
+  ) {
+    final valor = json[snakeCaseKey] ?? json[camelCaseKey];
+    return valor is num ? valor.toDouble() : 0;
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'fecha': fecha.toIso8601String(),
-      'montoApertura': montoApertura,
-      'montoCierre': montoCierre,
-      'montoEsperado': montoEsperado,
-      'montoReal': montoReal,
+      'monto_apertura': montoApertura,
+      'monto_cierre': montoCierre,
+      'monto_esperado': montoEsperado,
+      'monto_real': montoReal,
       'cerrada': cerrada,
     };
 

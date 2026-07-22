@@ -13,6 +13,7 @@ import '../cubit/cita_cubit_state.dart';
 import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 const _kMonths = [
   'Enero',
@@ -251,37 +252,44 @@ class _ControlBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          // El selector de vista y los contadores del día no caben en una
+          // sola línea por debajo de tablet: se reparten en varias.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 8,
             children: [
               _ViewModePill(
                 selected: state.viewMode,
                 onChanged: cubit.changeViewMode,
               ),
-              const Spacer(),
               if (state.viewMode == CalendarioViewMode.diaria &&
-                  citasHoy.isNotEmpty) ...[
-                _SummaryChip(
-                  icon: Icons.calendar_today_rounded,
-                  label: '${citasHoy.length} citas',
-                  color: ac.primaryBlue,
+                  citasHoy.isNotEmpty)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _SummaryChip(
+                      icon: Icons.calendar_today_rounded,
+                      label: '${citasHoy.length} citas',
+                      color: ac.primaryBlue,
+                    ),
+                    if (urgentes > 0)
+                      _SummaryChip(
+                        icon: Icons.priority_high_rounded,
+                        label: '$urgentes urgente${urgentes > 1 ? 's' : ''}',
+                        color: ac.red,
+                      ),
+                    if (pendientes > 0)
+                      _SummaryChip(
+                        icon: Icons.hourglass_empty_rounded,
+                        label:
+                            '$pendientes pendiente${pendientes > 1 ? 's' : ''}',
+                        color: ac.amber,
+                      ),
+                  ],
                 ),
-                if (urgentes > 0) ...[
-                  const SizedBox(width: 6),
-                  _SummaryChip(
-                    icon: Icons.priority_high_rounded,
-                    label: '$urgentes urgente${urgentes > 1 ? 's' : ''}',
-                    color: ac.red,
-                  ),
-                ],
-                if (pendientes > 0) ...[
-                  const SizedBox(width: 6),
-                  _SummaryChip(
-                    icon: Icons.hourglass_empty_rounded,
-                    label: '$pendientes pendiente${pendientes > 1 ? 's' : ''}',
-                    color: ac.amber,
-                  ),
-                ],
-              ],
             ],
           ),
         ],
@@ -1076,51 +1084,67 @@ class _CitaCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            runSpacing: 4,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  cita.persona.fullName,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: ac.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                cita.persona.fullName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: ac.textPrimary,
                                 ),
                               ),
-                              if (cita.esEmergencia) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: ac.red.withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(100),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.priority_high_rounded,
-                                        size: 10,
-                                        color: ac.red,
+                              if (cita.esEmergencia)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  // Insignia decorativa de 10 px: su sentido lo
+                                  // llevan también el icono y el color de la
+                                  // ficha, así que su texto no crece sin fin.
+                                  child: MediaQuery.withClampedTextScaling(
+                                    maxScaleFactor: 1.4,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
                                       ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        'Urgente',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: ac.red,
+                                      decoration: BoxDecoration(
+                                        color: ac.red.withValues(alpha: 0.10),
+                                        borderRadius: BorderRadius.circular(
+                                          100,
                                         ),
                                       ),
-                                    ],
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.priority_high_rounded,
+                                            size: 10,
+                                            color: ac.red,
+                                          ),
+                                          if (MediaQuery.textScalerOf(
+                                                context,
+                                              ).scale(1) <=
+                                              1.3) ...[
+                                            const SizedBox(width: 2),
+                                            Flexible(
+                                              child: Text(
+                                                'Urgente',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: ac.red,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ],
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -1147,14 +1171,30 @@ class _CitaCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _EstadoDropdown(
-                      cita: cita,
-                      onCancelar: () =>
-                          _mostrarDialogoCancelacion(context, cita.id!),
-                    ),
+                    // En móvil el selector de estado no cabe junto al nombre:
+                    // baja a su propia línea con el resto de acciones.
+                    if (!context.appLayout.isCompact) ...[
+                      const SizedBox(width: 8),
+                      _EstadoDropdown(
+                        cita: cita,
+                        onCancelar: () =>
+                            _mostrarDialogoCancelacion(context, cita.id!),
+                      ),
+                    ],
                   ],
                 ),
+                if (context.appLayout.isCompact)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: _EstadoDropdown(
+                        cita: cita,
+                        onCancelar: () =>
+                            _mostrarDialogoCancelacion(context, cita.id!),
+                      ),
+                    ),
+                  ),
                 _botonEfectuar(context),
               ],
             ),
@@ -1399,42 +1439,48 @@ class _ViewModePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    return Container(
-      height: 34,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: ac.chipBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: _options.map((opt) {
-          final (mode, label) = opt;
-          final isSelected = mode == selected;
-          return GestureDetector(
-            onTap: () => onChanged(mode),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: isSelected ? ac.cardBg : Colors.transparent,
-                borderRadius: BorderRadius.circular(7),
-                boxShadow: isSelected ? [ac.cardShadow] : null,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? ac.textPrimary : ac.textMuted,
-                  height: 1,
+    final escala = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    // Las tres vistas siguen siendo alcanzables con texto ampliado: el control
+    // se desplaza en lugar de recortar opciones.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        height: 34 * escala,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: ac.chipBg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: _options.map((opt) {
+            final (mode, label) = opt;
+            final isSelected = mode == selected;
+            return GestureDetector(
+              onTap: () => onChanged(mode),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: isSelected ? ac.cardBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                  boxShadow: isSelected ? [ac.cardShadow] : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? ac.textPrimary : ac.textMuted,
+                    height: 1,
+                  ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

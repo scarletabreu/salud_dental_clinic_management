@@ -235,6 +235,16 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
+    // The session is authenticated before the profile that carries the roles
+    // arrives, and no role grants access to any destination. Show a spinner for
+    // that frame instead of indexing an empty list.
+    if (_visibleDestinations.isEmpty) {
+      return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     // Only mount the active module. Instantiating every module in an
     // IndexedStack makes an administrator's shell eagerly fetch and retain
     // eleven feature trees.
@@ -451,7 +461,9 @@ class _SideRail extends StatelessWidget {
           const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              // Bottom room so the last destination does not end flush against
+              // the user card when the list is taller than the rail.
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Column(
                 children: [
                   for (int i = 0; i < destinations.length; i++)
@@ -465,6 +477,8 @@ class _SideRail extends StatelessWidget {
               ),
             ),
           ),
+          Divider(height: 1, thickness: 0.5, color: ac.railDivider),
+          const SizedBox(height: 8),
           RailUserCard(extended: extended),
         ],
       ),

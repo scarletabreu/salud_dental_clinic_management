@@ -101,56 +101,60 @@ class _TratamientosViewState extends State<_TratamientosView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          // A Row would clip the counter badge once the title and the action
+          // button no longer fit; wrapping drops the button to its own line.
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Tratamientos',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.6,
-                        color: ac.textPrimary,
-                      ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Tratamientos',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.6,
+                      color: ac.textPrimary,
                     ),
-                    if (total > 0) ...[
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ac.primaryBlue.withOpacity(0.07),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '$total',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: ac.primaryBlue,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.medical_services_outlined,
-                              size: 13,
+                  ),
+                  if (total > 0) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ac.primaryBlue.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$total',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: ac.primaryBlue,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.medical_services_outlined,
+                            size: 13,
+                            color: ac.primaryBlue,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
               FilledButton.icon(
                 onPressed: () => _abrirFormulario(),

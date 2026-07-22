@@ -103,19 +103,34 @@ class MisCitasDelDiaPage extends StatelessWidget {
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
+          Future<void> abrirNuevaCita() async {
+            await NuevaCitaDialog.show(
+              context,
+              personaRepository: sl<PersonaRepository>(),
+              doctorRepository: sl<DoctorRepository>(),
+            );
+            if (context.mounted) context.read<CitaCubit>().load();
+          }
+
+          // The extended label eats roughly 40% of a 320 px screen and covers
+          // the last calendar row, so narrow phones get the compact button.
+          if (MediaQuery.sizeOf(context).width < 360) {
+            return FloatingActionButton(
+              heroTag: 'fab_nueva_cita_unique_tag',
+              backgroundColor: context.appColors.primaryBlue,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              tooltip: 'Nueva Cita',
+              onPressed: abrirNuevaCita,
+              child: const Icon(Icons.add_rounded),
+            );
+          }
           return FloatingActionButton.extended(
             heroTag: 'fab_nueva_cita_unique_tag',
             backgroundColor: context.appColors.primaryBlue,
             foregroundColor: Colors.white,
             elevation: 2,
-            onPressed: () async {
-              await NuevaCitaDialog.show(
-                context,
-                personaRepository: sl<PersonaRepository>(),
-                doctorRepository: sl<DoctorRepository>(),
-              );
-              context.read<CitaCubit>().load();
-            },
+            onPressed: abrirNuevaCita,
             icon: const Icon(Icons.add_rounded, size: 20),
             label: const Text(
               'Nueva Cita',

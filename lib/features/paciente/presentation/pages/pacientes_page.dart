@@ -496,61 +496,64 @@ class _PacientesPageState extends State<PacientesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          // A Row would clip the counter badge once the title and the action
+          // button no longer fit; wrapping drops the button to its own line.
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Pacientes',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                            letterSpacing: -0.6,
-                          ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Pacientes',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      letterSpacing: -0.6,
                     ),
-                    if (state is PacienteLoaded) ...[
-                      const SizedBox(width: 14),
-                      Builder(
-                        builder: (context) {
-                          final ac = context.appColors;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ac.primaryBlue.withValues(alpha: 0.07),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${state.todos.length}',
-                                  style: Theme.of(context).textTheme.labelMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: ac.primaryBlue,
-                                      ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.people_alt_rounded,
-                                  color: ac.primaryBlue,
-                                  size: 13,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                  ),
+                  if (state is PacienteLoaded) ...[
+                    const SizedBox(width: 14),
+                    Builder(
+                      builder: (context) {
+                        final ac = context.appColors;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ac.primaryBlue.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${state.todos.length}',
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: ac.primaryBlue,
+                                    ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.people_alt_rounded,
+                                color: ac.primaryBlue,
+                                size: 13,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
-                ),
+                ],
               ),
               FilledButton.icon(
                 onPressed: () => _openForm(),

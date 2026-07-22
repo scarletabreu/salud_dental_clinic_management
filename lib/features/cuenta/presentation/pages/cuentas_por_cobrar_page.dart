@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/esta
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_state.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/widgets/cuenta_card.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class CuentasPorCobrarPage extends StatefulWidget {
   const CuentasPorCobrarPage({super.key});
@@ -131,7 +132,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
     final currFmt = NumberFormat.currency(symbol: 'RD\$', decimalDigits: 2);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+      padding: context.pageInsets(top: 24, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -239,7 +240,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+      padding: context.pageInsets(top: 8, bottom: 8),
       child: Row(
         children: filtros.map((f) {
           final isSelected = state.filtroEstado == f.valor;
@@ -278,7 +279,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
     if (state is CuentasPorCobrarError) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: context.pageInsets(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -346,7 +347,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
             ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+              padding: context.pageInsets(top: 8, bottom: 24),
               itemCount: state.filtradas.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

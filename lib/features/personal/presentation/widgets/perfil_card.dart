@@ -56,29 +56,30 @@ class PerfilCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      // Nombre e insignias comparten línea mientras quepan; en
+                      // pantallas estrechas las insignias bajan a la siguiente.
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Expanded(
-                            child: Text(
-                              '${usuario.nombre} ${usuario.apellido}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurface,
-                                fontSize: 15,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            '${usuario.nombre} ${usuario.apellido}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                              fontSize: 15,
                             ),
                           ),
-                          const SizedBox(width: 8),
                           _buildRolBadge(usuario.rol, ac),
-                          if (!esActivo) ...[
-                            const SizedBox(width: 6),
-                            _buildInactivoBadge(ac),
-                          ],
+                          if (!esActivo) _buildInactivoBadge(ac),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 2,
                         children: [
                           Text(
                             '@${usuario.username}',
@@ -89,16 +90,15 @@ class PerfilCard extends StatelessWidget {
                               fontSize: 13,
                             ),
                           ),
-                          const SizedBox(width: 12),
                           Container(
                             width: 4,
                             height: 4,
+                            margin: const EdgeInsets.only(bottom: 2),
                             decoration: BoxDecoration(
                               color: colorScheme.outlineVariant,
                               shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(width: 12),
                           Text(
                             usuario.govID,
                             style: TextStyle(

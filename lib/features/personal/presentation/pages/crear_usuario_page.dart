@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -186,9 +187,12 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                           size: 13,
                           color: ac.textMuted,
                         ),
-                        Text(
-                          _isEditing ? 'Editar usuario' : 'Nuevo usuario',
-                          style: TextStyle(fontSize: 11, color: ac.textMuted),
+                        Flexible(
+                          child: Text(
+                            _isEditing ? 'Editar usuario' : 'Nuevo usuario',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, color: ac.textMuted),
+                          ),
                         ),
                       ],
                     ),
@@ -269,37 +273,32 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
       title: 'Datos personales del usuario',
       child: Column(
         children: [
-          Row(
+          AppFormRow(
             children: [
-              Expanded(
-                child: _FormField(
-                  ac: ac,
-                  icon: Icons.badge_outlined,
-                  label: 'Nombre *',
-                  child: TextFormField(
-                    controller: _nombreController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _inputDeco(ac, hint: 'Ej. Carlos'),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'El nombre es obligatorio'
-                        : null,
-                  ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Nombre *',
+                child: TextFormField(
+                  controller: _nombreController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Carlos'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El nombre es obligatorio'
+                      : null,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _FormField(
-                  ac: ac,
-                  icon: Icons.badge_outlined,
-                  label: 'Apellido *',
-                  child: TextFormField(
-                    controller: _apellidoController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _inputDeco(ac, hint: 'Ej. Mendoza'),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'El apellido es obligatorio'
-                        : null,
-                  ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Apellido *',
+                child: TextFormField(
+                  controller: _apellidoController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Mendoza'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El apellido es obligatorio'
+                      : null,
                 ),
               ),
             ],

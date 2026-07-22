@@ -32,6 +32,7 @@ import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class DashboardShell extends StatefulWidget {
   const DashboardShell({super.key});
@@ -492,7 +493,7 @@ class _PacientesPageState extends State<PacientesPage> {
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+      padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -707,7 +708,7 @@ class _PacientesPageState extends State<PacientesPage> {
           else ...[
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+                padding: context.pageInsets(top: 4, bottom: 24),
                 itemCount: state.filtrados.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _PacienteRow(

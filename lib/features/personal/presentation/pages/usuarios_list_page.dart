@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/personal/presentation/cu
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_card.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/crear_usuario_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class UsuariosListPage extends StatefulWidget {
   const UsuariosListPage({super.key});
@@ -105,7 +106,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     AppColors ac,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+      padding: context.pageInsets(top: 24, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,7 +195,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+      padding: context.pageInsets(top: 8, bottom: 8),
       child: Row(
         children: rolesAMostrar.map((item) {
           final isSelected = state.rolFiltro == item.rol;
@@ -289,7 +290,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 12, 28, 24),
+              padding: context.pageInsets(top: 12, bottom: 24),
               itemCount: state.filtrados.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

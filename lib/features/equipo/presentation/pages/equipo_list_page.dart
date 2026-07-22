@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/equipo/presentation/cubi
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_state.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/crear_editar_equipo_page.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/widgets/equipo_card.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class EquipoListPage extends StatefulWidget {
   const EquipoListPage({super.key});
@@ -154,7 +155,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
     AppColors ac,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+      padding: context.pageInsets(top: 24, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -238,7 +239,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
     if (state is EquipoError) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: context.pageInsets(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -314,7 +315,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
             ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 12, 28, 100),
+              padding: context.pageInsets(top: 12, bottom: 100),
               itemCount: state.filtrados.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

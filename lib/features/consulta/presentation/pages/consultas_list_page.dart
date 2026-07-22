@@ -14,6 +14,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/pa
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class ConsultasListPage extends StatefulWidget {
   const ConsultasListPage({super.key});
@@ -99,7 +100,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     final total = state is ConsultasLoaded ? state.todas.length : 0;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+      padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -335,7 +336,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+              padding: context.pageInsets(top: 4, bottom: 24),
               itemCount: state.filtradas.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
@@ -401,7 +402,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     final total = state.todas.length;
     return Container(
       color: context.appColors.cardBg,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      padding: context.pageInsets(top: 16, bottom: 16),
       child: Text(
         'Mostrando $shown de $total consulta${total == 1 ? '' : 's'}',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(

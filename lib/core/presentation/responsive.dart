@@ -54,6 +54,18 @@ extension AppLayoutResolution on AppLayout {
     return AppLayout.desktop;
   }
 
+  /// Horizontal breathing room a full-width page should keep at its edges.
+  ///
+  /// Desktop pages were written with a 28 px gutter; on a 320 px screen that
+  /// spends 17 % of the viewport on empty margins, so it tightens as the
+  /// viewport shrinks.
+  double get pageGutter => switch (this) {
+    AppLayout.narrowMobile => 12.0,
+    AppLayout.mobile => 16.0,
+    AppLayout.tablet => 20.0,
+    AppLayout.desktop => 28.0,
+  };
+
   static EdgeInsets contentPadding(
     MediaQueryData mediaQuery,
     AppLayout layout,
@@ -77,4 +89,12 @@ extension ResponsiveContext on BuildContext {
 
   /// Shorthand for the most common branch: one column or several.
   bool get isCompactLayout => appLayout.isCompact;
+
+  /// Page padding whose horizontal gutter follows the viewport.
+  ///
+  /// Replaces the hard-coded 28 px gutter the desktop pages were written with.
+  EdgeInsets pageInsets({double top = 0, double bottom = 0}) {
+    final gutter = appLayout.pageGutter;
+    return EdgeInsets.fromLTRB(gutter, top, gutter, bottom);
+  }
 }

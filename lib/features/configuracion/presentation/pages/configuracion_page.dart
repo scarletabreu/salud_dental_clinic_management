@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class ConfiguracionPage extends StatelessWidget {
   const ConfiguracionPage({super.key});
@@ -15,7 +16,7 @@ class ConfiguracionPage extends StatelessWidget {
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           return ListView(
-            padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+            padding: context.pageInsets(top: 28, bottom: 40),
             children: [
               _PageHeader(totalSections: 3),
 

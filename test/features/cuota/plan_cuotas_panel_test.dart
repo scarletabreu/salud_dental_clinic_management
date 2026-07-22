@@ -82,4 +82,55 @@ void main() {
     await tester.tap(find.text('Pagar cuota'));
     expect(cuotaPagada?.id, 'q1');
   });
+
+  // El calendario de cuotas es una de las vistas más densas: números, fechas y
+  // montos compiten por el mismo ancho.
+  final viewports = <String, Size>{
+    '320 px': const Size(320, 900),
+    '360 px': const Size(360, 900),
+    '390 px': const Size(390, 900),
+    'tablet': const Size(768, 1024),
+    'escritorio': const Size(1280, 900),
+  };
+
+  viewports.forEach((nombre, tamano) {
+    testWidgets('el calendario de cuotas no desborda en $nombre', (
+      tester,
+    ) async {
+      tester.view.physicalSize = tamano;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final cuotas = [
+        for (var i = 0; i < 6; i++)
+          Cuota(
+            id: 'q$i',
+            cuentaId: 'c1',
+            monto: 18500.55,
+            montoPagado: i.isEven ? 18500.55 : 0,
+            fechaVencimiento: DateTime(2026, 8 + i, 20),
+            estado: i.isEven ? EstadoCuota.pagada : EstadoCuota.pendiente,
+          ),
+      ];
+
+      await tester.pumpWidget(
+        _app(
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: PlanCuotasPanel(
+              cuotas: cuotas,
+              onConfigurar: () {},
+              onPagar: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'el plan de cuotas no debe desbordar en $nombre',
+      );
+    });
+  });
 }

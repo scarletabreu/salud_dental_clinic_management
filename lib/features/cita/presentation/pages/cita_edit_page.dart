@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 
 class CitaEditPage extends StatefulWidget {
   final Cita cita;
@@ -112,14 +113,12 @@ class _CitaEditPageState extends State<CitaEditPage> {
   }
 
   void _cancelarCita() {
-  setState(() => _intentandoGuardar = true);
+    setState(() => _intentandoGuardar = true);
 
-  context.read<CitaCubit>().actualizarCita(
-    widget.cita.copyWith(
-      estado: EstadoCita.cancelada,
-    ),
-  );
-}
+    context.read<CitaCubit>().actualizarCita(
+      widget.cita.copyWith(estado: EstadoCita.cancelada),
+    );
+  }
 
   void _snackError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -157,19 +156,20 @@ class _CitaEditPageState extends State<CitaEditPage> {
         listenWhen: (prev, curr) {
           if (prev is CitaCubitLoaded && curr is CitaCubitLoaded) {
             return prev.isSubmitting != curr.isSubmitting ||
-                  prev.errorMessage != curr.errorMessage;
+                prev.errorMessage != curr.errorMessage;
           }
           return true;
         },
         listener: (listenerContext, state) {
           print("DEBUG: Llegó un estado de tipo: ${state.runtimeType}");
           if (state is CitaCubitLoaded) {
-            print("DEBUG: isSubmitting = ${state.isSubmitting}, _intentandoGuardar = $_intentandoGuardar");
+            print(
+              "DEBUG: isSubmitting = ${state.isSubmitting}, _intentandoGuardar = $_intentandoGuardar",
+            );
             if (state.errorMessage != null) {
               _snackError(state.errorMessage!);
               setState(() => _intentandoGuardar = false);
-            } 
-            else if (!state.isSubmitting && _intentandoGuardar) {
+            } else if (!state.isSubmitting && _intentandoGuardar) {
               _intentandoGuardar = false;
 
               if (!mounted) return;
@@ -342,35 +342,30 @@ class _CitaEditPageState extends State<CitaEditPage> {
       iconColor: ac.primaryBlue,
       icon: Icons.calendar_today_outlined,
       title: 'Fecha y hora',
-      child: Row(
+      child: AppFormRow(
         children: [
-          Expanded(
-            child: _FieldGroup(
+          _FieldGroup(
+            ac: ac,
+            icon: Icons.calendar_month_outlined,
+            label: 'Fecha',
+            child: _TapField(
               ac: ac,
-              icon: Icons.calendar_month_outlined,
-              label: 'Fecha',
-              child: _TapField(
-                ac: ac,
-                icon: Icons.calendar_month_rounded,
-                label: fechaLabel,
-                hasValue: _fechaSeleccionada != null,
-                onTap: isSubmitting ? null : _seleccionarFecha,
-              ),
+              icon: Icons.calendar_month_rounded,
+              label: fechaLabel,
+              hasValue: _fechaSeleccionada != null,
+              onTap: isSubmitting ? null : _seleccionarFecha,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _FieldGroup(
+          _FieldGroup(
+            ac: ac,
+            icon: Icons.access_time_rounded,
+            label: 'Hora',
+            child: _TapField(
               ac: ac,
-              icon: Icons.access_time_rounded,
-              label: 'Hora',
-              child: _TapField(
-                ac: ac,
-                icon: Icons.access_time_filled_rounded,
-                label: horaLabel,
-                hasValue: _horaSeleccionada != null,
-                onTap: isSubmitting ? null : _seleccionarHora,
-              ),
+              icon: Icons.access_time_filled_rounded,
+              label: horaLabel,
+              hasValue: _horaSeleccionada != null,
+              onTap: isSubmitting ? null : _seleccionarHora,
             ),
           ),
         ],
@@ -477,42 +472,40 @@ class _CitaEditPageState extends State<CitaEditPage> {
   }
 
   Future<void> _confirmarCancelarCita() async {
-  final confirmar = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Cancelar cita'),
-        content: const Text(
-          '¿Está seguro de que desea cancelar esta cita? '
-          'Esta acción no debería realizarse accidentalmente.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Volver'),
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Cancelar cita'),
+          content: const Text(
+            '¿Está seguro de que desea cancelar esta cita? '
+            'Esta acción no debería realizarse accidentalmente.',
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancelar cita'),
-          ),
-        ],
-      );
-    },
-  );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Cancelar cita'),
+            ),
+          ],
+        );
+      },
+    );
 
-  if (confirmar == true) {
-    _cancelarCita();
+    if (confirmar == true) {
+      _cancelarCita();
+    }
   }
-}
 
   Widget _buildBotones(AppColors ac, bool isSubmitting) {
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: isSubmitting
-                ? null
-                : () => Navigator.of(context).pop(),
+            onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
               foregroundColor: ac.textSecondary,
               side: BorderSide(color: ac.divider),
@@ -565,10 +558,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 18,
-                  ),
+                : const Icon(Icons.check_circle_outline_rounded, size: 18),
             label: const Text(
               'Guardar cambios',
               style: TextStyle(fontWeight: FontWeight.w600),

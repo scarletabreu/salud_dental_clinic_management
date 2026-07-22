@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/medicina/presentation/pa
 import 'package:salud_dental_clinic_management/features/medicina/presentation/providers/medicinas_state.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/contraindicaciones_card.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/efectos_secundarios_card.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class MedicinaListPage extends StatefulWidget {
   final IMedicinaRepository repository;
@@ -106,7 +107,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         }
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+          padding: context.pageInsets(top: 28, bottom: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -342,7 +343,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         if (MediaQuery.sizeOf(context).width >= 600) _buildTableHeader(ac),
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+            padding: context.pageInsets(top: 4, bottom: 24),
             itemCount: state.filteredMedicinas.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (_, i) => _MedicinaRow(

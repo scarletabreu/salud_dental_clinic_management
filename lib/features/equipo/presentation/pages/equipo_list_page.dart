@@ -169,15 +169,8 @@ class _EquipoListPageState extends State<EquipoListPage> {
                   letterSpacing: -0.6,
                 ),
               ),
-              IconButton(
-                onPressed: _navegarACrear,
-                icon: Icon(
-                  Icons.add_circle_outline_rounded,
-                  color: ac.primaryBlue,
-                  size: 28,
-                ),
-                tooltip: 'Registrar nuevo equipo',
-              ),
+              // Creating an equipment item is offered by the floating action
+              // button; a second "+" in the header only duplicated it.
             ],
           ),
           const SizedBox(height: 4),

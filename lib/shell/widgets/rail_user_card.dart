@@ -66,7 +66,9 @@ class RailUserCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: ac.cardBg.withValues(alpha: 0.7),
+            // Opaque: the rail's destination list scrolls underneath and used
+            // to show through this card.
+            color: ac.cardBg,
             borderRadius: BorderRadius.circular(50),
             border: Border.all(
               color: ac.divider.withValues(alpha: 0.5),

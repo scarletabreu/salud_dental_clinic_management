@@ -120,16 +120,8 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
                   letterSpacing: -0.6,
                 ),
               ),
-              // Botón alternativo directo en la cabecera
-              IconButton(
-                onPressed: _navegarACrearUsuario,
-                icon: Icon(
-                  Icons.add_circle_outline_rounded,
-                  color: ac.primaryBlue,
-                  size: 28,
-                ),
-                tooltip: 'Crear nuevo usuario',
-              ),
+              // Creating a user is offered by the floating action button; a
+              // second "+" in the header only duplicated it.
             ],
           ),
           const SizedBox(height: 4),

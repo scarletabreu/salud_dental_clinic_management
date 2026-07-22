@@ -9,11 +9,7 @@ class TratamientoCard extends StatelessWidget {
   final Tratamiento tratamiento;
   final VoidCallback? onEdit;
 
-  const TratamientoCard({
-    super.key,
-    required this.tratamiento,
-    this.onEdit,
-  });
+  const TratamientoCard({super.key, required this.tratamiento, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -39,100 +35,148 @@ class TratamientoCard extends StatelessWidget {
         hoverColor: ac.primaryBlue.withOpacity(0.02),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: ac.primaryBlue.withOpacity(0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.medical_services_outlined,
-                  size: 20,
-                  color: ac.primaryBlue,
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      tratamiento.nombre,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: ac.textPrimary,
-                      ),
-                    ),
-                    if (tratamiento.descripcion.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        tratamiento.descripcion,
-                        style: TextStyle(fontSize: 13, color: ac.textSecondary),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
-              const SizedBox(width: 20),
-
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'PRECIO BASE',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      color: ac.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '\$${tratamiento.costo.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: ac.green,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-
-              _ActionIcon(
-                icon: Icons.edit_outlined,
-                tooltip: 'Editar',
-                color: ac.textSecondary.withOpacity(0.6),
-                onTap: () =>
-                    onEdit != null ? onEdit!() : _abrirEdicion(context),
-              ),
-              const SizedBox(width: 2),
-              _ActionIcon(
-                icon: Icons.delete_outline_rounded,
-                tooltip: 'Eliminar',
-                color: ac.red.withOpacity(0.70),
-                onTap: () => _confirmarEliminacion(context),
-              ),
-            ],
+          // Badge, price and the two actions need roughly 260 px of fixed
+          // width. Below that the name would be squeezed to zero and wrap one
+          // character per line, so they move to a second row instead.
+          child: LayoutBuilder(
+            builder: (context, constraints) => constraints.maxWidth < 420
+                ? _buildStacked(context, ac)
+                : _buildInline(context, ac),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildInline(BuildContext context, AppColors ac) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _leadingIcon(ac),
+        const SizedBox(width: 16),
+        Expanded(flex: 3, child: _nameAndDescription(ac)),
+        const SizedBox(width: 16),
+        _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
+        const SizedBox(width: 20),
+        _price(ac, CrossAxisAlignment.end),
+        const SizedBox(width: 16),
+        ..._actions(context, ac),
+      ],
+    );
+  }
+
+  Widget _buildStacked(BuildContext context, AppColors ac) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _leadingIcon(ac),
+            const SizedBox(width: 14),
+            Expanded(child: _nameAndDescription(ac)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
+            const SizedBox(width: 12),
+            Expanded(child: _price(ac, CrossAxisAlignment.start)),
+            ..._actions(context, ac),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _leadingIcon(AppColors ac) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: ac.primaryBlue.withOpacity(0.08),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.medical_services_outlined,
+        size: 20,
+        color: ac.primaryBlue,
+      ),
+    );
+  }
+
+  Widget _nameAndDescription(AppColors ac) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          tratamiento.nombre,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: ac.textPrimary,
+          ),
+        ),
+        if (tratamiento.descripcion.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            tratamiento.descripcion,
+            style: TextStyle(fontSize: 13, color: ac.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _price(AppColors ac, CrossAxisAlignment alignment) {
+    return Column(
+      crossAxisAlignment: alignment,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'PRECIO BASE',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+            color: ac.textMuted,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '\$${tratamiento.costo.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: ac.green,
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _actions(BuildContext context, AppColors ac) {
+    return [
+      _ActionIcon(
+        icon: Icons.edit_outlined,
+        tooltip: 'Editar',
+        color: ac.textSecondary.withOpacity(0.6),
+        onTap: () => onEdit != null ? onEdit!() : _abrirEdicion(context),
+      ),
+      const SizedBox(width: 2),
+      _ActionIcon(
+        icon: Icons.delete_outline_rounded,
+        tooltip: 'Eliminar',
+        color: ac.red.withOpacity(0.70),
+        onTap: () => _confirmarEliminacion(context),
+      ),
+    ];
   }
 
   void _abrirEdicion(BuildContext context) {

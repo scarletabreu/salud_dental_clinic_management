@@ -22,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/presentation
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
+import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
@@ -219,51 +220,38 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
 
-    _visibleDestinations = _allDestinations.where((destination) {
-      if (roles.isEmpty) return false;
-      switch (destination.label) {
-        case 'Configuración':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Perfiles':
-          return roles.contains(RolUsuario.admin);
-        case 'Equipos':
-          return roles.contains(RolUsuario.admin);
-        case 'Consultas':
-        case 'Medicinas':
-        case 'Tratamientos':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor);
-        case 'Pacientes':
-        case 'Mis Citas del Día':
-        case 'Cuentas por Cobrar':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.doctor) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Caja':
-          return roles.contains(RolUsuario.admin) ||
-              roles.contains(RolUsuario.asistente);
-        case 'Inicio':
-          return true;
-        default:
-          return false;
-      }
-    }).toList();
+    _visibleDestinations = _allDestinations
+        .where(
+          (destination) =>
+              ShellDestinationAccess.allows(destination.label, roles),
+        )
+        .toList();
 
     if (_selectedIndex >= _visibleDestinations.length) {
       _selectedIndex = 0;
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final layout = _ShellLayout.forWidth(width);
+    final mediaQuery = MediaQuery.of(context);
+    final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
-    final content = IndexedStack(
-      index: _selectedIndex,
-      children: [
-        for (final d in _visibleDestinations) Builder(builder: d.builder),
-      ],
+    // The session is authenticated before the profile that carries the roles
+    // arrives, and no role grants access to any destination. Show a spinner for
+    // that frame instead of indexing an empty list.
+    if (_visibleDestinations.isEmpty) {
+      return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Only mount the active module. Instantiating every module in an
+    // IndexedStack makes an administrator's shell eagerly fetch and retain
+    // eleven feature trees.
+    final selectedDestination = _visibleDestinations[_selectedIndex];
+    final content = KeyedSubtree(
+      key: ValueKey(selectedDestination.label),
+      child: Builder(builder: selectedDestination.builder),
     );
 
     return Scaffold(
@@ -272,7 +260,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         sectionTitle: _visibleDestinations.isNotEmpty
             ? _visibleDestinations[_selectedIndex].label
             : '',
-        compact: layout == _ShellLayout.mobile,
+        compact:
+            layout.usesBottomNavigation || mediaQuery.viewInsets.bottom > 0,
       ),
       body: Column(
         children: [
@@ -280,14 +269,17 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           Expanded(
             child: SafeArea(
               top: false,
-              child: layout == _ShellLayout.mobile
+              child: layout.usesBottomNavigation
                   ? content
                   : Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      padding: ShellLayoutResolution.contentPadding(
+                        mediaQuery,
+                        layout,
+                      ),
                       child: Row(
                         children: [
                           _SideRail(
-                            extended: layout == _ShellLayout.desktop,
+                            extended: layout.usesExtendedRail,
                             destinations: _visibleDestinations,
                             selectedIndex: _selectedIndex,
                             onDestinationSelected: _onDestinationSelected,
@@ -306,24 +298,160 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           ),
         ],
       ),
-      bottomNavigationBar: layout == _ShellLayout.mobile
-          ? NavigationBar(
+      bottomNavigationBar: layout.usesBottomNavigation
+          ? ShellMobileNavigation(
+              destinations: _visibleDestinations,
               selectedIndex: _selectedIndex,
               onDestinationSelected: _onDestinationSelected,
-              destinations: [
-                for (final d in _visibleDestinations)
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: _shortLabel(d.label),
-                  ),
-              ],
             )
           : null,
     );
   }
+}
 
-  String _shortLabel(String label) {
+class ShellMobileNavigation extends StatelessWidget {
+  const ShellMobileNavigation({
+    super.key,
+    required this.destinations,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  static const _primaryLimit = 3;
+  final List<ShellDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final primary = destinations.take(_primaryLimit).toList();
+    final secondary = destinations.skip(_primaryLimit).toList();
+    final selectedIsSecondary = selectedIndex >= primary.length;
+    final hasMore = secondary.isNotEmpty;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: ac.railBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: ac.railDivider.withValues(alpha: 0.6),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              for (var index = 0; index < primary.length; index++)
+                Expanded(
+                  child: _MobileRailItem(
+                    destination: primary[index],
+                    label: _shortLabel(primary[index].label),
+                    selected: selectedIndex == index,
+                    onTap: () => onDestinationSelected(index),
+                  ),
+                ),
+              if (hasMore)
+                Expanded(
+                  child: _MobileRailItem(
+                    destination: const ShellDestination(
+                      icon: Icons.more_horiz_rounded,
+                      selectedIcon: Icons.more_horiz_rounded,
+                      label: 'Más',
+                      builder: _emptyBuilder,
+                    ),
+                    label: 'Más',
+                    selected: selectedIsSecondary,
+                    onTap: () => _showMoreDestinations(
+                      context,
+                      primary.length,
+                      secondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _emptyBuilder(BuildContext context) => const SizedBox.shrink();
+
+  void _showMoreDestinations(
+    BuildContext context,
+    int offset,
+    List<ShellDestination> secondary,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final ac = sheetContext.appColors;
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.35,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, controller) => Container(
+            decoration: BoxDecoration(
+              color: ac.railBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: ac.railDivider.withValues(alpha: 0.6),
+                width: 0.5,
+              ),
+            ),
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: ac.railDivider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Más módulos',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: ac.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (var index = 0; index < secondary.length; index++)
+                  _MoreRailItem(
+                    destination: secondary[index],
+                    selected: selectedIndex == index + offset,
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      onDestinationSelected(index + offset);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static String _shortLabel(String label) {
     switch (label) {
       case 'Mis Citas del Día':
         return 'Citas';
@@ -337,15 +465,120 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   }
 }
 
-enum _ShellLayout {
-  desktop,
-  tablet,
-  mobile;
+class _MobileRailItem extends StatelessWidget {
+  const _MobileRailItem({
+    required this.destination,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  static _ShellLayout forWidth(double width) {
-    if (width >= 1024) return _ShellLayout.desktop;
-    if (width >= 600) return _ShellLayout.tablet;
-    return _ShellLayout.mobile;
+  final ShellDestination destination;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final foreground = selected ? ac.railTextSelected : ac.railText;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('mobile-navigation-$label'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          decoration: BoxDecoration(
+            color: selected ? ac.railSelectedBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected ? destination.selectedIcon : destination.icon,
+                size: 21,
+                color: foreground,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  height: 1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreRailItem extends StatelessWidget {
+  const _MoreRailItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ShellDestination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final foreground = selected ? ac.railTextSelected : ac.railText;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected ? ac.railSelectedBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? destination.selectedIcon : destination.icon,
+                  size: 22,
+                  color: foreground,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    destination.label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -385,7 +618,9 @@ class _SideRail extends StatelessWidget {
           const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              // Bottom room so the last destination does not end flush against
+              // the user card when the list is taller than the rail.
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Column(
                 children: [
                   for (int i = 0; i < destinations.length; i++)
@@ -399,6 +634,8 @@ class _SideRail extends StatelessWidget {
               ),
             ),
           ),
+          Divider(height: 1, thickness: 0.5, color: ac.railDivider),
+          const SizedBox(height: 8),
           RailUserCard(extended: extended),
         ],
       ),

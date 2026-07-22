@@ -211,6 +211,8 @@ class _AperturaView extends StatelessWidget {
                         abriendo ? 'Abriendo caja...' : 'Abrir caja de hoy',
                       ),
                       style: FilledButton.styleFrom(
+                        backgroundColor: ac.primaryBlue,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),

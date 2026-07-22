@@ -324,6 +324,7 @@ class ShellMobileNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = context.appColors;
     final primary = destinations.take(_primaryLimit).toList();
     final secondary = destinations.skip(_primaryLimit).toList();
     final selectedIsSecondary = selectedIndex >= primary.length;
@@ -331,34 +332,56 @@ class ShellMobileNavigation extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: NavigationBar(
-        selectedIndex: selectedIsSecondary && hasMore
-            ? primary.length
-            : selectedIndex,
-        onDestinationSelected: (index) {
-          if (hasMore && index == primary.length) {
-            _showMoreDestinations(context, primary.length, secondary);
-          } else {
-            onDestinationSelected(index);
-          }
-        },
-        destinations: [
-          for (final destination in primary)
-            NavigationDestination(
-              icon: Icon(destination.icon),
-              selectedIcon: Icon(destination.selectedIcon),
-              label: _shortLabel(destination.label),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: ac.railBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: ac.railDivider.withValues(alpha: 0.6),
+              width: 0.5,
             ),
-          if (hasMore)
-            const NavigationDestination(
-              icon: Icon(Icons.more_horiz_rounded),
-              selectedIcon: Icon(Icons.more_horiz_rounded),
-              label: 'Más',
-            ),
-        ],
+          ),
+          child: Row(
+            children: [
+              for (var index = 0; index < primary.length; index++)
+                Expanded(
+                  child: _MobileRailItem(
+                    destination: primary[index],
+                    label: _shortLabel(primary[index].label),
+                    selected: selectedIndex == index,
+                    onTap: () => onDestinationSelected(index),
+                  ),
+                ),
+              if (hasMore)
+                Expanded(
+                  child: _MobileRailItem(
+                    destination: const ShellDestination(
+                      icon: Icons.more_horiz_rounded,
+                      selectedIcon: Icons.more_horiz_rounded,
+                      label: 'Más',
+                      builder: _emptyBuilder,
+                    ),
+                    label: 'Más',
+                    selected: selectedIsSecondary,
+                    onTap: () => _showMoreDestinations(
+                      context,
+                      primary.length,
+                      secondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  static Widget _emptyBuilder(BuildContext context) => const SizedBox.shrink();
 
   void _showMoreDestinations(
     BuildContext context,
@@ -369,45 +392,62 @@ class ShellMobileNavigation extends StatelessWidget {
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.55,
-        minChildSize: 0.35,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).dividerColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final ac = sheetContext.appColors;
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.35,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, controller) => Container(
+            decoration: BoxDecoration(
+              color: ac.railBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: ac.railDivider.withValues(alpha: 0.6),
+                width: 0.5,
               ),
             ),
-            const SizedBox(height: 12),
-            Text('Más módulos', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            for (var index = 0; index < secondary.length; index++)
-              ListTile(
-                leading: Icon(
-                  selectedIndex == index + offset
-                      ? secondary[index].selectedIcon
-                      : secondary[index].icon,
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: ac.railDivider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
                 ),
-                title: Text(secondary[index].label),
-                selected: selectedIndex == index + offset,
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  onDestinationSelected(index + offset);
-                },
-              ),
-          ],
-        ),
-      ),
+                const SizedBox(height: 16),
+                Text(
+                  'Más módulos',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: ac.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (var index = 0; index < secondary.length; index++)
+                  _MoreRailItem(
+                    destination: secondary[index],
+                    selected: selectedIndex == index + offset,
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      onDestinationSelected(index + offset);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -422,6 +462,123 @@ class ShellMobileNavigation extends StatelessWidget {
       default:
         return label;
     }
+  }
+}
+
+class _MobileRailItem extends StatelessWidget {
+  const _MobileRailItem({
+    required this.destination,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ShellDestination destination;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final foreground = selected ? ac.railTextSelected : ac.railText;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('mobile-navigation-$label'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          decoration: BoxDecoration(
+            color: selected ? ac.railSelectedBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected ? destination.selectedIcon : destination.icon,
+                size: 21,
+                color: foreground,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  height: 1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreRailItem extends StatelessWidget {
+  const _MoreRailItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ShellDestination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final foreground = selected ? ac.railTextSelected : ac.railText;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected ? ac.railSelectedBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? destination.selectedIcon : destination.icon,
+                  size: 22,
+                  color: foreground,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    destination.label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

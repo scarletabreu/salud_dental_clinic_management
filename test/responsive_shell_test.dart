@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
@@ -35,6 +36,7 @@ Widget _mobileShell(
   double textScale = 1,
 }) {
   return MaterialApp(
+    theme: AppTheme.light,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(
         context,
@@ -95,7 +97,11 @@ void main() {
     var selected = -1;
 
     await tester.pumpWidget(_mobileShell(_labels, (index) => selected = index));
-    expect(find.byType(NavigationDestination), findsNWidgets(4));
+    expect(
+      find.byKey(const ValueKey('mobile-navigation-Inicio')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('mobile-navigation-Más')), findsOneWidget);
     expect(find.text('Perfiles'), findsNothing);
 
     await tester.tap(find.text('Más'));
@@ -125,6 +131,25 @@ void main() {
     await tester.pumpWidget(_mobileShell(_labels, (_) {}, textScale: 2));
     expect(find.text('Más'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile navigation uses the sidebar visual language', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_mobileShell(_labels, (_) {}));
+
+    final itemDecorations = tester
+        .widgetList<Container>(find.byType(Container))
+        .map((container) => container.decoration)
+        .whereType<BoxDecoration>();
+
+    expect(
+      itemDecorations.any(
+        (decoration) => decoration.borderRadius == BorderRadius.circular(12),
+      ),
+      isTrue,
+    );
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
   test('permissions expose exactly the modules permitted by each role', () {

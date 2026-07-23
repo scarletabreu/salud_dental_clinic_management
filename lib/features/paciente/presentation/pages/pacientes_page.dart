@@ -432,7 +432,7 @@ class _PacientesPageState extends State<PacientesPage> {
     });
   }
 
-  Future<void> _openForm({Paciente? paciente}) async {
+  Future<void> _openForm(Paciente paciente) async {
     final cubit = context.read<PacienteCubit>();
     await Navigator.push(
       context,
@@ -541,25 +541,6 @@ class _PacientesPageState extends State<PacientesPage> {
                       },
                     ),
                 ],
-              ),
-              FilledButton.icon(
-                onPressed: () => _openForm(),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text(
-                  'Nuevo Paciente',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.appColors.primaryBlue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
-                  ),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
               ),
             ],
           ),
@@ -699,7 +680,7 @@ class _PacientesPageState extends State<PacientesPage> {
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _PacienteRow(
                   paciente: state.filtrados[i],
-                  onEdit: () => _openForm(paciente: state.filtrados[i]),
+                  onEdit: () => _openForm(state.filtrados[i]),
                   onVerDetalle: () => _openDetalle(state.filtrados[i]),
                 ),
               ),

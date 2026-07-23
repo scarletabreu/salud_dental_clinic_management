@@ -13,6 +13,8 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 
 class EfectuarConsultaPage extends StatefulWidget {
   final String? citaId;
@@ -35,11 +37,39 @@ class EfectuarConsultaPage extends StatefulWidget {
 class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   bool _enWorkspace = false;
   bool _hasInitialTriggered = false;
+  bool _hasLoadedParaConsulta = false;
+  bool? _registroIncompleto;
+  Paciente? _pacienteParaForm; // <-- NUEVO: copia local, inmune a emits del cubit
+  late final PacienteCubit _pacienteCubit;
 
   @override
   void initState() {
     super.initState();
     _enWorkspace = widget.consultaId != null;
+    _pacienteCubit = sl<PacienteCubit>();
+    _verificarRegistro();
+  }
+
+  Future<void> _verificarRegistro() async {
+    final completo = await _pacienteCubit.isPaciente(widget.pacienteId);
+
+    if (!completo) {
+      await _pacienteCubit.loadParaConsulta(widget.pacienteId);
+      final s = _pacienteCubit.state;
+      if (s is PacienteDetailLoaded) {
+        _pacienteParaForm = s.paciente;
+      }
+    }
+
+    if (mounted) {
+      setState(() => _registroIncompleto = !completo);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pacienteCubit.close();
+    super.dispose();
   }
 
   @override
@@ -48,16 +78,11 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
 
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (_) =>
-              sl<PacienteCubit>()..loadParaConsulta(widget.pacienteId),
-        ),
+        BlocProvider.value(value: _pacienteCubit),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
       ],
       child: Builder(
-        // <--- 1. ADD THIS BUILDER RIGHT HERE
         builder: (innerContext) {
-          // 2. Safely trigger the resume logic using innerContext
           if (widget.consultaId != null && !_hasInitialTriggered) {
             _hasInitialTriggered = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -65,6 +90,40 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
               innerContext.read<ConsultaCubit>().reanudarConsulta(
                 consultaId: widget.consultaId!,
               );
+            });
+          }
+
+          if (_registroIncompleto == null) {
+            return Scaffold(
+              backgroundColor: ac.bgPage,
+              body: const Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          // Gate: falta completar la ficha clínica antes de evaluar/consultar.
+          if (_registroIncompleto == true) {
+            if (_pacienteParaForm == null) {
+              return Scaffold(
+                backgroundColor: ac.bgPage,
+                body: const Center(child: CircularProgressIndicator()),
+              );
+            }
+            return Scaffold(
+              backgroundColor: ac.bgPage,
+              body: PacienteFormPage(
+                paciente: _pacienteParaForm!,
+                modo: PacienteFormModo.completarRegistro,
+                onCompletado: () => setState(() => _registroIncompleto = false),
+              ),
+            );
+          }
+
+          // Ya confirmado que es paciente: recién aquí se carga/crea para consulta.
+          if (!_hasLoadedParaConsulta) {
+            _hasLoadedParaConsulta = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!innerContext.mounted) return;
+              innerContext.read<PacienteCubit>().loadParaConsulta(widget.pacienteId);
             });
           }
 
@@ -95,7 +154,6 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                     showPacienteAction: !panelInline,
                   ),
                   const SizedBox(height: 12),
-
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

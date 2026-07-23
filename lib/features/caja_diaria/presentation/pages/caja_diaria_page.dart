@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/resumen_cierre_page.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
@@ -228,10 +229,127 @@ class _AperturaView extends StatelessWidget {
   }
 }
 
-class _CajaAbiertaView extends StatelessWidget {
+class _CajaAbiertaView extends StatefulWidget {
   const _CajaAbiertaView({required this.state});
 
   final CajaDiariaAbierta state;
+
+  @override
+  State<_CajaAbiertaView> createState() => _CajaAbiertaViewState();
+}
+
+class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
+  bool _cerrando = false;
+
+  Future<void> _mostrarDialogoCierre(BuildContext context) async {
+    final montoController = TextEditingController(
+      text: widget.state.montoEsperado.toStringAsFixed(2),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cerrar caja del día'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Monto esperado en caja: ${formatMoneda(widget.state.montoEsperado)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              const Text('Ingresa el monto contado físicamente en caja:'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: montoController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d*[,.]?\d{0,2}'),
+                  ),
+                ],
+                decoration: const InputDecoration(
+                  prefixText: 'RD\$ ',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final parsed = double.tryParse(
+                    (value ?? '').replaceAll(',', '.'),
+                  );
+                  if (parsed == null || parsed < 0) {
+                    return 'Ingresa un monto válido.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: context.appColors.red,
+            ),
+            child: const Text('Confirmar y Cerrar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true || !mounted) return;
+
+    final montoContado = double.parse(
+      montoController.text.replaceAll(',', '.'),
+    );
+    final cubit = context.read<CajaDiariaCubit>();
+    final resumen = cubit.obtenerResumenCierre();
+
+    if (resumen == null) return;
+
+    setState(() => _cerrando = true);
+    final error = await cubit.cerrarCaja(
+      montoReal: montoContado,
+      montoEsperado: widget.state.montoEsperado,
+    );
+
+    if (!mounted) return;
+    setState(() => _cerrando = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: context.appColors.red),
+      );
+    } else {
+      final diferencia = montoContado - widget.state.montoEsperado;
+      final fechaCierre = DateTime.now();
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ReporteCierrePage(
+            resumen: resumen,
+            montoContado: montoContado,
+            diferencia: diferencia,
+            fechaCierre: fechaCierre,
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -259,36 +377,62 @@ class _CajaAbiertaView extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    fechaLargaEs(state.caja.fecha),
+                    fechaLargaEs(widget.state.caja.fecha),
                     style: TextStyle(color: ac.textSecondary),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: ac.green.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.circle, size: 10, color: ac.green),
-                    const SizedBox(width: 7),
-                    Text(
-                      'ABIERTA',
-                      style: TextStyle(
-                        color: ac.green,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        letterSpacing: .7,
-                      ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                  ],
-                ),
+                    decoration: BoxDecoration(
+                      color: ac.green.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.circle, size: 10, color: ac.green),
+                        const SizedBox(width: 7),
+                        Text(
+                          'ABIERTA',
+                          style: TextStyle(
+                            color: ac.green,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            letterSpacing: .7,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: _cerrando
+                        ? null
+                        : () => _mostrarDialogoCierre(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: _cerrando
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.lock_outlined, size: 18),
+                    label: Text(_cerrando ? 'Cerrando...' : 'Cerrar caja'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -310,28 +454,28 @@ class _CajaAbiertaView extends StatelessWidget {
                   _MetricCard(
                     width: width,
                     label: 'Apertura',
-                    value: formatMoneda(state.caja.montoApertura),
+                    value: formatMoneda(widget.state.caja.montoApertura),
                     icon: Icons.lock_open_rounded,
                     color: ac.primaryBlue,
                   ),
                   _MetricCard(
                     width: width,
                     label: 'Ingresos',
-                    value: formatMoneda(state.ingresos),
+                    value: formatMoneda(widget.state.ingresos),
                     icon: Icons.arrow_downward_rounded,
                     color: ac.green,
                   ),
                   _MetricCard(
                     width: width,
                     label: 'Egresos',
-                    value: formatMoneda(state.egresos),
+                    value: formatMoneda(widget.state.egresos),
                     icon: Icons.arrow_upward_rounded,
                     color: ac.orange,
                   ),
                   _MetricCard(
                     width: width,
                     label: 'Esperado',
-                    value: formatMoneda(state.montoEsperado),
+                    value: formatMoneda(widget.state.montoEsperado),
                     icon: Icons.account_balance_wallet_rounded,
                     color: ac.teal,
                   ),
@@ -358,7 +502,7 @@ class _CajaAbiertaView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (state.movimientos.isEmpty)
+          if (widget.state.movimientos.isEmpty)
             _EmptyMovements(ac: ac)
           else
             Container(
@@ -371,11 +515,11 @@ class _CajaAbiertaView extends StatelessWidget {
                 children: [
                   for (
                     var index = 0;
-                    index < state.movimientos.length;
+                    index < widget.state.movimientos.length;
                     index++
                   ) ...[
-                    _MovementRow(movimiento: state.movimientos[index]),
-                    if (index != state.movimientos.length - 1)
+                    _MovementRow(movimiento: widget.state.movimientos[index]),
+                    if (index != widget.state.movimientos.length - 1)
                       Divider(height: 1, color: ac.divider),
                   ],
                 ],

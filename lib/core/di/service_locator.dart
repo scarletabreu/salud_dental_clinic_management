@@ -23,6 +23,16 @@ import 'package:salud_dental_clinic_management/features/auth/data/repositories/u
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/consumible/data/repositories/consumible_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/actualizar_existencia.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/eliminar_consumible.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/get_inventario.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
+import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/eliminar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
@@ -466,6 +476,33 @@ Future<void> init() async {
       getInventario: sl(),
       registrarOActualizar: sl(),
       eliminar: sl(),
+    ),
+  );
+
+  // Datasource
+  sl.registerLazySingleton<ConsumibleRemoteDatasource>(
+    () => ConsumibleRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+
+  // Repository
+  sl.registerLazySingleton<ConsumibleRepository>(
+    () => ConsumibleRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Use Cases
+  sl.registerLazySingleton(() => GetInventario(sl()));
+  sl.registerLazySingleton(() => GuardarConsumible(sl()));
+  sl.registerLazySingleton(() => ActualizarExistencia(sl()));
+  sl.registerLazySingleton(() => EliminarConsumible(sl()));
+  sl.registerLazySingleton(() => ObtenerArticulosBajoMinimo(sl()));
+
+  // Cubit
+  sl.registerFactory(
+    () => InventarioCubit(
+      getInventario: sl(),
+      guardarConsumible: sl(),
+      actualizarExistencia: sl(),
+      eliminarConsumible: sl(),
     ),
   );
 }

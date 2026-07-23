@@ -32,6 +32,8 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubi
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
+import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consumible/presentation/pages/inventario_page.dart';
 
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
@@ -155,6 +157,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2_rounded,
+      label: 'Inventario',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<InventarioCubit>(),
+        child: const InventarioPage(),
+      ),
+    ),
+    ShellDestination(
       icon: Icons.admin_panel_settings_outlined,
       selectedIcon: Icons.admin_panel_settings_rounded,
       label: 'Perfiles',
@@ -235,9 +246,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // The session is authenticated before the profile that carries the roles
-    // arrives, and no role grants access to any destination. Show a spinner for
-    // that frame instead of indexing an empty list.
     if (_visibleDestinations.isEmpty) {
       return Scaffold(
         backgroundColor: colorScheme.surfaceContainerLowest,
@@ -245,9 +253,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       );
     }
 
-    // Only mount the active module. Instantiating every module in an
-    // IndexedStack makes an administrator's shell eagerly fetch and retain
-    // eleven feature trees.
     final selectedDestination = _visibleDestinations[_selectedIndex];
     final content = KeyedSubtree(
       key: ValueKey(selectedDestination.label),
@@ -618,8 +623,6 @@ class _SideRail extends StatelessWidget {
           const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
-              // Bottom room so the last destination does not end flush against
-              // the user card when the list is taller than the rail.
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Column(
                 children: [

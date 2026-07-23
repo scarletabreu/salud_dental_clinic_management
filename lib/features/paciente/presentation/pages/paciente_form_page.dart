@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
-import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
+
+enum PacienteFormModo { editar, completarRegistro }
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -82,8 +87,16 @@ class _ContactoEntry {
 }
 
 class PacienteFormPage extends StatefulWidget {
-  final Paciente? paciente;
-  const PacienteFormPage({super.key, this.paciente});
+  final Paciente paciente;
+  final PacienteFormModo modo;
+  final VoidCallback? onCompletado;
+
+  const PacienteFormPage({
+    super.key,
+    required this.paciente,
+    this.modo = PacienteFormModo.editar,
+    this.onCompletado,
+  });
 
   @override
   State<PacienteFormPage> createState() => _PacienteFormPageState();
@@ -103,36 +116,59 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Genero _genero = Genero.masculino;
   TipoPaciente _tipoPaciente = TipoPaciente.integrado;
 
-  bool get _isEditing => widget.paciente != null;
+  // ── Condiciones médicas (catálogo + selección) ──────────────────────────
+  List<Condicion> _condicionesIniciales = [];
+  List<Condicion> _condicionesSeleccionadas = [];
+  List<Condicion> _condicionesDisponibles = [];
+  bool _cargandoCondiciones = true;
+  bool _guardandoCondiciones = false;
+  bool _isProcessingSave = false;
+
+  bool get _isCompletarRegistro => widget.modo == PacienteFormModo.completarRegistro;
 
   @override
   void initState() {
     super.initState();
     final p = widget.paciente;
-    _nombreController = TextEditingController(text: p?.nombre ?? '');
-    _apellidoController = TextEditingController(text: p?.apellido ?? '');
-    _cedulaController = TextEditingController(text: p?.govID ?? '');
-    _trabajoController = TextEditingController(text: p?.trabajo ?? '');
-    _referenciaController = TextEditingController(text: p?.referencia ?? '');
-    _fechaNacimiento = p?.birthDate;
+    _nombreController = TextEditingController(text: p.nombre);
+    _apellidoController = TextEditingController(text: p.apellido);
+    _cedulaController = TextEditingController(text: p.govID);
+    _trabajoController = TextEditingController(text: p.trabajo);
+    _referenciaController = TextEditingController(text: p.referencia);
+    _fechaNacimiento = p.birthDate;
+    _genero = p.genero;
+    _tipoPaciente = p.tipoPaciente;
+    _contactos = p.contactos.isEmpty
+        ? [_ContactoEntry(isExpanded: true)]
+        : p.contactos
+              .asMap()
+              .entries
+              .map(
+                (e) => _ContactoEntry.fromContacto(
+                  e.value,
+                  isExpanded: e.key == 0,
+                ),
+              )
+              .toList();
 
-    if (p != null) {
-      _genero = p.genero;
-      _tipoPaciente = p.tipoPaciente;
-      _contactos = p.contactos.isEmpty
-          ? [_ContactoEntry(isExpanded: true)]
-          : p.contactos
-                .asMap()
-                .entries
-                .map(
-                  (e) => _ContactoEntry.fromContacto(
-                    e.value,
-                    isExpanded: e.key == 0,
-                  ),
-                )
-                .toList();
-    } else {
-      _contactos = [_ContactoEntry(isExpanded: true)];
+    _cargarCondiciones();
+  }
+
+  Future<void> _cargarCondiciones() async {
+    try {
+      final results = await Future.wait([
+        sl<RecordRepository>().getCondicionesDelPaciente(widget.paciente.id!),
+        sl<CondicionRepository>().getCondiciones(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _condicionesIniciales = results[0];
+        _condicionesSeleccionadas = List.of(results[0]);
+        _condicionesDisponibles = results[1];
+        _cargandoCondiciones = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cargandoCondiciones = false);
     }
   }
 
@@ -159,13 +195,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   }
 
   void _removeContacto(int index) {
+    final removed = _contactos.removeAt(index);
     setState(() {
-      _contactos[index].dispose();
-      _contactos.removeAt(index);
       if (_contactos.isNotEmpty && _contactos.every((c) => !c.isExpanded)) {
         _contactos.first.isExpanded = true;
       }
     });
+    // Defer disposal until after build frame to avoid assertion exceptions
+    WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
   }
 
   void _toggleContacto(int index) {
@@ -178,10 +215,30 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     });
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
+  void _toggleCondicion(Condicion condicion, bool selected) {
+    setState(() {
+      if (selected) {
+        _condicionesSeleccionadas = [..._condicionesSeleccionadas, condicion];
+      } else {
+        _condicionesSeleccionadas = _condicionesSeleccionadas
+            .where((c) => c.id != condicion.id)
+            .toList();
+      }
+    });
+  }
 
-    // Verificación de negocio para el contacto principal requerido en el formulario
+  void _save() {
+    if (!_formKey.currentState!.validate() || _fechaNacimiento == null) {
+      if (_fechaNacimiento == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Debe seleccionar la fecha de nacimiento.'),
+          ),
+        );
+      }
+      return;
+    }
+
     if (_contactos.isEmpty || _contactos.first.telefono.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -192,28 +249,103 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     }
 
     final paciente = Paciente(
-      id: widget.paciente?.id,
+      id: widget.paciente.id,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
       govID: _cedulaController.text.trim(),
       contactos: _contactos.map((c) => c.toModel()).toList(),
-      estatus: widget.paciente?.estatus ?? EstatusPersona.activo,
+      estatus: widget.paciente.estatus,
       genero: _genero,
       tipoPaciente: _tipoPaciente,
       trabajo: _trabajoController.text.trim(),
       referencia: _referenciaController.text.trim(),
-      record: widget.paciente?.record ?? RecordModel.empty(),
-      citas: widget.paciente?.citas ?? const [],
+      record: widget.paciente.record,
+      citas: widget.paciente.citas,
     );
 
-    final cubit = context.read<PacienteCubit>();
+    context.read<PacienteCubit>().updatePaciente(paciente);
+  }
 
-    // Modo Edición vs Registro disparando los eventos/métodos correspondientes
-    if (_isEditing) {
-      cubit.updatePaciente(paciente);
-    } else {
-      cubit.addPaciente(paciente);
+  Future<void> _guardarDiffCondiciones() async {
+    final idsIniciales = _condicionesIniciales.map((c) => c.id).toSet();
+    final idsFinales = _condicionesSeleccionadas.map((c) => c.id).toSet();
+    final agregadas = idsFinales.difference(idsIniciales);
+    final quitadas = idsIniciales.difference(idsFinales);
+
+    if (agregadas.isEmpty && quitadas.isEmpty) return;
+
+    final pacienteId = widget.paciente.id;
+    if (pacienteId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: const Text(
+              'El paciente se guardó, pero no se pudieron actualizar las condiciones (id no disponible).',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _guardandoCondiciones = true);
+    final recordRepo = sl<RecordRepository>();
+
+    print('DEBUG creando condiciones para pacienteId=$pacienteId agregadas=$agregadas');
+    try {
+      // Secuencial, no Future.wait en paralelo: la primera llamada crea el
+      // `record` si no existe; las siguientes ya lo encuentran, evitando
+      // inserts duplicados por condiciones de carrera.
+      for (final id in agregadas) {
+        await recordRepo.agregarCondicion(pacienteId, id!);
+      }
+      for (final id in quitadas) {
+        await recordRepo.quitarCondicion(pacienteId, id!);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: const Text(
+              'El paciente se guardó, pero hubo un error actualizando las condiciones.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _guardandoCondiciones = false);
+    }
+  }
+
+  Future<void> _onPacienteGuardadoExitosamente() async {
+    if (_isProcessingSave) return;
+    _isProcessingSave = true;
+
+    try {
+      await _guardarDiffCondiciones();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.teal,
+          content: Text(
+            _isCompletarRegistro
+                ? 'Ficha clínica completada'
+                : 'Paciente actualizado exitosamente',
+          ),
+        ),
+      );
+
+      if (_isCompletarRegistro) {
+        widget.onCompletado?.call();
+      } else {
+        Navigator.pop(context);
+      }
+    } finally {
+      _isProcessingSave = false;
     }
   }
 
@@ -223,7 +355,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       context: context,
       initialDate: _fechaNacimiento ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
-      // Prevenir el registro de fechas futuras bloqueando el calendario hasta el día de hoy
       lastDate: now,
       helpText: 'Fecha de nacimiento',
       confirmText: 'Seleccionar',
@@ -243,27 +374,19 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return BlocConsumer<PacienteCubit, PacienteState>(
       listener: (context, state) {
         if (state is PacienteError) {
+          _isProcessingSave = false;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(backgroundColor: ac.red, content: Text(state.message)),
           );
         }
         if (state is PacienteOperationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: ac.teal,
-              content: Text(
-                _isEditing
-                    ? 'Paciente actualizado exitosamente'
-                    : 'Paciente registrado exitosamente',
-              ),
-            ),
-          );
-          Navigator.pop(context);
+          _onPacienteGuardadoExitosamente();
         }
       },
       builder: (context, state) {
-        // Validación del estado de carga del Cubit para renderizar el loader en el botón
-        final isSaving = state is PacienteLoading;
+        final isSaving = state is PacienteLoading ||
+            _guardandoCondiciones ||
+            _isProcessingSave;
 
         return Scaffold(
           backgroundColor: ac.bgPage,
@@ -274,11 +397,17 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
+                  if (_isCompletarRegistro) ...[
+                    _buildAvisoCompletarRegistro(ac),
+                    const SizedBox(height: 16),
+                  ],
                   _buildDatosPersonalesCard(ac),
                   const SizedBox(height: 16),
                   _buildContactosCard(ac),
                   const SizedBox(height: 16),
                   _buildInfoAdicionalCard(ac),
+                  const SizedBox(height: 16),
+                  _buildCondicionesCard(ac),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -286,6 +415,32 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAvisoCompletarRegistro(AppColors ac) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ac.amber.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.amber.withOpacity(0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: ac.amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Esta persona aún no tiene ficha clínica. Completa sus datos '
+              'para poder iniciar la consulta.',
+              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -299,23 +454,24 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           bottom: false,
           child: Row(
             children: [
-              GestureDetector(
-                onTap: isSaving ? null : () => Navigator.pop(context),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: ac.divider),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_rounded,
-                    size: 18,
-                    color: ac.textSecondary,
+              if (!_isCompletarRegistro)
+                GestureDetector(
+                  onTap: isSaving ? null : () => Navigator.pop(context),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: ac.divider),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 18,
+                      color: ac.textSecondary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
+              if (!_isCompletarRegistro) const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,14 +489,18 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                           color: ac.textMuted,
                         ),
                         Text(
-                          _isEditing ? 'Editar paciente' : 'Nuevo paciente',
+                          _isCompletarRegistro
+                              ? 'Completar ficha clínica'
+                              : 'Editar paciente',
                           style: TextStyle(fontSize: 11, color: ac.textMuted),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _isEditing ? 'Editar paciente' : 'Registro de paciente',
+                      _isCompletarRegistro
+                          ? 'Completar ficha clínica'
+                          : 'Editar paciente',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -350,26 +510,28 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ],
                 ),
               ),
-              OutlinedButton(
-                onPressed: isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
+              if (!_isCompletarRegistro) ...[
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  child: const Text('Cancelar'),
                 ),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
@@ -382,7 +544,11 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                         ),
                       )
                     : const Icon(Icons.save_outlined, size: 16),
-                label: Text(isSaving ? 'Guardando...' : 'Guardar'),
+                label: Text(
+                  isSaving
+                      ? 'Guardando...'
+                      : (_isCompletarRegistro ? 'Completar registro' : 'Guardar'),
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: ac.primaryBlue,
                   foregroundColor: Colors.white,
@@ -464,7 +630,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 if (v == null || v.trim().isEmpty) {
                   return 'La cédula es obligatoria';
                 }
-                // Limpiar guiones para verificar los 11 dígitos requeridos por el ticket
                 final demasked = v.replaceAll('-', '');
                 if (demasked.length != 11) {
                   return 'La cédula debe contener exactamente 11 dígitos';
@@ -809,6 +974,57 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCondicionesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.red,
+      iconBg: ac.red.withOpacity(0.10),
+      icon: Icons.health_and_safety_outlined,
+      title: 'Condiciones médicas',
+      child: _cargandoCondiciones
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          : _condicionesDisponibles.isEmpty
+              ? Text(
+                  'No hay condiciones registradas en el catálogo.',
+                  style: TextStyle(fontSize: 12, color: ac.textMuted),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _condicionesDisponibles.map((c) {
+                    final isActive =
+                        _condicionesSeleccionadas.any((s) => s.id == c.id);
+                    return FilterChip(
+                      label: Text(c.nombre),
+                      selected: isActive,
+                      onSelected: (v) => _toggleCondicion(c, v),
+                      selectedColor: ac.red.withOpacity(0.12),
+                      checkmarkColor: ac.red,
+                      backgroundColor: ac.bgPage,
+                      labelStyle: TextStyle(
+                        color: isActive ? ac.red : ac.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      side: BorderSide(
+                        color: isActive ? ac.red.withOpacity(0.4) : ac.divider,
+                        width: isActive ? 1.0 : 0.5,
+                      ),
+                    );
+                  }).toList(),
+                ),
     );
   }
 

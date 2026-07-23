@@ -7,6 +7,7 @@ abstract class IPacienteRepository {
   Future<Either<Failure, void>> addPaciente(Paciente paciente);
   Future<Either<Failure, void>> updatePaciente(Paciente paciente);
   Future<Either<Failure, void>> deletePaciente(String id);
+  Future<Either<Failure, bool>> faltaRegistro(String id);
   Future<Either<Failure, Paciente>> getPacienteById(String id);
 
   /// Paciente asociado a la persona [personaId]; si aún no existe, lo crea

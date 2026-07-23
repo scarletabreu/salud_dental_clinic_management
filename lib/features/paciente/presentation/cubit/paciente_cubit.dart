@@ -47,6 +47,30 @@ class PacienteCubit extends Cubit<PacienteState> {
     );
   }
 
+  Future<bool> isPaciente(String id) async {
+    final result = await _repository.faltaRegistro(id);
+    emit(const PacienteDetailLoading());
+
+    return result.fold(
+      (failure) {
+        print("connection error");
+        emit(PacienteError(failure.message));
+        return false;
+      },
+      (success) {
+        if (!success) {
+          print("Si es paciente");
+          emit(PacienteOperationSuccess());
+          return true;
+        } else {
+          print("no es paciente");
+          emit(PacienteError('El paciente es nuevo, requiere registro.'));
+          return false;
+        }
+      },
+    );
+  }
+
   /// El expediente no debe romperse si falla el historial (p. ej. pacientes
   /// de prueba con id no-uuid): se degrada a lista vacía.
   Future<List<Consulta>> _historialDe(String? pacienteId) async {

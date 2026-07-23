@@ -20,6 +20,14 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
+  Future<Either<Failure, bool>> faltaRegistro(String id){
+    return guard(
+      () => remoteDataSource.esPersonaSinFichaClinica(id),
+      context: 'verificar si es paciente',
+    );
+  }
+
+  @override
   Future<Either<Failure, void>> addPaciente(Paciente paciente) {
     return guard(
       () => remoteDataSource.addPaciente(PacienteModel.fromEntity(paciente)),

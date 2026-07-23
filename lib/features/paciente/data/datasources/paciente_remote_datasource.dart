@@ -355,6 +355,18 @@ class PacienteRemoteDatasource {
     throw Exception('Paciente con id "$normalizedId" no encontrado.');
   }
 
+  Future<bool> esPersonaSinFichaClinica(String personaId) async {
+    final normalizedId = _normalizeId(personaId);
+
+    final enPacientes = await client
+        .from('pacientes')
+        .select('id')
+        .eq('id', normalizedId)
+        .maybeSingle();
+    if (enPacientes != null) return false;
+    return true;
+  }
+
   /// Devuelve el paciente cuya PK coincide con [personaId]; si la persona aún
   /// no es paciente (p. ej. se registró solo para agendar una cita), crea la
   /// fila de `pacientes` con valores por defecto. La PK de `pacientes` es la
@@ -363,21 +375,17 @@ class PacienteRemoteDatasource {
     final normalizedId = _normalizeId(personaId);
     final pacienteModel = await _fetchPacienteModel(normalizedId);
     if (pacienteModel != null) {
-      print("a");
       final record = await _loadOrCreateRecord(pacienteModel.id!);
-      print(record.tipoSangre);
       return pacienteModel.copyWithModel(record: record);
     }
 
     if (!_isValidUuid(normalizedId)) {
-      print("b");
       final local = _pacientesPrueba
           .where((p) => p.id == normalizedId)
           .firstOrNull;
       if (local != null) return local;
     }
 
-    print("c");
     final now = DateTime.now().toIso8601String();
     final creado = await client
         .from('pacientes')

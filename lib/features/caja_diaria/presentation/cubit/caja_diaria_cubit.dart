@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
@@ -72,5 +73,37 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
   Future<void> close() async {
     await _movimientosSubscription?.cancel();
     return super.close();
+  }
+
+  ResumenCierre? obtenerResumenCierre() {
+    final currentState = state;
+    if (currentState is! CajaDiariaAbierta) return null;
+
+    final Map<String, double> totalesPorMetodo = {
+      'Efectivo / General': currentState.ingresos,
+    };
+
+    return ResumenCierre(
+      totalesPorMetodoPago: totalesPorMetodo,
+      totalIngresos: currentState.ingresos,
+      totalEgresos: currentState.egresos,
+      montoEsperado: currentState.montoEsperado,
+      movimientos: currentState.movimientos,
+    );
+  }
+
+  Future<String?> cerrarCaja({
+    required double montoReal,
+    required double montoEsperado,
+  }) async {
+    try {
+      await _repository.cerrarCaja(
+        montoReal: montoReal,
+        montoCierre: montoReal,
+      );
+      return null;
+    } catch (e) {
+      return 'Error al cerrar la caja: ${e.toString().replaceAll('Exception: ', '')}';
+    }
   }
 }

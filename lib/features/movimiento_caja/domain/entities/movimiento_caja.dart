@@ -8,6 +8,7 @@ class MovimientoCaja {
   final String descripcion;
   final DateTime fecha;
   final String referenciaId;
+  final String metodoPago;
 
   MovimientoCaja({
     this.id,
@@ -17,6 +18,7 @@ class MovimientoCaja {
     required this.descripcion,
     required this.fecha,
     required this.referenciaId,
+    this.metodoPago = 'efectivo', // AÑADIDO
   });
 
   MovimientoCaja copyWith({
@@ -26,6 +28,7 @@ class MovimientoCaja {
     String? descripcion,
     DateTime? fecha,
     String? referenciaId,
+    String? metodoPago,
   }) {
     return MovimientoCaja(
       id: id,
@@ -35,6 +38,7 @@ class MovimientoCaja {
       descripcion: descripcion ?? this.descripcion,
       fecha: fecha ?? this.fecha,
       referenciaId: referenciaId ?? this.referenciaId,
+      metodoPago: metodoPago ?? this.metodoPago, // AÑADIDO
     );
   }
 }

@@ -5,6 +5,8 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/cierre_caja_cubit.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/cierre_caja_page.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
@@ -91,6 +93,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
             onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
             onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
             onNavigateToConfiguracion: () => _navigateToLabel('Configuración'),
+            onNavigateToCierreCaja: () => _navigateToLabel('Cierre de Caja'),
           ),
         ),
       ),
@@ -134,10 +137,19 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     ShellDestination(
       icon: Icons.account_balance_wallet_outlined,
       selectedIcon: Icons.account_balance_wallet_rounded,
-      label: 'Cuentas por Cobrar',
+      label: 'Cuentas',
       builder: (_) => BlocProvider(
         create: (_) => sl<CuentasPorCobrarCubit>(),
         child: const CuentasPorCobrarPage(),
+      ),
+    ),
+    ShellDestination(
+      icon: Icons.receipt_outlined,
+      selectedIcon: Icons.receipt_rounded,
+      label: 'Cierre de Caja',
+      builder: (_) => BlocProvider(
+        create: (_) => sl<CierreCajaCubit>(),
+        child: const CierreCajaPage(),
       ),
     ),
     ShellDestination(
@@ -206,13 +218,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         case 'Equipos':
           return roles.contains(RolUsuario.admin);
         case 'Consultas':
+        case 'Cierre de Caja':
+          return roles.contains(RolUsuario.admin);
         case 'Medicinas':
         case 'Tratamientos':
           return roles.contains(RolUsuario.admin) ||
               roles.contains(RolUsuario.doctor);
         case 'Pacientes':
         case 'Mis Citas del Día':
-        case 'Cuentas por Cobrar':
+        case 'Cuentas':
           return roles.contains(RolUsuario.admin) ||
               roles.contains(RolUsuario.doctor) ||
               roles.contains(RolUsuario.asistente);

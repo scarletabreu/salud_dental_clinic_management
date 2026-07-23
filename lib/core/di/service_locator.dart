@@ -150,6 +150,11 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubi
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_cubit.dart';
 
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/data/repositories/caja_diaria_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/cierre_caja_cubit.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init() async {
@@ -426,5 +431,17 @@ Future<void> init() async {
       registrarOActualizar: sl(),
       eliminar: sl(),
     ),
+  );
+
+  sl.registerLazySingleton<CajaDiariaDatasource>(
+    () => CajaDiariaDatasourceImpl(sl()),
+  );
+
+  sl.registerLazySingleton<CajaDiariaRepositoryImpl>(
+    () => CajaDiariaRepositoryImpl(sl(), sl()),
+  );
+
+  sl.registerFactory<CierreCajaCubit>(
+    () => CierreCajaCubit(sl<CajaDiariaRepositoryImpl>()),
   );
 }

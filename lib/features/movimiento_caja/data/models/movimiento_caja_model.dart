@@ -10,6 +10,7 @@ class MovimientoCajaModel extends MovimientoCaja {
     required super.descripcion,
     required super.fecha,
     required super.referenciaId,
+    super.metodoPago,
   });
 
   factory MovimientoCajaModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class MovimientoCajaModel extends MovimientoCaja {
       descripcion: json['descripcion'] as String,
       fecha: DateTime.parse(json['fecha'] as String).toLocal(),
       referenciaId: json['referencia_id'] ?? json['referenciaId'] as String,
+      metodoPago: json['metodo_pago'] as String? ?? 'efectivo',
     );
   }
 
@@ -35,6 +37,7 @@ class MovimientoCajaModel extends MovimientoCaja {
       'descripcion': descripcion,
       'fecha': fecha.toUtc().toIso8601String(),
       'referencia_id': referenciaId,
+      'metodo_pago': metodoPago,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {
@@ -53,6 +56,7 @@ class MovimientoCajaModel extends MovimientoCaja {
       descripcion: entidad.descripcion,
       fecha: entidad.fecha,
       referenciaId: entidad.referenciaId,
+      metodoPago: entidad.metodoPago,
     );
   }
 }

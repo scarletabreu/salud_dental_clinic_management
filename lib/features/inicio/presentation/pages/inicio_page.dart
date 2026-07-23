@@ -20,11 +20,13 @@ class InicioPage extends StatelessWidget {
     this.onNavigateToPacientes,
     this.onNavigateToMedicinas,
     this.onNavigateToConfiguracion,
+    this.onNavigateToCierreCaja,
   });
 
   final VoidCallback? onNavigateToCitas;
   final VoidCallback? onNavigateToPacientes;
   final VoidCallback? onNavigateToMedicinas;
+  final VoidCallback? onNavigateToCierreCaja;
   final VoidCallback? onNavigateToConfiguracion;
 
   @override
@@ -66,7 +68,6 @@ class InicioPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Header ───────────────────────────────────────────────
                   DashboardHeaderCard(
                     onVerCitas: onNavigateToCitas,
                     nombreDoctor: loaded.nombreDoctor,
@@ -75,11 +76,9 @@ class InicioPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Métricas ─────────────────────────────────────────────
                   _buildMetricsGrid(loaded, isNarrow, ac),
                   const SizedBox(height: 16),
 
-                  // ── Charts row: donut + barras semanales ─────────────────
                   isNarrow
                       ? Column(
                           children: [
@@ -109,11 +108,9 @@ class InicioPage extends StatelessWidget {
                         ),
                   const SizedBox(height: 16),
 
-                  // ── Tendencia mensual (line chart) ───────────────────────
                   _MonthlyTrendChart(ac: ac),
                   const SizedBox(height: 16),
 
-                  // ── Siguiente paciente ────────────────────────────────────
                   if (loaded.isDoctor || loaded.isAdmin) ...[
                     SiguientePacienteCard(
                       cita: siguientePaciente,
@@ -125,11 +122,9 @@ class InicioPage extends StatelessWidget {
                     const SizedBox(height: 16),
                   ],
 
-                  // ── Accesos rápidos ───────────────────────────────────────
                   _buildQuickActions(loaded, ac),
                   const SizedBox(height: 16),
 
-                  // ── Lista citas de hoy ────────────────────────────────────
                   DashboardCitasHoySection(
                     citas: loaded.citasDeHoy,
                     onCambiarEstado: cambiarEstado,
@@ -144,7 +139,6 @@ class InicioPage extends StatelessWidget {
     );
   }
 
-  // ── Metrics grid (unchanged logic, kept here for self-containment) ─────────
   Widget _buildMetricsGrid(
     DashboardLoaded loaded,
     bool isNarrow,
@@ -319,11 +313,6 @@ class InicioPage extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Chart 1: Distribución del día  (donut — antes DashboardCitasChart)
-// Mejorado: segmentos más gruesos, label central con total, leyenda con barras
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _DayDistributionChart extends StatefulWidget {
   final int pendientes;
   final int enEspera;
@@ -360,7 +349,6 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
           ? _EmptyChart(message: 'Sin citas registradas para hoy')
           : Row(
               children: [
-                // Donut
                 Expanded(
                   flex: 5,
                   child: SizedBox(
@@ -401,7 +389,6 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
                             }),
                           ),
                         ),
-                        // Centro: total
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -429,7 +416,6 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Leyenda con mini barras de progreso
                 Expanded(
                   flex: 6,
                   child: Column(
@@ -475,7 +461,6 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
                               ],
                             ),
                             const SizedBox(height: 5),
-                            // Mini progress bar
                             ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: LinearProgressIndicator(
@@ -501,16 +486,10 @@ class _DayDistributionChartState extends State<_DayDistributionChart> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Chart 2: Citas por día de la semana  (bar chart)
-// Datos simulados — conectar al cubit cuando el backend exponga el historial
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _WeeklyBarChart extends StatelessWidget {
   const _WeeklyBarChart({required this.ac});
   final AppColors ac;
 
-  // TODO: replace with real weekly data from DashboardLoaded
   static const _days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   static const _completadas = [8.0, 5.0, 9.0, 7.0, 11.0, 4.0, 2.0];
   static const _pendientes = [2.0, 3.0, 1.0, 4.0, 2.0, 1.0, 0.0];
@@ -638,15 +617,10 @@ class _WeeklyBarChart extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Chart 3: Tendencia mensual  (line chart — últimas 4 semanas)
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _MonthlyTrendChart extends StatelessWidget {
   const _MonthlyTrendChart({required this.ac});
   final AppColors ac;
 
-  // TODO: replace with real data from DashboardLoaded / cubit
   static const _weeks = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'];
   static const _citasSemana = [32.0, 28.0, 41.0, 37.0];
   static const _nuevos = [5.0, 3.0, 8.0, 6.0];
@@ -695,7 +669,6 @@ class _MonthlyTrendChart extends StatelessWidget {
                   interval: 1.0,
                   getTitlesWidget: (value, meta) {
                     final i = value.toInt();
-                    // Only render label when value is exactly an integer index
                     if (value != i.toDouble()) return const SizedBox();
                     if (i < 0 || i >= _weeks.length) return const SizedBox();
                     return Padding(
@@ -742,7 +715,6 @@ class _MonthlyTrendChart extends StatelessWidget {
             ),
             borderData: FlBorderData(show: false),
             lineBarsData: [
-              // Citas atendidas — área suave azul
               LineChartBarData(
                 spots: List.generate(
                   _citasSemana.length,
@@ -773,7 +745,6 @@ class _MonthlyTrendChart extends StatelessWidget {
                   ),
                 ),
               ),
-              // Pacientes nuevos — línea teal
               LineChartBarData(
                 spots: List.generate(
                   _nuevos.length,
@@ -803,10 +774,6 @@ class _MonthlyTrendChart extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Shared chart wrapper card
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _ChartCard extends StatelessWidget {
   const _ChartCard({
     required this.title,
@@ -833,7 +800,6 @@ class _ChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -862,7 +828,6 @@ class _ChartCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Leyenda inline
               if (legendItems != null)
                 Wrap(spacing: 14, children: legendItems!),
             ],
@@ -874,10 +839,6 @@ class _ChartCard extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Small helpers
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _ChartSection {
   const _ChartSection(this.label, this.value, this.color);
@@ -903,7 +864,6 @@ class _LegendItem extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Circle or dashed line indicator
         dashed
             ? Row(
                 mainAxisSize: MainAxisSize.min,

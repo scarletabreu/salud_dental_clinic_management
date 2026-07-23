@@ -34,6 +34,8 @@ class ShellDestinationAccess {
       case 'Tratamientos':
         return roles.contains(RolUsuario.admin) ||
             roles.contains(RolUsuario.doctor);
+      case 'Inventario':
+        return roles.contains(RolUsuario.admin);
       case 'Pacientes':
       case 'Mis Citas del Día':
       case 'Cuentas por Cobrar':

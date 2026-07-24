@@ -39,6 +39,9 @@ Failure mapExceptionToFailure(Object error, {String? context}) {
 
   // 3. Excepciones tipadas de Supabase → error de servidor con su mensaje limpio.
   if (error is PostgrestException) {
+    if (error.message == _cajaCerradaMessage) {
+      return const ValidationFailure(_cajaCerradaMessage);
+    }
     return ServerFailure(_serverMessage(context, error.message));
   }
   if (error is StorageException) {
@@ -51,6 +54,9 @@ Failure mapExceptionToFailure(Object error, {String? context}) {
   // 4. Cualquier otra cosa: error de servidor genérico.
   return ServerFailure(_serverMessage(context, null));
 }
+
+const _cajaCerradaMessage =
+    'No hay una caja abierta para hoy. Abre la caja antes de registrar el pago.';
 
 const _networkMarkers = [
   'failed host lookup',

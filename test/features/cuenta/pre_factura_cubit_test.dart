@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
@@ -56,7 +57,8 @@ class _FakeCuentaRepository implements CuentaRepository {
   Future<void> actualizarCuenta(Cuenta cuenta) => throw UnimplementedError();
 
   @override
-  Future<Cuenta?> getCuentaByConsultaId(String consultaId) => throw UnimplementedError();
+  Future<Cuenta?> getCuentaByConsultaId(String consultaId) =>
+      throw UnimplementedError();
 
   @override
   Future<List<Cuenta>> getCuentasPorCobrar() => throw UnimplementedError();
@@ -69,6 +71,9 @@ class _FakeCuentaRepository implements CuentaRepository {
 /// Fake del repositorio de pagos: registra la última llamada para poder
 /// aseverar los argumentos y devuelve un id fijo.
 class _FakePagoRepository implements PagoRepository {
+  _FakePagoRepository({this.error});
+
+  final Object? error;
   String? ultimaCuentaId;
   double? ultimoMonto;
   pago_enums.MetodoPago? ultimoMetodo;
@@ -80,6 +85,7 @@ class _FakePagoRepository implements PagoRepository {
     required pago_enums.MetodoPago metodo,
     String? cuotaId,
   }) async {
+    if (error != null) throw error!;
     ultimaCuentaId = cuentaId;
     ultimoMonto = monto;
     ultimoMetodo = metodo;
@@ -245,6 +251,35 @@ void main() {
       expect(error, isNull);
       expect(cubit.ultimoPagoRegistrado?.id, 'pago-1');
       expect((cubit.state as PreFacturaCargada).cuenta.montoPagado, 400);
+      await cubit.close();
+    });
+
+    test('devuelve el error accionable cuando no hay caja abierta', () async {
+      const message =
+          'No hay una caja abierta para hoy. Abre la caja antes de registrar el pago.';
+      final cuenta = _cuenta(items: [_item(1000)]);
+      final cuotaRepository = _FakeCuotaRepository();
+      final cubit = PreFacturaCubit(
+        getCuenta: GetCuentaByIdUseCase(
+          repository: _FakeCuentaRepository(resultado: cuenta),
+        ),
+        registrarPago: RegistrarPago(
+          _FakePagoRepository(error: const ValidationFailure(message)),
+        ),
+        cuotaRepository: cuotaRepository,
+        generarPlan: GenerarPlanDeCuotas(cuotaRepository),
+        consultaRepository: _FakeConsultaRepository(),
+        pacienteRepository: _FakePacienteRepository(),
+      );
+
+      await cubit.cargar('c1');
+      final error = await cubit.registrarPago(
+        monto: 100,
+        metodo: pago_enums.MetodoPago.efectivo,
+      );
+
+      expect(error, message);
+      expect(cubit.state, isA<PreFacturaCargada>());
       await cubit.close();
     });
   });

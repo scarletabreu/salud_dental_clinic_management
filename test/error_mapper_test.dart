@@ -19,12 +19,15 @@ void main() {
       expect(f, isA<NetworkFailure>());
     });
 
-    test('mensaje con "Failed host lookup" -> NetworkFailure (fallback string)', () {
-      final f = mapExceptionToFailure(
-        Exception('Error: Failed host lookup: supabase.co'),
-      );
-      expect(f, isA<NetworkFailure>());
-    });
+    test(
+      'mensaje con "Failed host lookup" -> NetworkFailure (fallback string)',
+      () {
+        final f = mapExceptionToFailure(
+          Exception('Error: Failed host lookup: supabase.co'),
+        );
+        expect(f, isA<NetworkFailure>());
+      },
+    );
 
     test('mensaje con "Connection refused" -> NetworkFailure', () {
       final f = mapExceptionToFailure(Exception('Connection refused'));
@@ -46,6 +49,18 @@ void main() {
       );
       expect(f, isA<ServerFailure>());
       expect(f.message, 'Error al crear la cita: boom');
+    });
+
+    test('error de caja cerrada conserva el mensaje accionable', () {
+      const message =
+          'No hay una caja abierta para hoy. Abre la caja antes de registrar el pago.';
+      final f = mapExceptionToFailure(
+        PostgrestException(message: message, code: 'P0001'),
+        context: 'registrar el pago',
+      );
+
+      expect(f, isA<ValidationFailure>());
+      expect(f.message, message);
     });
 
     test('excepción desconocida -> ServerFailure genérico', () {

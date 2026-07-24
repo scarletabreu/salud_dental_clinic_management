@@ -41,6 +41,7 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Confirmar apertura'),
         content: Text(
           'Abrirás la caja de hoy con ${formatMoneda(monto)} como fondo inicial. Podrás registrar los movimientos del día a continuación.',
@@ -52,6 +53,9 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.appColors.primaryBlue,
+            ),
             child: const Text('Abrir caja'),
           ),
         ],
@@ -65,7 +69,14 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
     setState(() => _abriendo = false);
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: context.appColors.red),
+        SnackBar(
+          content: Text(error),
+          backgroundColor: context.appColors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       );
     }
   }
@@ -241,6 +252,180 @@ class _CajaAbiertaView extends StatefulWidget {
 class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
   bool _cerrando = false;
 
+  Future<void> _mostrarDialogoRegistrarEgreso(BuildContext context) async {
+    final montoController = TextEditingController();
+    final descripcionController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final ac = context.appColors;
+
+    final registrado = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: ac.orange.withValues(alpha: 0.12),
+              child: Icon(
+                Icons.arrow_upward_rounded,
+                color: ac.orange,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Registrar egreso',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: ac.bgPage,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ac.divider.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Efectivo disponible:',
+                        style: TextStyle(color: ac.textSecondary, fontSize: 13),
+                      ),
+                      Text(
+                        formatMoneda(widget.state.montoEsperado),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: ac.primaryBlue,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: montoController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  autofocus: true,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*[,.]?\d{0,2}'),
+                    ),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Monto a retirar *',
+                    prefixText: 'RD\$ ',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final parsed = double.tryParse(
+                      (value ?? '').replaceAll(',', '.'),
+                    );
+                    if (parsed == null || parsed <= 0) {
+                      return 'Ingresa un monto mayor a cero.';
+                    }
+                    if (parsed > widget.state.montoEsperado) {
+                      return 'El monto supera el disponible en caja.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: descripcionController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción del gasto *',
+                    hintText: 'Ej. Compra de agua, botiquín, transporte...',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'La descripción es obligatoria.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: ac.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogCtx, true);
+              }
+            },
+            child: const Text('Registrar egreso'),
+          ),
+        ],
+      ),
+    );
+
+    if (registrado != true || !mounted) return;
+
+    final monto = double.parse(montoController.text.replaceAll(',', '.'));
+    final descripcion = descripcionController.text;
+
+    final error = await context.read<CajaDiariaCubit>().registrarEgreso(
+      monto: monto,
+      descripcion: descripcion,
+    );
+
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: ac.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Egreso registrado correctamente por ${formatMoneda(monto)}.',
+          ),
+          backgroundColor: ac.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _mostrarDialogoCierre(BuildContext context) async {
     final montoController = TextEditingController(
       text: widget.state.montoEsperado.toStringAsFixed(2),
@@ -250,6 +435,7 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Cerrar caja del día'),
         content: Form(
           key: formKey,
@@ -332,7 +518,14 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
 
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: context.appColors.red),
+        SnackBar(
+          content: Text(error),
+          backgroundColor: context.appColors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       );
     } else {
       final diferencia = montoContado - widget.state.montoEsperado;
@@ -382,8 +575,10 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                   ),
                 ],
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -411,7 +606,28 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _mostrarDialogoRegistrarEgreso(context),
+                    icon: Icon(
+                      Icons.arrow_upward_rounded,
+                      color: ac.orange,
+                      size: 18,
+                    ),
+                    label: Text(
+                      'Registrar egreso',
+                      style: TextStyle(color: ac.textPrimary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: ac.orange.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
                   FilledButton.icon(
                     onPressed: _cerrando
                         ? null
@@ -419,6 +635,13 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                     style: FilledButton.styleFrom(
                       backgroundColor: ac.red,
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     icon: _cerrando
                         ? const SizedBox(

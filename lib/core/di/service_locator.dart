@@ -37,6 +37,7 @@ import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/e
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/usecases/registrar_egreso_caja.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 
@@ -392,7 +393,7 @@ Future<void> init() async {
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
   );
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
-  sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl()));
+  sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl(), sl()));
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),
@@ -505,4 +506,6 @@ Future<void> init() async {
       eliminarConsumible: sl(),
     ),
   );
+
+  sl.registerLazySingleton(() => RegistrarEgresoCaja(sl()));
 }

@@ -38,13 +38,14 @@ begin
   -- Ayer: jornada cerrada con faltante. Apertura 5000, ingresos 12 300,
   -- egresos 1500 → esperado 15 800; se contaron 15 680 → diferencia -120.00.
   -- --------------------------------------------------------------------------
+  -- El trigger `validar_caja_abierta` rechaza movimientos sobre una caja ya
+  -- cerrada, así que hay que reproducir el orden real de la jornada: se abre,
+  -- se registran los movimientos y sólo al final se cierra.
   insert into public.cajas (
-    fecha, monto_apertura, monto_esperado, monto_real, monto_cierre,
-    cerrada, observaciones
+    fecha, monto_apertura, monto_esperado, monto_real, monto_cierre, cerrada
   ) values (
     (v_hoy - 1)::timestamptz + time '08:30',
-    5000, 15800, 15680, 15680,
-    true, 'Faltante de RD$ 120.00. Se revisa el arqueo de la tarde.'
+    5000, 5000, 0, 0, false
   ) returning id into v_caja_ayer;
 
   insert into public.movimientos_caja (caja_diaria_id, tipo, monto, descripcion, fecha)
@@ -53,6 +54,12 @@ begin
     (v_caja_ayer, 'ingreso', 6500.00, 'Cobro de extracción de tercer molar',  (v_hoy - 1)::timestamptz + time '12:40'),
     (v_caja_ayer, 'ingreso', 1000.00, 'Abono a plan de cuotas',               (v_hoy - 1)::timestamptz + time '16:05'),
     (v_caja_ayer, 'egreso',  1500.00, 'Pago a laboratorio dental',            (v_hoy - 1)::timestamptz + time '17:20');
+
+  update public.cajas
+     set monto_esperado = 15800, monto_real = 15680, monto_cierre = 15680,
+         cerrada = true,
+         observaciones = 'Faltante de RD$ 120.00. Se revisa el arqueo de la tarde.'
+   where id = v_caja_ayer;
 
   -- --------------------------------------------------------------------------
   -- Hoy: jornada abierta. Sólo puede haber una caja con `cerrada = false`

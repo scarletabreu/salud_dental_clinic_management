@@ -34,6 +34,8 @@ set local role postgres;
 do $test$
 declare
   v_persona_id  uuid := gen_random_uuid();
+  v_doctor_id   uuid := gen_random_uuid();
+  v_consulta_id uuid;
   v_cuenta_id   uuid;
   v_caja_hoy    uuid;
   v_caja_ayer   uuid;
@@ -45,18 +47,37 @@ declare
   v_zona constant text := 'America/Santo_Domingo';
 begin
   -- --------------------------------------------------------------------------
-  -- Fixtures mínimos: la cadena persona → paciente → cuenta que exige la FK de
-  -- `pagos`. Se usan las mismas columnas que escribe la app en producción.
+  -- Fixtures mínimos: la cadena completa que exigen las FK de `pagos`.
+  --
+  --   personas → pacientes                    ─┐
+  --   personas → usuarios → doctores          ─┴→ consultas → cuentas → pagos
+  --
+  -- `cuentas.consulta_id` es NOT NULL, así que no se puede cobrar sin consulta.
   -- --------------------------------------------------------------------------
   insert into public.personas (id, nombre, apellido, fecha_nacimiento, cedula, estatus)
   values (v_persona_id, 'Paciente', 'De Prueba SD-119', date '1990-01-01',
-          'SD119-' || substr(v_persona_id::text, 1, 8), 'activo');
+          'SD119-P-' || substr(v_persona_id::text, 1, 8), 'activo');
 
   insert into public.pacientes (id, genero, tipo_paciente)
   values (v_persona_id, 'otro', 'integrado');
 
-  insert into public.cuentas (paciente_id, estado, monto_total, metodo_pago, fecha_creacion)
-  values (v_persona_id, 'abierta', 10000, 'contado', now())
+  insert into public.personas (id, nombre, apellido, fecha_nacimiento, cedula, estatus)
+  values (v_doctor_id, 'Doctor', 'De Prueba SD-119', date '1980-01-01',
+          'SD119-D-' || substr(v_doctor_id::text, 1, 8), 'activo');
+
+  insert into public.usuarios (id, username)
+  values (v_doctor_id, 'sd119-' || substr(v_doctor_id::text, 1, 8));
+
+  insert into public.doctores (id, especialidad)
+  values (v_doctor_id, 'Odontología general');
+
+  insert into public.consultas (paciente_id, doctor_id, fecha, motivo_consulta)
+  values (v_persona_id, v_doctor_id, now(), 'Consulta de prueba SD-119')
+  returning id into v_consulta_id;
+
+  insert into public.cuentas (paciente_id, consulta_id, estado, monto_total,
+                              metodo_pago, fecha_creacion)
+  values (v_persona_id, v_consulta_id, 'abierta', 10000, 'contado', now())
   returning id into v_cuenta_id;
 
   -- --------------------------------------------------------------------------
@@ -184,17 +205,22 @@ begin
   -- El drift ya metió una vez `tr_pago_a_movimiento_caja` conviviendo con
   -- `pagos_registrar_ingreso_caja`; dos triggers duplican cada cobro del día.
   -- --------------------------------------------------------------------------
+  -- Se cuentan sólo los triggers que ESCRIBEN en `movimientos_caja`. `pagos`
+  -- tiene legítimamente otros (p. ej. `tr_validar_exceso_pago`, que valida el
+  -- saldo); contarlos todos sería ruido.
   select count(*) into v_triggers
     from pg_trigger t
     join pg_class c on c.oid = t.tgrelid
+    join pg_proc  p on p.oid = t.tgfoid
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relname = 'pagos'
-     and not t.tgisinternal;
+     and not t.tgisinternal
+     and p.prosrc like '%movimientos_caja%';
 
   if v_triggers <> 1 then
-    raise warning
-      'REVISAR (5): `pagos` tiene % triggers no internos. Verifica que sólo uno alimente la caja.',
+    raise exception
+      'FALLO (5): % triggers de `pagos` escriben en movimientos_caja; debe ser exactamente 1.',
       v_triggers;
   end if;
 

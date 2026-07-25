@@ -140,15 +140,27 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
     );
   }
 
-  Future<String?> cerrarCaja({
-    required double montoReal,
-    required double montoEsperado,
-  }) async {
+  /// El monto esperado no se recibe por parámetro a propósito: lo recalcula el
+  /// repositorio contra los movimientos persistidos justo antes de cerrar, para
+  /// que un cobro que entró mientras el cajero contaba el efectivo no quede
+  /// fuera del cuadre.
+  Future<String?> cerrarCaja({required double montoReal}) async {
+    if (state is! CajaDiariaAbierta) {
+      return 'No hay una caja abierta para cerrar.';
+    }
+
+    if (montoReal < 0) {
+      return 'El monto contado no puede ser negativo.';
+    }
+
     try {
       await _repository.cerrarCaja(
         montoReal: montoReal,
         montoCierre: montoReal,
       );
+      // La caja quedó cerrada en la base: el estado debe reflejarlo o la
+      // pantalla seguiría ofreciendo registrar movimientos sobre una caja muerta.
+      await cargar();
       return null;
     } catch (e) {
       return 'Error al cerrar la caja: ${e.toString().replaceAll('Exception: ', '')}';

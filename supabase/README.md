@@ -11,8 +11,9 @@ y reconstruir una instancia idéntica desde cero.
 ## 📌 Estado actual y línea base
 
 * **`supabase/schema.sql`**: línea base extraída de la instancia real con
-  `supabase db dump --linked`. **Refrescada el 25 jul 2026**: 42 tablas, 25 tipos,
-  158 políticas RLS y las funciones/triggers vigentes. Sólo estructura, sin datos.
+  `supabase db dump --linked`. **Refrescada el 25 jul 2026 (SD-135)**: 45 tablas,
+  27 tipos, 172 políticas RLS y las funciones/triggers vigentes. Sólo estructura,
+  sin datos.
   Está al día con todas las migraciones listadas abajo, así que por sí sola
   reconstruye la base completa.
 
@@ -143,6 +144,7 @@ así que no dejan datos, y abortan con `ERROR` si el contrato se rompe.
 | Script | Qué verifica |
 |---|---|
 | `tests/sd_111_trigger_caja_test.sql` | `pagos_registrar_ingreso_caja`: un pago `completado` genera **un** ingreso en la caja abierta de hoy; un pago pendiente no la toca; sin caja abierta el pago se rechaza (P0001) y no se persiste; la caja de ayer no habilita el cobro de hoy; no revivió el trigger duplicado `tr_pago_a_movimiento_caja`. |
+| `tests/sd_135_plan_tratamiento_test.sql` | Separación evaluación / plan / ejecución: registrar hallazgos **no** crea tratamiento aplicado ni cuenta; una actividad todavía `propuesto` no se puede vincular a una ejecución (trigger `trg_item_plan_ejecutable`); el eje de ejecución rechaza el estado heredado `indicado` (CHECK `tratamientos_aplicados_solo_ejecucion`); `finalizar_consulta` cobra solo lo ejecutado e ignora lo planificado, y es idempotente. |
 
 ```bash
 # Contra la base local levantada por el CLI
@@ -162,12 +164,12 @@ dentro de su propia transacción (el `ROLLBACK` la devuelve intacta), porque si 
 caso 3 —"sin caja abierta el pago se rechaza"— no probaría nada. Por eso se puede
 correr con el seed ya cargado, o contra una instancia con la jornada en curso.
 
-> ⚠️ **Ojo con el bootstrap desde cero.** `supabase db reset` **no funciona hoy**:
-> `schema.sql` no define ninguna tabla, así que la primera migración
-> (`20260720190000_sd_103_plan_cuotas.sql`) muere con
-> `relation "public.cuotas" does not exist`. Para levantar un entorno local hay que
-> reconstruir a mano las tablas base. Es deuda técnica del "punto cero", no de estas
-> pruebas.
+> ⚠️ **Ojo con el bootstrap desde cero.** `supabase db reset` sigue sin servir: aplica
+> las migraciones sobre una base vacía y la primera (`20260720190000_sd_103_plan_cuotas.sql`)
+> muere con `relation "public.cuotas" does not exist`. Usa el procedimiento de
+> «Cómo reconstruir la BD desde cero» (cargar `schema.sql` y luego `seed.sql`), que sí
+> deja la base completa: verificado el 25 jul 2026 cargando la línea base en una base
+> limpia y corriendo `tests/sd_135_plan_tratamiento_test.sql` sobre ella.
 
 ### Verificación manual equivalente
 

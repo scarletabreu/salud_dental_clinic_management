@@ -199,6 +199,20 @@ CREATE TYPE "public"."estado_cuota" AS ENUM (
 ALTER TYPE "public"."estado_cuota" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."estado_item_plan" AS ENUM (
+    'propuesto',
+    'aceptado',
+    'rechazado',
+    'pendiente',
+    'en_proceso',
+    'completado',
+    'cancelado'
+);
+
+
+ALTER TYPE "public"."estado_item_plan" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."estado_pago" AS ENUM (
     'pendiente',
     'parcial',
@@ -211,6 +225,20 @@ CREATE TYPE "public"."estado_pago" AS ENUM (
 
 
 ALTER TYPE "public"."estado_pago" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."estado_plan_tratamiento" AS ENUM (
+    'borrador',
+    'propuesto',
+    'aceptado',
+    'rechazado',
+    'en_proceso',
+    'completado',
+    'cancelado'
+);
+
+
+ALTER TYPE "public"."estado_plan_tratamiento" OWNER TO "postgres";
 
 
 CREATE TYPE "public"."estatus_persona" AS ENUM (
@@ -596,9 +624,7 @@ declare
   v_monto_total numeric(12,2);
   v_metodo_pago modo_pago;
 begin
-  -- 0. El método de pago llega como texto desde la app; `cuentas.metodo_pago`
-  --    es el enum `modo_pago`. Se normaliza y se rechaza con un mensaje claro
-  --    en vez de dejar que el cast implícito reviente la transacción.
+  -- El método llega como texto desde la app; la columna es el enum `modo_pago`.
   begin
     v_metodo_pago := lower(btrim(coalesce(p_metodo_pago, 'contado')))::modo_pago;
   exception when invalid_text_representation then
@@ -606,71 +632,47 @@ begin
       p_metodo_pago using errcode = '22023';
   end;
 
-  -- 1. Datos de la consulta (paciente para la cuenta, cita para completarla).
-  select paciente_id, cita_id
-    into v_paciente_id, v_cita_id
-    from consultas
-   where id = p_consulta_id
-     and deleted_at is null;
-
+  select paciente_id, cita_id into v_paciente_id, v_cita_id
+  from consultas where id = p_consulta_id and deleted_at is null;
   if v_paciente_id is null then
     raise exception 'La consulta % no existe o fue eliminada.', p_consulta_id;
   end if;
 
-  -- 2. Idempotencia: si esta consulta ya tiene cuenta, se devuelve la existente
-  --    (evita pre-facturas duplicadas si se reintenta finalizar).
-  select id
-    into v_cuenta_id
-    from cuentas
-   where consulta_id = p_consulta_id
-     and deleted_at is null
-   limit 1;
+  -- Idempotencia: reintentar finalizar no duplica la pre-factura.
+  select id into v_cuenta_id from cuentas
+  where consulta_id = p_consulta_id and deleted_at is null limit 1;
+  if v_cuenta_id is not null then return v_cuenta_id; end if;
 
-  if v_cuenta_id is not null then
-    return v_cuenta_id;
-  end if;
+  -- Solo procedimientos ejecutados. Las actividades del plan (propuestas,
+  -- aceptadas o pendientes) y los hallazgos de la evaluación no facturan.
+  select coalesce(sum(precio_aplicado), 0) into v_monto_total
+  from tratamientos_aplicados
+  where consulta_id = p_consulta_id
+    and deleted_at is null
+    and coalesce(estado, 'aplicado') <> 'indicado';
 
-  -- 3. Monto = suma de los precios congelados de los tratamientos aplicados.
-  select coalesce(sum(precio_aplicado), 0)
-    into v_monto_total
-    from tratamientos_aplicados
-   where consulta_id = p_consulta_id
-     and deleted_at is null
-     and coalesce(estado, 'aplicado') = 'aplicado';
-
-  -- 4. Cuenta ABIERTA con el total calculado.
   insert into cuentas (
     paciente_id, consulta_id, estado, monto_total, metodo_pago,
     fecha_creacion, nota, created_at, updated_at
-  )
-  values (
+  ) values (
     v_paciente_id, p_consulta_id, 'abierta', v_monto_total, v_metodo_pago,
     now(), p_nota, now(), now()
-  )
-  returning id into v_cuenta_id;
+  ) returning id into v_cuenta_id;
 
-  -- 5. Un ítem por tratamiento aplicado (descripción = nombre del tratamiento).
   insert into items_cuenta (
     cuenta_id, descripcion, precio_unitario, cantidad, created_at, updated_at
   )
-  select
-    v_cuenta_id,
-    coalesce(t.nombre, 'Tratamiento'),
-    coalesce(ta.precio_aplicado, 0),
-    1,
-    now(), now()
+  select v_cuenta_id, coalesce(t.nombre, 'Tratamiento'),
+         coalesce(ta.precio_aplicado, 0), 1, now(), now()
   from tratamientos_aplicados ta
   left join tratamientos t on t.id = ta.tratamiento_id
   where ta.consulta_id = p_consulta_id
     and ta.deleted_at is null
-    and coalesce(ta.estado, 'aplicado') = 'aplicado';
+    and coalesce(ta.estado, 'aplicado') <> 'indicado';
 
-  -- 6. Cierre clínico: marcar la cita como completada (si la consulta nació de una).
   if v_cita_id is not null then
-    update citas
-       set estado     = 'completada'::estado_cita,
-           updated_at = now()
-     where id = v_cita_id;
+    update citas set estado = 'completada'::estado_cita, updated_at = now()
+    where id = v_cita_id;
   end if;
 
   return v_cuenta_id;
@@ -1440,6 +1442,38 @@ $$;
 
 ALTER FUNCTION "public"."validar_monto_pago"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."verificar_item_plan_ejecutable"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+  v_estado public.estado_item_plan;
+begin
+  if new.item_plan_id is null then
+    return new;
+  end if;
+
+  select estado into v_estado
+  from public.items_plan_tratamiento
+  where id = new.item_plan_id and deleted_at is null;
+
+  if v_estado is null then
+    raise exception 'El item de plan % no existe o fue eliminado.', new.item_plan_id;
+  end if;
+
+  if v_estado in ('propuesto', 'rechazado', 'cancelado') then
+    raise exception
+      'No se puede registrar la ejecución de una actividad en estado %. '
+      'Debe estar aceptada, pendiente, en proceso o completada.', v_estado;
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."verificar_item_plan_ejecutable"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -1730,7 +1764,8 @@ CREATE TABLE IF NOT EXISTS "public"."diagnosticos_aplicados" (
     "consulta_id" "uuid",
     "diente_id" "uuid",
     "superficie" "public"."tipo_superficie",
-    "origen" "text" DEFAULT 'preexistente'::"text" NOT NULL
+    "origen" "text" DEFAULT 'preexistente'::"text" NOT NULL,
+    "evaluacion_id" "uuid"
 );
 
 
@@ -1828,6 +1863,27 @@ CREATE TABLE IF NOT EXISTS "public"."equipos_mantenimientos" (
 ALTER TABLE "public"."equipos_mantenimientos" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."evaluaciones_clinicas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "paciente_id" "uuid" NOT NULL,
+    "consulta_id" "uuid",
+    "doctor_id" "uuid" NOT NULL,
+    "fecha" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "motivo" "text",
+    "resumen" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."evaluaciones_clinicas" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."evaluaciones_clinicas" IS 'Acto de evaluar al paciente. Sus hallazgos son las filas de diagnosticos_aplicados. Registrar un hallazgo aquí NO crea tratamiento aplicado ni cuenta (SD-135).';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."items_cuenta" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "cuenta_id" "uuid" NOT NULL,
@@ -1841,6 +1897,39 @@ CREATE TABLE IF NOT EXISTS "public"."items_cuenta" (
 
 
 ALTER TABLE "public"."items_cuenta" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."items_plan_tratamiento" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "plan_id" "uuid" NOT NULL,
+    "tratamiento_id" "uuid" NOT NULL,
+    "diagnostico_aplicado_id" "uuid",
+    "diente_id" "uuid",
+    "superficie" "public"."tipo_superficie",
+    "estado" "public"."estado_item_plan" DEFAULT 'propuesto'::"public"."estado_item_plan" NOT NULL,
+    "precio_estimado" numeric(15,2) DEFAULT 0 NOT NULL,
+    "orden" integer DEFAULT 0 NOT NULL,
+    "notas" "text",
+    "doctor_propone_id" "uuid",
+    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "fecha_aceptacion" timestamp with time zone,
+    "fecha_rechazo" timestamp with time zone,
+    "motivo_rechazo" "text",
+    "fecha_inicio" timestamp with time zone,
+    "fecha_completado" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone,
+    CONSTRAINT "items_plan_fechas_coherentes" CHECK (((("estado" <> 'rechazado'::"public"."estado_item_plan") OR ("fecha_rechazo" IS NOT NULL)) AND (("estado" <> 'completado'::"public"."estado_item_plan") OR ("fecha_completado" IS NOT NULL)))),
+    CONSTRAINT "items_plan_precio_no_negativo" CHECK (("precio_estimado" >= (0)::numeric))
+);
+
+
+ALTER TABLE "public"."items_plan_tratamiento" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."items_plan_tratamiento" IS 'Actividad planificada sobre un diente/superficie. Su estado es la decisión clínica y del paciente; no genera cargo hasta ejecutarse.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."medicinas" (
@@ -1998,6 +2087,31 @@ CREATE TABLE IF NOT EXISTS "public"."personas" (
 ALTER TABLE "public"."personas" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."planes_tratamiento" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "paciente_id" "uuid" NOT NULL,
+    "evaluacion_id" "uuid",
+    "consulta_origen_id" "uuid",
+    "doctor_id" "uuid" NOT NULL,
+    "estado" "public"."estado_plan_tratamiento" DEFAULT 'borrador'::"public"."estado_plan_tratamiento" NOT NULL,
+    "notas" "text",
+    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "fecha_aceptacion" timestamp with time zone,
+    "fecha_rechazo" timestamp with time zone,
+    "motivo_rechazo" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."planes_tratamiento" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."planes_tratamiento" IS 'Lo que se decide tratar. Agrupa las actividades propuestas al paciente a partir de una evaluación; solo un subconjunto de los hallazgos llega aquí.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."procedimientos" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "nombre" "text" NOT NULL,
@@ -2141,7 +2255,11 @@ CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
     "precio_aplicado" numeric(10,2),
     "consulta_id" "uuid",
     "notas" "text",
-    "estado" "text" DEFAULT 'aplicado'::"text" NOT NULL
+    "estado" "text" DEFAULT 'aplicado'::"text" NOT NULL,
+    "item_plan_id" "uuid",
+    "doctor_ejecuta_id" "uuid",
+    "fecha_ejecucion" timestamp with time zone,
+    CONSTRAINT "tratamientos_aplicados_solo_ejecucion" CHECK ((("deleted_at" IS NOT NULL) OR ("estado" = ANY (ARRAY['aplicado'::"text", 'en_proceso'::"text", 'completado'::"text"]))))
 );
 
 
@@ -2281,8 +2399,18 @@ ALTER TABLE ONLY "public"."equipos"
 
 
 
+ALTER TABLE ONLY "public"."evaluaciones_clinicas"
+    ADD CONSTRAINT "evaluaciones_clinicas_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."items_cuenta"
     ADD CONSTRAINT "item_cuentas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2343,6 +2471,11 @@ ALTER TABLE ONLY "public"."personas"
 
 ALTER TABLE ONLY "public"."personas"
     ADD CONSTRAINT "personas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."planes_tratamiento"
+    ADD CONSTRAINT "planes_tratamiento_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2456,11 +2589,43 @@ CREATE INDEX "idx_diagnosticos_aplicados_diente_id" ON "public"."diagnosticos_ap
 
 
 
+CREATE INDEX "idx_diagnosticos_aplicados_evaluacion" ON "public"."diagnosticos_aplicados" USING "btree" ("evaluacion_id") WHERE ("deleted_at" IS NULL);
+
+
+
 CREATE INDEX "idx_documentos_consulta" ON "public"."documentos_clinicos" USING "btree" ("consulta_id");
 
 
 
+CREATE INDEX "idx_evaluaciones_clinicas_paciente" ON "public"."evaluaciones_clinicas" USING "btree" ("paciente_id", "fecha" DESC) WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_items_plan_diagnostico" ON "public"."items_plan_tratamiento" USING "btree" ("diagnostico_aplicado_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_items_plan_diente" ON "public"."items_plan_tratamiento" USING "btree" ("diente_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_items_plan_estado" ON "public"."items_plan_tratamiento" USING "btree" ("estado") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_items_plan_plan" ON "public"."items_plan_tratamiento" USING "btree" ("plan_id", "orden") WHERE ("deleted_at" IS NULL);
+
+
+
 CREATE INDEX "idx_pagos_cuota_id" ON "public"."pagos" USING "btree" ("cuota_id") WHERE (("cuota_id" IS NOT NULL) AND ("deleted_at" IS NULL));
+
+
+
+CREATE INDEX "idx_planes_tratamiento_evaluacion" ON "public"."planes_tratamiento" USING "btree" ("evaluacion_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_planes_tratamiento_paciente" ON "public"."planes_tratamiento" USING "btree" ("paciente_id", "fecha_propuesta" DESC) WHERE ("deleted_at" IS NULL);
 
 
 
@@ -2484,11 +2649,19 @@ CREATE INDEX "idx_tratamientos_aplicados_estado" ON "public"."tratamientos_aplic
 
 
 
+CREATE INDEX "idx_tratamientos_aplicados_item_plan" ON "public"."tratamientos_aplicados" USING "btree" ("item_plan_id") WHERE ("deleted_at" IS NULL);
+
+
+
 CREATE INDEX "movimientos_caja_fecha_idx" ON "public"."movimientos_caja" USING "btree" ("caja_diaria_id", "fecha" DESC) WHERE ("deleted_at" IS NULL);
 
 
 
 CREATE INDEX "movimientos_stock_consumible_consumible_fecha_idx" ON "public"."movimientos_stock_consumible" USING "btree" ("consumible_id", "created_at" DESC);
+
+
+
+CREATE UNIQUE INDEX "uq_evaluaciones_clinicas_consulta" ON "public"."evaluaciones_clinicas" USING "btree" ("consulta_id") WHERE (("consulta_id" IS NOT NULL) AND ("deleted_at" IS NULL));
 
 
 
@@ -2545,6 +2718,10 @@ CREATE OR REPLACE TRIGGER "tr_validar_pago_caja_abierta" BEFORE INSERT ON "publi
 
 
 CREATE OR REPLACE TRIGGER "trg_aplicar_movimiento_stock" BEFORE INSERT ON "public"."movimientos_stock_consumible" FOR EACH ROW EXECUTE FUNCTION "public"."fn_aplicar_movimiento_stock"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_item_plan_ejecutable" BEFORE INSERT OR UPDATE OF "item_plan_id" ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."verificar_item_plan_ejecutable"();
 
 
 
@@ -2681,6 +2858,11 @@ ALTER TABLE ONLY "public"."diagnosticos_aplicados"
 
 
 
+ALTER TABLE ONLY "public"."diagnosticos_aplicados"
+    ADD CONSTRAINT "diagnosticos_aplicados_evaluacion_id_fkey" FOREIGN KEY ("evaluacion_id") REFERENCES "public"."evaluaciones_clinicas"("id");
+
+
+
 ALTER TABLE ONLY "public"."dientes"
     ADD CONSTRAINT "dientes_diagnostico_principal_id_fkey" FOREIGN KEY ("diagnostico_principal_id") REFERENCES "public"."diagnosticos_aplicados"("id");
 
@@ -2731,6 +2913,21 @@ ALTER TABLE ONLY "public"."equipos_mantenimientos"
 
 
 
+ALTER TABLE ONLY "public"."evaluaciones_clinicas"
+    ADD CONSTRAINT "evaluaciones_clinicas_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."evaluaciones_clinicas"
+    ADD CONSTRAINT "evaluaciones_clinicas_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."evaluaciones_clinicas"
+    ADD CONSTRAINT "evaluaciones_clinicas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE RESTRICT;
+
+
+
 ALTER TABLE ONLY "public"."consumibles_compras"
     ADD CONSTRAINT "fk_consumibles_compras_compra" FOREIGN KEY ("compra_id") REFERENCES "public"."compras"("id") ON DELETE CASCADE;
 
@@ -2743,6 +2940,31 @@ ALTER TABLE ONLY "public"."contraindicaciones"
 
 ALTER TABLE ONLY "public"."items_cuenta"
     ADD CONSTRAINT "item_cuentas_cuenta_id_fkey" FOREIGN KEY ("cuenta_id") REFERENCES "public"."cuentas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_diagnostico_aplicado_id_fkey" FOREIGN KEY ("diagnostico_aplicado_id") REFERENCES "public"."diagnosticos_aplicados"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_diente_id_fkey" FOREIGN KEY ("diente_id") REFERENCES "public"."dientes"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_doctor_propone_id_fkey" FOREIGN KEY ("doctor_propone_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "public"."planes_tratamiento"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."items_plan_tratamiento"
+    ADD CONSTRAINT "items_plan_tratamiento_tratamiento_id_fkey" FOREIGN KEY ("tratamiento_id") REFERENCES "public"."tratamientos"("id") ON DELETE RESTRICT;
 
 
 
@@ -2798,6 +3020,26 @@ ALTER TABLE ONLY "public"."persona_contactos"
 
 ALTER TABLE ONLY "public"."persona_contactos"
     ADD CONSTRAINT "persona_contactos_persona_id_fkey" FOREIGN KEY ("persona_id") REFERENCES "public"."personas"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."planes_tratamiento"
+    ADD CONSTRAINT "planes_tratamiento_consulta_origen_id_fkey" FOREIGN KEY ("consulta_origen_id") REFERENCES "public"."consultas"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."planes_tratamiento"
+    ADD CONSTRAINT "planes_tratamiento_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."planes_tratamiento"
+    ADD CONSTRAINT "planes_tratamiento_evaluacion_id_fkey" FOREIGN KEY ("evaluacion_id") REFERENCES "public"."evaluaciones_clinicas"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."planes_tratamiento"
+    ADD CONSTRAINT "planes_tratamiento_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE RESTRICT;
 
 
 
@@ -2858,6 +3100,16 @@ ALTER TABLE ONLY "public"."tratamientos_aplicados"
 
 ALTER TABLE ONLY "public"."tratamientos_aplicados"
     ADD CONSTRAINT "tratamientos_aplicados_diente_id_fkey" FOREIGN KEY ("diente_id") REFERENCES "public"."dientes"("id");
+
+
+
+ALTER TABLE ONLY "public"."tratamientos_aplicados"
+    ADD CONSTRAINT "tratamientos_aplicados_doctor_ejecuta_id_fkey" FOREIGN KEY ("doctor_ejecuta_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."tratamientos_aplicados"
+    ADD CONSTRAINT "tratamientos_aplicados_item_plan_id_fkey" FOREIGN KEY ("item_plan_id") REFERENCES "public"."items_plan_tratamiento"("id") ON DELETE SET NULL;
 
 
 
@@ -3306,6 +3558,25 @@ CREATE POLICY "equipos_update" ON "public"."equipos" FOR UPDATE TO "authenticate
 
 
 
+ALTER TABLE "public"."evaluaciones_clinicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "evaluaciones_clinicas_delete" ON "public"."evaluaciones_clinicas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "evaluaciones_clinicas_insert" ON "public"."evaluaciones_clinicas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "evaluaciones_clinicas_select" ON "public"."evaluaciones_clinicas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "evaluaciones_clinicas_update" ON "public"."evaluaciones_clinicas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
 ALTER TABLE "public"."items_cuenta" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3322,6 +3593,25 @@ CREATE POLICY "items_cuenta_select" ON "public"."items_cuenta" FOR SELECT TO "au
 
 
 CREATE POLICY "items_cuenta_update" ON "public"."items_cuenta" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
+
+
+
+ALTER TABLE "public"."items_plan_tratamiento" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "items_plan_tratamiento_delete" ON "public"."items_plan_tratamiento" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "items_plan_tratamiento_insert" ON "public"."items_plan_tratamiento" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "items_plan_tratamiento_select" ON "public"."items_plan_tratamiento" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "items_plan_tratamiento_update" ON "public"."items_plan_tratamiento" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
 
 
 
@@ -3458,6 +3748,25 @@ CREATE POLICY "persona_update" ON "public"."personas" FOR UPDATE TO "authenticat
 
 
 ALTER TABLE "public"."personas" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."planes_tratamiento" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "planes_tratamiento_delete" ON "public"."planes_tratamiento" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "planes_tratamiento_insert" ON "public"."planes_tratamiento" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "planes_tratamiento_select" ON "public"."planes_tratamiento" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+CREATE POLICY "planes_tratamiento_update" ON "public"."planes_tratamiento" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
 
 
 ALTER TABLE "public"."procedimientos" ENABLE ROW LEVEL SECURITY;
@@ -3973,6 +4282,12 @@ GRANT ALL ON FUNCTION "public"."validar_monto_pago"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "anon";
+GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "service_role";
+
+
+
 
 
 
@@ -4126,9 +4441,21 @@ GRANT ALL ON TABLE "public"."equipos_mantenimientos" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "anon";
+GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."items_cuenta" TO "anon";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "authenticated";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "anon";
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "authenticated";
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "service_role";
 
 
 
@@ -4183,6 +4510,12 @@ GRANT ALL ON TABLE "public"."persona_contactos" TO "service_role";
 GRANT ALL ON TABLE "public"."personas" TO "anon";
 GRANT ALL ON TABLE "public"."personas" TO "authenticated";
 GRANT ALL ON TABLE "public"."personas" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "anon";
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "authenticated";
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "service_role";
 
 
 

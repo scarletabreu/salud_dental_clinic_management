@@ -14,7 +14,7 @@
 --  Esquema real (verificado contra la BD):
 --    · Las PK `id` tienen DEFAULT gen_random_uuid().
 --    · consultas.temp_condiciones es text[].
---    · dientes NO tiene `esta_ausente`.
+--    · dientes tiene `esta_ausente`, con `false` como valor por defecto.
 --    · superficies.tipo_superficie es un enum en minúscula; los tratamientos
 --      viven en `tratamientos_ids uuid[]` (aquí se dejan vacíos).
 --    · documentos_clinicos NO tiene `fecha_creacion` (se usa created_at).

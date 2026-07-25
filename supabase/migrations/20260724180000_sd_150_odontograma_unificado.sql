@@ -11,6 +11,11 @@ alter table public.diagnosticos_aplicados
   add column if not exists superficie tipo_superficie,
   add column if not exists origen text not null default 'preexistente';
 
+-- La ausencia de una pieza es parte del estado clínico normalizado. La app la
+-- consulta y actualiza junto con las anotaciones de cada diente.
+alter table public.dientes
+  add column if not exists esta_ausente boolean not null default false;
+
 create index if not exists idx_diagnosticos_aplicados_consulta_id
   on public.diagnosticos_aplicados (consulta_id);
 create index if not exists idx_diagnosticos_aplicados_diente_id
@@ -36,8 +41,11 @@ insert into public.diagnosticos (
   nombre, descripcion, severidad_default, alcance, categoria,
   clave_odontograma, created_at, updated_at
 )
-select seed.nombre, seed.descripcion, seed.severidad, seed.alcance,
-       seed.categoria, seed.clave, now(), now()
+select seed.nombre, seed.descripcion,
+       seed.severidad::public.severidad_diagnosis,
+       seed.alcance::public.alcance,
+       seed.categoria::public.categoria_diagnosis,
+       seed.clave, now(), now()
 from (values
   ('Cariada', 'Lesión cariosa registrada en el odontograma.', 'moderada', 'puntual', 'caries', 'cariada'),
   ('Pérdida dental', 'Pieza dental ausente o perdida.', 'grave', 'diente', 'patologia_atm', 'perdida'),

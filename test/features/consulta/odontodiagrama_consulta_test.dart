@@ -35,6 +35,9 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/c
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 
 const _consultaId = '33333333-3333-3333-3333-333333333333';
 const _pacienteId = '11111111-1111-1111-1111-111111111111';
@@ -158,6 +161,14 @@ class _CondicionesDoble extends _Vacio implements GetCondicionesPaciente {
   Future<List<Condicion>> call(String pacienteId) async => const [];
 }
 
+/// La consulta de estos casos no tiene plan: la sección se dibuja vacía y no
+/// interfiere con lo que se está probando (odontodiagrama y tratamientos).
+class _PlanRepositorioDoble extends _Vacio
+    implements PlanTratamientoRepository {
+  @override
+  Future<PlanTratamiento?> getPlanDeConsulta(String consultaId) async => null;
+}
+
 class _PacienteCubitDoble extends Cubit<PacienteState>
     implements PacienteCubit {
   _PacienteCubitDoble() : super(PacienteLoading());
@@ -276,6 +287,12 @@ void main() {
             providers: [
               BlocProvider<ConsultaCubit>.value(value: cubit),
               BlocProvider<PacienteCubit>(create: (_) => _PacienteCubitDoble()),
+              // El workspace muestra el plan de tratamiento (SD-135); en
+              // producción lo provee EfectuarConsultaPage.
+              BlocProvider<PlanTratamientoCubit>(
+                create: (_) =>
+                    PlanTratamientoCubit(repository: _PlanRepositorioDoble()),
+              ),
             ],
             child: const Scaffold(body: WorkspaceConsulta(citaId: 'cita-1')),
           ),

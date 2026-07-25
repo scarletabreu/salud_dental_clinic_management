@@ -11,6 +11,20 @@ class CompraRepositoryImpl implements CompraRepository {
   CompraRepositoryImpl({required this.remoteDataSource});
 
   @override
+  Future<void> recibirCompra({
+    required String compraId,
+    required String usuarioId,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.recibirCompra(
+        compraId: compraId,
+        usuarioId: usuarioId,
+      ),
+      context: 'recibir la compra y registrar el egreso en caja',
+    );
+  }
+
+  @override
   Future<List<Compra>> fetchCompras() {
     return runGuarded(() async {
       final comprasData = await remoteDataSource.fetchCompras();

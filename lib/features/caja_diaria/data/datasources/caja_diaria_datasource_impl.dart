@@ -15,7 +15,7 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
       'monto_apertura': montoInicial,
       'cerrada': false,
       'fecha': DateTime.now().toIso8601String(),
-      'abierta_por': userId, // Integración de campo
+      'abierta_por': userId,
       'monto_esperado': montoInicial,
       'monto_real': 0,
       'monto_cierre': 0,
@@ -44,6 +44,7 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
         .from('movimientos_caja')
         .select()
         .eq('caja_diaria_id', caja['id'])
+        .filter('deleted_at', 'is', null)
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response as List);
@@ -108,28 +109,35 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     return supabase
         .from('movimientos_caja')
         .stream(primaryKey: ['id'])
-        .map(
-          (rows) =>
-              rows
-                  .where(
-                    (row) =>
-                        row['caja_diaria_id'] == cajaDiariaId &&
-                        row['deleted_at'] == null,
-                  )
-                  .map(Map<String, dynamic>.from)
-                  .toList()
-                ..sort(
-                  (a, b) =>
-                      (b['fecha'] as String).compareTo(a['fecha'] as String),
-                ),
-        );
+        .eq('caja_diaria_id', cajaDiariaId)
+        .map((rows) {
+          final filtrados = rows
+              .where((row) => row['deleted_at'] == null)
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList();
+
+          filtrados.sort((a, b) {
+            final fA =
+                a['fecha']?.toString() ?? a['created_at']?.toString() ?? '';
+            final fB =
+                b['fecha']?.toString() ?? b['created_at']?.toString() ?? '';
+            return fB.compareTo(fA);
+          });
+
+          return filtrados;
+        });
   }
 
   Future<Map<String, dynamic>?> _getCajaAbiertaActual() async {
-    return await supabase
+    final response = await supabase
         .from('cajas')
         .select()
         .eq('cerrada', false)
-        .maybeSingle();
+        .order('created_at', ascending: false)
+        .limit(1);
+
+    final list = response as List;
+    if (list.isEmpty) return null;
+    return Map<String, dynamic>.from(list.first as Map);
   }
 }

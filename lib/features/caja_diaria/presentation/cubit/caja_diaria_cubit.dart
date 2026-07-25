@@ -32,12 +32,25 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
 
       _cajaActual = caja;
       emit(CajaDiariaAbierta(caja: caja));
+
       _movimientosSubscription = _repository.watchMovimientos(caja.id!).listen((
         movimientos,
-      ) {
-        final cajaActual = _cajaActual;
-        if (cajaActual != null && !isClosed) {
-          emit(CajaDiariaAbierta(caja: cajaActual, movimientos: movimientos));
+      ) async {
+        if (!isClosed) {
+          final cajaActualizada = await _repository.getCajaActual();
+          if (cajaActualizada != null) {
+            _cajaActual = cajaActualizada;
+            emit(
+              CajaDiariaAbierta(
+                caja: cajaActualizada,
+                movimientos: movimientos,
+              ),
+            );
+          } else if (_cajaActual != null) {
+            emit(
+              CajaDiariaAbierta(caja: _cajaActual!, movimientos: movimientos),
+            );
+          }
         }
       }, onError: (_, _) {});
     } catch (_) {
@@ -103,6 +116,7 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
       );
 
       await _movimientoCajaRepository.crearMovimiento(movimiento);
+      await cargar();
       return null;
     } catch (e) {
       return 'Error al registrar el egreso: ${e.toString().replaceAll('Exception: ', '')}';

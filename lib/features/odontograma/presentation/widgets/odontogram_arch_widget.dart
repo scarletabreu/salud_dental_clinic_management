@@ -173,54 +173,6 @@ class _NavBtn extends StatelessWidget {
 //  Legend
 // ─────────────────────────────────────────────
 
-class _Legend extends StatelessWidget {
-  const _Legend();
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    const items = [
-      (ToothStatus.treated, 'Tratado'),
-      (ToothStatus.mild, 'Leve'),
-      (ToothStatus.moderate, 'Moderado'),
-      (ToothStatus.critical, 'Grave'),
-    ];
-    return Wrap(
-      spacing: 12,
-      runSpacing: 6,
-      children: items.map((item) {
-        final color = PaletaArcada.de(context).status(item.$1);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.20),
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.60),
-                  width: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              item.$2,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: ac.textMuted,
-              ),
-            ),
-          ],
-        );
-      }).toList(),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────
 //  Toggle pill
 // ─────────────────────────────────────────────
@@ -417,9 +369,10 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             ),
           ] else ...[
             const SizedBox(height: 12),
-            const _Legend(),
-            const SizedBox(height: 12),
-
+            // La leyenda ya no se dibuja aquí: la trae cada vista desde
+            // `LeyendaOdontograma`, con el mismo vocabulario que el color de
+            // las piezas. La que había aquí describía una escala de severidad
+            // que la arcada dejó de usar.
             VistasOdontograma(odontograma: currentOdo),
           ],
         ],

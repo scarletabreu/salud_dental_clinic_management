@@ -3,8 +3,11 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
 /// Las dos maneras de mirar la misma boca.
@@ -104,6 +107,15 @@ class VistasOdontograma extends StatefulWidget {
   final void Function(Diente, int index, bool terminado)?
   onToggleTratamientoTerminado;
   final String Function(String tratamientoId)? nombreTratamiento;
+  final String Function(String doctorId)? nombreDoctor;
+
+  /// Actividades del plan de tratamiento que caen sobre cada pieza, indexadas
+  /// por código FDI. Es lo que permite que la ficha distinga lo que se piensa
+  /// hacer de lo que ya se hizo.
+  final Map<int, List<ItemPlanTratamiento>> itemsPlan;
+
+  /// Anota una observación clínica sobre una pieza concreta.
+  final void Function(Diente, String)? onNotasPiezaChanged;
 
   /// Contenido opcional a la derecha del selector (un indicador de carga, un
   /// contador de tratamientos…).
@@ -128,6 +140,9 @@ class VistasOdontograma extends StatefulWidget {
     this.onQuitarTratamiento,
     this.onToggleTratamientoTerminado,
     this.nombreTratamiento,
+    this.nombreDoctor,
+    this.itemsPlan = const {},
+    this.onNotasPiezaChanged,
     this.accion,
     this.formularioPersonalizado,
     this.pie,
@@ -176,6 +191,8 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                       for (final diente in widget.odontograma.dientes)
                         diente.fdiCode: diente,
                     },
+                    itemsPlan: widget.itemsPlan,
+                    onNotasPiezaChanged: widget.onNotasPiezaChanged,
                     onAddDiagnosis: widget.onAddDiagnosis,
                     onAddTratamiento: widget.onAddTratamiento,
                     onToggleAusente: widget.onToggleAusente,
@@ -184,15 +201,30 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                         widget.onToggleTratamientoTerminado,
                     nombreTratamiento: widget.nombreTratamiento,
                   ),
-            VistaOdontograma.arcada => OdontogramWidget(
-              odontograma: widget.odontograma,
-              editMode: widget.editable,
-              onAddDiagnosis: widget.onAddDiagnosis,
-              onAddTratamiento: widget.onAddTratamiento,
-              onToggleAusente: widget.onToggleAusente,
-              onQuitarTratamiento: widget.onQuitarTratamiento,
-              onToggleTratamientoTerminado: widget.onToggleTratamientoTerminado,
-              nombreTratamiento: widget.nombreTratamiento,
+            // La arcada no lleva las claves incrustadas —no es una hoja que se
+            // imprima—, así que la leyenda compartida va debajo. Es la misma
+            // que dibuja el formulario, de modo que las dos vistas explican la
+            // boca con las mismas palabras.
+            VistaOdontograma.arcada => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OdontogramWidget(
+                  odontograma: widget.odontograma,
+                  editMode: widget.editable,
+                  itemsPlan: widget.itemsPlan,
+                  onNotasPiezaChanged: widget.onNotasPiezaChanged,
+                  onAddDiagnosis: widget.onAddDiagnosis,
+                  onAddTratamiento: widget.onAddTratamiento,
+                  onToggleAusente: widget.onToggleAusente,
+                  onQuitarTratamiento: widget.onQuitarTratamiento,
+                  onToggleTratamientoTerminado:
+                      widget.onToggleTratamientoTerminado,
+                  nombreTratamiento: widget.nombreTratamiento,
+                  nombreDoctor: widget.nombreDoctor,
+                ),
+                const SizedBox(height: 16),
+                LeyendaOdontograma(paleta: PaletaOdontodiagrama.de(context)),
+              ],
             ),
           },
           if (widget.pie != null) ...[const SizedBox(height: 16), widget.pie!],

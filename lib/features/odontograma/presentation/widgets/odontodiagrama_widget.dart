@@ -5,22 +5,17 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/glifo_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/panel_detalle_pieza.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
-/// Las seis claves del papel más el estado abierto que la clínica usa para lo
-/// que no está impreso. La lista es un parámetro del widget, así que acordar
-/// una clave nueva no obliga a tocar el dibujo.
-final List<EntradaLeyendaOdontograma> leyendaClinicaPredeterminada =
-    List.unmodifiable([
-      ...leyendaFormularioFisico,
-      EntradaLeyendaOdontograma.delFormulario(
-        EstadoClinicoDental.otro,
-        etiqueta: 'Otro (anotar)',
-      ),
-    ]);
+// La leyenda es la misma para las dos vistas y para la hoja impresa; se
+// reexporta para no obligar a cambiar los imports que ya la usaban desde aquí.
+export 'leyenda_odontograma.dart' show leyendaClinicaPredeterminada;
 
 /// Reproducción del ODONTODIAGRAMA del formulario en papel de la clínica.
 ///
@@ -56,6 +51,14 @@ class OdontodiagramaWidget extends StatefulWidget {
   /// no abre panel: es lo que hacen la impresión y el expediente.
   final Map<int, Diente> dientes;
 
+  /// Actividades del plan de tratamiento que caen sobre cada pieza. Es lo que
+  /// permite que la ficha distinga lo planificado de lo ya ejecutado.
+  final Map<int, List<ItemPlanTratamiento>> itemsPlan;
+
+  /// Anota una observación clínica sobre la pieza. `null` deja el campo en solo
+  /// lectura, que es como lo ve el expediente.
+  final void Function(Diente, String)? onNotasPiezaChanged;
+
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, bool ausente)? onToggleAusente;
@@ -73,6 +76,8 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.leyenda,
     this.onChanged,
     this.dientes = const {},
+    this.itemsPlan = const {},
+    this.onNotasPiezaChanged,
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
@@ -301,8 +306,10 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     fdi: fdi,
     diente: widget.dientes[fdi],
     hallazgosHistoricos: _historicoDe(fdi),
+    itemsPlan: widget.itemsPlan[fdi] ?? const [],
     editMode: _editando,
     onClose: () => setState(() => _fdiSeleccionado = null),
+    onNotasChanged: widget.onNotasPiezaChanged,
     onAddDiagnosis: widget.onAddDiagnosis,
     onAddTratamiento: widget.onAddTratamiento,
     onToggleAusente: widget.onToggleAusente,
@@ -469,47 +476,15 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     BuildContext context,
     bool compacto,
     PaletaOdontodiagrama paleta,
-  ) {
-    final texto = paleta.apoyoSobreTarjeta(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'CLAVES',
-          style: TextStyle(
-            color: paleta.tituloSobreTarjeta(context),
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.9,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: compacto ? 12 : 18,
-          runSpacing: 8,
-          children: [
-            for (final entrada in _leyenda)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  MarcaClinicaIcono(
-                    marca: entrada.marca,
-                    estado: entrada.estado,
-                    paleta: paleta,
-                    lado: 16,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    entrada.label,
-                    style: TextStyle(color: texto, fontSize: 11),
-                  ),
-                ],
-              ),
-          ],
-        ),
-        if (_hayHistorico) ...[
-          const SizedBox(height: 10),
-          Row(
+  ) => LeyendaOdontograma(
+    paleta: paleta,
+    claves: _leyenda,
+    compacto: compacto,
+    // El papel solo lleva la tinta de hoy; lo anterior y lo planificado se leen
+    // en la ficha de la pieza, así que la leyenda no promete lo que no dibuja.
+    procedencias: const [ProcedenciaMarca.evaluado, ProcedenciaMarca.ejecutado],
+    pie: _hayHistorico
+        ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.history_rounded, size: 13, color: paleta.textoVacio),
@@ -525,11 +500,9 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
                 ),
               ),
             ],
-          ),
-        ],
-      ],
-    );
-  }
+          )
+        : null,
+  );
 
   Widget _tejidosBlandos(
     BuildContext context,

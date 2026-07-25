@@ -1,6 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
+
+/// Cómo se dibuja una marca: el tono viene de la clave clínica y el trazo de su
+/// procedencia. Ver [PaletaOdontodiagrama.estiloDe].
+@immutable
+class EstiloMarcaClinica {
+  final Color color;
+
+  /// 0 significa que la cara no se rellena, solo se perfila.
+  final double alfaRelleno;
+
+  final double alfaTrazo;
+  final double grosorTrazo;
+
+  /// Contorno discontinuo, reservado a lo que aún no se ha hecho.
+  final bool punteado;
+
+  const EstiloMarcaClinica({
+    required this.color,
+    required this.alfaRelleno,
+    required this.alfaTrazo,
+    required this.grosorTrazo,
+    required this.punteado,
+  });
+
+  Color get relleno => color.withValues(alpha: alfaRelleno);
+  Color get trazo => color.withValues(alpha: alfaTrazo);
+
+  @override
+  bool operator ==(Object other) =>
+      other is EstiloMarcaClinica &&
+      other.color == color &&
+      other.alfaRelleno == alfaRelleno &&
+      other.alfaTrazo == alfaTrazo &&
+      other.grosorTrazo == grosorTrazo &&
+      other.punteado == punteado;
+
+  @override
+  int get hashCode =>
+      Object.hash(color, alfaRelleno, alfaTrazo, grosorTrazo, punteado);
+}
 
 /// Superficie sobre la que se dibuja el odontodiagrama y las tintas con las que
 /// se anota.
@@ -92,7 +133,10 @@ class PaletaOdontodiagrama {
 
   /// Resuelve la paleta del tema activo. [impresion] fuerza el papel blanco
   /// para las vistas que se archivan o se imprimen.
-  factory PaletaOdontodiagrama.de(BuildContext context, {bool imprimir = false}) {
+  factory PaletaOdontodiagrama.de(
+    BuildContext context, {
+    bool imprimir = false,
+  }) {
     if (imprimir) return PaletaOdontodiagrama.impresion;
     return Theme.of(context).brightness == Brightness.dark
         ? PaletaOdontodiagrama.oscuro
@@ -108,6 +152,54 @@ class PaletaOdontodiagrama {
 
   /// Alfa del relleno de una superficie anotada en esta consulta.
   double get alfaRelleno => esOscura ? 0.62 : 0.72;
+
+  /// Cómo se estampa una marca sobre una cara del diente.
+  ///
+  /// El color lo decide siempre la clave clínica —una caries es roja porque es
+  /// una caries, no porque toque—; la procedencia decide con cuánta firmeza se
+  /// dibuja. Ese reparto es lo que permite leer el mapa de superficies sin
+  /// consultar la leyenda: el tono dice *qué* y el trazo dice *cuándo*.
+  ///
+  /// La procedencia va además codificada en el trazo (sólido, punteado,
+  /// ausente) y no solo en la opacidad, para que siga distinguiéndose impresa
+  /// en blanco y negro o por quien no separa bien los tonos.
+  EstiloMarcaClinica estiloDe(
+    EstadoClinicoDental clave,
+    ProcedenciaMarca procedencia,
+  ) {
+    final color = tintaDe(clave);
+    return switch (procedencia) {
+      ProcedenciaMarca.ejecutado => EstiloMarcaClinica(
+        color: color,
+        alfaRelleno: esOscura ? 0.55 : 0.62,
+        alfaTrazo: 1,
+        grosorTrazo: 1.6,
+        punteado: false,
+      ),
+      ProcedenciaMarca.evaluado => EstiloMarcaClinica(
+        color: color,
+        alfaRelleno: esOscura ? 0.34 : 0.38,
+        alfaTrazo: 0.92,
+        grosorTrazo: 1.4,
+        punteado: false,
+      ),
+      // Lo planificado todavía no está en la boca: se perfila, no se rellena.
+      ProcedenciaMarca.planificado => EstiloMarcaClinica(
+        color: color,
+        alfaRelleno: 0,
+        alfaTrazo: 0.85,
+        grosorTrazo: 1.6,
+        punteado: true,
+      ),
+      ProcedenciaMarca.historico => EstiloMarcaClinica(
+        color: color,
+        alfaRelleno: esOscura ? 0.16 : 0.14,
+        alfaTrazo: 0.45,
+        grosorTrazo: 1.2,
+        punteado: false,
+      ),
+    };
+  }
 
   /// Texto de un rótulo del diagrama, ya sea sobre papel o sobre la tarjeta.
   Color tituloSobreTarjeta(BuildContext context) =>

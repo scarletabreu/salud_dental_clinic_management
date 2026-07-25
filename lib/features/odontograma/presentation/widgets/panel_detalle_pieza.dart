@@ -1,11 +1,16 @@
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/trazo_punteado.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'tooth_geometry.dart';
 
 // ─────────────────────────────────────────────
@@ -129,33 +134,42 @@ ToothStatus statusForDiente(Diente? d) {
   return ToothStatus.empty;
 }
 
-/// Estado clínico de una cara concreta, tal como se colorea en el mapa de
-/// superficies.
-enum EstadoSuperficie { sinDatos, historico, tratada, diagnosticada }
-
-/// En qué estado está la cara [cara] del diente [d].
+/// Todo lo anotado sobre la pieza [d], listo para pintar y para listar.
 ///
-/// La fuente es `TratamientoAplicado.superficie`, que es donde la consulta
-/// guarda realmente la cara elegida. Antes se leía `Superficie.tratamientos` /
-/// `Superficie.diagnosisId`, dos campos que ningún camino de la app escribe:
-/// el doctor asignaba un tratamiento a una cara y el mapa seguía en blanco.
-EstadoSuperficie estadoDeSuperficie(Diente? d, TipoSuperficie cara) {
-  if (d == null || dienteEstaAusente(d)) return EstadoSuperficie.sinDatos;
-  if (d.diagnosis.any((diagnostico) => diagnostico.superficie == cara)) {
-    return EstadoSuperficie.diagnosticada;
-  }
-  if (d.superficies.any(
-    (s) => s.tipoSuperficie == cara && s.diagnosisId != null,
-  )) {
-    return EstadoSuperficie.diagnosticada;
-  }
-  if (d.tratamientos.any((t) => t.superficie == cara)) {
-    return EstadoSuperficie.tratada;
-  }
-  if (d.tratamientosHistoricos.any((t) => t.superficie == cara)) {
-    return EstadoSuperficie.historico;
-  }
-  return EstadoSuperficie.sinDatos;
+/// Cada cara se colorea por lo que clínicamente tiene —una caries en rojo, una
+/// restauración en azul—, no por un color de presentación elegido para que se
+/// distinga del de al lado. El tono sale de la clave del catálogo y el trazo,
+/// de la procedencia; ambas cosas están en [MarcaClinicaPieza].
+///
+/// Una pieza ausente no muestra caras: lo que hubiera en ellas ya no está en
+/// la boca.
+List<MarcaClinicaPieza> marcasDelDiente(
+  Diente? d, {
+  int? fdi,
+  List<ItemPlanTratamiento> itemsPlan = const [],
+  List<HallazgoDental> hallazgosHistoricos = const [],
+  String Function(String tratamientoId)? nombreTratamiento,
+}) {
+  final codigo = fdi ?? d?.fdiCode;
+  if (codigo == null) return const [];
+  return marcasDePieza(
+    fdi: codigo,
+    diente: d,
+    itemsPlan: itemsPlan,
+    hallazgosHistoricos: hallazgosHistoricos,
+    nombreTratamiento: nombreTratamiento,
+  );
+}
+
+/// La marca que colorea la cara [cara] del diente [d], o `null` si no tiene
+/// nada anotado.
+MarcaClinicaPieza? marcaDeSuperficieDelDiente(
+  Diente? d,
+  TipoSuperficie cara, {
+  List<ItemPlanTratamiento> itemsPlan = const [],
+}) {
+  if (d == null || dienteEstaAusente(d)) return null;
+  return marcaDeSuperficie(marcasDelDiente(d, itemsPlan: itemsPlan), cara);
 }
 
 /// Indicador de los tratamientos aplicados en vivo sobre un diente:
@@ -203,13 +217,26 @@ class PanelDetallePieza extends StatefulWidget {
   /// tratada—, así que este panel es donde se consultan.
   final List<HallazgoDental> hallazgosHistoricos;
 
+  /// Actividades del plan que caen sobre esta pieza. Se listan aparte de lo
+  /// ejecutado porque planificar y hacer son actos distintos (SD-135).
+  final List<ItemPlanTratamiento> itemsPlan;
+
   final VoidCallback onClose;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, bool)? onToggleAusente;
   final void Function(Diente, int index)? onQuitarTratamiento;
   final void Function(Diente, int index, bool terminado)? onToggleTerminado;
+
+  /// Anota una observación clínica sobre la pieza. `null` deja el campo en solo
+  /// lectura.
+  final void Function(Diente, String)? onNotasChanged;
+
   final String Function(String tratamientoId)? nombreTratamiento;
+
+  /// Resuelve el nombre del doctor de una anotación. Sin él, la ficha omite la
+  /// autoría en vez de mostrar un identificador que no dice nada.
+  final String Function(String doctorId)? nombreDoctor;
 
   const PanelDetallePieza({
     super.key,
@@ -218,12 +245,15 @@ class PanelDetallePieza extends StatefulWidget {
     required this.editMode,
     required this.onClose,
     this.hallazgosHistoricos = const [],
+    this.itemsPlan = const [],
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
     this.onQuitarTratamiento,
     this.onToggleTerminado,
+    this.onNotasChanged,
     this.nombreTratamiento,
+    this.nombreDoctor,
   });
 
   @override
@@ -232,6 +262,40 @@ class PanelDetallePieza extends StatefulWidget {
 
 class _PanelDetallePiezaState extends State<PanelDetallePieza> {
   TipoSuperficie? _selectedSurface;
+  late final TextEditingController _notas;
+  final _focoNotas = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _notas = TextEditingController(text: widget.diente?.observaciones ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant PanelDetallePieza old) {
+    super.didUpdateWidget(old);
+    // Mientras el campo tiene el foco, lo que llega de fuera es el eco de esta
+    // misma escritura —ya recortada por el cubit— y reasignarlo mandaría el
+    // cursor al principio en cuanto se escribe un espacio.
+    if (_focoNotas.hasFocus) return;
+    final entrante = widget.diente?.observaciones ?? '';
+    if (_notas.text != entrante) _notas.text = entrante;
+  }
+
+  @override
+  void dispose() {
+    _focoNotas.dispose();
+    _notas.dispose();
+    super.dispose();
+  }
+
+  List<MarcaClinicaPieza> get _marcas => marcasDelDiente(
+    widget.diente,
+    fdi: widget.fdi,
+    itemsPlan: widget.itemsPlan,
+    hallazgosHistoricos: widget.hallazgosHistoricos,
+    nombreTratamiento: widget.nombreTratamiento,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +304,7 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
     final name = kFdiNames[widget.fdi] ?? 'Diente ${widget.fdi}';
     final d = widget.diente;
     final isAbsent = d != null && dienteEstaAusente(d);
+    final marcas = _marcas;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -335,7 +400,7 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
             child: _MapaSuperficies(
               key: const ValueKey('mapa_superficies'),
               fdi: widget.fdi,
-              diente: d,
+              marcas: isAbsent ? const [] : marcas,
               editMode: widget.editMode,
               selectedSurface: _selectedSurface,
               onSurfaceSelected: (s) => setState(() {
@@ -345,19 +410,124 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
           ),
           const SizedBox(height: 16),
 
-          _InfoPieza(
+          _MarcasPieza(
             diente: d,
-            hallazgosHistoricos: widget.hallazgosHistoricos,
+            marcas: marcas,
             editMode: widget.editMode,
             selectedSurface: _selectedSurface,
+            nombreDoctor: widget.nombreDoctor,
             onAddDiagnosis: widget.onAddDiagnosis,
             onAddTratamiento: widget.onAddTratamiento,
             onQuitarTratamiento: widget.onQuitarTratamiento,
             onToggleTerminado: widget.onToggleTerminado,
-            nombreTratamiento: widget.nombreTratamiento,
           ),
+
+          if (d != null) ...[
+            const SizedBox(height: 14),
+            _NotasPieza(
+              controller: _notas,
+              foco: _focoNotas,
+              onChanged: widget.onNotasChanged == null
+                  ? null
+                  : (texto) => widget.onNotasChanged!(d, texto),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Notas clínicas de la pieza
+// ─────────────────────────────────────────────
+
+/// Observación pegada al diente, no a la visita.
+///
+/// Antes lo único editable eran las notas generales de la consulta: una
+/// anotación sobre el 36 se perdía dentro del párrafo de la sesión y, al abrir
+/// la pieza meses después, no había manera de recuperarla. Esto se guarda en
+/// `dientes.observaciones` y viaja con la pieza.
+class _NotasPieza extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode foco;
+  final ValueChanged<String>? onChanged;
+
+  const _NotasPieza({
+    required this.controller,
+    required this.foco,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final soloLectura = onChanged == null;
+    if (soloLectura && controller.text.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, color: ac.divider),
+        const SizedBox(height: 12),
+        Semantics(
+          header: true,
+          child: Text(
+            'NOTAS DE LA PIEZA',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: ac.textMuted,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (soloLectura)
+          Text(
+            controller.text,
+            style: TextStyle(
+              fontSize: 12,
+              color: ac.textSecondary,
+              height: 1.4,
+            ),
+          )
+        else
+          TextField(
+            key: const ValueKey('notas_pieza'),
+            controller: controller,
+            focusNode: foco,
+            onChanged: onChanged,
+            minLines: 2,
+            maxLines: 4,
+            style: TextStyle(fontSize: 12, color: ac.textPrimary, height: 1.4),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Observación clínica de este diente…',
+              hintStyle: TextStyle(fontSize: 12, color: ac.textMuted),
+              filled: true,
+              fillColor: ac.chipBg,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: ac.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: ac.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: ac.indigo, width: 1.4),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -368,7 +538,7 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
 
 class _MapaSuperficies extends StatelessWidget {
   final int fdi;
-  final Diente? diente;
+  final List<MarcaClinicaPieza> marcas;
   final bool editMode;
   final TipoSuperficie? selectedSurface;
   final ValueChanged<TipoSuperficie> onSurfaceSelected;
@@ -376,7 +546,7 @@ class _MapaSuperficies extends StatelessWidget {
   const _MapaSuperficies({
     super.key,
     required this.fdi,
-    required this.diente,
+    required this.marcas,
     required this.editMode,
     required this.selectedSurface,
     required this.onSurfaceSelected,
@@ -402,14 +572,31 @@ class _MapaSuperficies extends StatelessWidget {
     return TipoSuperficie.distal;
   }
 
+  /// Nombre de cada cara y lo que tiene, para quien navega con lector de
+  /// pantalla y no puede ver el color.
+  String _descripcion(Map<TipoSuperficie, MarcaClinicaPieza?> porCara) {
+    final anotadas = [
+      for (final entry in porCara.entries)
+        if (entry.value case final marca?)
+          '${entry.key.name}: ${marca.titulo}, ${marca.procedencia.etiqueta.toLowerCase()}',
+    ];
+    if (anotadas.isEmpty) return 'Caras del diente $fdi, ninguna anotada';
+    return 'Caras del diente $fdi. ${anotadas.join('. ')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final labelColor = context.appColors.textDisabled;
+    final paletaClinica = PaletaOdontodiagrama.de(context);
+    final porCara = {
+      for (final cara in TipoSuperficie.values)
+        cara: marcaDeSuperficie(marcas, cara),
+    };
 
     Widget map = CustomPaint(
       size: const Size(_size, _size),
       painter: _MapaSuperficiesPainter(
-        diente: diente,
+        marcaPorCara: porCara,
         centerSurface: _centerSurface,
         bottomSurface: _bottomSurface,
         selected: selectedSurface,
@@ -417,8 +604,11 @@ class _MapaSuperficies extends StatelessWidget {
         b: _b,
         labelColor: labelColor,
         paleta: PaletaArcada.de(context),
+        paletaClinica: paletaClinica,
       ),
     );
+
+    map = Semantics(label: _descripcion(porCara), child: map);
 
     if (editMode) {
       map = MouseRegion(
@@ -438,7 +628,9 @@ class _MapaSuperficies extends StatelessWidget {
 }
 
 class _MapaSuperficiesPainter extends CustomPainter {
-  final Diente? diente;
+  /// Lo que tiñe cada cara. `null` en una cara sin nada anotado.
+  final Map<TipoSuperficie, MarcaClinicaPieza?> marcaPorCara;
+
   final TipoSuperficie centerSurface;
   final TipoSuperficie bottomSurface;
   final TipoSuperficie? selected;
@@ -447,8 +639,11 @@ class _MapaSuperficiesPainter extends CustomPainter {
   final Color labelColor;
   final PaletaArcada paleta;
 
+  /// De aquí sale el color de cada cara: la tinta de su clave clínica.
+  final PaletaOdontodiagrama paletaClinica;
+
   const _MapaSuperficiesPainter({
-    required this.diente,
+    required this.marcaPorCara,
     required this.centerSurface,
     required this.bottomSurface,
     required this.selected,
@@ -456,17 +651,17 @@ class _MapaSuperficiesPainter extends CustomPainter {
     required this.b,
     required this.labelColor,
     required this.paleta,
+    required this.paletaClinica,
   });
 
   Color get _sinDatos => paleta.esmalte;
-  Color get _tealActivo => paleta.status(ToothStatus.treated);
+  Color get _seleccion => paleta.status(ToothStatus.treated);
 
-  Color _baseColor(TipoSuperficie t) => switch (estadoDeSuperficie(diente, t)) {
-    EstadoSuperficie.diagnosticada => paleta.status(ToothStatus.moderate),
-    EstadoSuperficie.tratada => _tealActivo,
-    EstadoSuperficie.historico => paleta.status(ToothStatus.historico),
-    EstadoSuperficie.sinDatos => _sinDatos,
-  };
+  EstiloMarcaClinica? _estilo(TipoSuperficie cara) {
+    final marca = marcaPorCara[cara];
+    if (marca == null) return null;
+    return paletaClinica.estiloDe(marca.claveEfectiva, marca.procedencia);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -506,47 +701,44 @@ class _MapaSuperficiesPainter extends CustomPainter {
     regions.forEach((t, poly) {
       final path = Path()..addPolygon(poly, true);
       final isSel = selected == t;
-      final base = _baseColor(t);
-      final hasData = base != _sinDatos;
+      final estilo = _estilo(t);
 
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = isSel
-              ? _tealActivo.withAlpha(38)
-              : hasData
-              ? base.withAlpha(46)
-              : _sinDatos,
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = isSel
-              ? _tealActivo
-              : hasData
-              ? base.withAlpha(150)
-              : paleta.regla
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = isSel ? 2.0 : 1.2
-          ..strokeJoin = StrokeJoin.round,
-      );
+      // El fondo del esmalte va siempre debajo: sobre él, el relleno de la
+      // marca ya lleva su propia opacidad, así que una cara planificada —que no
+      // se rellena— queda perfilada sobre papel y no sobre un hueco.
+      canvas.drawPath(path, Paint()..color = _sinDatos);
+      if (estilo != null && estilo.alfaRelleno > 0) {
+        canvas.drawPath(path, Paint()..color = estilo.relleno);
+      }
+      if (isSel) {
+        canvas.drawPath(path, Paint()..color = _seleccion.withAlpha(30));
+      }
+
+      final trazo = Paint()
+        ..color = isSel ? _seleccion : (estilo?.trazo ?? paleta.regla)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isSel ? 2.0 : (estilo?.grosorTrazo ?? 1.2)
+        ..strokeJoin = StrokeJoin.round;
+
+      // El punteado es lo que distingue una cara planificada de una tratada sin
+      // depender del color, que es justo lo que se pierde al imprimir en gris.
+      if (estilo != null && estilo.punteado && !isSel) {
+        dibujarPoligonoPunteado(canvas, poly, trazo);
+      } else {
+        canvas.drawPath(path, trazo);
+      }
     });
 
     labels.forEach((t, lbl) {
       final isSel = selected == t;
-      final base = _baseColor(t);
-      final hasData = base != _sinDatos;
+      final estilo = _estilo(t);
       final tp = TextPainter(
         text: TextSpan(
           text: lbl.$1,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: isSel
-                ? _tealActivo
-                : hasData
-                ? base
-                : labelColor,
+            color: isSel ? _seleccion : (estilo?.color ?? labelColor),
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -557,262 +749,126 @@ class _MapaSuperficiesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MapaSuperficiesPainter old) =>
-      !identical(old.diente, diente) ||
+      !mapEquals(old.marcaPorCara, marcaPorCara) ||
       old.selected != selected ||
       old.centerSurface != centerSurface ||
       old.bottomSurface != bottomSurface ||
       old.labelColor != labelColor ||
-      old.paleta != paleta;
+      old.paleta != paleta ||
+      old.paletaClinica != paletaClinica;
 }
 
 // ─────────────────────────────────────────────
-//  Tooth info panel
+//  Marcas de la pieza, agrupadas por procedencia
 // ─────────────────────────────────────────────
 
-class _InfoPieza extends StatelessWidget {
+/// Todo lo anotado sobre la pieza, en un solo formato y agrupado por su
+/// procedencia.
+///
+/// Antes esto eran tres listas con tres aspectos distintos —diagnósticos,
+/// tratamientos, histórico— y ninguna decía de qué consulta ni de qué doctor
+/// venía cada línea; el plan de tratamiento ni siquiera aparecía. Cada fila
+/// lleva ahora tipo, cara, estado, fecha, consulta, doctor y notas, que es lo
+/// que hace falta para leer una pieza sin salir de su ficha.
+class _MarcasPieza extends StatelessWidget {
   final Diente? diente;
-  final List<HallazgoDental> hallazgosHistoricos;
+  final List<MarcaClinicaPieza> marcas;
   final bool editMode;
   final TipoSuperficie? selectedSurface;
+  final String Function(String doctorId)? nombreDoctor;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, int index)? onQuitarTratamiento;
   final void Function(Diente, int index, bool terminado)? onToggleTerminado;
-  final String Function(String tratamientoId)? nombreTratamiento;
 
-  const _InfoPieza({
+  const _MarcasPieza({
     required this.diente,
-    required this.hallazgosHistoricos,
+    required this.marcas,
     required this.editMode,
     required this.selectedSurface,
-    required this.onAddDiagnosis,
-    required this.onAddTratamiento,
+    this.nombreDoctor,
+    this.onAddDiagnosis,
+    this.onAddTratamiento,
     this.onQuitarTratamiento,
     this.onToggleTerminado,
-    this.nombreTratamiento,
   });
+
+  /// El orden en que se cuenta la historia de la pieza: qué se halló, qué se
+  /// decidió, qué se hizo y qué traía de antes.
+  static const _orden = [
+    ProcedenciaMarca.evaluado,
+    ProcedenciaMarca.planificado,
+    ProcedenciaMarca.ejecutado,
+    ProcedenciaMarca.historico,
+  ];
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final d = diente;
-    final tratamientosHistoricos =
-        d?.tratamientosHistoricos ?? const <TratamientoAplicado>[];
-    final hayHistorico =
-        tratamientosHistoricos.isNotEmpty || hallazgosHistoricos.isNotEmpty;
-    final hayAnotacionDeHoy =
-        d != null && (d.diagnosis.isNotEmpty || d.tratamientos.isNotEmpty);
-    // Sin pieza normalizada no hay nada que editar, pero sus antecedentes —que
-    // el diagrama ya no dibuja— siguen mereciendo mostrarse.
-    if (!hayAnotacionDeHoy && !hayHistorico && !(editMode && d != null)) {
+    final puedeEditar = editMode && d != null;
+
+    if (marcas.isEmpty && !puedeEditar) {
       return Text(
         'Sin datos registrados',
         style: TextStyle(fontSize: 12, color: ac.textDisabled),
       );
     }
 
+    final paletaClinica = PaletaOdontodiagrama.de(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (d != null && d.diagnosis.isNotEmpty) ...[
-          Text(
-            'DIAGNÓSTICOS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: ac.textMuted,
+        for (final procedencia in _orden)
+          if (marcas.where((m) => m.procedencia == procedencia).toList()
+              case final grupo when grupo.isNotEmpty) ...[
+            _EncabezadoProcedencia(
+              procedencia: procedencia,
+              paleta: paletaClinica,
+              conteo: grupo.length,
             ),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 5,
-            children: d.diagnosis.asMap().entries.map((entrada) {
-              final diag = entrada.value;
-              final color = switch (diag.severidad) {
-                SeveridadDiagnosis.grave => ac.red,
-                SeveridadDiagnosis.moderada => ac.amber,
-                SeveridadDiagnosis.leve => ac.indigo,
-              };
-              final label = switch (diag.severidad) {
-                SeveridadDiagnosis.grave => 'Grave',
-                SeveridadDiagnosis.moderada => 'Moderado',
-                SeveridadDiagnosis.leve => 'Leve',
-              };
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          conSuperficie(
-                            diag.nombreDiagnostico ?? label,
-                            diag.superficie,
-                          ),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      origenClinico(diag.consultaId, diag.fechaAplicacion),
-                      style: TextStyle(fontSize: 9, color: ac.textMuted),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          if (d.tratamientos.isNotEmpty) const SizedBox(height: 12),
-        ],
-        if (d != null && d.tratamientos.isNotEmpty) ...[
-          Text(
-            'TRATAMIENTOS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: ac.textMuted,
-            ),
-          ),
-          const SizedBox(height: 6),
-          ...d.tratamientos.asMap().entries.map(
-            (e) => _TratamientoAplicadoRow(
-              nombre:
-                  e.value.nombreTratamiento ??
-                  nombreTratamiento?.call(e.value.tratamientoId) ??
-                  'Tratamiento',
-              tratamiento: e.value,
-              editMode: editMode,
-              onToggleTerminado: onToggleTerminado == null
-                  ? null
-                  : () => onToggleTerminado!(d, e.key, !e.value.estaTerminado),
-              onQuitar: onQuitarTratamiento == null
-                  ? null
-                  : () => onQuitarTratamiento!(d, e.key),
-            ),
-          ),
-        ],
-        if (hayHistorico) ...[
-          if (hayAnotacionDeHoy) const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.history_rounded, size: 13, color: ac.textMuted),
-              const SizedBox(width: 5),
-              Text(
-                'HISTÓRICO',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: ac.textMuted,
-                ),
+            const SizedBox(height: 6),
+            for (final marca in grupo)
+              _FilaMarca(
+                marca: marca,
+                paleta: paletaClinica,
+                nombreDoctor: nombreDoctor,
+                onToggleTerminado:
+                    _editaEjecucion(marca) && onToggleTerminado != null
+                    ? () => onToggleTerminado!(
+                        d!,
+                        marca.indiceOrigen!,
+                        marca.estado != 'Terminado',
+                      )
+                    : null,
+                onQuitar: _editaEjecucion(marca) && onQuitarTratamiento != null
+                    ? () => onQuitarTratamiento!(d!, marca.indiceOrigen!)
+                    : null,
               ),
-              const SizedBox(width: 6),
-              Text(
-                'consultas anteriores',
-                style: TextStyle(fontSize: 10, color: ac.textDisabled),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ...hallazgosHistoricos.map((h) => _HallazgoHistoricoRow(hallazgo: h)),
-          ...tratamientosHistoricos.map(
-            (t) => _TratamientoHistoricoRow(
-              nombre:
-                  t.nombreTratamiento ??
-                  nombreTratamiento?.call(t.tratamientoId) ??
-                  'Tratamiento',
-              tratamiento: t,
-            ),
-          ),
-        ],
-        if (d != null &&
-            d.observaciones != null &&
-            d.observaciones!.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text(
-            d.observaciones!,
-            style: TextStyle(
-              fontSize: 12,
-              color: ac.textMuted,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-        if (editMode && d != null) ...[
-          const SizedBox(height: 14),
+            const SizedBox(height: 10),
+          ],
+        if (puedeEditar) ...[
+          const SizedBox(height: 4),
           Divider(height: 1, color: ac.divider),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              OutlinedButton.icon(
+              _BotonAnadir(
+                etiqueta: 'Diagnóstico',
+                color: ac.indigo,
                 onPressed: onAddDiagnosis == null
                     ? null
                     : () => onAddDiagnosis!(d, selectedSurface),
-                icon: const Icon(Icons.add_rounded, size: 14),
-                label: const Text('Diagnóstico'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.indigo,
-                  side: BorderSide(color: ac.indigo.withValues(alpha: 0.40)),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
-              OutlinedButton.icon(
+              _BotonAnadir(
+                etiqueta: 'Tratamiento',
+                color: ac.teal,
                 onPressed: onAddTratamiento == null
                     ? null
                     : () => onAddTratamiento!(d, selectedSurface),
-                icon: const Icon(Icons.add_rounded, size: 14),
-                label: const Text('Tratamiento'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.teal,
-                  side: BorderSide(color: ac.teal.withValues(alpha: 0.40)),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           ),
@@ -820,37 +876,77 @@ class _InfoPieza extends StatelessWidget {
       ],
     );
   }
+
+  /// Solo lo ejecutado en esta consulta se edita desde la ficha: un antecedente
+  /// pertenece a otra consulta y una actividad del plan se decide en el plan.
+  bool _editaEjecucion(MarcaClinicaPieza marca) =>
+      editMode &&
+      diente != null &&
+      marca.procedencia == ProcedenciaMarca.ejecutado &&
+      marca.indiceOrigen != null;
 }
 
-// ─────────────────────────────────────────────
-//  Applied treatment row (name · estado · quitar)
-// ─────────────────────────────────────────────
+class _EncabezadoProcedencia extends StatelessWidget {
+  final ProcedenciaMarca procedencia;
+  final PaletaOdontodiagrama paleta;
+  final int conteo;
 
-/// «Resina compuesta · Oclusal», o solo el nombre si la marca es de la pieza
-/// entera. La cara es dato clínico: sin ella, dos resinas en el mismo diente se
-/// leen como una repetición.
-String conSuperficie(String nombre, TipoSuperficie? superficie) =>
-    superficie == null ? nombre : '$nombre · ${superficie.name}';
+  const _EncabezadoProcedencia({
+    required this.procedencia,
+    required this.paleta,
+    required this.conteo,
+  });
 
-String origenClinico(String? consultaId, DateTime? fecha) {
-  final consulta = consultaId == null
-      ? 'Esta consulta'
-      : 'Consulta ${consultaId.length > 8 ? consultaId.substring(0, 8) : consultaId}';
-  if (fecha == null) return consulta;
-  return '$consulta · ${fecha.day}/${fecha.month}/${fecha.year}';
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Semantics(
+      header: true,
+      label: '${procedencia.etiqueta}: ${procedencia.descripcion}. $conteo',
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          MuestraProcedencia(
+            procedencia: procedencia,
+            paleta: paleta,
+            lado: 13,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            procedencia.etiqueta.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: ac.textMuted,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              procedencia.descripcion,
+              style: TextStyle(fontSize: 10, color: ac.textDisabled),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _TratamientoAplicadoRow extends StatelessWidget {
-  final String nombre;
-  final TratamientoAplicado tratamiento;
-  final bool editMode;
+/// Una anotación: qué es, sobre qué cara, en qué estado, y de dónde viene.
+class _FilaMarca extends StatelessWidget {
+  final MarcaClinicaPieza marca;
+  final PaletaOdontodiagrama paleta;
+  final String Function(String doctorId)? nombreDoctor;
   final VoidCallback? onToggleTerminado;
   final VoidCallback? onQuitar;
 
-  const _TratamientoAplicadoRow({
-    required this.nombre,
-    required this.tratamiento,
-    required this.editMode,
+  const _FilaMarca({
+    required this.marca,
+    required this.paleta,
+    this.nombreDoctor,
     this.onToggleTerminado,
     this.onQuitar,
   });
@@ -858,175 +954,199 @@ class _TratamientoAplicadoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    // Desde SD-135 esta lista es solo ejecución: lo que se piensa hacer vive en
-    // el plan de tratamiento y se pinta en su propia sección.
-    final terminado = tratamiento.estaTerminado;
-    final estadoColor = terminado ? ac.green : ac.amber;
-    final etiquetaEstado = terminado ? 'Terminado' : 'En proceso';
+    final tinta = paleta.tintaDe(marca.claveEfectiva);
+    final procedencia = procedenciaAtenuada(marca, ac);
+    final origen = _origen(context);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(
-            terminado
-                ? Icons.check_circle_outline_rounded
-                : Icons.pending_outlined,
-            size: 14,
-            color: estadoColor,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              conSuperficie(nombre, tratamiento.superficie),
-              style: TextStyle(fontSize: 12, color: ac.textSecondary),
-            ),
-          ),
-          if (editMode) ...[
-            GestureDetector(
-              onTap: onToggleTerminado,
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        label: descripcionAccesible(marca, nombreDoctor: nombreDoctor),
+        excludeSemantics: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                width: 8,
+                height: 8,
                 decoration: BoxDecoration(
-                  color: estadoColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(100),
+                  color: marca.vigente ? tinta : tinta.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
                 ),
-                child: Text(
-                  etiquetaEstado,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: estadoColor,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    conSuperficie(marca.titulo, marca.superficie),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: procedencia,
+                    ),
+                  ),
+                  if (origen.isNotEmpty)
+                    Text(
+                      origen,
+                      style: TextStyle(fontSize: 10, color: ac.textDisabled),
+                    ),
+                  if (marca.notas case final notas?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        notas,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: ac.textMuted,
+                          fontStyle: FontStyle.italic,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _ChipEstado(
+              texto: marca.estado,
+              color: tinta,
+              onTap: onToggleTerminado,
+            ),
+            if (onQuitar != null) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onQuitar,
+                child: Tooltip(
+                  message: 'Quitar',
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 16,
+                    color: ac.red,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onQuitar,
-              child: Icon(
-                Icons.delete_outline_rounded,
-                size: 16,
-                color: ac.red,
-              ),
-            ),
-          ] else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: estadoColor.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                etiquetaEstado,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: estadoColor,
-                ),
-              ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }
+
+  /// «12/6/2026 · Dr. Pérez · Consulta ab12cd34». Se omite lo que no se sabe en
+  /// vez de rellenarlo con un identificador que no dice nada.
+  String _origen(BuildContext context) {
+    final partes = <String>[
+      if (marca.fecha case final fecha?) fechaCortaDeMarca(fecha),
+      if (marca.doctorId case final doctorId?)
+        if (nombreDoctor?.call(doctorId) case final nombre?
+            when nombre.trim().isNotEmpty)
+          nombre,
+      if (marca.consultaId case final consultaId?
+          when marca.procedencia == ProcedenciaMarca.historico)
+        'Consulta ${referenciaCorta(consultaId)}',
+    ];
+    return partes.join(' · ');
+  }
 }
 
-// ─────────────────────────────────────────────
-//  Historic finding row (clave del odontodiagrama de consultas anteriores)
-// ─────────────────────────────────────────────
+/// Los antecedentes y lo que ya no se hará se leen más apagados: siguen ahí,
+/// pero no describen el estado de hoy.
+Color procedenciaAtenuada(MarcaClinicaPieza marca, AppColors ac) =>
+    !marca.vigente || marca.procedencia == ProcedenciaMarca.historico
+    ? ac.textMuted
+    : ac.textSecondary;
 
-/// «Restaurada · oclusal, mesial», o solo la clave cuando es de la pieza
-/// entera. Es lo que antes se estampaba en tinta tenue sobre el papel.
-class _HallazgoHistoricoRow extends StatelessWidget {
-  final HallazgoDental hallazgo;
+class _ChipEstado extends StatelessWidget {
+  final String texto;
+  final Color color;
+  final VoidCallback? onTap;
 
-  const _HallazgoHistoricoRow({required this.hallazgo});
+  const _ChipEstado({required this.texto, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final caras = hallazgo.superficies.map((s) => s.name).join(', ');
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(Icons.history_rounded, size: 14, color: ac.textMuted),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              caras.isEmpty
-                  ? hallazgo.estado.label
-                  : '${hallazgo.estado.label} · $caras',
-              style: TextStyle(fontSize: 12, color: ac.textMuted),
-            ),
-          ),
-        ],
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
+    if (onTap == null) return chip;
+    return GestureDetector(onTap: onTap, child: chip);
   }
 }
 
-// ─────────────────────────────────────────────
-//  Historic treatment row (read-only · capa histórico)
-// ─────────────────────────────────────────────
+class _BotonAnadir extends StatelessWidget {
+  final String etiqueta;
+  final Color color;
+  final VoidCallback? onPressed;
 
-class _TratamientoHistoricoRow extends StatelessWidget {
-  final String nombre;
-  final TratamientoAplicado tratamiento;
-
-  const _TratamientoHistoricoRow({
-    required this.nombre,
-    required this.tratamiento,
+  const _BotonAnadir({
+    required this.etiqueta,
+    required this.color,
+    this.onPressed,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final terminado = tratamiento.estaTerminado;
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: onPressed,
+    icon: const Icon(Icons.add_rounded, size: 14),
+    label: Text(etiqueta),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: color,
+      side: BorderSide(color: color.withValues(alpha: 0.40)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+    ),
+  );
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(Icons.history_rounded, size: 14, color: ac.textMuted),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  conSuperficie(nombre, tratamiento.superficie),
-                  style: TextStyle(fontSize: 12, color: ac.textMuted),
-                ),
-                Text(
-                  origenClinico(
-                    tratamiento.consultaId,
-                    tratamiento.fechaAplicacion,
-                  ),
-                  style: TextStyle(fontSize: 10, color: ac.textDisabled),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: ac.textMuted.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(100),
-            ),
-            child: Text(
-              terminado ? 'Terminado' : 'En proceso',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: ac.textMuted,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+/// «Resina compuesta · Oclusal», o solo el nombre si la marca es de la pieza
+/// entera. La cara es dato clínico: sin ella, dos resinas en el mismo diente se
+/// leen como una repetición.
+String conSuperficie(String nombre, TipoSuperficie? superficie) =>
+    superficie == null ? nombre : '$nombre · ${superficie.name}';
+
+/// Los ocho primeros caracteres de un uuid: lo justo para reconocer la consulta
+/// sin llenar la ficha de identificadores.
+String referenciaCorta(String id) => id.length > 8 ? id.substring(0, 8) : id;
+
+String fechaCortaDeMarca(DateTime fecha) =>
+    '${fecha.day}/${fecha.month}/${fecha.year}';
+
+/// La fila entera dicha en voz alta, para quien no ve el color ni el trazo.
+String descripcionAccesible(
+  MarcaClinicaPieza marca, {
+  String Function(String doctorId)? nombreDoctor,
+}) {
+  final cara = marca.superficie == null
+      ? 'pieza completa'
+      : 'cara ${marca.superficie!.name.toLowerCase()}';
+  final partes = <String>[
+    '${marca.titulo}, $cara',
+    marca.procedencia.etiqueta.toLowerCase(),
+    marca.estado.toLowerCase(),
+    if (marca.fecha case final fecha?) fechaCortaDeMarca(fecha),
+    if (marca.doctorId case final doctorId?)
+      if (nombreDoctor?.call(doctorId) case final nombre?
+          when nombre.trim().isNotEmpty)
+        nombre,
+    ?marca.notas,
+  ];
+  return partes.join('. ');
 }

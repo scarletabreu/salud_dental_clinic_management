@@ -16,6 +16,15 @@ class DiagnosticoAplicado {
   final TipoSuperficie? superficie;
   final OrigenMarcaOdontograma origen;
 
+  /// Acto de evaluación (SD-135) al que pertenece el hallazgo. De él cuelga el
+  /// doctor que lo anotó: el eje de evaluación no repite esa columna.
+  final String? evaluacionId;
+
+  /// Quién anotó el hallazgo. No es una columna propia: llega del JOIN con la
+  /// evaluación y, a falta de ella, del doctor de la consulta. Se conserva en
+  /// la entidad porque la ficha de la pieza tiene que poder mostrarlo (SD-142).
+  final String? doctorId;
+
   /// Datos del catálogo incluidos por el JOIN; permiten proyectar el glifo sin
   /// convertir el catálogo en un mapa codificado en la interfaz.
   final String? nombreDiagnostico;
@@ -31,6 +40,8 @@ class DiagnosticoAplicado {
     this.dienteId,
     this.superficie,
     this.origen = OrigenMarcaOdontograma.preexistente,
+    this.evaluacionId,
+    this.doctorId,
     this.nombreDiagnostico,
     this.claveOdontograma,
   });
@@ -45,6 +56,8 @@ class DiagnosticoAplicado {
     String? dienteId,
     TipoSuperficie? superficie,
     OrigenMarcaOdontograma? origen,
+    String? evaluacionId,
+    String? doctorId,
     String? nombreDiagnostico,
     String? claveOdontograma,
   }) {
@@ -58,6 +71,8 @@ class DiagnosticoAplicado {
       dienteId: dienteId ?? this.dienteId,
       superficie: superficie ?? this.superficie,
       origen: origen ?? this.origen,
+      evaluacionId: evaluacionId ?? this.evaluacionId,
+      doctorId: doctorId ?? this.doctorId,
       nombreDiagnostico: nombreDiagnostico ?? this.nombreDiagnostico,
       claveOdontograma: claveOdontograma ?? this.claveOdontograma,
     );

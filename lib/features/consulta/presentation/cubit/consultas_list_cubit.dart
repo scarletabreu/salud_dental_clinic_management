@@ -31,9 +31,6 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
   Future<void> recargar() =>
       cargar(restringidoADoctorId: _restringidoADoctorId);
 
-
-  /// Carga el listado completo de consultas junto con los nombres de pacientes
-  /// y doctores. Permite además aplicar filtros iniciales.
   Future<void> cargar({
     String? pacienteId,
     String? doctorId,
@@ -91,34 +88,45 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
   void buscarPaciente(String query) {
     final current = state;
     if (current is! ConsultasLoaded) return;
-    emit(
-      current.copyWith(
-        busquedaPaciente: query,
-        filtradas: _filtrarDesde(current, busqueda: query),
-      ),
-    );
+    final updated = current.copyWith(busquedaPaciente: query);
+    emit(updated.copyWith(filtradas: _filtrarDesde(updated)));
   }
 
   void filtrarPorDoctor(String? doctorId) {
     final current = state;
     if (current is! ConsultasLoaded) return;
-    emit(
-      current.copyWith(
-        doctorIdFiltro: () => doctorId,
-        filtradas: _filtrarDesde(current, doctorId: () => doctorId),
-      ),
-    );
+    final updated = current.copyWith(doctorIdFiltro: doctorId);
+    emit(updated.copyWith(filtradas: _filtrarDesde(updated)));
   }
 
   void filtrarPorRango(DateTimeRange? rango) {
     final current = state;
     if (current is! ConsultasLoaded) return;
-    emit(
-      current.copyWith(
-        rangoFechas: () => rango,
-        filtradas: _filtrarDesde(current, rango: () => rango),
-      ),
+    final updated = current.copyWith(rangoFechas: rango);
+    emit(updated.copyWith(filtradas: _filtrarDesde(updated)));
+  }
+
+  void aplicarFiltrosAvanzados({
+    bool? finalizada,
+    bool? tieneNotas,
+    bool? tieneOdontograma,
+    bool? tieneRecetas,
+    bool? tieneTratamientos,
+    bool? soloEmergencias,
+  }) {
+    final current = state;
+    if (current is! ConsultasLoaded) return;
+
+    final newState = current.copyWith(
+      finalizada: finalizada,
+      tieneNotas: tieneNotas,
+      tieneOdontograma: tieneOdontograma,
+      tieneRecetas: tieneRecetas,
+      tieneTratamientos: tieneTratamientos,
+      soloEmergencias: soloEmergencias,
     );
+
+    emit(newState.copyWith(filtradas: _filtrarDesde(newState)));
   }
 
   void limpiarFiltros() {
@@ -136,20 +144,14 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     );
   }
 
-  /// Elimina una consulta creada por error hoy, sin tratamientos ni pre-factura.
-  ///
-  /// El use case valida los guardrails antes de ejecutar.
   Future<void> eliminarConsulta(Consulta consulta) async {
     try {
       await _eliminarConsultaUseCase(consulta);
-      // Recargar lista después de eliminación exitosa
       await recargar();
     } catch (e) {
       emit(ConsultasError(_mensajeError(e)));
     }
   }
-
-  // ── helpers ───────────────────────────────────────────────────────────────
 
   Future<List<Paciente>> _cargarPacientes() async {
     final result = await _pacienteRepository.getPacientes();
@@ -164,19 +166,18 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     }
   }
 
-  /// Reaplica los filtros tomando los valores actuales del estado, salvo los
-  /// que se sobreescriban explícitamente.
-  List<Consulta> _filtrarDesde(
-    ConsultasLoaded current, {
-    String? busqueda,
-    String? Function()? doctorId,
-    DateTimeRange? Function()? rango,
-  }) {
+  List<Consulta> _filtrarDesde(ConsultasLoaded current) {
     return _filtrar(
       current.todas,
-      busqueda: busqueda ?? current.busquedaPaciente,
-      doctorId: doctorId != null ? doctorId() : current.doctorIdFiltro,
-      rango: rango != null ? rango() : current.rangoFechas,
+      busqueda: current.busquedaPaciente,
+      doctorId: current.doctorIdFiltro,
+      rango: current.rangoFechas,
+      finalizada: current.finalizada,
+      tieneNotas: current.tieneNotas,
+      tieneOdontograma: current.tieneOdontograma,
+      tieneRecetas: current.tieneRecetas,
+      tieneTratamientos: current.tieneTratamientos,
+      soloEmergencias: current.soloEmergencias,
       pacienteNombres: current.pacienteNombres,
     );
   }
@@ -186,6 +187,12 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     required String busqueda,
     String? doctorId,
     DateTimeRange? rango,
+    bool? finalizada,
+    bool? tieneNotas,
+    bool? tieneOdontograma,
+    bool? tieneRecetas,
+    bool? tieneTratamientos,
+    bool? soloEmergencias,
     required Map<String, String> pacienteNombres,
   }) {
     Iterable<Consulta> resultado = base;
@@ -218,6 +225,44 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
       resultado = resultado.where(
         (c) => !c.fecha.isBefore(inicio) && !c.fecha.isAfter(fin),
       );
+    }
+
+    if (finalizada != null) {
+      resultado = resultado.where((c) => c.finalizada == finalizada);
+    }
+
+    if (tieneNotas != null) {
+      resultado = resultado.where((c) {
+        final hasNotas = c.notas != null && c.notas!.trim().isNotEmpty;
+        return hasNotas == tieneNotas;
+      });
+    }
+
+    if (tieneOdontograma != null) {
+      resultado = resultado.where(
+        (c) => (c.odontograma != null) == tieneOdontograma,
+      );
+    }
+
+    if (tieneRecetas != null) {
+      resultado = resultado.where((c) => c.tieneRecetas == tieneRecetas);
+    }
+
+    if (tieneTratamientos != null) {
+      resultado = resultado.where(
+        (c) => c.tieneTratamientosAplicados == tieneTratamientos,
+      );
+    }
+
+    if (soloEmergencias != null && soloEmergencias == true) {
+      resultado = resultado.where((c) {
+        try {
+          final dynamic obj = c;
+          return obj.esEmergencia == true;
+        } catch (_) {
+          return c.motivoConsulta?.toLowerCase().contains('emergencia') == true;
+        }
+      });
     }
 
     return resultado.toList();

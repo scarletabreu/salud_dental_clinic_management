@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart' show DateTimeRange;
-import 'package:flutter/foundation.dart' show ValueGetter;
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
@@ -20,71 +19,110 @@ class ConsultasLoading extends ConsultasListState {
 }
 
 class ConsultasLoaded extends ConsultasListState {
-  /// Todas las consultas cargadas (sin filtrar).
   final List<Consulta> todas;
-
-  /// Consultas tras aplicar los filtros activos.
   final List<Consulta> filtradas;
-
-  /// Mapa pacienteId -> nombre completo, para mostrar y buscar por nombre.
-  final Map<String, String> pacienteNombres;
-
-  /// Mapa doctorId -> nombre completo.
-  final Map<String, String> doctorNombres;
-
-  /// Doctores disponibles para el filtro de chips.
   final List<Doctor> doctores;
-
-  /// Si el usuario puede filtrar por doctor (admin). Para un doctor el listado
-  /// queda restringido a sus propias consultas y no se muestran los chips.
+  final Map<String, String> pacienteNombres;
+  final Map<String, String> doctorNombres;
   final bool puedeFiltrarPorDoctor;
-
-  /// Filtros activos.
   final String busquedaPaciente;
   final String? doctorIdFiltro;
   final DateTimeRange? rangoFechas;
 
+  final bool? finalizada;
+  final bool? tieneNotas;
+  final bool? tieneOdontograma;
+  final bool? tieneRecetas;
+  final bool? tieneTratamientos;
+  final bool? soloEmergencias;
+
   const ConsultasLoaded({
     required this.todas,
     required this.filtradas,
-    required this.pacienteNombres,
-    required this.doctorNombres,
     required this.doctores,
+    this.pacienteNombres = const {},
+    this.doctorNombres = const {},
     this.puedeFiltrarPorDoctor = true,
     this.busquedaPaciente = '',
     this.doctorIdFiltro,
     this.rangoFechas,
+    this.finalizada,
+    this.tieneNotas,
+    this.tieneOdontograma,
+    this.tieneRecetas,
+    this.tieneTratamientos,
+    this.soloEmergencias,
   });
 
   bool get hayFiltrosActivos =>
-      busquedaPaciente.trim().isNotEmpty ||
+      busquedaPaciente.isNotEmpty ||
       doctorIdFiltro != null ||
-      rangoFechas != null;
+      rangoFechas != null ||
+      finalizada != null ||
+      tieneNotas != null ||
+      tieneOdontograma != null ||
+      tieneRecetas != null ||
+      tieneTratamientos != null ||
+      soloEmergencias != null;
 
-  String nombrePaciente(String id) => pacienteNombres[id] ?? 'Paciente desconocido';
+  String nombrePaciente(String pacienteId) {
+    return pacienteNombres[pacienteId] ?? 'Paciente #$pacienteId';
+  }
 
-  String nombreDoctor(String id) => doctorNombres[id] ?? 'Doctor desconocido';
+  String nombreDoctor(String doctorId) {
+    if (doctorNombres.containsKey(doctorId)) {
+      return doctorNombres[doctorId]!;
+    }
+    final d = doctores.where((doc) => doc.id == doctorId).firstOrNull;
+    return d != null ? 'Dr. ${d.nombre} ${d.apellido}' : 'Doctor asignado';
+  }
 
-  /// Para los campos anulables (`doctorIdFiltro`, `rangoFechas`) se usa un
-  /// `ValueGetter`: pasar la función permite distinguir "no cambiar" (null)
-  /// de "limpiar el filtro" (() => null).
   ConsultasLoaded copyWith({
+    List<Consulta>? todas,
     List<Consulta>? filtradas,
+    List<Doctor>? doctores,
+    Map<String, String>? pacienteNombres,
+    Map<String, String>? doctorNombres,
+    bool? puedeFiltrarPorDoctor,
     String? busquedaPaciente,
-    ValueGetter<String?>? doctorIdFiltro,
-    ValueGetter<DateTimeRange?>? rangoFechas,
+    Object? doctorIdFiltro = _absent,
+    Object? rangoFechas = _absent,
+    Object? finalizada = _absent,
+    Object? tieneNotas = _absent,
+    Object? tieneOdontograma = _absent,
+    Object? tieneRecetas = _absent,
+    Object? tieneTratamientos = _absent,
+    Object? soloEmergencias = _absent,
   }) {
     return ConsultasLoaded(
-      todas: todas,
+      todas: todas ?? this.todas,
       filtradas: filtradas ?? this.filtradas,
-      pacienteNombres: pacienteNombres,
-      doctorNombres: doctorNombres,
-      doctores: doctores,
-      puedeFiltrarPorDoctor: puedeFiltrarPorDoctor,
+      doctores: doctores ?? this.doctores,
+      pacienteNombres: pacienteNombres ?? this.pacienteNombres,
+      doctorNombres: doctorNombres ?? this.doctorNombres,
+      puedeFiltrarPorDoctor:
+          puedeFiltrarPorDoctor ?? this.puedeFiltrarPorDoctor,
       busquedaPaciente: busquedaPaciente ?? this.busquedaPaciente,
-      doctorIdFiltro:
-          doctorIdFiltro != null ? doctorIdFiltro() : this.doctorIdFiltro,
-      rangoFechas: rangoFechas != null ? rangoFechas() : this.rangoFechas,
+      doctorIdFiltro: doctorIdFiltro == _absent
+          ? this.doctorIdFiltro
+          : doctorIdFiltro as String?,
+      rangoFechas: rangoFechas == _absent
+          ? this.rangoFechas
+          : rangoFechas as DateTimeRange?,
+      finalizada: finalizada == _absent ? this.finalizada : finalizada as bool?,
+      tieneNotas: tieneNotas == _absent ? this.tieneNotas : tieneNotas as bool?,
+      tieneOdontograma: tieneOdontograma == _absent
+          ? this.tieneOdontograma
+          : tieneOdontograma as bool?,
+      tieneRecetas: tieneRecetas == _absent
+          ? this.tieneRecetas
+          : tieneRecetas as bool?,
+      tieneTratamientos: tieneTratamientos == _absent
+          ? this.tieneTratamientos
+          : tieneTratamientos as bool?,
+      soloEmergencias: soloEmergencias == _absent
+          ? this.soloEmergencias
+          : soloEmergencias as bool?,
     );
   }
 
@@ -92,15 +130,26 @@ class ConsultasLoaded extends ConsultasListState {
   List<Object?> get props => [
     todas,
     filtradas,
+    doctores,
+    pacienteNombres,
+    doctorNombres,
+    puedeFiltrarPorDoctor,
     busquedaPaciente,
     doctorIdFiltro,
     rangoFechas,
+    finalizada,
+    tieneNotas,
+    tieneOdontograma,
+    tieneRecetas,
+    tieneTratamientos,
+    soloEmergencias,
   ];
 }
 
+const _absent = Object();
+
 class ConsultasError extends ConsultasListState {
   final String message;
-
   const ConsultasError(this.message);
 
   @override

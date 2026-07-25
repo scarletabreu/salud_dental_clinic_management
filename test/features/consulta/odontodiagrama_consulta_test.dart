@@ -71,7 +71,7 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
   Future<Consulta?> getDetalleConsulta(String id) async => consulta;
 
   @override
-  Future<void> guardarResultadoConsulta({
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -82,6 +82,7 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
   }) async {
     escrituras++;
     guardado = odontograma;
+    return const {};
   }
 
   @override
@@ -309,6 +310,17 @@ void main() {
       final hallazgo = estado.consulta.odontograma!.evaluacion.de(16).single;
       expect(hallazgo.estado, EstadoClinicoDental.cariada);
       expect(hallazgo.superficies, {TipoSuperficie.oclusal});
+
+      // Anotar deja la consulta pendiente y el autoguardado la escribe solo,
+      // sin que el doctor pulse nada.
+      expect(estado.guardado, EstadoGuardado.pendiente);
+      await tester.pump(ConsultaCubit.esperaAutoguardado);
+      await tester.pumpAndSettle();
+      expect(repo.escrituras, 1);
+      expect(
+        (cubit.state as ConsultaIniciada).guardado,
+        EstadoGuardado.alDia,
+      );
     });
   });
 }

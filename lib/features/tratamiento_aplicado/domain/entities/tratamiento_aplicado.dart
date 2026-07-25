@@ -36,6 +36,9 @@ class TratamientoAplicado {
   });
 
   TratamientoAplicado copyWith({
+    /// Solo se pasa al sellar sobre el estado en memoria el id que devolvió la
+    /// BD: una fila ya persistida no cambia de identidad.
+    String? id,
     String? tratamientoId,
     String? tratamientoPadreId,
     bool? esContinuo,
@@ -47,7 +50,7 @@ class TratamientoAplicado {
     String? notas,
   }) {
     return TratamientoAplicado(
-      id: id,
+      id: id ?? this.id,
       tratamientoId: tratamientoId ?? this.tratamientoId,
       tratamientoPadreId: tratamientoPadreId ?? this.tratamientoPadreId,
       esContinuo: esContinuo ?? this.esContinuo,

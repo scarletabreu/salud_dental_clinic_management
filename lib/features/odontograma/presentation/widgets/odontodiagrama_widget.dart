@@ -140,14 +140,15 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   }
 
   /// Solo se muestra en la capa tenue lo que no está ya anotado en firme, para
-  /// que una clave repetida no se dibuje dos veces sobre la misma pieza.
+  /// que una clave repetida no se dibuje dos veces sobre la misma pieza. La
+  /// resta es por superficie: lo que el histórico anota en otra cara sigue
+  /// viéndose.
   List<HallazgoDental> _historicoDe(int fdi) {
     if (!_hayHistorico) return const [];
-    final vigentes = widget.evaluacion.de(fdi);
-    return widget.historico
-        .de(fdi)
-        .where((h) => !vigentes.any((v) => v.estado == h.estado))
-        .toList(growable: false);
+    return hallazgosRestantes(
+      widget.historico.de(fdi),
+      widget.evaluacion.de(fdi),
+    );
   }
 
   @override

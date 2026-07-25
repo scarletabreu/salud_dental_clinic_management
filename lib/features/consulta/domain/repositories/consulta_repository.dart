@@ -18,7 +18,13 @@ abstract class ConsultaRepository {
     String? nota,
   });
 
-  Future<void> guardarResultadoConsulta({
+  /// Persiste el odontograma, las recetas y las notas de la consulta.
+  ///
+  /// Devuelve, por código FDI, los ids de los tratamientos aplicados en el
+  /// mismo orden en que se enviaron: sellarlos sobre el estado en memoria es
+  /// lo que permite que el siguiente guardado actualice esas filas en vez de
+  /// crear duplicados.
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,

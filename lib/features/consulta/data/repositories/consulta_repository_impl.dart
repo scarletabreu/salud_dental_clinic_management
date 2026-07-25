@@ -102,7 +102,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<void> guardarResultadoConsulta({
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -112,29 +112,37 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     bool? finalizada,
   }) {
     return runGuarded(() async {
-      final tratamientosPorFdi = <int, List<Map<String, dynamic>>>{
+      final dientesPorFdi = <int, Map<String, dynamic>>{
         for (final diente in odontograma.dientes)
-          if (diente.tratamientos.isNotEmpty)
-            diente.fdiCode: [
+          diente.fdiCode: {
+            'esta_ausente': diente.estaAusente,
+            'observaciones': diente.observaciones,
+            'tratamientos': [
               for (final t in diente.tratamientos)
                 {
+                  if (t.id != null) 'id': t.id,
                   'tratamiento_id': t.tratamientoId,
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
                   'superficie': t.superficie?.name.toLowerCase(),
                   'precio_aplicado': t.precioAplicado,
+                  // La justificación clínica de una contraindicación viaja
+                  // aquí. Sin ella el expediente diría que el tratamiento se
+                  // aplicó a ciegas.
+                  'notas': t.notas,
                 },
             ],
+          },
       };
 
       final recetasJson = [
         for (final r in recetas) RecetaModel.fromEntity(r).toJson(),
       ];
 
-      await remoteDataSource.guardarResultadoConsulta(
+      return remoteDataSource.guardarResultadoConsulta(
         consultaId: consultaId,
         pacienteId: pacienteId,
-        tratamientosPorFdi: tratamientosPorFdi,
+        dientesPorFdi: dientesPorFdi,
         recetas: recetasJson,
         evaluacionOdontologica: odontograma.evaluacionToJson(),
         notas: notas,

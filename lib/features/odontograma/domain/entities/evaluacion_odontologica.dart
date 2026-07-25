@@ -134,6 +134,27 @@ class HallazgoDental {
     detalle: detalle ?? this.detalle,
   );
 
+  /// Lo que este hallazgo sigue aportando frente a [vigentes], o `null` si ya
+  /// no aporta nada.
+  ///
+  /// Comparar solo por clave escondía lesiones: una caries anotada hoy en
+  /// mesial borraba de la capa histórica la caries previa en distal, y el
+  /// doctor dejaba de ver una lesión que sigue en la boca. La resta es por
+  /// superficie, y solo una anotación de pieza completa tapa a otra igual.
+  HallazgoDental? menos(Iterable<HallazgoDental> vigentes) {
+    final mismaClave = vigentes.where((v) => v.estado == estado);
+    if (mismaClave.isEmpty) return this;
+
+    // Una clave vigente sobre la pieza entera cubre cualquier superficie.
+    if (mismaClave.any((v) => v.esPiezaCompleta)) return null;
+    // …pero una clave vigente por superficie no cubre la pieza entera.
+    if (esPiezaCompleta) return this;
+
+    final cubiertas = {for (final v in mismaClave) ...v.superficies};
+    final restantes = superficies.where((s) => !cubiertas.contains(s)).toSet();
+    return restantes.isEmpty ? null : copyWith(superficies: restantes);
+  }
+
   Map<String, dynamic> toJson() => {
     'estado': estado.dbValue,
     if (superficies.isNotEmpty)
@@ -173,6 +194,17 @@ class HallazgoDental {
   int get hashCode =>
       Object.hash(estado, detalle, Object.hashAllUnordered(superficies));
 }
+
+/// Lo que queda de [historicos] una vez descontado lo que [vigentes] ya anota
+/// en firme. La usan la capa tenue del odontodiagrama y el resumen del
+/// expediente, para que ambas escondan exactamente lo mismo.
+List<HallazgoDental> hallazgosRestantes(
+  Iterable<HallazgoDental> historicos,
+  Iterable<HallazgoDental> vigentes,
+) => [
+  for (final historico in historicos)
+    if (historico.menos(vigentes) case final restante?) restante,
+];
 
 extension TipoSuperficieDb on TipoSuperficie {
   /// El enum `tipo_superficie` de Postgres está en minúscula.
@@ -309,10 +341,7 @@ class EvaluacionOdontologica {
   EvaluacionOdontologica menos(EvaluacionOdontologica actual) {
     final piezas = <int, List<HallazgoDental>>{};
     for (final entry in hallazgos.entries) {
-      final vigentes = actual.de(entry.key);
-      final restantes = entry.value
-          .where((h) => !vigentes.any((v) => v.estado == h.estado))
-          .toList();
+      final restantes = hallazgosRestantes(entry.value, actual.de(entry.key));
       if (restantes.isNotEmpty) piezas[entry.key] = List.unmodifiable(restantes);
     }
     final tejidos = {

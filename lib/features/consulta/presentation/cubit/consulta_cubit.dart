@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
@@ -48,6 +50,80 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     this._citaRepository,
     this._consultaRepository,
   ) : super(const ConsultaInactiva());
+
+  /// Margen entre el último cambio y la escritura. Corto a propósito: lo que se
+  /// pierde en una consulta no se puede reconstruir de memoria.
+  static const esperaAutoguardado = Duration(seconds: 3);
+
+  Timer? _autoguardado;
+  bool _guardando = false;
+
+  @override
+  Future<void> close() {
+    _autoguardado?.cancel();
+    return super.close();
+  }
+
+  /// Registra un cambio clínico en memoria y programa su autoguardado.
+  void _emitirCambio(Consulta consulta) {
+    if (isClosed) return;
+    emit(
+      ConsultaIniciada(consulta: consulta, guardado: EstadoGuardado.pendiente),
+    );
+    _autoguardado?.cancel();
+    _autoguardado = Timer(esperaAutoguardado, guardarParcial);
+  }
+
+  /// Sella sobre el estado vigente los ids que devolvió la BD.
+  ///
+  /// Solo se sellan los dientes cuya lista no cambió mientras se escribía —se
+  /// comparan por identidad—; si el doctor tocó una pieza justo entonces, esa
+  /// se deja como está y el siguiente guardado la reconcilia.
+  Consulta _sellarIds(
+    Consulta vigente,
+    Consulta enviada,
+    Map<int, List<String>> idsPorFdi,
+  ) {
+    final odonto = vigente.odontograma;
+    if (odonto == null || idsPorFdi.isEmpty) return vigente;
+
+    final enviadaPorFdi = {
+      for (final d in enviada.odontograma?.dientes ?? const []) d.fdiCode: d,
+    };
+
+    return vigente.copyWith(
+      odontograma: odonto.copyWith(
+        dientes: [
+          for (final diente in odonto.dientes)
+            _sellarDiente(
+              diente,
+              enviadaPorFdi[diente.fdiCode],
+              idsPorFdi[diente.fdiCode],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Diente _sellarDiente(Diente vigente, Diente? enviado, List<String>? ids) {
+    if (enviado == null || ids == null) return vigente;
+    final actuales = vigente.tratamientos;
+    if (actuales.length != enviado.tratamientos.length ||
+        actuales.length != ids.length) {
+      return vigente;
+    }
+    for (var i = 0; i < actuales.length; i++) {
+      if (!identical(actuales[i], enviado.tratamientos[i])) return vigente;
+    }
+    return vigente.copyWith(
+      tratamientos: [
+        for (var i = 0; i < actuales.length; i++)
+          actuales[i].id == null && ids[i].isNotEmpty
+              ? actuales[i].copyWith(id: ids[i])
+              : actuales[i],
+      ],
+    );
+  }
 
   Future<void> iniciar({
     required String pacienteId,
@@ -150,14 +226,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   void actualizarSignosVitales(SignosVitales signos) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
-      emit(ConsultaIniciada(consulta: actual.copyWith(signosVitales: signos)));
+      _emitirCambio(actual.copyWith(signosVitales: signos));
     }
   }
 
   void actualizarObservaciones(String notas) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
-      emit(ConsultaIniciada(consulta: actual.copyWith(notas: notas)));
+      _emitirCambio(actual.copyWith(notas: notas));
     }
   }
 
@@ -190,11 +266,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         }).toList(),
       );
 
-      emit(
-        ConsultaIniciada(
-          consulta: actual.copyWith(odontograma: nuevoOdontograma),
-        ),
-      );
+      _emitirCambio(actual.copyWith(odontograma: nuevoOdontograma));
     }
   }
 
@@ -213,11 +285,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }).toList(),
     );
 
-    emit(
-      ConsultaIniciada(
-        consulta: actual.copyWith(odontograma: nuevoOdontograma),
-      ),
-    );
+    _emitirCambio(actual.copyWith(odontograma: nuevoOdontograma));
   }
 
   void marcarTratamientoTerminado(Diente diente, int index, bool terminado) {
@@ -241,11 +309,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }).toList(),
     );
 
-    emit(
-      ConsultaIniciada(
-        consulta: actual.copyWith(odontograma: nuevoOdontograma),
-      ),
-    );
+    _emitirCambio(actual.copyWith(odontograma: nuevoOdontograma));
   }
 
   void toggleDienteAusente(Diente diente, bool ausente) {
@@ -263,11 +327,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         }).toList(),
       );
 
-      emit(
-        ConsultaIniciada(
-          consulta: actual.copyWith(odontograma: nuevoOdontograma),
-        ),
-      );
+      _emitirCambio(actual.copyWith(odontograma: nuevoOdontograma));
     }
   }
 
@@ -278,11 +338,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     final actual = (state as ConsultaIniciada).consulta;
     final odontograma = actual.odontograma;
     if (odontograma == null) return;
-    emit(
-      ConsultaIniciada(
-        consulta: actual.copyWith(
-          odontograma: odontograma.copyWith(evaluacion: evaluacion),
-        ),
+    _emitirCambio(
+      actual.copyWith(
+        odontograma: odontograma.copyWith(evaluacion: evaluacion),
       ),
     );
   }
@@ -290,11 +348,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   void agregarItemReceta(Receta receta) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
-      emit(
-        ConsultaIniciada(
-          consulta: actual.copyWith(recetas: [...actual.recetas, receta]),
-        ),
-      );
+      _emitirCambio(actual.copyWith(recetas: [...actual.recetas, receta]));
     }
   }
 
@@ -304,7 +358,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     if (index < 0 || index >= actual.recetas.length) return;
 
     final nuevasRecetas = [...actual.recetas]..removeAt(index);
-    emit(ConsultaIniciada(consulta: actual.copyWith(recetas: nuevasRecetas)));
+    _emitirCambio(actual.copyWith(recetas: nuevasRecetas));
   }
 
   Future<void> reanudarConsulta({required String consultaId}) async {
@@ -313,6 +367,17 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       final consulta = await _consultaRepository.getDetalleConsulta(consultaId);
       if (consulta == null) {
         emit(const ConsultaError('No se encontró la consulta para reanudar.'));
+        return;
+      }
+
+      // Una consulta cerrada ya generó su pre-factura: reabrirla dejaría la
+      // clínica y la cuenta emitida contando cosas distintas.
+      if (consulta.finalizada) {
+        emit(
+          const ConsultaError(
+            'Esta consulta ya fue finalizada y no puede reanudarse.',
+          ),
+        );
         return;
       }
 
@@ -353,18 +418,30 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     return consulta.copyWith(odontograma: odonto.copyWith(dientes: dientes));
   }
 
+  /// Escribe el trabajo clínico sin bloquear la pantalla: el doctor sigue
+  /// anotando mientras se guarda, y el estado del guardado se refleja en la
+  /// barra de la consulta.
+  ///
+  /// Lo dispara el autoguardado tras cada cambio y también el botón «Guardar
+  /// avance», que ya solo sirve para forzarlo antes de tiempo.
   Future<void> guardarParcial() async {
-    if (state is! ConsultaIniciada) return;
+    final actual = state;
+    if (actual is! ConsultaIniciada) return;
+    // Una escritura en vuelo no se pisa: al terminar, si quedaron cambios,
+    // ella misma reprograma el siguiente guardado.
+    if (_guardando) return;
 
-    final consulta = (state as ConsultaIniciada).consulta;
+    final consulta = actual.consulta;
     final consultaId = consulta.id;
     final odontograma = consulta.odontograma;
 
     if (consultaId == null || odontograma == null) return;
 
-    emit(ConsultaGuardando(consulta: consulta));
+    _autoguardado?.cancel();
+    _guardando = true;
+    emit(actual.copyWith(guardado: EstadoGuardado.guardando));
     try {
-      await _consultaRepository.guardarResultadoConsulta(
+      final idsPorFdi = await _consultaRepository.guardarResultadoConsulta(
         consultaId: consultaId,
         pacienteId: consulta.pacienteId,
         odontograma: odontograma,
@@ -372,11 +449,35 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         notas: consulta.notas,
         finalizada: false,
       );
-      emit(ConsultaIniciada(consulta: consulta));
+      _guardando = false;
+      if (isClosed) return;
+
+      final vigente = state;
+      if (vigente is! ConsultaIniciada) return;
+      final sellada = _sellarIds(vigente.consulta, consulta, idsPorFdi);
+      // Si el doctor anotó algo mientras se escribía, eso sigue pendiente.
+      final quedaPendiente = !identical(vigente.consulta, consulta);
+      emit(
+        ConsultaIniciada(
+          consulta: sellada,
+          guardado: quedaPendiente
+              ? EstadoGuardado.pendiente
+              : EstadoGuardado.alDia,
+        ),
+      );
+      if (quedaPendiente) {
+        _autoguardado = Timer(esperaAutoguardado, guardarParcial);
+      }
     } catch (e) {
+      _guardando = false;
       if (kDebugMode) debugPrint('Error en guardado parcial: $e');
-      emit(ConsultaError(_mensajeError(e)));
-      emit(ConsultaIniciada(consulta: consulta));
+      if (isClosed) return;
+      final vigente = state;
+      if (vigente is! ConsultaIniciada) return;
+      // El trabajo sigue en memoria y se reintenta solo: se avisa sin sacar al
+      // doctor de la consulta.
+      emit(vigente.copyWith(guardado: EstadoGuardado.fallido));
+      _autoguardado = Timer(esperaAutoguardado, guardarParcial);
     }
   }
 
@@ -391,6 +492,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       emit(const ConsultaError('No hay una consulta activa con odontograma.'));
       return;
     }
+
+    _autoguardado?.cancel();
+    // Dos escrituras simultáneas duplicarían tratamientos: si el autoguardado
+    // está en vuelo, se espera a que termine antes de cerrar.
+    for (var espera = 0; _guardando && espera < 50; espera++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    _guardando = true;
 
     emit(ConsultaGuardando(consulta: consulta));
     try {
@@ -408,8 +517,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       //    ítems) y marca la cita como completada. Devuelve el id de la cuenta.
       final cuentaId = await _finalizarConsulta(consultaId: consultaId);
 
+      _guardando = false;
       emit(ConsultaTerminada(cuentaId: cuentaId));
     } catch (e) {
+      _guardando = false;
       if (kDebugMode) debugPrint('Error al terminar consulta: $e');
       emit(
         ConsultaError(

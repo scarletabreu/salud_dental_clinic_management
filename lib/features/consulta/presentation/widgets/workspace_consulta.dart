@@ -267,6 +267,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           (sum, d) => sum + d.tratamientos.length,
         );
         final cargando = state is ConsultaGuardando;
+        final guardado = state is ConsultaIniciada
+            ? state.guardado
+            : EstadoGuardado.guardando;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
@@ -319,6 +322,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     ],
                   ),
                 ),
+                _IndicadorGuardado(estado: guardado),
+                if (totalTratamientos > 0) const SizedBox(width: 8),
                 if (totalTratamientos > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -390,12 +395,14 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               iconColor: ac.indigo,
               titulo: 'Notas clínicas',
               subtitulo: 'Observaciones para el expediente',
+              // La consulta ya se guarda sola; el botón solo adelanta la
+              // escritura para quien prefiere confirmarlo a mano.
               accion: TextButton.icon(
-                onPressed: cargando
+                onPressed: cargando || guardado == EstadoGuardado.guardando
                     ? null
                     : () => context.read<ConsultaCubit>().guardarParcial(),
                 icon: const Icon(Icons.save_outlined, size: 16),
-                label: const Text('Guardar avance'),
+                label: const Text('Guardar ahora'),
               ),
               child: TextField(
                 controller: _notasController,
@@ -496,6 +503,74 @@ class _TerminarButton extends StatelessWidget {
               )
             : const Icon(Icons.check_circle_outline_rounded, size: 20),
         label: Text(cargando ? 'Finalizando…' : 'Terminar consulta'),
+      ),
+    );
+  }
+}
+
+/// Estado del autoguardado, siempre visible en la cabecera de la consulta.
+///
+/// El doctor tiene que poder saber de un vistazo si lo que acaba de anotar ya
+/// está a salvo, sin abrir nada ni acordarse de pulsar un botón.
+class _IndicadorGuardado extends StatelessWidget {
+  final EstadoGuardado estado;
+
+  const _IndicadorGuardado({required this.estado});
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final (color, icono, texto) = switch (estado) {
+      EstadoGuardado.alDia => (ac.green, Icons.cloud_done_outlined, 'Guardado'),
+      EstadoGuardado.pendiente => (
+        ac.textMuted,
+        Icons.cloud_queue_rounded,
+        'Sin guardar',
+      ),
+      EstadoGuardado.guardando => (
+        ac.textMuted,
+        Icons.cloud_sync_outlined,
+        'Guardando…',
+      ),
+      EstadoGuardado.fallido => (
+        ac.red,
+        Icons.cloud_off_rounded,
+        'No se pudo guardar',
+      ),
+    };
+
+    return Tooltip(
+      message: switch (estado) {
+        EstadoGuardado.alDia => 'Todo el trabajo de esta consulta está en el '
+            'servidor.',
+        EstadoGuardado.pendiente => 'Hay cambios que se guardarán solos en unos '
+            'segundos.',
+        EstadoGuardado.guardando => 'Escribiendo los cambios en el servidor.',
+        EstadoGuardado.fallido => 'Los cambios siguen aquí y se reintentará '
+            'solo. No cierres la consulta.',
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icono, size: 12, color: color),
+            const SizedBox(width: 5),
+            Text(
+              texto,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

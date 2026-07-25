@@ -4,7 +4,6 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'tooth_geometry.dart';
@@ -123,6 +122,32 @@ ToothStatus statusForDiente(Diente? d) {
   if (d.tratamientosHistoricos.isNotEmpty) return ToothStatus.historico;
   if (d.superficies.any((s) => s.diagnosisId != null)) return ToothStatus.mild;
   return ToothStatus.empty;
+}
+
+/// Estado clínico de una cara concreta, tal como se colorea en el mapa de
+/// superficies.
+enum EstadoSuperficie { sinDatos, historico, tratada, diagnosticada }
+
+/// En qué estado está la cara [cara] del diente [d].
+///
+/// La fuente es `TratamientoAplicado.superficie`, que es donde la consulta
+/// guarda realmente la cara elegida. Antes se leía `Superficie.tratamientos` /
+/// `Superficie.diagnosisId`, dos campos que ningún camino de la app escribe:
+/// el doctor asignaba un tratamiento a una cara y el mapa seguía en blanco.
+EstadoSuperficie estadoDeSuperficie(Diente? d, TipoSuperficie cara) {
+  if (d == null || d.estaAusente) return EstadoSuperficie.sinDatos;
+  if (d.superficies.any(
+    (s) => s.tipoSuperficie == cara && s.diagnosisId != null,
+  )) {
+    return EstadoSuperficie.diagnosticada;
+  }
+  if (d.tratamientos.any((t) => t.superficie == cara)) {
+    return EstadoSuperficie.tratada;
+  }
+  if (d.tratamientosHistoricos.any((t) => t.superficie == cara)) {
+    return EstadoSuperficie.historico;
+  }
+  return EstadoSuperficie.sinDatos;
 }
 
 /// Indicador de los tratamientos aplicados en vivo sobre un diente:
@@ -506,11 +531,6 @@ class _SurfaceMap extends StatelessWidget {
   static const double _a = 0.32;
   static const double _b = 0.68;
 
-  Map<TipoSuperficie, Superficie> _surfaceMap() {
-    if (diente == null) return {};
-    return {for (final s in diente!.superficies) s.tipoSuperficie: s};
-  }
-
   TipoSuperficie get _centerSurface =>
       isAnteriorTooth(fdi) ? TipoSuperficie.incisal : TipoSuperficie.oclusal;
   TipoSuperficie get _bottomSurface =>
@@ -534,7 +554,7 @@ class _SurfaceMap extends StatelessWidget {
     Widget map = CustomPaint(
       size: const Size(_size, _size),
       painter: _SurfaceMapPainter(
-        surfaces: _surfaceMap(),
+        diente: diente,
         centerSurface: _centerSurface,
         bottomSurface: _bottomSurface,
         selected: selectedSurface,
@@ -563,7 +583,7 @@ class _SurfaceMap extends StatelessWidget {
 }
 
 class _SurfaceMapPainter extends CustomPainter {
-  final Map<TipoSuperficie, Superficie> surfaces;
+  final Diente? diente;
   final TipoSuperficie centerSurface;
   final TipoSuperficie bottomSurface;
   final TipoSuperficie? selected;
@@ -573,7 +593,7 @@ class _SurfaceMapPainter extends CustomPainter {
   final PaletaArcada paleta;
 
   const _SurfaceMapPainter({
-    required this.surfaces,
+    required this.diente,
     required this.centerSurface,
     required this.bottomSurface,
     required this.selected,
@@ -586,13 +606,12 @@ class _SurfaceMapPainter extends CustomPainter {
   Color get _sinDatos => paleta.esmalte;
   Color get _tealActivo => paleta.status(ToothStatus.treated);
 
-  Color _baseColor(TipoSuperficie t) {
-    final s = surfaces[t];
-    if (s == null) return _sinDatos;
-    if (s.diagnosisId != null) return paleta.status(ToothStatus.moderate);
-    if (s.tratamientos.isNotEmpty) return _tealActivo;
-    return _sinDatos;
-  }
+  Color _baseColor(TipoSuperficie t) => switch (estadoDeSuperficie(diente, t)) {
+    EstadoSuperficie.diagnosticada => paleta.status(ToothStatus.moderate),
+    EstadoSuperficie.tratada => _tealActivo,
+    EstadoSuperficie.historico => paleta.status(ToothStatus.historico),
+    EstadoSuperficie.sinDatos => _sinDatos,
+  };
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -683,7 +702,7 @@ class _SurfaceMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SurfaceMapPainter old) =>
-      old.surfaces != surfaces ||
+      !identical(old.diente, diente) ||
       old.selected != selected ||
       old.centerSurface != centerSurface ||
       old.bottomSurface != bottomSurface ||
@@ -910,6 +929,11 @@ class _ToothInfoPanel extends StatelessWidget {
 //  Applied treatment row (name · estado · quitar)
 // ─────────────────────────────────────────────
 
+/// «Resina compuesta · Oclusal», o solo el nombre si el tratamiento es de la
+/// pieza entera.
+String _conSuperficie(String nombre, TipoSuperficie? superficie) =>
+    superficie == null ? nombre : '$nombre · ${superficie.name}';
+
 class _TratamientoAplicadoRow extends StatelessWidget {
   final String nombre;
   final TratamientoAplicado tratamiento;
@@ -945,7 +969,9 @@ class _TratamientoAplicadoRow extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              nombre,
+              // La cara tratada es dato clínico: sin ella, dos resinas en el
+              // mismo diente se leen como una repetición.
+              _conSuperficie(nombre, tratamiento.superficie),
               style: TextStyle(fontSize: 12, color: ac.textSecondary),
             ),
           ),
@@ -1025,7 +1051,7 @@ class _TratamientoHistoricoRow extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              nombre,
+              _conSuperficie(nombre, tratamiento.superficie),
               style: TextStyle(fontSize: 12, color: ac.textMuted),
             ),
           ),

@@ -399,18 +399,70 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     );
   }
 
+  // Cápsula flotante con punto indicador + badge "filtrado", mismo patrón
+  // que usan medicina_list_page y paciente_form_page para el conteo.
   Widget _buildFooter(BuildContext context, ConsultasLoaded state) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
     final shown = state.filtradas.length;
     final total = state.todas.length;
-    return Container(
-      color: context.appColors.cardBg,
-      padding: context.pageInsets(top: 16, bottom: 16),
-      child: Text(
-        'Mostrando $shown de $total consulta${total == 1 ? '' : 's'}',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w500,
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: ac.cardBg,
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(
+            color: ac.divider.withValues(alpha: 0.5),
+            width: 0.5,
+          ),
+          boxShadow: [ac.cardShadow],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: shown == total ? ac.primaryBlue : ac.amber,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                shown == total
+                    ? '$total consulta${total == 1 ? '' : 's'} en total'
+                    : '$shown de $total consulta${total == 1 ? '' : 's'}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textSecondary,
+                ),
+              ),
+            ),
+            if (shown != total) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: ac.amber.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'filtrado',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ac.amber,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

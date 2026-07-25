@@ -17,6 +17,9 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.nombreTratamiento,
     super.claveOdontograma,
     super.fechaAplicacion,
+    super.itemPlanId,
+    super.doctorEjecutaId,
+    super.fechaEjecucion,
   });
 
   factory TratamientoAplicadoModel.fromJson(Map<String, dynamic> json) {
@@ -38,10 +41,7 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
         json['precio_aplicado'] ?? json['precioAplicado'],
       ),
       notas: json['notas'],
-      estado: EstadoTratamientoAplicado.values.firstWhere(
-        (estado) => estado.name == json['estado'],
-        orElse: () => EstadoTratamientoAplicado.aplicado,
-      ),
+      estado: EstadoTratamientoAplicado.fromDb(json['estado'] as String?),
       nombreTratamiento: catalogo['nombre'] as String?,
       claveOdontograma:
           catalogo['clave_odontograma'] as String? ??
@@ -49,6 +49,9 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       fechaAplicacion: _parseFecha(
         json['fecha_aplicacion'] ?? json['created_at'],
       ),
+      itemPlanId: json['item_plan_id'] as String?,
+      doctorEjecutaId: json['doctor_ejecuta_id'] as String?,
+      fechaEjecucion: _parseFecha(json['fecha_ejecucion']),
     );
   }
 
@@ -83,8 +86,11 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'superficie': superficie?.name.toLowerCase(),
       'precio_aplicado': precioAplicado,
       'notas': notas,
-      'estado': estado.name,
+      'estado': estado.dbValue,
       'fecha_aplicacion': fechaAplicacion?.toIso8601String(),
+      'item_plan_id': itemPlanId,
+      'doctor_ejecuta_id': doctorEjecutaId,
+      'fecha_ejecucion': fechaEjecucion?.toIso8601String(),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

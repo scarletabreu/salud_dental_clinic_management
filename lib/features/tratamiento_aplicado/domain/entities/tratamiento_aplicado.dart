@@ -1,6 +1,35 @@
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
-enum EstadoTratamientoAplicado { indicado, aplicado }
+/// Estado de un procedimiento **ya ejecutado**. Desde SD-135 esta tabla no
+/// alberga intenciones: lo que se piensa hacer vive en el plan de tratamiento
+/// (`items_plan_tratamiento`), no aquí. Por eso desapareció `indicado`.
+///
+/// Coincide con el CHECK `tratamientos_aplicados_solo_ejecucion` de Postgres.
+enum EstadoTratamientoAplicado {
+  /// La ejecución empezó y sigue abierta (un conducto en varias sesiones).
+  enProceso,
+
+  /// Se ejecutó. Es el estado normal de un procedimiento de una sola sesión.
+  aplicado,
+
+  /// Ejecución cerrada de un procedimiento que venía en varias sesiones.
+  completado;
+
+  String get dbValue =>
+      this == EstadoTratamientoAplicado.enProceso ? 'en_proceso' : name;
+
+  static EstadoTratamientoAplicado fromDb(String? valor) {
+    if (valor == 'en_proceso') return EstadoTratamientoAplicado.enProceso;
+    // `indicado` es de antes de SD-135: era una intención guardada en el eje de
+    // ejecución. La migración las movió al plan y borró lógicamente sus filas;
+    // si alguna sobrevive, se lee como iniciada y no como terminada.
+    if (valor == 'indicado') return EstadoTratamientoAplicado.enProceso;
+    return EstadoTratamientoAplicado.values.firstWhere(
+      (estado) => estado.name == valor,
+      orElse: () => EstadoTratamientoAplicado.aplicado,
+    );
+  }
+}
 
 class TratamientoAplicado {
   final String? id;
@@ -28,6 +57,14 @@ class TratamientoAplicado {
   final String? claveOdontograma;
   final DateTime? fechaAplicacion;
 
+  /// Actividad del plan que esta ejecución cumple. `null` = ejecución no
+  /// planificada (una urgencia resuelta en el momento), que es legítima.
+  final String? itemPlanId;
+
+  /// Auditoría de la ejecución: quién la hizo y cuándo (SD-135).
+  final String? doctorEjecutaId;
+  final DateTime? fechaEjecucion;
+
   TratamientoAplicado({
     this.id,
     required this.tratamientoId,
@@ -43,6 +80,9 @@ class TratamientoAplicado {
     this.nombreTratamiento,
     this.claveOdontograma,
     this.fechaAplicacion,
+    this.itemPlanId,
+    this.doctorEjecutaId,
+    this.fechaEjecucion,
   });
 
   TratamientoAplicado copyWith({
@@ -62,6 +102,9 @@ class TratamientoAplicado {
     String? nombreTratamiento,
     String? claveOdontograma,
     DateTime? fechaAplicacion,
+    String? itemPlanId,
+    String? doctorEjecutaId,
+    DateTime? fechaEjecucion,
   }) {
     return TratamientoAplicado(
       id: id ?? this.id,
@@ -78,6 +121,9 @@ class TratamientoAplicado {
       nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
       claveOdontograma: claveOdontograma ?? this.claveOdontograma,
       fechaAplicacion: fechaAplicacion ?? this.fechaAplicacion,
+      itemPlanId: itemPlanId ?? this.itemPlanId,
+      doctorEjecutaId: doctorEjecutaId ?? this.doctorEjecutaId,
+      fechaEjecucion: fechaEjecucion ?? this.fechaEjecucion,
     );
   }
 }

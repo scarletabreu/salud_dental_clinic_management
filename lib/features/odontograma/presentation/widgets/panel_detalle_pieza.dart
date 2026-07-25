@@ -858,9 +858,11 @@ class _TratamientoAplicadoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    // Desde SD-135 esta lista es solo ejecución: lo que se piensa hacer vive en
+    // el plan de tratamiento y se pinta en su propia sección.
     final terminado = tratamiento.estaTerminado;
-    final indicado = tratamiento.estado == EstadoTratamientoAplicado.indicado;
     final estadoColor = terminado ? ac.green : ac.amber;
+    final etiquetaEstado = terminado ? 'Terminado' : 'En proceso';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -869,8 +871,6 @@ class _TratamientoAplicadoRow extends StatelessWidget {
           Icon(
             terminado
                 ? Icons.check_circle_outline_rounded
-                : indicado
-                ? Icons.assignment_late_outlined
                 : Icons.pending_outlined,
             size: 14,
             color: estadoColor,
@@ -892,11 +892,7 @@ class _TratamientoAplicadoRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  terminado
-                      ? 'Terminado'
-                      : indicado
-                      ? 'Indicado'
-                      : 'En proceso',
+                  etiquetaEstado,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -922,11 +918,7 @@ class _TratamientoAplicadoRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
-                terminado
-                    ? 'Terminado'
-                    : indicado
-                    ? 'Indicado'
-                    : 'En proceso',
+                etiquetaEstado,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,

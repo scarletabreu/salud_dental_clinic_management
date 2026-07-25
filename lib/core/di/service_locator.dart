@@ -131,6 +131,15 @@ import '../../features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import '../../features/diagnostico_aplicado/data/datasources/diagnostico_aplicado_remote_datasource.dart';
 import '../../features/diagnostico_aplicado/data/repositories/diagnostico_aplicado_repository_impl.dart';
 import '../../features/diagnostico_aplicado/domain/repositories/diagnostico_aplicado_repository.dart';
+import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource.dart';
+import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource_impl.dart';
+import '../../features/evaluacion_clinica/data/repositories/evaluacion_clinica_repository_impl.dart';
+import '../../features/evaluacion_clinica/domain/repositories/evaluacion_clinica_repository.dart';
+import '../../features/plan_tratamiento/data/datasources/plan_tratamiento_remote_datasource.dart';
+import '../../features/plan_tratamiento/data/datasources/plan_tratamiento_remote_datasource_impl.dart';
+import '../../features/plan_tratamiento/data/repositories/plan_tratamiento_repository_impl.dart';
+import '../../features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
+import '../../features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import '../../features/odontograma/data/datasources/odontograma_remote_datasource.dart';
 import '../../features/odontograma/data/repositories/odontograma_repository_impl.dart';
 import '../../features/odontograma/domain/repositories/odontograma_repository.dart';
@@ -244,6 +253,12 @@ Future<void> init() async {
   sl.registerLazySingleton<TratamientoAplicadoDatasource>(
     () => TratamientoAplicadoDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<EvaluacionClinicaRemoteDatasource>(
+    () => EvaluacionClinicaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<PlanTratamientoRemoteDatasource>(
+    () => PlanTratamientoRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<EquipoRemoteDatasource>(
     () => EquipoRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -323,6 +338,12 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<TratamientoAplicadoRepository>(
     () => TratamientoAplicadoRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<EvaluacionClinicaRepository>(
+    () => EvaluacionClinicaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<PlanTratamientoRepository>(
+    () => PlanTratamientoRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerFactory<RegistrarTratamientoAplicado>(
     () => RegistrarTratamientoAplicado(sl()),
@@ -409,6 +430,9 @@ Future<void> init() async {
   );
   sl.registerFactory<ConsultaDetalleCubit>(
     () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
+  );
+  sl.registerFactory<PlanTratamientoCubit>(
+    () => PlanTratamientoCubit(repository: sl()),
   );
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl(), sl()));

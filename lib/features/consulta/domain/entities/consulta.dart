@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 
 class Consulta {
   final String? id;
@@ -10,6 +11,7 @@ class Consulta {
   final String? citaId;
   final DateTime fecha;
   final List<Receta> recetas;
+  final List<InsumoUtilizado> insumosUtilizados;
   final List<DocumentoClinico> documentosClinicos;
   final Odontograma? odontograma;
   final List<String> tempCondiciones;
@@ -27,6 +29,7 @@ class Consulta {
     this.citaId,
     required this.fecha,
     this.recetas = const [],
+    this.insumosUtilizados = const [],
     this.documentosClinicos = const [],
     this.odontograma,
     this.tempCondiciones = const [],
@@ -52,6 +55,7 @@ class Consulta {
     String? doctorId,
     DateTime? fecha,
     List<Receta>? recetas,
+    List<InsumoUtilizado>? insumosUtilizados,
     List<DocumentoClinico>? documentosClinicos,
     Odontograma? odontograma,
     String? citaId,
@@ -69,6 +73,7 @@ class Consulta {
       citaId: citaId ?? this.citaId,
       fecha: fecha ?? this.fecha,
       recetas: recetas ?? List.from(this.recetas),
+      insumosUtilizados: insumosUtilizados ?? List.from(this.insumosUtilizados),
       documentosClinicos:
           documentosClinicos ?? List.from(this.documentosClinicos),
       odontograma: odontograma ?? this.odontograma,

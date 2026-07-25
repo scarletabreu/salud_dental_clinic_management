@@ -47,6 +47,7 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 
 // Módulo Suplidores
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
@@ -426,6 +427,7 @@ Future<void> init() async {
       sl<SupabaseStorageHelper>(),
       sl<CitaRepository>(),
       sl<ConsultaRepository>(),
+      sl<DescontarStockPorConsumo>(),
     ),
   );
   sl.registerFactory<ConsultaDetalleCubit>(
@@ -489,7 +491,7 @@ Future<void> init() async {
   sl.registerFactory<HistorialFinancieroCubit>(
     () => HistorialFinancieroCubit(getHistorial: sl()),
   );
-
+  sl.registerLazySingleton(() => DescontarStockPorConsumo(sl()));
   sl.registerFactory<GetCondicionesPaciente>(
     () => GetCondicionesPaciente(sl()),
   );

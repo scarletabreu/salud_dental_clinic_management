@@ -33,6 +33,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_insumos.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -643,6 +644,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               recetas: consulta.recetas,
             ),
             const SizedBox(height: 28),
+
+            const SizedBox(height: 16),
+            SeccionInsumos(insumos: consulta.insumosUtilizados),
 
             _TerminarButton(
               cargando: cargando,

@@ -10,4 +10,8 @@ abstract class ConsumibleRepository {
   );
   Future<void> guardarConsumible(Consumible consumible);
   Future<void> eliminarConsumible(String id);
+  Future<void> descontarPorConsumo({
+    required String consumibleId,
+    required int cantidad,
+  });
 }

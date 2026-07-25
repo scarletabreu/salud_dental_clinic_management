@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
@@ -28,6 +29,7 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/entitie
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 
 /// Las tres capas del pasado clínico del paciente, tal como se cargan juntas al
 /// abrir o reanudar una consulta.
@@ -65,6 +67,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   final SupabaseStorageHelper _storage;
   final CitaRepository _citaRepository;
   final ConsultaRepository _consultaRepository;
+  final DescontarStockPorConsumo _descontarStockPorConsumo;
 
   ConsultaCubit(
     this._crearConsulta,
@@ -72,6 +75,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     this._storage,
     this._citaRepository,
     this._consultaRepository,
+    this._descontarStockPorConsumo,
   ) : super(const ConsultaInactiva());
 
   /// Margen entre el último cambio y la escritura. Corto a propósito: lo que se
@@ -473,6 +477,25 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  void agregarInsumo(InsumoUtilizado insumo) {
+    if (state is ConsultaIniciada) {
+      final actual = (state as ConsultaIniciada).consulta;
+      _emitirCambio(
+        actual.copyWith(
+          insumosUtilizados: [...actual.insumosUtilizados, insumo],
+        ),
+      );
+    }
+  }
+
+  void quitarInsumo(int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.insumosUtilizados.length) return;
+    final nuevos = [...actual.insumosUtilizados]..removeAt(index);
+    _emitirCambio(actual.copyWith(insumosUtilizados: nuevos));
+  }
+
   /// Anota una observación clínica sobre una pieza concreta.
   ///
   /// Es distinta de las notas de la consulta: aquella describe la sesión y esta
@@ -747,6 +770,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         notas: consulta.notas,
         finalizada: true,
       );
+
+      // 1.5 Descuenta del inventario los insumos marcados en esta consulta.
+      //     Deuda conocida: no es atómico con el paso 2 (ver DescontarStockPorConsumo).
+      if (consulta.insumosUtilizados.isNotEmpty) {
+        await _descontarStockPorConsumo(consulta.insumosUtilizados);
+      }
 
       // 2. Handoff financiero atómico: la BD genera la pre-factura (cuenta +
       //    ítems) y marca la cita como completada. Devuelve el id de la cuenta.

@@ -14,15 +14,43 @@ class ConsumibleModel extends Consumible {
   factory ConsumibleModel.fromJson(Map<String, dynamic> json) {
     return ConsumibleModel(
       id: json['id'] as String?,
-      nombre: json['nombre'] as String,
-      descripcion: json['descripcion'] ?? '',
-      stockActual: (json['stock_actual'] ?? json['stockActual'] as num).toInt(),
-      stockMinimo: (json['stock_minimo'] ?? json['stockMinimo'] as num).toInt(),
-      estado: EstadoConsumible.values.firstWhere(
-        (e) => e.name == json['estado'],
-        orElse: () => EstadoConsumible.disponible,
-      ),
+      nombre: json['nombre'] as String? ?? '',
+      descripcion: json['descripcion'] as String? ?? '',
+      stockActual: (json['stock_actual'] ?? json['stockActual'] ?? 0 as num)
+          .toInt(),
+      stockMinimo: (json['stock_minimo'] ?? json['stockMinimo'] ?? 0 as num)
+          .toInt(),
+      estado: _parseEstado(json['estado'] as String?),
     );
+  }
+
+  static EstadoConsumible _parseEstado(String? estadoStr) {
+    if (estadoStr == null) return EstadoConsumible.disponible;
+    switch (estadoStr) {
+      case 'bajo_stock':
+      case 'bajoStock':
+        return EstadoConsumible.bajoStock;
+      case 'agotado':
+        return EstadoConsumible.agotado;
+      case 'descontinuado':
+        return EstadoConsumible.descontinuado;
+      case 'disponible':
+      default:
+        return EstadoConsumible.disponible;
+    }
+  }
+
+  static String _estadoToPg(EstadoConsumible estado) {
+    switch (estado) {
+      case EstadoConsumible.bajoStock:
+        return 'bajo_stock';
+      case EstadoConsumible.disponible:
+        return 'disponible';
+      case EstadoConsumible.agotado:
+        return 'agotado';
+      case EstadoConsumible.descontinuado:
+        return 'descontinuado';
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -31,10 +59,10 @@ class ConsumibleModel extends Consumible {
       'descripcion': descripcion,
       'stock_actual': stockActual,
       'stock_minimo': stockMinimo,
-      'estado': estado.name,
+      'estado': _estadoToPg(estado),
     };
 
-    if (id != null && id!.contains('-') && id!.length == 36) {
+    if (id != null && id!.trim().isNotEmpty && id!.contains('-')) {
       data['id'] = id;
     }
 

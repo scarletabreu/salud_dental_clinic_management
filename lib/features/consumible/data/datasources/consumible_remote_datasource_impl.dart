@@ -11,7 +11,7 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
     final response = await supabaseClient
         .from('consumibles')
         .select()
-        .isFilter('deleted_at', null)
+        .filter('deleted_at', 'is', null)
         .order('nombre', ascending: true);
 
     return List<Map<String, dynamic>>.from(response as List);
@@ -21,15 +21,23 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   Future<void> updateStock(String id, int nuevoStock) async {
     await supabaseClient
         .from('consumibles')
-        .update({'stock_actual': nuevoStock})
+        .update({
+          'stock_actual': nuevoStock,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
         .eq('id', id);
   }
 
   @override
   Future<void> upsertConsumible(Map<String, dynamic> data) async {
-    data.remove('id');
     data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('consumibles').upsert(data);
+
+    if (data['id'] == null) {
+      data['created_at'] = DateTime.now().toIso8601String();
+      await supabaseClient.from('consumibles').insert(data);
+    } else {
+      await supabaseClient.from('consumibles').upsert(data);
+    }
   }
 
   @override

@@ -57,7 +57,7 @@ class InventarioCubit extends Cubit<InventarioState> {
       await cargar();
       return null;
     } catch (e) {
-      return 'Error al guardar el artículo.';
+      return 'Error al guardar el artículo: ${e.toString().replaceAll('Exception: ', '')}';
     }
   }
 

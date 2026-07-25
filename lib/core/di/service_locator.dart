@@ -402,11 +402,14 @@ Future<void> init() async {
       eliminarConsultaUseCase: EliminarConsultaUseCase(repository: sl()),
     ),
   );
+
   sl.registerFactory<DashboardCubit>(
     () => DashboardCubit(
       citaRepository: sl(),
       pacienteRepository: sl(),
       medicinaRepository: sl(),
+      consumibleRepository: sl(),
+      cajaDiariaRepository: sl(),
     ),
   );
   sl.registerFactory<PersonalPerfilesCubit>(

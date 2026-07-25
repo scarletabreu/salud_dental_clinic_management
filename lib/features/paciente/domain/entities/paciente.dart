@@ -12,6 +12,8 @@ class Paciente extends Persona {
   final String referencia;
   final List<Cita> citas;
   final TipoPaciente tipoPaciente;
+  final double? peso;
+  final double? altura;
 
   Paciente({
     super.id,
@@ -27,6 +29,8 @@ class Paciente extends Persona {
     required this.referencia,
     required this.citas,
     required this.tipoPaciente,
+    this.peso,
+    this.altura,
   });
 
   Paciente copyWith({
@@ -38,6 +42,8 @@ class Paciente extends Persona {
     String? referencia,
     List<Cita>? citas,
     TipoPaciente? tipoPaciente,
+    double? peso,
+    double? altura,
   }) {
     return Paciente(
       id: id,
@@ -53,6 +59,8 @@ class Paciente extends Persona {
       referencia: referencia ?? this.referencia,
       citas: citas ?? this.citas,
       tipoPaciente: tipoPaciente ?? this.tipoPaciente,
+      peso: peso ?? this.peso,
+      altura: altura ?? this.altura,
     );
   }
 }

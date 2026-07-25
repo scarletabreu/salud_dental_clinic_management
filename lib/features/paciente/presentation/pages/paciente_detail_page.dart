@@ -150,9 +150,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           LayoutBuilder(
             builder: (context, constraints) {
               final contacto = _buildContactoCard(p);
-              final clinica = _buildInfoClinicaCard(p.record);
-              // Dos tarjetas de datos densos necesitan ~300 px cada una; por
-              // debajo de eso se apilan en lugar de comprimirse.
+              final clinica = _buildInfoClinicaCard(p);
               if (constraints.maxWidth < 620) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -197,8 +195,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Las etiquetas del paciente y los botones de acción comparten fila
-          // mientras quepan; si no, las acciones bajan enteras.
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -315,7 +311,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   Widget _buildAlertasMedicas(Record record) {
     final hasCondiciones = record.condiciones.isNotEmpty;
-
     final hasCirugias = record.cirugiasPrevias.isNotEmpty;
 
     if (!hasCondiciones && !hasCirugias) {
@@ -339,7 +334,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             children: [
               Container(
                 width: 3,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -619,8 +614,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildInfoClinicaCard(Record record) {
+  Widget _buildInfoClinicaCard(Paciente p) {
     final ac = context.appColors;
+    final record = p.record;
     final hasHistorial = record.historialFamiliar.trim().isNotEmpty;
 
     return _SectionCard(
@@ -649,6 +645,28 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   iconColor: ac.indigo,
                   label: 'HIJOS',
                   value: '${record.cantHijos}',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  icon: Icons.monitor_weight_outlined,
+                  iconColor: ac.teal,
+                  label: 'PESO',
+                  value: p.peso != null ? '${p.peso} kg' : '—',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _MetricTile(
+                  icon: Icons.height_rounded,
+                  iconColor: ac.primaryBlue,
+                  label: 'ALTURA',
+                  value: p.altura != null ? '${p.altura} cm' : '—',
                 ),
               ),
             ],

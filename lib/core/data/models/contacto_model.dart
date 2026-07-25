@@ -6,14 +6,17 @@ class ContactoModel extends Contacto {
     required super.email,
     required super.numeroTelefono,
     required super.direccion,
+    super.esEmergencia = false,
   });
 
   factory ContactoModel.fromJson(Map<String, dynamic> json) {
     return ContactoModel(
       id: json['id'] as String?,
       email: json['email'] as String? ?? '',
-      numeroTelefono: json['numero_telefono'] as String? ?? '',
+      numeroTelefono: (json['numero_telefono'] ?? json['telefono'] ?? '')
+          .toString(),
       direccion: json['direccion'] as String? ?? '',
+      esEmergencia: json['es_emergencia'] as bool? ?? false,
     );
   }
 
@@ -22,6 +25,7 @@ class ContactoModel extends Contacto {
       'email': email,
       'numero_telefono': numeroTelefono,
       'direccion': direccion,
+      'es_emergencia': esEmergencia,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {
@@ -32,6 +36,22 @@ class ContactoModel extends Contacto {
   }
 
   factory ContactoModel.empty() {
-    return ContactoModel(id: '', email: '', numeroTelefono: '', direccion: '');
+    return ContactoModel(
+      id: '',
+      email: '',
+      numeroTelefono: '',
+      direccion: '',
+      esEmergencia: false,
+    );
+  }
+
+  factory ContactoModel.fromEntity(Contacto contacto) {
+    return ContactoModel(
+      id: contacto.id,
+      email: contacto.email,
+      numeroTelefono: contacto.numeroTelefono,
+      direccion: contacto.direccion,
+      esEmergencia: contacto.esEmergencia,
+    );
   }
 }

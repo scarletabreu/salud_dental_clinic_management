@@ -29,7 +29,9 @@ class CajaDiariaModel extends CajaDiaria {
     String camelCaseKey,
   ) {
     final valor = json[snakeCaseKey] ?? json[camelCaseKey];
-    return valor is num ? valor.toDouble() : 0;
+    if (valor is num) return valor.toDouble();
+    if (valor is String) return double.tryParse(valor) ?? 0.0;
+    return 0.0;
   }
 
   Map<String, dynamic> toJson() {

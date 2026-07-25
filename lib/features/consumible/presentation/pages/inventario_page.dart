@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/compra/presentation/cubit/compra_cubit.dart';
+import 'package:salud_dental_clinic_management/features/compra/presentation/widgets/compras_tab_view.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/estado_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
@@ -21,52 +23,56 @@ class InventarioPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-        appBar: AppBar(
-          backgroundColor: ac.cardBg,
-          elevation: 0,
-          toolbarHeight: 0, // Oculta la barra de herramientas superior nativa
-          bottom: TabBar(
-            labelColor: ac.primaryBlue,
-            unselectedLabelColor: ac.textSecondary,
-            indicatorColor: ac.primaryBlue,
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<SuplidorCubit>(create: (_) => sl<SuplidorCubit>()),
+        BlocProvider<CompraCubit>(create: (_) => sl<CompraCubit>()),
+      ],
+      child: DefaultTabController(
+        length: 3,
+        child: Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+          appBar: AppBar(
+            backgroundColor: ac.cardBg,
+            elevation: 0,
+            toolbarHeight: 0,
+            bottom: TabBar(
+              labelColor: ac.primaryBlue,
+              unselectedLabelColor: ac.textSecondary,
+              indicatorColor: ac.primaryBlue,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(
+                  icon: Icon(Icons.inventory_2_outlined, size: 20),
+                  text: 'Consumibles',
+                ),
+                Tab(
+                  icon: Icon(Icons.local_shipping_outlined, size: 20),
+                  text: 'Suplidores',
+                ),
+                Tab(
+                  icon: Icon(Icons.shopping_bag_outlined, size: 20),
+                  text: 'Compras',
+                ),
+              ],
             ),
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.inventory_2_outlined, size: 20),
-                text: 'Consumibles',
-              ),
-              Tab(
-                icon: Icon(Icons.local_shipping_outlined, size: 20),
-                text: 'Suplidores',
-              ),
+          ),
+          body: const TabBarView(
+            children: [
+              _ConsumiblesTabBody(),
+              SuplidoresTabView(),
+              ComprasTabView(),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            const _ConsumiblesTabBody(),
-            BlocProvider<SuplidorCubit>(
-              create: (_) => sl<SuplidorCubit>(),
-              child: const SuplidoresTabView(),
-            ),
-          ],
         ),
       ),
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════
-// VISTA PESTAÑA: CONSUMIBLES (INVENTARIO)
-// ══════════════════════════════════════════════════════════════════════════
 
 class _ConsumiblesTabBody extends StatefulWidget {
   const _ConsumiblesTabBody();
@@ -764,10 +770,6 @@ class _EstadoBadge extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// DIÁLOGOS ESTILIZADOS PARA CONSUMIBLES
-// -----------------------------------------------------------------------------
-
 Future<void> _mostrarDialogoFormulario(
   BuildContext context, {
   Consumible? consumible,
@@ -811,7 +813,6 @@ Future<void> _mostrarDialogoFormulario(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Header Modal ─────────────────────────────────────────
                     Row(
                       children: [
                         Container(
@@ -857,7 +858,6 @@ Future<void> _mostrarDialogoFormulario(
                     Divider(height: 1, color: ac.divider),
                     const SizedBox(height: 20),
 
-                    // ── Campos ───────────────────────────────────────────────
                     TextFormField(
                       controller: nombreController,
                       decoration: InputDecoration(
@@ -1015,7 +1015,6 @@ Future<void> _mostrarDialogoFormulario(
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Acciones Modal ───────────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [

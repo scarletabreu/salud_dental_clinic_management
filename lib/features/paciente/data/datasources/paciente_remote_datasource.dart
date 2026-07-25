@@ -1,11 +1,11 @@
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/models/paciente_model.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
-import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PacienteRemoteDatasource {
@@ -13,8 +13,6 @@ class PacienteRemoteDatasource {
 
   PacienteRemoteDatasource(this.client);
 
-  /// `pacientes` comparte PK con `personas`; los contactos cuelgan de la
-  /// persona vía la tabla puente `persona_contactos`.
   static const _selectPaciente =
       '*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus, '
       'persona_contacto:persona_contactos(contactos(*)))';
@@ -28,14 +26,12 @@ class PacienteRemoteDatasource {
     final lista = (pacientesRes as List)
         .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
         .toList();
-    // Only include local mock patients when the backend returns no results,
-    // so we don't mix test data with real data in production.
+
     if (lista.isEmpty) lista.addAll(_pacientesPrueba);
     lista.sort((a, b) => a.nombre.compareTo(b.nombre));
     return lista;
   }
 
-  // IDs p1-p6 must match CitaRemoteDataSource._citasPrueba so mock flows work end-to-end.
   static final _pacientesPrueba = [
     PacienteModel(
       id: 'p1',
@@ -237,15 +233,9 @@ class PacienteRemoteDatasource {
     ),
   ];
 
-  /// El enum `genero` de Postgres solo admite {masculino, femenino, otro};
-  /// `noPrefiereDecir` (que sí existe en la app) se persiste como `otro`.
   String _generoDb(Genero g) =>
       g == Genero.noPrefiereDecir ? Genero.otro.name : g.name;
 
-  /// Crea un paciente completo respetando el esquema de dos niveles:
-  /// `contactos` → `personas` → `persona_contactos` → `pacientes`.
-  /// La fila de `pacientes` comparte el `id` de la `persona` (PK compartida),
-  /// por eso se inserta `personas` primero y se reutiliza su id.
   Future<void> addPaciente(PacienteModel paciente) async {
     if (paciente.contactos.isEmpty) {
       throw Exception('El paciente debe tener al menos un contacto.');
@@ -292,9 +282,6 @@ class PacienteRemoteDatasource {
         ..['updated_at'] = DateTime.now().toIso8601String();
       await client.from('pacientes').insert(data);
     } on PostgrestException {
-      // Rollback best-effort para no dejar filas huérfanas si algo falla
-      // a mitad de camino. Se re-lanza la excepción tipada para que el guard
-      // la clasifique (red vs. servidor).
       if (personaId != null) {
         await client
             .from('persona_contactos')
@@ -310,29 +297,86 @@ class PacienteRemoteDatasource {
   }
 
   Future<void> updatePaciente(PacienteModel paciente) async {
-    final data = paciente.toJson();
-    data.remove('id');
-    data['genero'] = _generoDb(paciente.genero);
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await client.from('pacientes').update(data).eq('id', paciente.id!);
+    final pacienteId = paciente.id;
+    if (pacienteId == null) {
+      throw Exception('No se puede actualizar un paciente sin ID.');
+    }
+
+    final now = DateTime.now().toIso8601String();
+
+    await client
+        .from('personas')
+        .update({
+          'nombre': paciente.nombre,
+          'apellido': paciente.apellido,
+          'fecha_nacimiento': paciente.birthDate.toIso8601String(),
+          'cedula': paciente.govID,
+          'estatus': paciente.estatus.name,
+          'updated_at': now,
+        })
+        .eq('id', pacienteId);
+
+    await client
+        .from('pacientes')
+        .update({
+          'genero': _generoDb(paciente.genero),
+          'tipo_paciente': paciente.tipoPaciente.name,
+          'trabajo': paciente.trabajo,
+          'referencia': paciente.referencia,
+          'peso': paciente.peso,
+          'altura': paciente.altura,
+          'updated_at': now,
+        })
+        .eq('id', pacienteId);
+
+    for (int i = 0; i < paciente.contactos.length; i++) {
+      final contacto = paciente.contactos[i];
+      final isPrincipal = i == 0;
+      final isEmergencia = contacto.esEmergencia || i > 0;
+
+      if (contacto.id != null && _isValidUuid(contacto.id)) {
+        await client
+            .from('contactos')
+            .update({
+              'email': contacto.email,
+              'numero_telefono': contacto.numeroTelefono,
+              'direccion': contacto.direccion,
+              'updated_at': now,
+            })
+            .eq('id', contacto.id!);
+      } else if (contacto.numeroTelefono.trim().isNotEmpty) {
+        final nuevoRes = await client
+            .from('contactos')
+            .insert({
+              'email': contacto.email,
+              'numero_telefono': contacto.numeroTelefono,
+              'direccion': contacto.direccion,
+            })
+            .select('id')
+            .single();
+
+        final nuevoContactoId = nuevoRes['id'] as String;
+
+        await client.from('persona_contactos').insert({
+          'persona_id': pacienteId,
+          'contacto_id': nuevoContactoId,
+          'es_principal': isPrincipal,
+          'es_emergencia': isEmergencia,
+        });
+      }
+    }
   }
 
   Future<void> deletePaciente(String id) async {
     final now = DateTime.now().toIso8601String();
     await client
         .from('pacientes')
-        .update({
-          'deleted_at': now,
-          'updated_at': now,
-        })
+        .update({'deleted_at': now, 'updated_at': now})
         .eq('id', id);
 
     await client
         .from('personas')
-        .update({
-          'deleted_at': now,
-          'updated_at': now,
-        })
+        .update({'deleted_at': now, 'updated_at': now})
         .eq('id', id);
   }
 
@@ -367,10 +411,6 @@ class PacienteRemoteDatasource {
     return true;
   }
 
-  /// Devuelve el paciente cuya PK coincide con [personaId]; si la persona aún
-  /// no es paciente (p. ej. se registró solo para agendar una cita), crea la
-  /// fila de `pacientes` con valores por defecto. La PK de `pacientes` es la
-  /// misma de `personas` (tabla de dos niveles).
   Future<PacienteModel> getOrCreateByPersonaId(String personaId) async {
     final normalizedId = _normalizeId(personaId);
     final pacienteModel = await _fetchPacienteModel(normalizedId);
@@ -422,17 +462,17 @@ class PacienteRemoteDatasource {
         if (record.id != null) {
           final condicionesRes = await client
               .from('record_condicion')
-              .select('condiciones(*)')
+              .select('*, condiciones(*)')
               .eq('record_id', record.id!);
 
           final condiciones = <CondicionModel>[];
           for (final item in condicionesRes) {
             if (item is Map<String, dynamic>) {
               Map<String, dynamic>? condicionJson;
-              if (item['condicion'] is Map<String, dynamic>) {
-                condicionJson = item['condicion'] as Map<String, dynamic>?;
-              } else if (item['condiciones'] is Map<String, dynamic>) {
+              if (item['condiciones'] is Map<String, dynamic>) {
                 condicionJson = item['condiciones'] as Map<String, dynamic>?;
+              } else if (item['condicion'] is Map<String, dynamic>) {
+                condicionJson = item['condicion'] as Map<String, dynamic>?;
               } else if (item.containsKey('id') && item.containsKey('nombre')) {
                 condicionJson = Map<String, dynamic>.from(item);
               }
@@ -468,7 +508,6 @@ class PacienteRemoteDatasource {
 
       return RecordModel.fromJson(Map<String, dynamic>.from(created));
     } on PostgrestException {
-      // Se re-lanza la excepción tipada para que el guard la clasifique.
       rethrow;
     }
   }

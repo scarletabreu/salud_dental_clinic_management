@@ -7,7 +7,7 @@ class MovimientoCaja {
   final double monto;
   final String descripcion;
   final DateTime fecha;
-  final String referenciaId;
+  final String? referenciaId;
 
   MovimientoCaja({
     this.id,
@@ -16,7 +16,7 @@ class MovimientoCaja {
     required this.monto,
     required this.descripcion,
     required this.fecha,
-    required this.referenciaId,
+    this.referenciaId,
   });
 
   MovimientoCaja copyWith({

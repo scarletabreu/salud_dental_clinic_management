@@ -1,5 +1,5 @@
 enum EstadoCompra {
-  pendente,
+  pendiente,
   aprovado,
   recibido,
   enviado,

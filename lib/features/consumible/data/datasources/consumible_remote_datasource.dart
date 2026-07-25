@@ -6,4 +6,5 @@ abstract class ConsumibleRemoteDatasource {
   Future<void> upsertConsumible(Map<String, dynamic> data);
   Future<void> updateStock(String id, int nuevoStock);
   Future<void> adjustStock(String id, int nuevoStock, String motivo);
+  Future<void> registrarConsumoClinico(String consumibleId, int cantidad);
 }

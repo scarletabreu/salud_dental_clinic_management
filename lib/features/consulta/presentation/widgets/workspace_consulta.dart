@@ -18,6 +18,7 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/enums/
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_insumos.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -449,6 +450,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               recetas: consulta.recetas,
             ),
             const SizedBox(height: 28),
+
+            const SizedBox(height: 16),
+            SeccionInsumos(insumos: consulta.insumosUtilizados),
 
             _TerminarButton(
               cargando: cargando,

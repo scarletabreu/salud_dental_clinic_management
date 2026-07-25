@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
@@ -18,14 +19,31 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   }
 
   @override
+  Future<void> registrarConsumoClinico(
+    String consumibleId,
+    int cantidad,
+  ) async {
+    await supabaseClient.from('movimientos_stock_consumible').insert({
+      'consumible_id': consumibleId,
+      'diferencia': -cantidad,
+      'motivo': MotivoAjusteStock.usoInterno.name,
+    });
+  }
+
+  @override
   Future<void> adjustStock(String id, int nuevoStock, String motivo) async {
-    await supabaseClient
+    final actual = await supabaseClient
         .from('consumibles')
-        .update({
-          'stock_actual': nuevoStock,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+        .select('stock_actual')
+        .eq('id', id)
+        .single();
+    final diferencia = nuevoStock - (actual['stock_actual'] as int);
+
+    await supabaseClient.from('movimientos_stock_consumible').insert({
+      'consumible_id': id,
+      'diferencia': diferencia,
+      'motivo': motivo,
+    });
   }
 
   @override

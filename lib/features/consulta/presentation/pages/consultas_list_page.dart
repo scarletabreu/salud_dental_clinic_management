@@ -93,8 +93,6 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     );
   }
 
-  // ── Header + buscador + filtros ─────────────────────────────────────────────
-
   Widget _buildHeaderYFiltros(BuildContext context, ConsultasListState state) {
     final colorScheme = Theme.of(context).colorScheme;
     final total = state is ConsultasLoaded ? state.todas.length : 0;
@@ -277,7 +275,6 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         else
           const Spacer(),
         const SizedBox(width: 12),
-        // Selector de rango de fecha
         rangeButton,
         if (state.rangoFechas != null)
           IconButton(
@@ -296,8 +293,6 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       ],
     );
   }
-
-  // ── Cuerpo ──────────────────────────────────────────────────────────────────
 
   Widget _buildBody(BuildContext context, ConsultasListState state) {
     if (state is ConsultasLoading || state is ConsultasInitial) {
@@ -399,8 +394,6 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     );
   }
 
-  // Cápsula flotante con punto indicador + badge "filtrado", mismo patrón
-  // que usan medicina_list_page y paciente_form_page para el conteo.
   Widget _buildFooter(BuildContext context, ConsultasLoaded state) {
     final ac = context.appColors;
     final shown = state.filtradas.length;
@@ -468,8 +461,6 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     );
   }
 }
-
-// ═════════════════════════════════════════════════════════════════════════════
 
 class _CountBadge extends StatelessWidget {
   final int count;
@@ -542,8 +533,6 @@ class _DoctorChip extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ConsultaCard extends StatelessWidget {
   final Consulta consulta;
@@ -715,8 +704,6 @@ class _ConsultaCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Los indicadores y acciones se reparten en varias líneas
-                // cuando la ficha no da para tenerlos todos en fila.
                 Flexible(
                   child: Wrap(
                     alignment: WrapAlignment.end,
@@ -743,8 +730,6 @@ class _ConsultaCard extends StatelessWidget {
                                 size: 13,
                                 color: ac.amber,
                               ),
-                              // Con texto ampliado el rótulo cede: el icono y el
-                              // color ya identifican el estado.
                               if (MediaQuery.textScalerOf(context).scale(1) <=
                                   1.3) ...[
                                 const SizedBox(width: 4),
@@ -859,8 +844,6 @@ class _DateBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    // La chapa de fecha es un cuadrado fijo: su contenido se ajusta al hueco
-    // en vez de reventarlo cuando el texto está ampliado.
     return Container(
       width: 54,
       height: 54,

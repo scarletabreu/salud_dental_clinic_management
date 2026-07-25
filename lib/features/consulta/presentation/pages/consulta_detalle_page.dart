@@ -12,9 +12,6 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
-/// Resumen clínico de solo lectura de una consulta cerrada: datos del paciente,
-/// signos vitales, odontograma con tratamientos (y su precio congelado),
-/// recetas, documentos, notas y el resumen económico de la consulta.
 class ConsultaDetallePage extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;

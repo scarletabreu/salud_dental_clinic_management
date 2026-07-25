@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
-import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 enum PacienteFormModo { editar, completarRegistro }
 
@@ -65,11 +65,12 @@ class _ContactoEntry {
         isExpanded: isExpanded,
       );
 
-  ContactoModel toModel() => ContactoModel(
+  ContactoModel toModel({bool esEmergencia = false}) => ContactoModel(
     id: originalId,
     numeroTelefono: telefono.text.trim(),
     email: email.text.trim(),
     direccion: direccion.text.trim(),
+    esEmergencia: esEmergencia,
   );
 
   void dispose() {
@@ -111,9 +112,11 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   late final TextEditingController _cedulaController;
   late final TextEditingController _trabajoController;
   late final TextEditingController _referenciaController;
-  late final List<_ContactoEntry> _contactos;
   late final TextEditingController _pesoController;
   late final TextEditingController _alturaController;
+  late final TextEditingController _historialFamiliarController;
+  late final TextEditingController _cantHijosController;
+  late final List<_ContactoEntry> _contactos;
 
   DateTime? _fechaNacimiento;
   Genero _genero = Genero.masculino;
@@ -143,6 +146,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
     _alturaController = TextEditingController(
       text: p.altura != null ? p.altura.toString() : '',
+    );
+    _historialFamiliarController = TextEditingController(
+      text: p.record.historialFamiliar,
+    );
+    _cantHijosController = TextEditingController(
+      text: p.record.cantHijos.toString(),
     );
     _fechaNacimiento = p.birthDate;
     _genero = p.genero;
@@ -190,6 +199,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _referenciaController.dispose();
     _pesoController.dispose();
     _alturaController.dispose();
+    _historialFamiliarController.dispose();
+    _cantHijosController.dispose();
     for (final c in _contactos) {
       c.dispose();
     }
@@ -258,13 +269,22 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       return;
     }
 
+    final recordActualizado = widget.paciente.record.copyWith(
+      historialFamiliar: _historialFamiliarController.text.trim(),
+      cantHijos: int.tryParse(_cantHijosController.text.trim()) ?? 0,
+    );
+
     final paciente = Paciente(
       id: widget.paciente.id,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
       govID: _cedulaController.text.trim(),
-      contactos: _contactos.map((c) => c.toModel()).toList(),
+      contactos: _contactos
+          .asMap()
+          .entries
+          .map((e) => e.value.toModel(esEmergencia: e.key > 0))
+          .toList(),
       estatus: widget.paciente.estatus,
       genero: _genero,
       tipoPaciente: _tipoPaciente,
@@ -272,7 +292,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       referencia: _referenciaController.text.trim(),
       peso: double.tryParse(_pesoController.text.trim()),
       altura: double.tryParse(_alturaController.text.trim()),
-      record: widget.paciente.record,
+      record: recordActualizado,
       citas: widget.paciente.citas,
     );
 
@@ -288,19 +308,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     if (agregadas.isEmpty && quitadas.isEmpty) return;
 
     final pacienteId = widget.paciente.id;
-    if (pacienteId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: context.appColors.red,
-            content: const Text(
-              'El paciente se guardó, pero no se pudieron actualizar las condiciones (id no disponible).',
-            ),
-          ),
-        );
-      }
-      return;
-    }
+    if (pacienteId == null) return;
 
     setState(() => _guardandoCondiciones = true);
     final recordRepo = sl<RecordRepository>();
@@ -316,9 +324,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: context.appColors.red,
-            content: const Text(
-              'El paciente se guardó, pero hubo un error actualizando las condiciones.',
-            ),
+            content: const Text('Error al actualizar condiciones médicas.'),
           ),
         );
       }
@@ -364,16 +370,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       firstDate: DateTime(1900),
       lastDate: now,
       helpText: 'Fecha de nacimiento',
-      confirmText: 'Seleccionar',
-      cancelText: 'Cancelar',
     );
     if (picked != null) setState(() => _fechaNacimiento = picked);
   }
 
   String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/'
-      '${d.year}';
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +417,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   const SizedBox(height: 16),
                   _buildInfoAdicionalCard(ac),
                   const SizedBox(height: 16),
+                  _buildHistorialFamiliarCard(ac),
+                  const SizedBox(height: 16),
                   _buildCondicionesCard(ac),
                   const SizedBox(height: 24),
                 ],
@@ -436,14 +440,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         border: Border.all(color: ac.amber.withOpacity(0.25)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.info_outline_rounded, size: 18, color: ac.amber),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Esta persona aún no tiene ficha clínica. Completa sus datos '
-              'para poder iniciar la consulta.',
+              'Completa la ficha clínica del paciente para habilitar consultas.',
               style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
             ),
           ),
@@ -485,26 +487,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Pacientes',
-                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 13,
-                          color: ac.textMuted,
-                        ),
-                        Text(
-                          _isCompletarRegistro
-                              ? 'Completar ficha clínica'
-                              : 'Editar paciente',
-                          style: TextStyle(fontSize: 11, color: ac.textMuted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
                     Text(
                       _isCompletarRegistro
                           ? 'Completar ficha clínica'
@@ -518,30 +500,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ],
                 ),
               ),
-              if (!_isCompletarRegistro) ...[
-                if (!context.appLayout.isCompact) ...[
-                  OutlinedButton(
-                    onPressed: isSaving ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: ac.textSecondary,
-                      side: BorderSide(color: ac.divider),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 9,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    child: const Text('Cancelar'),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
@@ -554,26 +512,16 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                         ),
                       )
                     : const Icon(Icons.save_outlined, size: 16),
-                label: Text(
-                  isSaving
-                      ? 'Guardando...'
-                      : (_isCompletarRegistro
-                            ? 'Completar registro'
-                            : 'Guardar'),
-                ),
+                label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
                   backgroundColor: ac.primaryBlue,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
+                    horizontal: 16,
+                    vertical: 10,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -604,7 +552,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   textCapitalization: TextCapitalization.words,
                   decoration: _inputDeco(ac, hint: 'Ana'),
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El nombre es obligatorio'
+                      ? 'Nombre obligatorio'
                       : null,
                 ),
               ),
@@ -617,7 +565,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   textCapitalization: TextCapitalization.words,
                   decoration: _inputDeco(ac, hint: 'García'),
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El apellido es obligatorio'
+                      ? 'Apellido obligatorio'
                       : null,
                 ),
               ),
@@ -634,13 +582,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               inputFormatters: [_CedulaInputFormatter()],
               decoration: _inputDeco(ac, hint: '000-0000000-0'),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'La cédula es obligatoria';
-                }
-                final demasked = v.replaceAll('-', '');
-                if (demasked.length != 11) {
-                  return 'La cédula debe contener exactamente 11 dígitos';
-                }
+                if (v == null || v.trim().isEmpty) return 'Cédula obligatoria';
+                if (v.replaceAll('-', '').length != 11)
+                  return 'Debe tener 11 dígitos';
                 return null;
               },
             ),
@@ -650,69 +594,39 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
             ac: ac,
             icon: Icons.calendar_today_outlined,
             label: 'Fecha de nacimiento *',
-            child: FormField<DateTime>(
-              initialValue: _fechaNacimiento,
-              validator: (_) => _fechaNacimiento == null
-                  ? 'La fecha de nacimiento es obligatoria'
-                  : null,
-              builder: (field) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: _pickFecha,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ac.bgPage,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: field.hasError ? ac.red : ac.divider,
-                          width: field.hasError ? 1.0 : 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_month_rounded,
-                            size: 16,
-                            color: ac.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _fechaNacimiento != null
-                                  ? _formatDate(_fechaNacimiento!)
-                                  : 'Seleccionar fecha',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: _fechaNacimiento != null
-                                    ? ac.textPrimary
-                                    : ac.textMuted,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 18,
-                            color: ac.textMuted,
-                          ),
-                        ],
+            child: GestureDetector(
+              onTap: _pickFecha,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: ac.bgPage,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ac.divider),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_month_rounded,
+                      size: 16,
+                      color: ac.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _fechaNacimiento != null
+                          ? _formatDate(_fechaNacimiento!)
+                          : 'Seleccionar fecha',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _fechaNacimiento != null
+                            ? ac.textPrimary
+                            : ac.textMuted,
                       ),
                     ),
-                  ),
-                  if (field.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 6),
-                      child: Text(
-                        field.errorText ?? '',
-                        style: TextStyle(color: ac.red, fontSize: 12),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -747,15 +661,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
         label: Text(
           'Agregar',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: ac.primaryBlue,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          style: TextStyle(fontSize: 12, color: ac.primaryBlue),
         ),
       ),
       child: Column(
@@ -781,12 +687,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       decoration: BoxDecoration(
         color: ac.bgPage,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: entry.isExpanded
-              ? ac.primaryBlue.withOpacity(0.40)
-              : ac.divider,
-          width: entry.isExpanded ? 1.0 : 0.5,
-        ),
+        border: Border.all(color: ac.divider),
       ),
       child: Column(
         children: [
@@ -797,66 +698,33 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Row(
                 children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: isFirst
-                          ? ac.primaryBlue.withOpacity(0.10)
-                          : ac.red.withOpacity(0.10),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      isFirst ? Icons.phone : Icons.contact_emergency,
-                      size: 14,
-                      color: isFirst ? ac.primaryBlue : ac.red,
-                    ),
+                  Icon(
+                    isFirst ? Icons.phone : Icons.contact_emergency,
+                    size: 16,
+                    color: isFirst ? ac.primaryBlue : ac.red,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFirst
-                              ? 'Contacto principal *'
-                              : 'Contacto de emergencia #${index}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isFirst ? ac.textPrimary : ac.red,
-                          ),
-                        ),
-                        if (!entry.isExpanded && entry.telefono.text.isNotEmpty)
-                          Text(
-                            entry.telefono.text,
-                            style: TextStyle(fontSize: 11, color: ac.textMuted),
-                          ),
-                      ],
+                    child: Text(
+                      isFirst
+                          ? 'Contacto principal *'
+                          : 'Contacto de emergencia #${index}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isFirst ? ac.textPrimary : ac.red,
+                      ),
                     ),
                   ),
                   if (!isFirst)
                     GestureDetector(
                       onTap: () => _removeContacto(index),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 16,
-                          color: ac.red.withOpacity(0.70),
-                        ),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: ac.red,
                       ),
                     ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    entry.isExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: ac.textMuted,
-                  ),
                 ],
               ),
             ),
@@ -879,9 +747,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       controller: entry.telefono,
                       keyboardType: TextInputType.phone,
                       decoration: _inputDeco(ac, hint: '809-000-0000'),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'El teléfono es obligatorio'
-                          : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -902,13 +769,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     label: 'Dirección',
                     child: TextFormField(
                       controller: entry.direccion,
-                      textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
-                      decoration: _inputDeco(
-                        ac,
-                        hint: 'Calle, ciudad…',
-                        alignLabelWithHint: true,
-                      ),
+                      decoration: _inputDeco(ac, hint: 'Calle, ciudad…'),
                     ),
                   ),
                 ],
@@ -944,14 +806,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
             ),
           ),
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
                 child: _FormField(
                   ac: ac,
                   icon: Icons.monitor_weight_outlined,
-                  label: 'Peso (kg/lbs)',
+                  label: 'Peso (kg)',
                   child: TextFormField(
                     controller: _pesoController,
                     keyboardType: const TextInputType.numberWithOptions(
@@ -979,15 +840,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
             ],
           ),
           const SizedBox(height: 14),
-
           _FormField(
             ac: ac,
             icon: Icons.work_outline_rounded,
-            label: 'Trabajo / ocupación',
+            label: 'Ocupación',
             child: TextFormField(
               controller: _trabajoController,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: _inputDeco(ac, hint: 'Médico, ingeniero…'),
+              decoration: _inputDeco(ac, hint: 'Ej. Ingeniero, estudiante...'),
             ),
           ),
           const SizedBox(height: 14),
@@ -997,8 +856,48 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
             label: 'Referencia',
             child: TextFormField(
               controller: _referenciaController,
-              textCapitalization: TextCapitalization.sentences,
               decoration: _inputDeco(ac, hint: '¿Cómo nos conoció?'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistorialFamiliarCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.indigo,
+      iconBg: ac.indigo.withOpacity(0.10),
+      icon: Icons.family_restroom_outlined,
+      title: 'Antecedentes y contexto familiar',
+      child: Column(
+        children: [
+          _FormField(
+            ac: ac,
+            icon: Icons.child_care_outlined,
+            label: 'Cantidad de Hijos',
+            child: TextFormField(
+              controller: _cantHijosController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: _inputDeco(ac, hint: '0'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.notes_outlined,
+            label: 'Historial / Antecedentes Familiares',
+            child: TextFormField(
+              controller: _historialFamiliarController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _inputDeco(
+                ac,
+                hint: 'Ej. Padre con hipertensión, antecedentes de diabetes...',
+                alignLabelWithHint: true,
+              ),
             ),
           ),
         ],
@@ -1012,21 +911,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       iconColor: ac.red,
       iconBg: ac.red.withOpacity(0.10),
       icon: Icons.health_and_safety_outlined,
-      title: 'Condiciones médicas',
+      title: 'Condiciones médicas generales',
       child: _cargandoCondiciones
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _condicionesDisponibles.isEmpty
           ? Text(
-              'No hay condiciones registradas en el catálogo.',
+              'Sin catálogo de condiciones.',
               style: TextStyle(fontSize: 12, color: ac.textMuted),
             )
           : Wrap(
@@ -1046,11 +936,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   labelStyle: TextStyle(
                     color: isActive ? ac.red : ac.textSecondary,
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  side: BorderSide(
-                    color: isActive ? ac.red.withOpacity(0.4) : ac.divider,
-                    width: isActive ? 1.0 : 0.5,
                   ),
                 );
               }).toList(),
@@ -1068,10 +953,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
     filled: true,
     fillColor: ac.bgPage,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.divider),
-    ),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(color: ac.divider, width: 0.5),
@@ -1079,10 +961,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.red, width: 0.5),
     ),
     alignLabelWithHint: alignLabelWithHint,
   );
@@ -1143,7 +1021,7 @@ class _FormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              ?action,
+              if (action != null) action!,
             ],
           ),
           const SizedBox(height: 20),

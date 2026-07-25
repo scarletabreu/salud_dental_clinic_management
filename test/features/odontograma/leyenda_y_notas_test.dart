@@ -4,8 +4,10 @@ import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart'
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/panel_detalle_pieza.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
@@ -83,7 +85,92 @@ Future<void> _montarPanel(
   await tester.pumpAndSettle();
 }
 
+/// El odontodiagrama con una sola pieza cargada, en un viewport donde el papel
+/// cabe entero.
+Future<void> _montarDiagrama(WidgetTester tester, Diente diente) async {
+  tester.view.physicalSize = const Size(1400, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: OdontodiagramaWidget(
+            evaluacion: EvaluacionOdontologica.vacia,
+            dientes: {diente.fdiCode: diente},
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  group('tratamientos en el formulario', () {
+    TratamientoAplicado reconstruccion(TipoSuperficie cara) =>
+        TratamientoAplicado(
+          tratamientoId: 't-1',
+          esContinuo: false,
+          estaTerminado: false,
+          superficie: cara,
+          nombreTratamiento: 'Reconstrucción dental',
+        );
+
+    testWidgets('un tratamiento por cara se ve sin abrir la pieza', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await _montarDiagrama(
+        tester,
+        _pieza(tratamientos: [reconstruccion(TipoSuperficie.oclusal)]),
+      );
+
+      // El tratamiento no tiene clave del papel, así que no estampa símbolo;
+      // lo que tiene que verse es su cara teñida, y eso se dice aquí.
+      expect(
+        find.bySemanticsLabel(
+          RegExp(r'Pieza 36: Reconstrucción dental \(oclusal\)'),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('cada cara tratada se anuncia por separado', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montarDiagrama(
+        tester,
+        _pieza(
+          tratamientos: [
+            reconstruccion(TipoSuperficie.oclusal),
+            reconstruccion(TipoSuperficie.distal),
+          ],
+        ),
+      );
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'\(distal\).*\(oclusal\)')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('una pieza sin nada anotado lo dice', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montarDiagrama(tester, _pieza());
+
+      expect(
+        find.bySemanticsLabel('Pieza 36, sin hallazgos'),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+  });
+
   group('leyenda del odontograma', () {
     Future<void> montarLeyenda(
       WidgetTester tester, {

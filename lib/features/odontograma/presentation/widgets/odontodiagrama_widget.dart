@@ -191,6 +191,32 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     setState(() => _fdiSeleccionado = _fdiSeleccionado == fdi ? null : fdi);
   }
 
+  /// Lo que tiñe cada cara de la pieza [fdi] en el papel.
+  ///
+  /// Solo entra lo de esta consulta, que es lo que la hoja representa y lo que
+  /// promete su leyenda: los antecedentes se leen en la ficha —dejaron de
+  /// estamparse en tinta tenue porque llenaban de marcas una boca muy tratada—
+  /// y lo planificado todavía no está en la boca.
+  Map<TipoSuperficie, MarcaClinicaPieza> _superficiesDe(int fdi) {
+    final diente = widget.dientes[fdi];
+    if (diente == null) return const {};
+
+    final deHoy = [
+      for (final marca in marcasDePieza(fdi: fdi, diente: diente))
+        if (marca.procedencia == ProcedenciaMarca.evaluado ||
+            marca.procedencia == ProcedenciaMarca.ejecutado)
+          marca,
+    ];
+    if (deHoy.isEmpty) return const {};
+
+    final porCara = <TipoSuperficie, MarcaClinicaPieza>{};
+    for (final cara in TipoSuperficie.values) {
+      final marca = marcaDeSuperficie(deHoy, cara);
+      if (marca != null) porCara[cara] = marca;
+    }
+    return porCara;
+  }
+
   /// Solo se muestra en la capa tenue lo que no está ya anotado en firme, para
   /// que una clave repetida no se dibuje dos veces sobre la misma pieza. La
   /// resta es por superficie: lo que el histórico anota en otra cara sigue
@@ -450,6 +476,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
         mesialALaDerecha: fila.hemicampoIzquierdo,
       ),
       hallazgos: widget.evaluacion.de(fdi),
+      superficies: _superficiesDe(fdi),
       historicos: _historicoDe(fdi),
       lado: lado,
       paleta: paleta,
@@ -661,6 +688,10 @@ class _PiezaDental extends StatefulWidget {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
 
+  /// Lo que tiñe cada cara. Alimenta el dibujo y la descripción accesible: un
+  /// tratamiento por cara se ve en el papel y se dice en voz alta.
+  final Map<TipoSuperficie, MarcaClinicaPieza> superficies;
+
   /// Antecedentes de la pieza. No se dibujan —el papel solo lleva la tinta de
   /// hoy—; alimentan la descripción accesible y el tooltip, y el detalle
   /// completo vive en la ficha que abre el toque.
@@ -680,6 +711,7 @@ class _PiezaDental extends StatefulWidget {
     super.key,
     required this.glifo,
     required this.hallazgos,
+    required this.superficies,
     required this.historicos,
     required this.lado,
     required this.paleta,
@@ -695,7 +727,7 @@ class _PiezaDental extends StatefulWidget {
 class _PiezaDentalState extends State<_PiezaDental> {
   bool _hover = false;
 
-  String _resumen(List<HallazgoDental> lista) => lista
+  String _resumen(Iterable<HallazgoDental> lista) => lista
       .map((h) {
         final caras = h.superficies.isEmpty
             ? 'pieza completa'
@@ -704,10 +736,23 @@ class _PiezaDentalState extends State<_PiezaDental> {
       })
       .join('; ');
 
+  /// Lo anotado por cara, en el orden fijo del enum para que la lectura no
+  /// cambie de una pieza a otra.
+  String get _resumenSuperficies => [
+    for (final cara in TipoSuperficie.values)
+      if (widget.superficies[cara] case final marca?)
+        '${marca.titulo} (${cara.name.toLowerCase()})',
+  ].join('; ');
+
   String get _descripcion {
     final fdi = widget.glifo.fdi;
+    final porCara = _resumenSuperficies;
     final partes = [
-      if (widget.hallazgos.isNotEmpty) _resumen(widget.hallazgos),
+      if (porCara.isNotEmpty) porCara,
+      // Las claves de pieza completa no salen del mapa de caras: se dicen
+      // aparte para no perderlas de la descripción.
+      if (widget.hallazgos.any((h) => h.esPiezaCompleta))
+        _resumen(widget.hallazgos.where((h) => h.esPiezaCompleta)),
       if (widget.historicos.isNotEmpty) 'Antes: ${_resumen(widget.historicos)}',
     ];
     if (partes.isEmpty) return 'Pieza $fdi, sin hallazgos';
@@ -721,6 +766,7 @@ class _PiezaDentalState extends State<_PiezaDental> {
       painter: GlifoPiezaPainter(
         glifo: widget.glifo,
         hallazgos: widget.hallazgos,
+        superficies: widget.superficies,
         paleta: widget.paleta,
         resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
       ),

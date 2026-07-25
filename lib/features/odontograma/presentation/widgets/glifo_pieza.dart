@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
@@ -155,13 +156,24 @@ class GlifoPieza {
   }
 }
 
-/// Dibuja el glifo de una pieza con los hallazgos de esta consulta encima.
+/// Dibuja el glifo de una pieza con lo anotado hoy encima.
 ///
-/// Una sola capa a plena tinta: lo anotado hoy. Los antecedentes ya no se
+/// Una sola capa a plena tinta: lo de esta consulta. Los antecedentes ya no se
 /// estampan en tinta tenue sobre la pieza —con una boca muy tratada el papel
 /// se llenaba de marcas repetidas—; se leen en la ficha de la pieza al tocarla.
+///
+/// Son dos dibujos distintos sobre el mismo glifo:
+/// - [superficies] tiñe cada cara con la tinta de lo que tiene. Es lo que hace
+///   visible desde fuera un tratamiento por cara, tenga clave del papel o no.
+/// - [hallazgos] estampa los símbolos de las claves que afectan a la pieza
+///   entera (la `X` de pérdida, el `⊙` de un conducto).
 class GlifoPiezaPainter extends CustomPainter {
   final GlifoPieza glifo;
+
+  /// Lo que tiñe cada cara, ya resuelto por quien dibuja: una cara solo puede
+  /// mostrar una cosa y la elección de cuál es clínica, no del pintor.
+  final Map<TipoSuperficie, MarcaClinicaPieza> superficies;
+
   final List<HallazgoDental> hallazgos;
   final PaletaOdontodiagrama paleta;
 
@@ -172,6 +184,7 @@ class GlifoPiezaPainter extends CustomPainter {
     required this.glifo,
     required this.hallazgos,
     required this.paleta,
+    this.superficies = const {},
     this.resalte,
   });
 
@@ -187,7 +200,7 @@ class GlifoPiezaPainter extends CustomPainter {
       canvas.drawPath(exterior, Paint()..color = resalte!);
     }
 
-    _pintarSuperficies(canvas, lado, hallazgos, paleta.alfaRelleno);
+    _pintarSuperficies(canvas, lado);
 
     final lapiz = Paint()
       ..color = paleta.trazo
@@ -204,26 +217,23 @@ class GlifoPiezaPainter extends CustomPainter {
     _pintarMarcasDePieza(canvas, lado, exterior, hallazgos);
   }
 
-  void _pintarSuperficies(
-    Canvas canvas,
-    double lado,
-    List<HallazgoDental> capa,
-    double alfa,
-  ) {
-    final porSuperficie = <TipoSuperficie, Color>{};
-    for (final hallazgo in capa) {
-      if (hallazgo.estado.marca != MarcaClinica.relleno) continue;
-      for (final superficie in hallazgo.superficies) {
-        porSuperficie[superficie] = paleta.tintaDe(hallazgo.estado);
-      }
-    }
-    if (porSuperficie.isEmpty) return;
+  /// Tiñe cada cara anotada con la tinta de lo que tiene y la firmeza de su
+  /// procedencia, exactamente igual que el mapa de caras de la ficha.
+  ///
+  /// Antes esto solo miraba las claves del papel, así que un tratamiento por
+  /// cara —una reconstrucción oclusal— no se veía en el diagrama y había que
+  /// abrir la pieza para enterarse de que estaba tratada.
+  void _pintarSuperficies(Canvas canvas, double lado) {
+    if (superficies.isEmpty) return;
 
     final regiones = glifo.regiones(lado);
-    porSuperficie.forEach((superficie, tinta) {
+    superficies.forEach((superficie, marca) {
       final region = regiones[superficie];
       if (region == null) return;
-      canvas.drawPath(region, Paint()..color = tinta.withValues(alpha: alfa));
+      final estilo = paleta.estiloDe(marca.tintaClinica, marca.procedencia);
+      if (estilo.alfaRelleno > 0) {
+        canvas.drawPath(region, Paint()..color = estilo.relleno);
+      }
     });
   }
 
@@ -260,7 +270,8 @@ class GlifoPiezaPainter extends CustomPainter {
       old.paleta != paleta ||
       old.resalte != resalte ||
       old.glifo.fdi != glifo.fdi ||
-      !listEquals(old.hallazgos, hallazgos);
+      !listEquals(old.hallazgos, hallazgos) ||
+      !mapEquals(old.superficies, superficies);
 }
 
 /// Traza una de las claves del formulario sobre un lienzo de [lado] píxeles.

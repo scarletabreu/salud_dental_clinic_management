@@ -9,10 +9,6 @@ import 'package:salud_dental_clinic_management/features/condicion/domain/enums/t
 import 'package:salud_dental_clinic_management/features/record/presentation/cubit/condiciones_paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/record/presentation/cubit/condiciones_paciente_state.dart';
 
-/// Tarjeta de gestión de condiciones médicas del paciente en su expediente.
-/// Lista las condiciones (puente `record_condicion`), permite agregar desde el
-/// catálogo o crear una nueva, y quitar. Solo opera sobre pacientes ya
-/// persistidos (id uuid); para pacientes de prueba muestra un aviso.
 class CondicionesMedicasCard extends StatelessWidget {
   final String pacienteId;
 
@@ -104,8 +100,6 @@ class _CondicionesView extends StatelessWidget {
               Row(
                 children: [
                   Expanded(child: _Header()),
-                  // Con texto ampliado la etiqueta "Agregar" se come el título:
-                  // el botón se queda solo con su icono.
                   if (MediaQuery.textScalerOf(context).scale(1) > 1.3)
                     IconButton(
                       onPressed: procesando ? null : () => _onAgregar(context),
@@ -353,8 +347,6 @@ class _AvisoPacientePrueba extends StatelessWidget {
   }
 }
 
-// ── Diálogo de agregar / crear ────────────────────────────────────────────
-
 class _AgregarResult {
   final String? existenteId;
   final Condicion? nueva;
@@ -416,7 +408,6 @@ class _AgregarCondicionDialogState extends State<_AgregarCondicionDialog> {
     final ac = context.appColors;
     final query = _busquedaController.text.trim().toLowerCase();
 
-    // The catalogue list has to give way when the keyboard takes the screen.
     final alturaCatalogo =
         ((MediaQuery.sizeOf(context).height -
                     MediaQuery.viewInsetsOf(context).bottom) *

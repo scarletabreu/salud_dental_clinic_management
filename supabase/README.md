@@ -125,8 +125,20 @@ psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" \
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/sd_111_trigger_caja_test.sql
 ```
 
-Salida esperada: una línea `NOTICE  OK ...` por caso y un `ROLLBACK` final. Cualquier
+Salida esperada: seis líneas `NOTICE  OK ...` y un `ROLLBACK` final. Cualquier
 `ERROR` es un fallo real del trigger, no del script.
+
+El script **no asume el estado de la base**: si encuentra una caja abierta la cierra
+dentro de su propia transacción (el `ROLLBACK` la devuelve intacta), porque si no el
+caso 3 —"sin caja abierta el pago se rechaza"— no probaría nada. Por eso se puede
+correr con el seed ya cargado, o contra una instancia con la jornada en curso.
+
+> ⚠️ **Ojo con el bootstrap desde cero.** `supabase db reset` **no funciona hoy**:
+> `schema.sql` no define ninguna tabla, así que la primera migración
+> (`20260720190000_sd_103_plan_cuotas.sql`) muere con
+> `relation "public.cuotas" does not exist`. Para levantar un entorno local hay que
+> reconstruir a mano las tablas base. Es deuda técnica del "punto cero", no de estas
+> pruebas.
 
 ### Verificación manual equivalente
 

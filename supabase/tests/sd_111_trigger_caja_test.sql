@@ -60,7 +60,15 @@ begin
   returning id into v_cuenta_id;
 
   -- --------------------------------------------------------------------------
-  -- Caso 3 primero (aún sin caja abierta): el pago debe ser rechazado.
+  -- Precondición: la prueba no puede asumir el estado de la base. Si hay una
+  -- caja abierta (el seed deja una, y en una instancia real la habrá casi
+  -- siempre), el caso 3 no probaría nada. Se cierra dentro de la transacción,
+  -- así que el ROLLBACK final la devuelve intacta.
+  -- --------------------------------------------------------------------------
+  update public.cajas set cerrada = true where cerrada = false;
+
+  -- --------------------------------------------------------------------------
+  -- Caso 3 (ya sin caja abierta): el pago debe ser rechazado.
   -- --------------------------------------------------------------------------
   begin
     insert into public.pagos (cuenta_id, monto, fecha, estado, metodo_pago)
@@ -119,7 +127,8 @@ begin
   values (v_cuenta_id, 1500.75, now(), 'completado', 'efectivo')
   returning id into v_pago_id;
 
-  select count(*), coalesce(max(monto), 0), max(referencia_id)
+  -- `max()` no está definido para uuid, de ahí el array_agg.
+  select count(*), coalesce(max(monto), 0), (array_agg(referencia_id))[1]
     into v_movimientos, v_monto, v_referencia
     from public.movimientos_caja
    where caja_diaria_id = v_caja_hoy

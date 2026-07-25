@@ -10,9 +10,16 @@ y reconstruir una instancia idéntica desde cero.
 
 ## 📌 Estado actual y línea base
 
-* **`supabase/schema.sql`**: línea base ("Punto Cero") extraída de la instancia real.
-  Está desactualizada respecto a la instancia; sirve como punto de partida, no como
-  verdad absoluta.
+* **`supabase/schema.sql`**: línea base extraída de la instancia real con
+  `supabase db dump --linked`. **Refrescada el 25 jul 2026**: 42 tablas, 25 tipos,
+  158 políticas RLS y las funciones/triggers vigentes. Sólo estructura, sin datos.
+  Está al día con todas las migraciones listadas abajo, así que por sí sola
+  reconstruye la base completa.
+
+  > Antes de ese refresco el archivo no definía **ninguna tabla** (sólo extensiones)
+  > y era imposible levantar el proyecto desde cero: la primera migración moría con
+  > `relation "public.cuotas" does not exist`. Si vuelve a quedar desfasado, se
+  > regenera con `supabase db dump --linked -f supabase/schema.sql`.
 * **`supabase/migrations/`**: cambios incrementales ordenados cronológicamente a partir
   de la línea base. **Es el único canal válido para cambios de esquema.**
 * **`supabase/*.sql` (raíz)**: scripts históricos (`sd-81`, `sd-84`, `sd-96`, …) que se
@@ -85,9 +92,31 @@ select c.relname, t.tgname, p.proname
 
 ## 🛠️ Cómo reconstruir la BD desde cero
 
-1. Ejecutar `supabase/schema.sql` (estructura base).
-2. Aplicar las migraciones en orden: `supabase db push --linked`.
-3. Cargar los datos de desarrollo: `supabase/seed.sql` (lo aplica `supabase db reset`).
+Verificado de punta a punta el 25 jul 2026 contra una instancia local limpia:
+
+```bash
+supabase start                      # levanta el stack local
+export PGURL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+psql "$PGURL" -q -c "drop schema public cascade; create schema public;
+  grant all on schema public to postgres, anon, authenticated, service_role;"
+
+psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/schema.sql   # 1. estructura completa
+psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/seed.sql     # 2. día de caja de ejemplo
+```
+
+`schema.sql` ya incluye todas las migraciones aplicadas hasta su fecha de dump, así
+que **no hay que reaplicarlas**. Sólo se aplican las migraciones *posteriores* al
+dump, con `supabase db push --linked`.
+
+> ⚠️ **`supabase db reset` no sirve para bootstrapear** este proyecto: aplica las
+> migraciones sobre una base vacía y la primera (`sd_103_plan_cuotas`) asume tablas
+> que ninguna migración crea. Usa el procedimiento de arriba.
+>
+> Si aun así reaplicas migraciones sobre `schema.sql`, cuatro fallarán con
+> `already exists`: `sd_112_caja_diaria` (el `alter publication ... add table` no es
+> idempotente) y las tres de políticas RLS (`create policy` sin `drop policy if
+> exists` previo). Es ruido esperado, no un fallo de la base.
 
 ---
 

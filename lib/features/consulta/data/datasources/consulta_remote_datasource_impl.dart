@@ -361,7 +361,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     var query = supabaseClient
         .from('tratamientos_aplicados')
         .select(
-          '*, tratamiento:tratamientos(nombre), '
+          // La clave del catálogo es lo que decide cómo se dibuja la pieza:
+          // sin ella todo tratamiento previo caía en «Otro».
+          '*, tratamiento:tratamientos(nombre, clave_odontograma), '
           'diente:dientes!inner(fdi_code), '
           'consulta:consultas!inner(paciente_id, fecha)',
         )
@@ -373,6 +375,35 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     }
 
     final response = await query.order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    var query = supabaseClient
+        .from('diagnosticos_aplicados')
+        .select(
+          '*, diagnosis:diagnosticos(nombre, clave_odontograma), '
+          'diente:dientes!inner(fdi_code), '
+          'consulta:consultas!inner(paciente_id, fecha)',
+        )
+        .eq('consulta.paciente_id', pacienteId)
+        .isFilter('deleted_at', null);
+
+    if (excluyendoConsultaId != null) {
+      query = query.neq('consulta_id', excluyendoConsultaId);
+    }
+
+    // De la más reciente a la más antigua: al consolidar gana la primera que
+    // anota cada pieza, es decir la última palabra del doctor.
+    final response = await query.order(
+      'fecha',
+      referencedTable: 'consulta',
+      ascending: false,
+    );
     return List<Map<String, dynamic>>.from(response as List);
   }
 

@@ -50,8 +50,16 @@ abstract class ConsultaRemoteDatasource {
     String? excluyendoConsultaId,
   });
 
+  /// Diagnósticos de las consultas anteriores del paciente, de la más reciente
+  /// a la más antigua y con la clave del catálogo que los dibuja en el papel.
+  Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  });
+
   /// Odontodiagramas de las consultas anteriores del paciente, de la más
-  /// reciente a la más antigua.
+  /// reciente a la más antigua. Tras SD-150 el jsonb solo conserva los tejidos
+  /// blandos: las piezas viven en `diagnosticos_aplicados`.
   Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,

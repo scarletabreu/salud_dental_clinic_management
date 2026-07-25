@@ -15,8 +15,9 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/enums/
 /// pieza con historial, indistinguible de lo anotado hoy. El historial se lee
 /// en la ficha de la pieza, al tocarla.
 EvaluacionOdontologica proyectarEvaluacionOdontologica(
-  Odontograma odontograma,
-) {
+  Odontograma odontograma, {
+  bool soloDiagnosticos = false,
+}) {
   final hallazgos = <int, List<HallazgoDental>>{};
   for (final diente in odontograma.dientes) {
     final porEstado = <EstadoClinicoDental, Set<TipoSuperficie>>{};
@@ -31,10 +32,14 @@ EvaluacionOdontologica proyectarEvaluacionOdontologica(
     for (final diagnostico in diente.diagnosis) {
       agregar(diagnostico.claveOdontograma, diagnostico.superficie);
     }
-    for (final tratamiento in diente.tratamientos) {
-      // Catálogos antiguos aún no tienen clave: se muestran como «Otro» en
-      // vez de desaparecer de la otra vista mientras la clínica los clasifica.
-      agregar(tratamiento.claveOdontograma ?? 'otro', tratamiento.superficie);
+    // La capa tenue solo lleva diagnósticos: un tratamiento de otra consulta
+    // se lee en la ficha de la pieza, no se estampa debajo del de hoy.
+    if (!soloDiagnosticos) {
+      for (final tratamiento in diente.tratamientos) {
+        // Catálogos antiguos aún no tienen clave: se muestran como «Otro» en
+        // vez de desaparecer de la otra vista mientras la clínica los clasifica.
+        agregar(tratamiento.claveOdontograma ?? 'otro', tratamiento.superficie);
+      }
     }
 
     if (diente.estaAusente) {

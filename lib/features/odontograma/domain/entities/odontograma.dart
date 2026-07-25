@@ -61,4 +61,9 @@ class Odontograma {
   /// persiste como JSON: la fuente de las claves son las filas normalizadas.
   EvaluacionOdontologica get evaluacionProyectada =>
       proyectarEvaluacionOdontologica(this);
+
+  /// Lo mismo, pero como se ve *debajo* de otra consulta: solo diagnósticos,
+  /// para que un tratamiento previo no se estampe en tenue sobre la pieza.
+  EvaluacionOdontologica get evaluacionComoAntecedente =>
+      proyectarEvaluacionOdontologica(this, soloDiagnosticos: true);
 }

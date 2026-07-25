@@ -14,6 +14,8 @@ import 'package:salud_dental_clinic_management/features/record/domain/entities/r
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 
+enum _VistaConsultas { cronologica, lista }
+
 class PacienteDetailPage extends StatefulWidget {
   final String pacienteId;
 
@@ -24,36 +26,28 @@ class PacienteDetailPage extends StatefulWidget {
 }
 
 class _PacienteDetailPageState extends State<PacienteDetailPage> {
+  _VistaConsultas _modoVista = _VistaConsultas.cronologica;
+  bool _ordenDescendente = true; // true: más reciente primero
+
   @override
   void initState() {
     super.initState();
-
     context.read<PacienteCubit>().loadById(widget.pacienteId);
   }
 
   String _ageFormatted(DateTime birth) {
     final now = DateTime.now();
-
     int years = now.year - birth.year;
     int months = now.month - birth.month;
 
-    if (now.day < birth.day) {
-      months--;
-    }
-
+    if (now.day < birth.day) months--;
     if (months < 0) {
       years--;
       months += 12;
     }
 
-    if (years == 0) {
-      return '$months meses';
-    }
-
-    if (months == 0) {
-      return '$years años';
-    }
-
+    if (years == 0) return '$months meses';
+    if (months == 0) return '$years años';
     return '$years a., $months m.';
   }
 
@@ -72,6 +66,29 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       'Nov',
       'Dic',
     ][m - 1];
+  }
+
+  String? _getDoctorNombre(Consulta c) {
+    try {
+      final dynamic obj = c;
+      final d = obj.doctor;
+      if (d != null) {
+        final nombre = d.nombre ?? '';
+        final apellido = d.apellido ?? '';
+        return 'Dr. $nombre $apellido'.trim();
+      }
+    } catch (_) {}
+
+    try {
+      final dynamic obj = c;
+      final name = obj.doctorNombre ?? obj.nombreDoctor;
+      if (name != null && name.toString().isNotEmpty) {
+        final nameStr = name.toString().trim();
+        return nameStr.startsWith('Dr.') ? nameStr : 'Dr. $nameStr';
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   @override
@@ -99,7 +116,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           if (state is PacienteDetailLoading) {
             return Center(
               child: CircularProgressIndicator(
-                color: context.appColors.primaryBlue,
+                color: ac.primaryBlue,
                 strokeWidth: 2,
               ),
             );
@@ -123,8 +140,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   }
 
   Widget _buildContent(Paciente p, {bool historialNoDisponible = false}) {
-    final sorted = [...p.record.consultas]
-      ..sort((a, b) => b.fecha.compareTo(a.fecha));
+    final sortedConsultas = [...p.record.consultas]
+      ..sort(
+        (a, b) => _ordenDescendente
+            ? b.fecha.compareTo(a.fecha)
+            : a.fecha.compareTo(b.fecha),
+      );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -171,11 +192,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
           OdontogramArchWidget(
-            consultas: sorted,
+            consultas: sortedConsultas,
             historialNoDisponible: historialNoDisponible,
           ),
           const SizedBox(height: 16),
-          _buildTimelineCard(sorted),
+          _buildTimelineCard(sortedConsultas),
           const SizedBox(height: 24),
         ],
       ),
@@ -213,7 +234,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   OutlinedButton.icon(
                     onPressed: () {
                       final pacienteCubit = context.read<PacienteCubit>();
-
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -223,10 +243,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                           ),
                         ),
                       ).then((_) {
-                        if (!mounted) {
-                          return;
-                        }
-
+                        if (!mounted) return;
                         pacienteCubit.loadById(p.id!);
                       });
                     },
@@ -253,7 +270,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Próximamente: creación de citas'),
+                          content: Text(
+                            'Para crear una cita utiliza el menú lateral "Mis Citas del Día"',
+                          ),
                         ),
                       );
                     },
@@ -516,16 +535,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           const SizedBox(height: 20),
-
           ...List.generate(contactos.length, (index) {
             final contacto = contactos[index];
-
             final phone = contacto.numeroTelefono.isEmpty
                 ? '—'
                 : contacto.numeroTelefono;
-
             final email = contacto.email.isEmpty ? '—' : contacto.email;
-
             final hasAddress = contacto.direccion.isNotEmpty;
 
             return Padding(
@@ -552,27 +567,31 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
-                            Icons.person_outline_rounded,
+                            contacto.esEmergencia
+                                ? Icons.contact_emergency_outlined
+                                : Icons.person_outline_rounded,
                             size: 16,
-                            color: ac.teal,
+                            color: contacto.esEmergencia ? ac.red : ac.teal,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Contacto ${index + 1}',
+                            contacto.esEmergencia
+                                ? 'Contacto de Emergencia ${index + 1}'
+                                : 'Contacto ${index + 1}',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: ac.textPrimary,
+                              color: contacto.esEmergencia
+                                  ? ac.red
+                                  : ac.textPrimary,
                             ),
                           ),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 16),
-
                     Row(
                       children: [
                         Expanded(
@@ -592,7 +611,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                         ),
                       ],
                     ),
-
                     if (hasAddress) ...[
                       const SizedBox(height: 16),
                       Divider(height: 1, color: ac.divider),
@@ -700,6 +718,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
+  // ── Historial de Consultas & Actividades Longitudinales ────────────────────
+
   Widget _buildTimelineCard(List<Consulta> sorted) {
     final ac = context.appColors;
 
@@ -712,25 +732,69 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               const Expanded(
                 child: _SectionHeader(
                   icon: Icons.history_edu_outlined,
-                  title: 'Historial de Consultas',
+                  title: 'Historia Clínica Longitudinal',
                 ),
               ),
               if (sorted.isNotEmpty) _CountChip(sorted.length),
             ],
           ),
+          const SizedBox(height: 16),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SegmentedButton<_VistaConsultas>(
+                segments: const [
+                  ButtonSegment(
+                    value: _VistaConsultas.cronologica,
+                    icon: Icon(Icons.timeline_rounded, size: 16),
+                    label: Text('Línea de Tiempo'),
+                  ),
+                  ButtonSegment(
+                    value: _VistaConsultas.lista,
+                    icon: Icon(Icons.format_list_bulleted_rounded, size: 16),
+                    label: Text('Lista'),
+                  ),
+                ],
+                selected: {_modoVista},
+                onSelectionChanged: (val) =>
+                    setState(() => _modoVista = val.first),
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              IconButton(
+                tooltip: _ordenDescendente
+                    ? 'Ordenar: Más antigua primero'
+                    : 'Ordenar: Más reciente primero',
+                icon: Icon(
+                  _ordenDescendente
+                      ? Icons.sort_by_alpha_rounded
+                      : Icons.history_rounded,
+                  size: 20,
+                  color: ac.primaryBlue,
+                ),
+                onPressed: () =>
+                    setState(() => _ordenDescendente = !_ordenDescendente),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
           if (sorted.isEmpty) ...[
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             Center(
               child: Column(
                 children: [
                   Icon(
                     Icons.folder_open_outlined,
-                    size: 32,
+                    size: 36,
                     color: ac.textDisabled,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sin consultas registradas',
+                    'Sin consultas ni intervenciones registradas.',
                     style: TextStyle(
                       fontSize: 13,
                       color: ac.textDisabled,
@@ -740,19 +804,127 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 32),
-          ] else ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+          ] else if (_modoVista == _VistaConsultas.cronologica) ...[
             for (int i = 0; i < sorted.length; i++)
               _buildTimelineItem(sorted[i], i == sorted.length - 1),
+          ] else ...[
+            for (int i = 0; i < sorted.length; i++) _buildListItem(sorted[i]),
           ],
         ],
       ),
     );
   }
 
+  // ── Elemento Vista Cronológica ───────────────────────────────────────────
+
   Widget _buildTimelineItem(Consulta c, bool isLast) {
     final ac = context.appColors;
+    final notas = c.notas?.trim() ?? '';
+    final hasNotas = notas.isNotEmpty;
+    final docNombre = _getDoctorNombre(c);
+
+    Widget itemCard = InkWell(
+      onTap: () => _abrirDetalleConsulta(c),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ac.bgPage,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ac.divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    c.motivoConsulta?.isNotEmpty == true
+                        ? c.motivoConsulta!
+                        : 'Consulta médica general',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: ac.textMuted,
+                ),
+              ],
+            ),
+            if (docNombre != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                docNombre,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ac.primaryBlue,
+                ),
+              ),
+            ],
+            if (hasNotas) ...[
+              const SizedBox(height: 6),
+              Text(
+                notas,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ac.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (c.recetas.isNotEmpty)
+                  _MiniChip(
+                    label: '${c.recetas.length} receta(s)',
+                    icon: Icons.medication_outlined,
+                    color: ac.indigo,
+                  ),
+                if (c.documentosClinicos.isNotEmpty)
+                  _MiniChip(
+                    label: '${c.documentosClinicos.length} doc(s)',
+                    icon: Icons.description_outlined,
+                    color: ac.teal,
+                  ),
+                if (c.odontograma != null)
+                  _MiniChip(
+                    label: 'Odontograma',
+                    icon: Icons.medical_services_outlined,
+                    color: ac.amber,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (hasNotas) {
+      itemCard = Tooltip(
+        message: 'Notas: $notas',
+        preferBelow: false,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: ac.textPrimary.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        child: itemCard,
+      );
+    }
 
     return IntrinsicHeight(
       child: Row(
@@ -796,8 +968,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           Column(
             children: [
               Container(
-                width: 9,
-                height: 9,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
                   color: ac.teal,
                   shape: BoxShape.circle,
@@ -806,9 +978,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               if (!isLast)
                 Expanded(
                   child: Container(
-                    width: 1,
+                    width: 1.5,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: const Color(0xFFE5E7EB),
+                    color: ac.divider,
                   ),
                 ),
             ],
@@ -817,64 +989,282 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    c.motivoConsulta?.isNotEmpty == true
-                        ? c.motivoConsulta!
-                        : 'Consulta general',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: ac.textPrimary,
-                    ),
-                  ),
-                  if (c.tempCondiciones.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      c.tempCondiciones.join(' · '),
-                      style: TextStyle(fontSize: 12, color: ac.textSecondary),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      if (c.recetas.isNotEmpty)
-                        _MiniChip(
-                          label:
-                              '${c.recetas.length} receta${c.recetas.length > 1 ? 's' : ''}',
-                          icon: Icons.medication_outlined,
-                          color: ac.indigo,
-                        ),
-                      if (c.documentosClinicos.isNotEmpty)
-                        _MiniChip(
-                          label:
-                              '${c.documentosClinicos.length} doc${c.documentosClinicos.length > 1 ? 's' : ''}',
-                          icon: Icons.description_outlined,
-                          color: ac.teal,
-                        ),
-                      if (c.odontograma != null)
-                        _MiniChip(
-                          label: 'Odontograma',
-                          icon: Icons.medical_services_outlined,
-                          color: ac.amber,
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+              child: itemCard,
             ),
           ),
         ],
       ),
     );
   }
+
+  // ── Elemento Vista de Lista Detallada ────────────────────────────────────
+
+  Widget _buildListItem(Consulta c) {
+    final ac = context.appColors;
+    final fechaStr =
+        '${c.fecha.day.toString().padLeft(2, '0')}/${c.fecha.month.toString().padLeft(2, '0')}/${c.fecha.year}';
+    final docNombre = _getDoctorNombre(c);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: ac.bgPage,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.divider),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () => _abrirDetalleConsulta(c),
+        leading: CircleAvatar(
+          backgroundColor: ac.teal.withValues(alpha: 0.12),
+          child: Icon(
+            Icons.medical_information_outlined,
+            size: 20,
+            color: ac.teal,
+          ),
+        ),
+        title: Text(
+          c.motivoConsulta?.isNotEmpty == true
+              ? c.motivoConsulta!
+              : 'Consulta Médica',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: ac.textPrimary,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              'Fecha: $fechaStr ${docNombre != null ? '• $docNombre' : ''}',
+              style: TextStyle(fontSize: 12, color: ac.textSecondary),
+            ),
+            if (c.notas?.isNotEmpty == true)
+              Text(
+                'Notas: ${c.notas}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, color: ac.textMuted),
+              ),
+          ],
+        ),
+        trailing: Icon(Icons.chevron_right_rounded, color: ac.textMuted),
+      ),
+    );
+  }
+
+  // ── Modal de Detalle de Consulta ──────────────────────────────────────────
+
+  void _abrirDetalleConsulta(Consulta c) {
+    final ac = context.appColors;
+    final fechaStr =
+        '${c.fecha.day.toString().padLeft(2, '0')}/${c.fecha.month.toString().padLeft(2, '0')}/${c.fecha.year}';
+    final docNombre = _getDoctorNombre(c);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ac.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.9,
+        builder: (_, scrollCtrl) => SingleChildScrollView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ac.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: ac.primaryBlue.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.assignment_outlined,
+                      color: ac.primaryBlue,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.motivoConsulta?.isNotEmpty == true
+                              ? c.motivoConsulta!
+                              : 'Detalle de Consulta',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: ac.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Atención del $fechaStr',
+                          style: TextStyle(fontSize: 12, color: ac.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Divider(color: ac.divider),
+              const SizedBox(height: 16),
+
+              // Profesional Responsable
+              if (docNombre != null) ...[
+                Text(
+                  'PROFESIONAL RESPONSABLE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                    color: ac.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  docNombre,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Notas Clínicas
+              Text(
+                'NOTAS CLÍNICAS Y OBSERVACIONES',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                  color: ac.textMuted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ac.bgPage,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ac.divider),
+                ),
+                child: Text(
+                  c.notas?.isNotEmpty == true
+                      ? c.notas!
+                      : 'Sin notas ni observaciones registradas para esta fecha.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: ac.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Recetas
+              if (c.recetas.isNotEmpty) ...[
+                Text(
+                  'RECETAS Y FÁRMACOS PRESCRITOS (${c.recetas.length})',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                    color: ac.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final receta in c.recetas)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: ac.indigo.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: ac.indigo.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.medication_outlined,
+                          size: 18,
+                          color: ac.indigo,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            receta.toString(),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: ac.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
+              ],
+
+              // Documentos Adjuntos
+              if (c.documentosClinicos.isNotEmpty) ...[
+                Text(
+                  'DOCUMENTOS Y ADJUNTOS CLINICOS (${c.documentosClinicos.length})',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                    color: ac.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final doc in c.documentosClinicos)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(Icons.file_present_outlined, color: ac.teal),
+                    title: Text(
+                      doc.toString(),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+// ── Componentes Auxiliares ───────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final Widget child;
@@ -1091,9 +1481,7 @@ class _TipoPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final isEmergencia = tipo == TipoPaciente.emergencia;
-
     final color = isEmergencia ? ac.red : ac.teal;
-
     final label = isEmergencia ? 'EMERGENCIA' : 'INTEGRADO';
 
     return Container(

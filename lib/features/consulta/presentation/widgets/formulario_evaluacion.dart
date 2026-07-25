@@ -6,8 +6,6 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontograma_clinico_widget.dart';
 
 class FormularioEvaluacion extends StatefulWidget {
   final String pacienteId;
@@ -38,10 +36,6 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
 
   final List<String> _condiciones = [];
   final List<DocumentoAdjunto> _adjuntos = [];
-  Odontograma _evaluacionOdontologica = Odontograma(
-    consultaId: '',
-    dientes: const [],
-  );
 
   @override
   void dispose() {
@@ -109,8 +103,6 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
       tempCondiciones: _condiciones,
       adjuntos: _adjuntos,
       signosVitales: _buildSignosVitales(),
-      hallazgos: _evaluacionOdontologica.hallazgos,
-      tejidosBlandos: _evaluacionOdontologica.tejidosBlandos,
     );
   }
 
@@ -153,27 +145,6 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? 'El motivo de consulta es obligatorio'
                   : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _FormCard(
-            ac: ac,
-            icon: Icons.grid_view_rounded,
-            iconColor: ac.teal,
-            title: 'Evaluación odontológica',
-            subtitle: 'Registra hallazgos dentales y tejidos blandos',
-            child: OdontogramaClinicoWidget(
-              odontograma: _evaluacionOdontologica,
-              editable: true,
-              onHallazgosChanged: (hallazgos) => setState(
-                () => _evaluacionOdontologica = _evaluacionOdontologica
-                    .copyWith(hallazgos: hallazgos),
-              ),
-              onTejidosChanged: (tejidos) => setState(
-                () => _evaluacionOdontologica = _evaluacionOdontologica
-                    .copyWith(tejidosBlandos: tejidos),
-              ),
             ),
           ),
           const SizedBox(height: 16),

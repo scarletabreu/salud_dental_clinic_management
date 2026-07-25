@@ -9,8 +9,11 @@ class Odontograma {
   final List<Diente> dientes;
   final List<Tratamiento> tratamientos;
   final List<Diagnosis> diagnosis;
-  final Map<int, HallazgoDental> hallazgos;
-  final Map<TejidoBlando, EvaluacionTejidoBlando> tejidosBlandos;
+
+  /// Odontodiagrama del formulario: hallazgos por pieza y tejidos blandos.
+  /// Vive en `odontogramas.evaluacion_clinica` (jsonb), aparte de `dientes`,
+  /// que sigue normalizado porque de él cuelgan tratamientos y facturación.
+  final EvaluacionOdontologica evaluacion;
 
   Odontograma({
     this.id,
@@ -18,8 +21,7 @@ class Odontograma {
     required this.dientes,
     this.tratamientos = const [],
     this.diagnosis = const [],
-    this.hallazgos = const {},
-    this.tejidosBlandos = const {},
+    this.evaluacion = EvaluacionOdontologica.vacia,
   });
 
   Odontograma copyWith({
@@ -27,8 +29,7 @@ class Odontograma {
     List<Diente>? dientes,
     List<Tratamiento>? tratamientos,
     List<Diagnosis>? diagnosis,
-    Map<int, HallazgoDental>? hallazgos,
-    Map<TejidoBlando, EvaluacionTejidoBlando>? tejidosBlandos,
+    EvaluacionOdontologica? evaluacion,
   }) {
     return Odontograma(
       id: id,
@@ -36,19 +37,9 @@ class Odontograma {
       dientes: dientes ?? List.from(this.dientes),
       tratamientos: tratamientos ?? List.from(this.tratamientos),
       diagnosis: diagnosis ?? List.from(this.diagnosis),
-      hallazgos: hallazgos ?? Map.from(this.hallazgos),
-      tejidosBlandos: tejidosBlandos ?? Map.from(this.tejidosBlandos),
+      evaluacion: evaluacion ?? this.evaluacion,
     );
   }
 
-  Map<String, dynamic> evaluacionToJson() => {
-    'hallazgos': {
-      for (final entry in hallazgos.entries)
-        entry.key.toString(): entry.value.toJson(),
-    },
-    'tejidos_blandos': {
-      for (final entry in tejidosBlandos.entries)
-        entry.key.dbValue: entry.value.toJson(),
-    },
-  };
+  Map<String, dynamic> evaluacionToJson() => evaluacion.toJson();
 }

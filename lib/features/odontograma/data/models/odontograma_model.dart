@@ -11,8 +11,7 @@ class OdontogramaModel extends Odontograma {
     required super.dientes,
     super.tratamientos = const [],
     super.diagnosis = const [],
-    super.hallazgos = const {},
-    super.tejidosBlandos = const {},
+    super.evaluacion = EvaluacionOdontologica.vacia,
   });
 
   factory OdontogramaModel.fromJson(Map<String, dynamic> json) {
@@ -34,39 +33,8 @@ class OdontogramaModel extends Odontograma {
                 .map((e) => DiagnosisModel.fromJson(e))
                 .toList()
           : [],
-      hallazgos: _parseHallazgos(json['evaluacion_clinica']),
-      tejidosBlandos: _parseTejidos(json['evaluacion_clinica']),
+      evaluacion: EvaluacionOdontologica.fromJson(json['evaluacion_clinica']),
     );
-  }
-
-  static Map<int, HallazgoDental> _parseHallazgos(dynamic raw) {
-    final evaluacion = raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : const <String, dynamic>{};
-    final hallazgos = evaluacion['hallazgos'];
-    if (hallazgos is! Map) return const {};
-    return {
-      for (final entry in hallazgos.entries)
-        if (int.tryParse(entry.key.toString()) != null && entry.value is Map)
-          int.parse(entry.key.toString()): HallazgoDental.fromJson(
-            Map<String, dynamic>.from(entry.value as Map),
-          ),
-    };
-  }
-
-  static Map<TejidoBlando, EvaluacionTejidoBlando> _parseTejidos(dynamic raw) {
-    final evaluacion = raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : const <String, dynamic>{};
-    final tejidos = evaluacion['tejidos_blandos'];
-    if (tejidos is! Map) return const {};
-    return {
-      for (final tejido in TejidoBlando.values)
-        if (tejidos[tejido.dbValue] is Map)
-          tejido: EvaluacionTejidoBlando.fromJson(
-            Map<String, dynamic>.from(tejidos[tejido.dbValue] as Map),
-          ),
-    };
   }
 
   Map<String, dynamic> toJson() {

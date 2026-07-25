@@ -57,8 +57,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     required List<String> tempCondiciones,
     required List<DocumentoAdjunto> adjuntos,
     SignosVitales? signosVitales,
-    Map<int, HallazgoDental> hallazgos = const {},
-    Map<TejidoBlando, EvaluacionTejidoBlando> tejidosBlandos = const {},
   }) async {
     emit(const ConsultaGuardando());
     try {
@@ -110,9 +108,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       final odontograma = Odontograma(
         consultaId: consultaId,
-        hallazgos: hallazgos,
-        tejidosBlandos: tejidosBlandos,
-        dientes: kFdiTodos.map((fdi) {
+        dientes: kFdiPermanentes.map((fdi) {
           return Diente(
             odontogramaId: '',
             fdiCode: fdi,
@@ -129,16 +125,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         odontograma: odontograma,
         finalizada: false,
       );
-
-      if (hallazgos.isNotEmpty || tejidosBlandos.isNotEmpty) {
-        await _consultaRepository.guardarResultadoConsulta(
-          consultaId: consultaId,
-          pacienteId: pacienteId,
-          odontograma: odontograma,
-          recetas: const [],
-          finalizada: false,
-        );
-      }
 
       emit(ConsultaIniciada(consulta: consultaActiva));
     } catch (e) {
@@ -271,7 +257,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  void actualizarHallazgosDentales(Map<int, HallazgoDental> hallazgos) {
+  /// Anota el odontodiagrama en memoria. Se persiste con el resto de la
+  /// consulta al guardar avance o al terminarla, en la misma escritura.
+  void actualizarEvaluacionOdontologica(EvaluacionOdontologica evaluacion) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
     final odontograma = actual.odontograma;
@@ -279,23 +267,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     emit(
       ConsultaIniciada(
         consulta: actual.copyWith(
-          odontograma: odontograma.copyWith(hallazgos: hallazgos),
-        ),
-      ),
-    );
-  }
-
-  void actualizarTejidosBlandos(
-    Map<TejidoBlando, EvaluacionTejidoBlando> tejidos,
-  ) {
-    if (state is! ConsultaIniciada) return;
-    final actual = (state as ConsultaIniciada).consulta;
-    final odontograma = actual.odontograma;
-    if (odontograma == null) return;
-    emit(
-      ConsultaIniciada(
-        consulta: actual.copyWith(
-          odontograma: odontograma.copyWith(tejidosBlandos: tejidos),
+          odontograma: odontograma.copyWith(evaluacion: evaluacion),
         ),
       ),
     );

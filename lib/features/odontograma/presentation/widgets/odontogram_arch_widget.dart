@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'odontodiagrama_widget.dart';
 import 'odontogram_widget.dart';
-import 'odontograma_clinico_widget.dart';
 
 // ─────────────────────────────────────────────
 //  Aggregate helper
@@ -22,8 +23,14 @@ int _statusRank(Diente d) {
   };
 }
 
+/// Consolida el historial en un solo odontograma. [consultas] llega de la más
+/// reciente a la más antigua: los tratamientos se resumen por gravedad y el
+/// odontodiagrama se queda con la última anotación de cada pieza y tejido.
 Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
   final Map<int, Diente> worst = {};
+  final hallazgos = <int, List<HallazgoDental>>{};
+  final tejidos = <TejidoBlando, String>{};
+
   for (final c in consultas) {
     final odo = c.odontograma;
     if (odo == null) continue;
@@ -33,8 +40,22 @@ Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
         worst[d.fdiCode] = d;
       }
     }
+    odo.evaluacion.hallazgos.forEach(
+      (fdi, lista) => hallazgos.putIfAbsent(fdi, () => lista),
+    );
+    odo.evaluacion.tejidosBlandos.forEach(
+      (tejido, anotacion) => tejidos.putIfAbsent(tejido, () => anotacion),
+    );
   }
-  return Odontograma(consultaId: '', dientes: worst.values.toList());
+
+  return Odontograma(
+    consultaId: '',
+    dientes: worst.values.toList(),
+    evaluacion: EvaluacionOdontologica(
+      hallazgos: hallazgos,
+      tejidosBlandos: tejidos,
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -347,9 +368,14 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             const _Legend(),
             const SizedBox(height: 4),
 
-            OdontogramaClinicoWidget(odontograma: currentOdo),
-            const SizedBox(height: 12),
             OdontogramWidget(odontograma: currentOdo, editMode: false),
+
+            if (!currentOdo.evaluacion.estaVacia) ...[
+              const SizedBox(height: 18),
+              Divider(height: 1, color: ac.divider.withValues(alpha: 0.6)),
+              const SizedBox(height: 14),
+              OdontodiagramaPapel(evaluacion: currentOdo.evaluacion),
+            ],
           ],
         ],
       ),

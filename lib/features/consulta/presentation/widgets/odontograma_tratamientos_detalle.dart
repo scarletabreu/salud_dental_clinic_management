@@ -6,7 +6,6 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontograma_clinico_widget.dart';
 
 /// Odontograma read-only de la consulta y el desglose de tratamientos por
 /// diente (nombre + precio congelado, cargados por [ConsultaDetalleCubit]).
@@ -36,8 +35,6 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OdontogramaClinicoWidget(odontograma: odontograma),
-        const SizedBox(height: 16),
         OdontogramWidget(odontograma: odontograma),
         const SizedBox(height: 16),
         if (dientesConTratamientos.isEmpty)

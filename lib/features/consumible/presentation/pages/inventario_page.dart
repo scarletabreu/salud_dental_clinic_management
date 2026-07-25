@@ -6,8 +6,10 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/estado_consumible.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_state.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/entities/suplidor.dart';
 
 class InventarioPage extends StatefulWidget {
   const InventarioPage({super.key});
@@ -108,7 +110,15 @@ class _InventarioPageState extends State<InventarioPage> {
                 ),
               ),
               FilledButton.icon(
-                onPressed: () => _mostrarDialogoFormulario(context),
+                onPressed: () => _mostrarDialogoFormulario(
+                  context,
+                  consumibles: state is InventarioLoaded
+                      ? state.consumibles
+                      : const [],
+                  suplidores: state is InventarioLoaded
+                      ? state.suplidores
+                      : const [],
+                ),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Nuevo'),
                 style: FilledButton.styleFrom(
@@ -332,7 +342,7 @@ class _InventarioPageState extends State<InventarioPage> {
               child: ListView.separated(
                 padding: context.pageInsets(top: 8, bottom: 24),
                 itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return _ConsumibleCard(
@@ -340,8 +350,12 @@ class _InventarioPageState extends State<InventarioPage> {
                     ac: ac,
                     onAjustarStock: () =>
                         _mostrarDialogoAjustarStock(context, item),
-                    onEditar: () =>
-                        _mostrarDialogoFormulario(context, consumible: item),
+                    onEditar: () => _mostrarDialogoFormulario(
+                      context,
+                      consumible: item,
+                      consumibles: state.consumibles,
+                      suplidores: state.suplidores,
+                    ),
                     onEliminar: () => _confirmarEliminacion(context, item),
                   );
                 },
@@ -552,11 +566,19 @@ class _ConsumibleCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'RD\$ ${consumible.precio.toStringAsFixed(2)}'
+                      '${consumible.suplidorNombre == null ? '' : ' · ${consumible.suplidorNombre}'}',
+                      style: TextStyle(color: ac.textMuted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              _EstadoBadge(estado: consumible.estado, ac: ac),
+              _EstadoBadge(estado: consumible.estadoCalculado, ac: ac),
             ],
           ),
           const SizedBox(height: 14),
@@ -641,12 +663,8 @@ class _ConsumibleCard extends StatelessWidget {
                     onPressed: onEditar,
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.delete_outline_rounded,
-                      color: ac.red,
-                      size: 18,
-                    ),
-                    tooltip: 'Eliminar',
+                    icon: Icon(Icons.archive_outlined, color: ac.red, size: 18),
+                    tooltip: 'Dar de baja',
                     visualDensity: VisualDensity.compact,
                     onPressed: onEliminar,
                   ),
@@ -699,19 +717,28 @@ class _EstadoBadge extends StatelessWidget {
 Future<void> _mostrarDialogoFormulario(
   BuildContext context, {
   Consumible? consumible,
+  required List<Consumible> consumibles,
+  required List<Suplidor> suplidores,
 }) async {
-  final nombreController = TextEditingController(text: consumible?.nombre);
-  final descController = TextEditingController(text: consumible?.descripcion);
-  final stockActualController = TextEditingController(
+  final nombreController = TextEditingController(
+    text: consumible?.nombre ?? '',
+  );
+  final descController = TextEditingController(
+    text: consumible?.descripcion ?? '',
+  );
+  final precioController = TextEditingController(
+    text: consumible?.precio.toStringAsFixed(2) ?? '',
+  );
+  final stockInicialController = TextEditingController(
     text: consumible?.stockActual.toString() ?? '0',
   );
   final stockMinimoController = TextEditingController(
     text: consumible?.stockMinimo.toString() ?? '5',
   );
-  EstadoConsumible estado = consumible?.estado ?? EstadoConsumible.disponible;
+  String? suplidorId = consumible?.suplidorId;
   final formKey = GlobalKey<FormState>();
 
-  final guardar = await showDialog<bool>(
+  final nuevoItem = await showDialog<Consumible>(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
@@ -732,8 +759,19 @@ Future<void> _mostrarDialogoFormulario(
                     labelText: 'Nombre *',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Requerido' : null,
+                  validator: (v) {
+                    final nombre = v?.trim() ?? '';
+                    if (nombre.isEmpty) return 'El nombre es obligatorio';
+                    final duplicado = consumibles.any(
+                      (item) =>
+                          item.id != consumible?.id &&
+                          item.nombre.trim().toLowerCase() ==
+                              nombre.toLowerCase(),
+                    );
+                    return duplicado
+                        ? 'Ya existe un consumible con este nombre'
+                        : null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -744,18 +782,44 @@ Future<void> _mostrarDialogoFormulario(
                   ),
                 ),
                 const SizedBox(height: 12),
+                TextFormField(
+                  controller: precioController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Precio (RD\$) *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    final precio = double.tryParse(
+                      (v ?? '').replaceAll(',', '.'),
+                    );
+                    if (precio == null) return 'Ingresa un precio válido';
+                    return precio < 0
+                        ? 'El precio no puede ser negativo'
+                        : null;
+                  },
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: TextFormField(
-                        controller: stockActualController,
+                        controller: stockInicialController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Stock actual',
+                        decoration: InputDecoration(
+                          labelText: consumible == null
+                              ? 'Stock inicial *'
+                              : 'Stock actual',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) =>
-                            int.tryParse(v ?? '') == null ? 'Inválido' : null,
+                        readOnly: consumible != null,
+                        validator: (v) {
+                          final stock = int.tryParse(v ?? '');
+                          if (stock == null) return 'Inválido';
+                          return stock < 0 ? 'No puede ser negativo' : null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -767,26 +831,47 @@ Future<void> _mostrarDialogoFormulario(
                           labelText: 'Stock mínimo',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) =>
-                            int.tryParse(v ?? '') == null ? 'Inválido' : null,
+                        validator: (v) {
+                          final stock = int.tryParse(v ?? '');
+                          if (stock == null) return 'Inválido';
+                          return stock < 0 ? 'No puede ser negativo' : null;
+                        },
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<EstadoConsumible>(
-                  value: estado,
+                if (consumible != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Para cambiar el stock actual usa la acción “Ajustar stock”.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  initialValue: suplidorId,
                   decoration: const InputDecoration(
-                    labelText: 'Estado',
+                    labelText: 'Suplidor (opcional)',
                     border: OutlineInputBorder(),
                   ),
-                  items: EstadoConsumible.values
-                      .map(
-                        (e) => DropdownMenuItem(value: e, child: Text(e.name)),
-                      )
-                      .toList(),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Sin suplidor'),
+                    ),
+                    ...suplidores.map(
+                      (suplidor) => DropdownMenuItem<String?>(
+                        value: suplidor.id,
+                        child: Text(suplidor.nombre),
+                      ),
+                    ),
+                  ],
                   onChanged: (val) {
-                    if (val != null) setState(() => estado = val);
+                    setState(() => suplidorId = val);
                   },
                 ),
               ],
@@ -795,7 +880,7 @@ Future<void> _mostrarDialogoFormulario(
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogCtx, false),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Cancelar'),
           ),
           FilledButton(
@@ -807,7 +892,26 @@ Future<void> _mostrarDialogoFormulario(
             ),
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogCtx, true);
+                Navigator.pop(
+                  dialogCtx,
+                  Consumible(
+                    id: consumible?.id,
+                    nombre: nombreController.text.trim(),
+                    descripcion: descController.text.trim(),
+                    precio: double.parse(
+                      precioController.text.replaceAll(',', '.'),
+                    ),
+                    stockActual: int.parse(stockInicialController.text),
+                    stockMinimo: int.parse(stockMinimoController.text),
+                    estado: consumible?.estado ?? EstadoConsumible.disponible,
+                    suplidorId: suplidorId,
+                    suplidorNombre: suplidores
+                        .where((suplidor) => suplidor.id == suplidorId)
+                        .map((suplidor) => suplidor.nombre)
+                        .firstOrNull,
+                    activo: consumible?.activo ?? true,
+                  ),
+                );
               }
             },
             child: const Text('Guardar'),
@@ -817,16 +921,12 @@ Future<void> _mostrarDialogoFormulario(
     ),
   );
 
-  if (guardar != true || !context.mounted) return;
-
-  final nuevoItem = Consumible(
-    id: consumible?.id,
-    nombre: nombreController.text,
-    descripcion: descController.text,
-    stockActual: int.parse(stockActualController.text),
-    stockMinimo: int.parse(stockMinimoController.text),
-    estado: estado,
-  );
+  nombreController.dispose();
+  descController.dispose();
+  precioController.dispose();
+  stockInicialController.dispose();
+  stockMinimoController.dispose();
+  if (nuevoItem == null || !context.mounted) return;
 
   final error = await context.read<InventarioCubit>().guardar(nuevoItem);
   if (error != null && context.mounted) {
@@ -838,6 +938,10 @@ Future<void> _mostrarDialogoFormulario(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  } else if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Consumible guardado correctamente.')),
+    );
   }
 }
 
@@ -847,58 +951,92 @@ Future<void> _mostrarDialogoAjustarStock(
 ) async {
   final stockController = TextEditingController(text: '${item.stockActual}');
   final formKey = GlobalKey<FormState>();
+  MotivoAjusteStock? motivo;
 
-  final ok = await showDialog<bool>(
+  final ajuste = await showDialog<(int, MotivoAjusteStock)>(
     context: context,
-    builder: (dialogCtx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(
-        'Ajustar stock: ${item.nombre}',
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-      content: Form(
-        key: formKey,
-        child: TextFormField(
-          controller: stockController,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nuevo stock actual',
-            border: OutlineInputBorder(),
+    builder: (dialogCtx) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Ajustar stock: ${item.nombre}',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: stockController,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nuevo stock actual',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  final stock = int.tryParse(v ?? '');
+                  if (stock == null) return 'Ingresa un número válido';
+                  return stock < 0 ? 'El stock no puede ser negativo' : null;
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<MotivoAjusteStock>(
+                initialValue: motivo,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo *',
+                  border: OutlineInputBorder(),
+                ),
+                items: MotivoAjusteStock.values
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: item,
+                        child: Text(item.etiqueta),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => motivo = value),
+                validator: (value) =>
+                    value == null ? 'Selecciona un motivo' : null,
+              ),
+            ],
           ),
-          validator: (v) =>
-              int.tryParse(v ?? '') == null ? 'Número inválido' : null,
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogCtx, false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: context.appColors.primaryBlue,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: context.appColors.primaryBlue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogCtx, (
+                  int.parse(stockController.text),
+                  motivo!,
+                ));
+              }
+            },
+            child: const Text('Actualizar'),
           ),
-          onPressed: () {
-            if (formKey.currentState!.validate()) {
-              Navigator.pop(dialogCtx, true);
-            }
-          },
-          child: const Text('Actualizar'),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 
-  if (ok != true || !context.mounted) return;
+  stockController.dispose();
+  if (ajuste == null || !context.mounted) return;
 
-  final nuevoStock = int.parse(stockController.text);
   final error = await context.read<InventarioCubit>().ajustarStock(
     item.id!,
-    nuevoStock,
+    ajuste.$1,
+    ajuste.$2,
   );
 
   if (error != null && context.mounted) {
@@ -924,11 +1062,11 @@ Future<void> _confirmarEliminacion(
     builder: (dialogCtx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text(
-        'Eliminar consumible',
+        'Dar de baja el consumible',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
       content: Text(
-        '¿Deseas eliminar "${item.nombre}" del inventario?\n\nEsta acción no se puede deshacer.',
+        '¿Deseas dar de baja "${item.nombre}"?\n\nDejará de aparecer en el inventario, pero se conservará su historial.',
         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
       actions: [
@@ -944,7 +1082,7 @@ Future<void> _confirmarEliminacion(
             ),
           ),
           onPressed: () => Navigator.pop(dialogCtx, true),
-          child: const Text('Eliminar'),
+          child: const Text('Dar de baja'),
         ),
       ],
     ),
@@ -958,8 +1096,8 @@ Future<void> _confirmarEliminacion(
       SnackBar(
         content: Text(
           error == null
-              ? 'Artículo eliminado correctamente.'
-              : 'No se pudo eliminar el artículo.',
+              ? 'Artículo dado de baja correctamente.'
+              : 'No se pudo dar de baja el artículo.',
         ),
         backgroundColor: error == null ? ac.green : ac.red,
         behavior: SnackBarBehavior.floating,

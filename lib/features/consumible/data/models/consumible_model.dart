@@ -6,9 +6,13 @@ class ConsumibleModel extends Consumible {
     super.id,
     required super.nombre,
     required super.descripcion,
+    required super.precio,
     required super.stockActual,
     required super.stockMinimo,
     required super.estado,
+    super.suplidorId,
+    super.suplidorNombre,
+    super.activo,
   });
 
   factory ConsumibleModel.fromJson(Map<String, dynamic> json) {
@@ -57,6 +61,7 @@ class ConsumibleModel extends Consumible {
     final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
+      'precio': precio,
       'stock_actual': stockActual,
       'stock_minimo': stockMinimo,
       'estado': _estadoToPg(estado),

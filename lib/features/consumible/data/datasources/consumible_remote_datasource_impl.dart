@@ -60,7 +60,7 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
     await supabaseClient
         .from('consumibles')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
+          'activo': false,
           'updated_at': DateTime.now().toIso8601String(),
         })
         .eq('id', id);

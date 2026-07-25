@@ -2,19 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consulta_detalle_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
-import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class ConsultasListPage extends StatefulWidget {
   const ConsultasListPage({super.key});
@@ -76,6 +76,152 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
     }
   }
 
+  void _abrirModalFiltrosAvanzados(
+    BuildContext context,
+    ConsultasLoaded state,
+  ) {
+    final cubit = context.read<ConsultasListCubit>();
+    final ac = context.appColors;
+    bool? finalizada = state.finalizada;
+    bool? tieneNotas = state.tieneNotas;
+    bool? tieneOdontograma = state.tieneOdontograma;
+    bool? tieneRecetas = state.tieneRecetas;
+    bool? tieneTratamientos = state.tieneTratamientos;
+    bool? soloEmergencias = state.soloEmergencias;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ac.cardBg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: ac.primaryBlue),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Filtros Combinables de Consultas',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Divider(color: ac.divider),
+
+              SwitchListTile(
+                title: const Text(
+                  'Completadas (Finalizadas)',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: finalizada == true,
+                activeColor: ac.primaryBlue,
+                onChanged: (v) =>
+                    setModalState(() => finalizada = v ? true : null),
+              ),
+              SwitchListTile(
+                title: const Text(
+                  'Con notas / observaciones clínicas',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: tieneNotas == true,
+                activeColor: ac.primaryBlue,
+                onChanged: (v) =>
+                    setModalState(() => tieneNotas = v ? true : null),
+              ),
+              SwitchListTile(
+                title: const Text(
+                  'Con odontograma registrado',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: tieneOdontograma == true,
+                activeColor: ac.primaryBlue,
+                onChanged: (v) =>
+                    setModalState(() => tieneOdontograma = v ? true : null),
+              ),
+              SwitchListTile(
+                title: const Text(
+                  'Con recetas prescritas',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: tieneRecetas == true,
+                activeColor: ac.primaryBlue,
+                onChanged: (v) =>
+                    setModalState(() => tieneRecetas = v ? true : null),
+              ),
+              SwitchListTile(
+                title: const Text(
+                  'Con tratamientos aplicados',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: tieneTratamientos == true,
+                activeColor: ac.primaryBlue,
+                onChanged: (v) =>
+                    setModalState(() => tieneTratamientos = v ? true : null),
+              ),
+              SwitchListTile(
+                title: const Text(
+                  'Atención de emergencia',
+                  style: TextStyle(fontSize: 13),
+                ),
+                value: soloEmergencias == true,
+                activeColor: ac.red,
+                onChanged: (v) =>
+                    setModalState(() => soloEmergencias = v ? true : null),
+              ),
+
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      cubit.aplicarFiltrosAvanzados(
+                        finalizada: finalizada,
+                        tieneNotas: tieneNotas,
+                        tieneOdontograma: tieneOdontograma,
+                        tieneRecetas: tieneRecetas,
+                        tieneTratamientos: tieneTratamientos,
+                        soloEmergencias: soloEmergencias,
+                      );
+                      Navigator.pop(ctx);
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Aplicar Filtros'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.primaryBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -131,7 +277,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Historial de consultas registradas, filtrable por paciente, doctor y fecha.',
+            'Historial de consultas registradas, filtrables dinámicamente.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             ),
@@ -228,6 +374,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         ],
       ),
     );
+
     final rangeButton = OutlinedButton.icon(
       onPressed: () => _seleccionarRango(state.rangoFechas),
       icon: Icon(Icons.date_range_rounded, size: 18, color: ac.primaryBlue),
@@ -256,39 +403,41 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
-    if (MediaQuery.sizeOf(context).width < 600) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (state.puedeFiltrarPorDoctor)
-            SizedBox(width: double.infinity, child: doctorChips),
-          if (state.puedeFiltrarPorDoctor) const SizedBox(height: 10),
-          rangeButton,
-        ],
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+
+    final btnFiltrosAvanzados = FilledButton.icon(
+      onPressed: () => _abrirModalFiltrosAvanzados(context, state),
+      icon: const Icon(Icons.tune_rounded, size: 18),
+      label: const Text('Filtros'),
+      style: FilledButton.styleFrom(
+        backgroundColor: state.hayFiltrosActivos
+            ? ac.primaryBlue
+            : ac.searchFill,
+        foregroundColor: state.hayFiltrosActivos
+            ? Colors.white
+            : ac.textPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (state.puedeFiltrarPorDoctor)
-          Expanded(child: doctorChips)
-        else
-          const Spacer(),
-        const SizedBox(width: 12),
+          SizedBox(width: 300, child: doctorChips),
         rangeButton,
-        if (state.rangoFechas != null)
-          IconButton(
-            tooltip: 'Quitar rango',
-            icon: Icon(Icons.close_rounded, size: 18, color: ac.red),
-            onPressed: () => cubit.filtrarPorRango(null),
-          ),
+        btnFiltrosAvanzados,
         if (state.hayFiltrosActivos)
-          TextButton(
+          TextButton.icon(
             onPressed: () {
               _searchController.clear();
               cubit.limpiarFiltros();
             },
-            child: const Text('Limpiar'),
+            icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+            label: const Text('Limpiar todos'),
           ),
       ],
     );
@@ -752,7 +901,7 @@ class _ConsultaCard extends StatelessWidget {
                         _IndicadorIcono(
                           icon: Icons.healing_rounded,
                           color: ac.teal,
-                          tooltip: 'El paciente tiene tratamientos aplicados',
+                          tooltip: 'Tratamientos aplicados',
                         ),
                       if (consulta.tieneRecetas)
                         _IndicadorIcono(

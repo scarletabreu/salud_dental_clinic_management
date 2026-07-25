@@ -11,7 +11,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       '*, recetas(*), documentos_clinicos(*), '
       'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
       'dientes(id, odontograma_id, fdi_code, observaciones, esta_ausente, '
-      'tratamientos_aplicados_ids, diagnosis:diagnosticos_aplicados(*, '
+      'tratamientos_aplicados_ids, diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(*, '
       'diagnosis:diagnosticos(*)), tratamientos:tratamientos_aplicados(*, '
       'tratamiento:tratamientos(*))))';
 
@@ -84,7 +84,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .from('odontogramas')
         .select(
           'id, dientes(id, fdi_code, esta_ausente, observaciones, '
-          'tratamientos_aplicados_ids, diagnosticos:diagnosticos_aplicados(id))',
+          'tratamientos_aplicados_ids, diagnosticos:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(id))',
         )
         .eq('consulta_id', consultaId)
         .isFilter('deleted_at', null)

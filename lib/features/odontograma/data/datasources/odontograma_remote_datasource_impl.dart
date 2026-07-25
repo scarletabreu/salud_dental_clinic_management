@@ -13,7 +13,7 @@ class OdontogramaRemoteDatasourceImpl implements OdontogramaRemoteDatasource {
     return await supabaseClient
         .from('odontogramas')
         .select(
-          '*, dientes:dientes(*, diagnosis:diagnosticos_aplicados(*), tratamientos:tratamientos_aplicados(*))',
+          '*, dientes:dientes(*, diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(*), tratamientos:tratamientos_aplicados(*))',
         )
         .eq('consulta_id', consultaId)
         .filter('deleted_at', 'is', null)

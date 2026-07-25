@@ -1,6 +1,11 @@
 -- ============================================================================
+--  ⚠️ SUPERSEDIDO — no ejecutar. Se conserva como registro histórico.
+--  La definición vigente de `finalizar_consulta` vive en
+--  supabase/migrations/20260725100000_corregir_drift_rpc_y_caja.sql
+--  (esta versión quedó desfasada: no filtra por `tratamientos_aplicados.estado`
+--  ni valida el método de pago contra el enum `modo_pago`).
+--
 --  SD-96 · FinalizarConsulta: pre-factura al cerrar la consulta (handoff clínico→financiero)
---  Ejecuta este archivo en el SQL Editor de Supabase (una sola vez).
 --
 --  Objetivo:
 --    Al finalizar una consulta, dejar una pre-factura REAL en la BD: una `cuenta`

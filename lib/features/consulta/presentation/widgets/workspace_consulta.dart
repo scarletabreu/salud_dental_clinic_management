@@ -10,6 +10,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontograma_clinico_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
@@ -383,6 +384,28 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                   const SizedBox(height: 16),
                   Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
+                  OdontogramaClinicoWidget(
+                    odontograma: odontograma,
+                    editable: true,
+                    onHallazgosChanged: context
+                        .read<ConsultaCubit>()
+                        .actualizarHallazgosDentales,
+                    onTejidosChanged: context
+                        .read<ConsultaCubit>()
+                        .actualizarTejidosBlandos,
+                  ),
+                  const SizedBox(height: 20),
+                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tratamientos por superficie',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   OdontogramWidget(
                     odontograma: odontograma,
                     editMode: true,

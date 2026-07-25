@@ -6,6 +6,8 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontograma_clinico_widget.dart';
 
 class FormularioEvaluacion extends StatefulWidget {
   final String pacienteId;
@@ -36,6 +38,10 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
 
   final List<String> _condiciones = [];
   final List<DocumentoAdjunto> _adjuntos = [];
+  Odontograma _evaluacionOdontologica = Odontograma(
+    consultaId: '',
+    dientes: const [],
+  );
 
   @override
   void dispose() {
@@ -103,6 +109,8 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
       tempCondiciones: _condiciones,
       adjuntos: _adjuntos,
       signosVitales: _buildSignosVitales(),
+      hallazgos: _evaluacionOdontologica.hallazgos,
+      tejidosBlandos: _evaluacionOdontologica.tejidosBlandos,
     );
   }
 
@@ -145,6 +153,27 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? 'El motivo de consulta es obligatorio'
                   : null,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _FormCard(
+            ac: ac,
+            icon: Icons.grid_view_rounded,
+            iconColor: ac.teal,
+            title: 'Evaluación odontológica',
+            subtitle: 'Registra hallazgos dentales y tejidos blandos',
+            child: OdontogramaClinicoWidget(
+              odontograma: _evaluacionOdontologica,
+              editable: true,
+              onHallazgosChanged: (hallazgos) => setState(
+                () => _evaluacionOdontologica = _evaluacionOdontologica
+                    .copyWith(hallazgos: hallazgos),
+              ),
+              onTejidosChanged: (tejidos) => setState(
+                () => _evaluacionOdontologica = _evaluacionOdontologica
+                    .copyWith(tejidosBlandos: tejidos),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -244,17 +273,11 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
             subtitle: 'Presión, pulso, temperatura y saturación (opcionales)',
             child: Row(
               children: [
-                Expanded(
-                  child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg'),
-                ),
+                Expanded(child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg'),
-                ),
+                Expanded(child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm'),
-                ),
+                Expanded(child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm')),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _campoVital(
@@ -265,9 +288,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _saturacionCtrl, 'Sat %'),
-                ),
+                Expanded(child: _campoVital(ac, _saturacionCtrl, 'Sat %')),
               ],
             ),
           ),
@@ -293,20 +314,19 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     TextEditingController ctrl,
     String hint, {
     bool decimal = false,
-  }) =>
-      TextField(
-        controller: ctrl,
-        keyboardType: decimal
-            ? const TextInputType.numberWithOptions(decimal: true)
-            : TextInputType.number,
-        inputFormatters: [
-          decimal
-              ? FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
-              : FilteringTextInputFormatter.digitsOnly,
-        ],
-        decoration: _fieldDecoration(c, hint: hint),
-        textAlign: TextAlign.center,
-      );
+  }) => TextField(
+    controller: ctrl,
+    keyboardType: decimal
+        ? const TextInputType.numberWithOptions(decimal: true)
+        : TextInputType.number,
+    inputFormatters: [
+      decimal
+          ? FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+          : FilteringTextInputFormatter.digitsOnly,
+    ],
+    decoration: _fieldDecoration(c, hint: hint),
+    textAlign: TextAlign.center,
+  );
 
   InputDecoration _fieldDecoration(AppColors ac, {required String hint}) =>
       InputDecoration(

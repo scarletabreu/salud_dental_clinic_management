@@ -90,10 +90,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<String> finalizarConsulta({
-    required String consultaId,
-    String? nota,
-  }) {
+  Future<String> finalizarConsulta({required String consultaId, String? nota}) {
     return runGuarded(
       () => remoteDataSource.finalizarConsulta(
         consultaId: consultaId,
@@ -138,6 +135,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         pacienteId: pacienteId,
         tratamientosPorFdi: tratamientosPorFdi,
         recetas: recetasJson,
+        evaluacionOdontologica: odontograma.evaluacionToJson(),
         notas: notas,
         signosVitales: signosVitales,
         finalizada: finalizada,
@@ -149,7 +147,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<Map<String, TratamientoAplicadoDetalle>>
   getDetalleTratamientosAplicados(List<String> ids) {
     return runGuarded(() async {
-      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(ids);
+      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(
+        ids,
+      );
       return {
         for (final fila in filas)
           if (fila['id'] != null)

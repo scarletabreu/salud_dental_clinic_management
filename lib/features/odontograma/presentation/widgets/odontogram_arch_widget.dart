@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'odontogram_widget.dart';
+import 'odontograma_clinico_widget.dart';
 
 // ─────────────────────────────────────────────
 //  Aggregate helper
@@ -346,6 +347,8 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             const _Legend(),
             const SizedBox(height: 4),
 
+            OdontogramaClinicoWidget(odontograma: currentOdo),
+            const SizedBox(height: 12),
             OdontogramWidget(odontograma: currentOdo, editMode: false),
           ],
         ],

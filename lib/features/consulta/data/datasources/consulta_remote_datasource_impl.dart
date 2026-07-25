@@ -8,7 +8,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   static const _selectConsulta =
       '*, recetas(*), documentos_clinicos(*), '
-      'odontograma:odontogramas(id, consulta_id, '
+      'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
       'dientes(id, odontograma_id, fdi_code, observaciones, '
       'tratamientos_aplicados_ids))';
 
@@ -44,6 +44,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     required String? pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
     required List<Map<String, dynamic>> recetas,
+    required Map<String, dynamic> evaluacionOdontologica,
     String? notas,
     Map<String, dynamic>? signosVitales,
     bool? finalizada,
@@ -72,11 +73,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     if (recetas.isNotEmpty) {
       await supabaseClient.from('recetas').insert([
         for (final r in recetas)
-          {
-            ...r,
-            'consulta_id': consultaId,
-            'updated_at': now,
-          },
+          {...r, 'consulta_id': consultaId, 'updated_at': now},
       ]);
     }
 
@@ -90,6 +87,14 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       if (tratamientosPorFdi.isEmpty) return;
       throw Exception('No se encontró el odontograma de la consulta.');
     }
+
+    await supabaseClient
+        .from('odontogramas')
+        .update({
+          'evaluacion_clinica': evaluacionOdontologica,
+          'updated_at': now,
+        })
+        .eq('id', odontograma['id'] as String);
 
     final dientes = odontograma['dientes'] as List;
 
@@ -123,17 +128,12 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
                 },
             ])
             .select('id');
-        nuevosIds = [
-          for (final row in insertados as List) row['id'] as String,
-        ];
+        nuevosIds = [for (final row in insertados as List) row['id'] as String];
       }
 
       await supabaseClient
           .from('dientes')
-          .update({
-            'tratamientos_aplicados_ids': nuevosIds,
-            'updated_at': now,
-          })
+          .update({'tratamientos_aplicados_ids': nuevosIds, 'updated_at': now})
           .eq('id', dienteId);
     }
   }

@@ -14,6 +14,7 @@ abstract class ConsultaRemoteDatasource {
     required String? pacienteId,
     required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
     required List<Map<String, dynamic>> recetas,
+    required Map<String, dynamic> evaluacionOdontologica,
     String? notas,
     Map<String, dynamic>? signosVitales,
     bool? finalizada,

@@ -13,6 +13,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
@@ -56,6 +57,8 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     required List<String> tempCondiciones,
     required List<DocumentoAdjunto> adjuntos,
     SignosVitales? signosVitales,
+    Map<int, HallazgoDental> hallazgos = const {},
+    Map<TejidoBlando, EvaluacionTejidoBlando> tejidosBlandos = const {},
   }) async {
     emit(const ConsultaGuardando());
     try {
@@ -107,7 +110,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       final odontograma = Odontograma(
         consultaId: consultaId,
-        dientes: kFdiPermanentes.map((fdi) {
+        hallazgos: hallazgos,
+        tejidosBlandos: tejidosBlandos,
+        dientes: kFdiTodos.map((fdi) {
           return Diente(
             odontogramaId: '',
             fdiCode: fdi,
@@ -124,6 +129,16 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         odontograma: odontograma,
         finalizada: false,
       );
+
+      if (hallazgos.isNotEmpty || tejidosBlandos.isNotEmpty) {
+        await _consultaRepository.guardarResultadoConsulta(
+          consultaId: consultaId,
+          pacienteId: pacienteId,
+          odontograma: odontograma,
+          recetas: const [],
+          finalizada: false,
+        );
+      }
 
       emit(ConsultaIniciada(consulta: consultaActiva));
     } catch (e) {
@@ -256,6 +271,36 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  void actualizarHallazgosDentales(Map<int, HallazgoDental> hallazgos) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odontograma = actual.odontograma;
+    if (odontograma == null) return;
+    emit(
+      ConsultaIniciada(
+        consulta: actual.copyWith(
+          odontograma: odontograma.copyWith(hallazgos: hallazgos),
+        ),
+      ),
+    );
+  }
+
+  void actualizarTejidosBlandos(
+    Map<TejidoBlando, EvaluacionTejidoBlando> tejidos,
+  ) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odontograma = actual.odontograma;
+    if (odontograma == null) return;
+    emit(
+      ConsultaIniciada(
+        consulta: actual.copyWith(
+          odontograma: odontograma.copyWith(tejidosBlandos: tejidos),
+        ),
+      ),
+    );
+  }
+
   void agregarItemReceta(Receta receta) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
@@ -290,7 +335,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       emit(ConsultaIniciada(consulta: consultaRehidratada));
     } catch (e) {
       if (kDebugMode) debugPrint('Error al reanudar consulta: $e');
-      emit(ConsultaError(_mensajeError(e, fallback: 'No se pudo reanudar la consulta.')));
+      emit(
+        ConsultaError(
+          _mensajeError(e, fallback: 'No se pudo reanudar la consulta.'),
+        ),
+      );
     }
   }
 
@@ -299,15 +348,13 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     if (odonto == null) return consulta;
 
     final ids = <String>{
-      for (final diente in odonto.dientes)
-        ...diente.tratamientosAplicadosIds,
+      for (final diente in odonto.dientes) ...diente.tratamientosAplicadosIds,
     };
 
     if (ids.isEmpty) return consulta;
 
-    final detallePorId = await _consultaRepository.getDetalleTratamientosAplicados(
-      ids.toList(),
-    );
+    final detallePorId = await _consultaRepository
+        .getDetalleTratamientosAplicados(ids.toList());
 
     final dientes = odonto.dientes.map((diente) {
       final tratamientos = diente.tratamientosAplicadosIds
@@ -368,7 +415,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         odontograma: odontograma,
         recetas: consulta.recetas,
         notas: consulta.notas,
-        finalizada: true
+        finalizada: true,
       );
 
       // 2. Handoff financiero atómico: la BD genera la pre-factura (cuenta +

@@ -13,6 +13,8 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
     super.dienteId,
     super.superficie,
     super.origen,
+    super.evaluacionId,
+    super.doctorId,
     super.nombreDiagnostico,
     super.claveOdontograma,
   });
@@ -40,6 +42,8 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
         (origen) => origen.name == json['origen'],
         orElse: () => OrigenMarcaOdontograma.preexistente,
       ),
+      evaluacionId: json['evaluacion_id'] as String?,
+      doctorId: _doctorDe(json),
       nombreDiagnostico: catalogo['nombre'] as String?,
       claveOdontograma:
           catalogo['clave_odontograma'] as String? ??
@@ -57,6 +61,9 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
       'diente_id': dienteId,
       'superficie': superficie?.name.toLowerCase(),
       'origen': origen.name,
+      // El doctor no se escribe: cuelga de la evaluación, que es el acto que lo
+      // registra (SD-135). Mandarlo aquí duplicaría el dato en dos tablas.
+      if (evaluacionId != null) 'evaluacion_id': evaluacionId,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {
@@ -64,6 +71,21 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
     }
 
     return data;
+  }
+
+  /// Quién anotó el hallazgo. Manda la evaluación —es el acto que lo registra—
+  /// y, cuando la fila es anterior a SD-135 y no tiene una, el doctor de la
+  /// consulta, que es quien estaba delante del paciente.
+  static String? _doctorDe(Map<String, dynamic> json) {
+    final evaluacion = json['evaluacion'];
+    if (evaluacion is Map && evaluacion['doctor_id'] is String) {
+      return evaluacion['doctor_id'] as String;
+    }
+    final consulta = json['consulta'];
+    if (consulta is Map && consulta['doctor_id'] is String) {
+      return consulta['doctor_id'] as String;
+    }
+    return json['doctor_id'] as String?;
   }
 
   static TipoSuperficie? _parseSuperficie(dynamic raw) {

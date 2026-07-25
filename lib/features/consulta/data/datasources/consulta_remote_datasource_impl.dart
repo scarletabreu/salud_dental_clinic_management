@@ -12,6 +12,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
       'dientes(id, odontograma_id, fdi_code, observaciones, esta_ausente, '
       'tratamientos_aplicados_ids, diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(*, '
+      // El doctor de un hallazgo cuelga de su evaluación (SD-135): la ficha de
+      // la pieza tiene que poder decir quién lo anotó.
+      'evaluacion:evaluaciones_clinicas(doctor_id), '
       'diagnosis:diagnosticos(*)), tratamientos:tratamientos_aplicados(*, '
       'tratamiento:tratamientos(*))))';
 
@@ -387,8 +390,11 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .from('diagnosticos_aplicados')
         .select(
           '*, diagnosis:diagnosticos(nombre, clave_odontograma), '
+          'evaluacion:evaluaciones_clinicas(doctor_id), '
           'diente:dientes!inner(fdi_code), '
-          'consulta:consultas!inner(paciente_id, fecha)',
+          // `doctor_id` de la consulta es el respaldo para las filas anteriores
+          // a SD-135, que no cuelgan de ninguna evaluación.
+          'consulta:consultas!inner(paciente_id, fecha, doctor_id)',
         )
         .eq('consulta.paciente_id', pacienteId)
         .isFilter('deleted_at', null);

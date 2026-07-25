@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/reposito
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
@@ -227,6 +228,30 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       }
       return porFdi;
     }, context: 'obtener los tratamientos históricos');
+  }
+
+  @override
+  Future<Map<int, List<DiagnosticoAplicado>>>
+  getDiagnosticosHistoricosPorDiente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchDiagnosticosHistoricosPaciente(
+        pacienteId,
+        excluyendoConsultaId: excluyendoConsultaId,
+      );
+
+      final porFdi = <int, List<DiagnosticoAplicado>>{};
+      for (final fila in filas) {
+        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+        if (fdi == null) continue;
+        porFdi
+            .putIfAbsent(fdi, () => [])
+            .add(DiagnosticoAplicadoModel.fromJson(fila));
+      }
+      return porFdi;
+    }, context: 'obtener los hallazgos anteriores');
   }
 
   @override

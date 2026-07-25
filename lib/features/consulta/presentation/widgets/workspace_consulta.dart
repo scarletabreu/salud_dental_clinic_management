@@ -27,6 +27,10 @@ import 'package:salud_dental_clinic_management/features/condicion/domain/entitie
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/entities/evaluacion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/repositories/evaluacion_clinica_repository.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
 
@@ -46,6 +50,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   bool _cargandoCatalogo = true;
   List<Diagnosis> _catalogoDiagnosticos = const [];
 
+  /// Nombre de cada doctor, para que la ficha de una pieza pueda decir quién
+  /// anotó cada cosa en vez de mostrar un uuid.
+  Map<String, String> _nombrePorDoctorId = const {};
+
   /// Evaluación de esta consulta (SD-135). Se asegura una sola vez: es el
   /// contenedor al que se cuelgan los hallazgos y del que nace el plan.
   String? _evaluacionId;
@@ -61,6 +69,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     _cargarCatalogo();
     _cargarDiagnosticos();
     _cargarCondicionesPaciente();
+    _cargarDoctores();
 
     final state = context.read<ConsultaCubit>().state;
     if (state is ConsultaIniciada && state.consulta.notas != null) {
@@ -86,6 +95,27 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
+  Future<void> _cargarDoctores() async {
+    try {
+      final doctores = await sl<DoctorRepository>().getDoctores();
+      if (!mounted) return;
+      setState(() {
+        _nombrePorDoctorId = {
+          for (final doctor in doctores)
+            if (doctor.id != null)
+              doctor.id!: 'Dr. ${doctor.nombre} ${doctor.apellido}'.trim(),
+        };
+      });
+    } catch (_) {
+      // La ficha de la pieza omite la autoría en vez de mostrar un uuid; todo
+      // lo demás de la consulta sigue funcionando igual.
+    }
+  }
+
+  /// El nombre del doctor, o cadena vacía si aún no se cargó el personal: la
+  /// ficha prefiere no decir nada a mostrar un identificador.
+  String _nombreDoctor(String doctorId) => _nombrePorDoctorId[doctorId] ?? '';
+
   Future<void> _onAddDiagnosis(
     Diente diente,
     TipoSuperficie? superficie,
@@ -110,7 +140,45 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       severidad: seleccionado.severidad,
       origen: seleccionado.origen,
       notas: seleccionado.notas,
+      // El hallazgo cuelga del acto de evaluación de esta consulta: de ahí sale
+      // el doctor que lo anotó cuando el expediente lo vuelva a leer.
+      evaluacionId: _evaluacionId,
     );
+  }
+
+  /// Las actividades del plan repartidas por pieza.
+  ///
+  /// El plan referencia el diente por su id y el odontograma se dibuja por
+  /// código FDI, así que hace falta traducir. Una consulta recién creada aún no
+  /// conoce los ids de sus piezas: en ese momento no hay plan que mostrar
+  /// todavía, y el mapa sale vacío sin romper nada.
+  Map<int, List<ItemPlanTratamiento>> _itemsPlanPorFdi(
+    Odontograma odontograma,
+    PlanTratamientoState estado,
+  ) {
+    if (estado is! PlanTratamientoCargado) return const {};
+    final items = estado.plan?.items ?? const <ItemPlanTratamiento>[];
+    if (items.isEmpty) return const {};
+
+    final fdiPorDienteId = {
+      for (final diente in odontograma.dientes)
+        if (diente.id != null) diente.id!: diente.fdiCode,
+    };
+
+    final porFdi = <int, List<ItemPlanTratamiento>>{};
+    for (final item in items) {
+      final dienteId = item.dienteId;
+      if (dienteId == null) continue;
+      final fdi = fdiPorDienteId[dienteId];
+      if (fdi == null) continue;
+      porFdi.putIfAbsent(fdi, () => []).add(item);
+    }
+    return porFdi;
+  }
+
+  /// La observación queda pegada al diente, no al párrafo de la visita.
+  void _onNotasPieza(Diente diente, String notas) {
+    context.read<ConsultaCubit>().actualizarNotasPieza(diente, notas);
   }
 
   /// El odontodiagrama ya solo emite tejidos blandos: las claves dentales se
@@ -463,26 +531,34 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               subtitulo:
                   'Anota hallazgos en el formulario o asigna tratamientos en '
                   'la arcada: es la misma boca en dos vistas',
-              child: VistasOdontograma(
-                odontograma: odontograma,
-                editable: true,
-                onEvaluacionChanged: _onEvaluacionChanged,
-                onAddDiagnosis: _onAddDiagnosis,
-                onAddTratamiento: _onAddTratamiento,
-                onToggleAusente: _onToggleAusente,
-                onQuitarTratamiento: _onQuitarTratamiento,
-                onToggleTratamientoTerminado: _onToggleTerminado,
-                nombreTratamiento: _nombreTratamiento,
-                accion: _cargandoCatalogo
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: ac.teal,
-                        ),
-                      )
-                    : null,
+              // El plan se escucha aquí porque la ficha de cada pieza tiene que
+              // mostrar lo planificado junto a lo evaluado y lo ejecutado: son
+              // los tres ejes de SD-135 sobre el mismo diente.
+              child: BlocBuilder<PlanTratamientoCubit, PlanTratamientoState>(
+                builder: (context, planState) => VistasOdontograma(
+                  odontograma: odontograma,
+                  editable: true,
+                  itemsPlan: _itemsPlanPorFdi(odontograma, planState),
+                  onEvaluacionChanged: _onEvaluacionChanged,
+                  onNotasPiezaChanged: _onNotasPieza,
+                  onAddDiagnosis: _onAddDiagnosis,
+                  onAddTratamiento: _onAddTratamiento,
+                  onToggleAusente: _onToggleAusente,
+                  onQuitarTratamiento: _onQuitarTratamiento,
+                  onToggleTratamientoTerminado: _onToggleTerminado,
+                  nombreTratamiento: _nombreTratamiento,
+                  nombreDoctor: _nombreDoctor,
+                  accion: _cargandoCatalogo
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: ac.teal,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ),
             const SizedBox(height: 16),

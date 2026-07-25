@@ -55,6 +55,29 @@ void main() {
       expect(hallazgo.superficies, {TipoSuperficie.oclusal});
     });
 
+    test('un tratamiento sin clave no estampa ningún símbolo en el papel', () {
+      final odontograma = Odontograma(
+        consultaId: 'c-1',
+        dientes: [
+          _diente(
+            tratamientos: [
+              TratamientoAplicado(
+                tratamientoId: 't-corona',
+                esContinuo: false,
+                estaTerminado: false,
+                nombreTratamiento: 'Corona de porcelana',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      // «Otro» es lo que el doctor elige a propósito para algo que el programa
+      // no contempla; no el cajón de lo que el catálogo aún no clasificó. Antes
+      // toda corona estampaba un asterisco sobre su pieza.
+      expect(odontograma.evaluacionProyectada.de(74), isEmpty);
+    });
+
     test('un tratamiento de consultas anteriores no se dibuja en el papel', () {
       final odontograma = Odontograma(
         consultaId: 'c-1',

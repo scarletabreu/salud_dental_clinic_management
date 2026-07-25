@@ -1,12 +1,17 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
+import 'paleta_odontodiagrama.dart';
 import 'panel_detalle_pieza.dart';
 import 'tooth_geometry.dart';
+import 'trazo_punteado.dart';
 
 // La paleta, el estado clínico de una pieza y el panel de detalle viven en
 // `panel_detalle_pieza.dart` porque el odontodiagrama los usa igual. Se
@@ -23,20 +28,37 @@ const _kToothGreen = Color(0xFF10B981);
 
 class _OdontogramPainter extends CustomPainter {
   final Map<int, Diente> dientes;
+
+  /// Lo que describe el estado de cada pieza. El color del diente sale de la
+  /// clave clínica de esta marca —una caries se dibuja roja porque es una
+  /// caries— y su firmeza, de la procedencia. Antes el tono lo decidía una
+  /// escala de severidad propia de la arcada, de modo que la misma boca se
+  /// coloreaba con un criterio en la arcada y con otro en el formulario.
+  final Map<int, MarcaClinicaPieza?> marcaPorFdi;
+
   final int? selectedFdi;
   final int? hoveredFdi;
   final Color labelColor;
   final PaletaArcada paleta;
+  final PaletaOdontodiagrama paletaClinica;
   final DenticionArcada denticion;
 
   const _OdontogramPainter({
     required this.dientes,
+    required this.marcaPorFdi,
     required this.labelColor,
     required this.paleta,
+    required this.paletaClinica,
     required this.denticion,
     this.selectedFdi,
     this.hoveredFdi,
   });
+
+  EstiloMarcaClinica? _estilo(int fdi) {
+    final marca = marcaPorFdi[fdi];
+    if (marca == null) return null;
+    return paletaClinica.estiloDe(marca.tintaClinica, marca.procedencia);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -55,12 +77,14 @@ class _OdontogramPainter extends CustomPainter {
       final type = toothTypeFor(fdi);
       final upper = isUpperTooth(fdi);
       final d = dientes[fdi];
-      final status = statusForDiente(d);
       final isAbsent = d != null && dienteEstaAusente(d);
+      final estilo = isAbsent ? null : _estilo(fdi);
       final isSelected = fdi == selectedFdi;
       final isHovered = fdi == hoveredFdi && !isSelected;
-      final hasStatus = status != ToothStatus.empty && !isAbsent;
-      final statusColor = isAbsent ? paleta.vacio : paleta.status(status);
+      final hasStatus = estilo != null;
+      final statusColor = isAbsent
+          ? paleta.vacio
+          : (estilo?.color ?? paleta.vacio);
 
       final path = buildToothPath(type, p.size);
       final groove = buildGroovePath(type, p.size, upper: upper);
@@ -109,14 +133,18 @@ class _OdontogramPainter extends CustomPainter {
           : isHovered
           ? 220
           : (hasStatus ? 200 : 150);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = outlineColor.withAlpha(strokeAlpha)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = strokeWidth
-          ..strokeJoin = StrokeJoin.round,
-      );
+      final trazo = Paint()
+        ..color = outlineColor.withAlpha(strokeAlpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeJoin = StrokeJoin.round;
+      // Lo planificado se perfila discontinuo: todavía no está en la boca, y el
+      // trazo lo dice aunque la pieza se imprima sin color.
+      if (estilo != null && estilo.punteado && !isSelected && !isHovered) {
+        dibujarContornoPunteado(canvas, path, trazo);
+      } else {
+        canvas.drawPath(path, trazo);
+      }
 
       if (isAbsent) {
         final xPaint = Paint()
@@ -134,11 +162,13 @@ class _OdontogramPainter extends CustomPainter {
 
     layout.forEach((fdi, p) {
       final d = dientes[fdi];
-      final status = statusForDiente(d);
       final isAbsent = d?.estaAusente ?? false;
       final isSelected = fdi == selectedFdi;
-      final hasStatus = status != ToothStatus.empty && !isAbsent;
-      final statusColor = isAbsent ? paleta.vacio : paleta.status(status);
+      final estilo = isAbsent ? null : _estilo(fdi);
+      final hasStatus = estilo != null;
+      final statusColor = isAbsent
+          ? paleta.vacio
+          : (estilo?.color ?? paleta.vacio);
 
       final tp = TextPainter(
         text: TextSpan(
@@ -200,10 +230,12 @@ class _OdontogramPainter extends CustomPainter {
   @override
   bool shouldRepaint(_OdontogramPainter old) =>
       old.dientes != dientes ||
+      !mapEquals(old.marcaPorFdi, marcaPorFdi) ||
       old.selectedFdi != selectedFdi ||
       old.hoveredFdi != hoveredFdi ||
       old.labelColor != labelColor ||
       old.paleta != paleta ||
+      old.paletaClinica != paletaClinica ||
       old.denticion != denticion;
 }
 
@@ -222,6 +254,13 @@ class OdontogramWidget extends StatefulWidget {
   final void Function(Diente, int index, bool terminado)?
   onToggleTratamientoTerminado;
   final String Function(String tratamientoId)? nombreTratamiento;
+  final String Function(String doctorId)? nombreDoctor;
+
+  /// Actividades del plan que caen sobre cada pieza, indexadas por código FDI.
+  final Map<int, List<ItemPlanTratamiento>> itemsPlan;
+
+  /// Anota una observación clínica sobre la pieza abierta.
+  final void Function(Diente, String)? onNotasPiezaChanged;
 
   const OdontogramWidget({
     super.key,
@@ -234,6 +273,9 @@ class OdontogramWidget extends StatefulWidget {
     this.onQuitarTratamiento,
     this.onToggleTratamientoTerminado,
     this.nombreTratamiento,
+    this.nombreDoctor,
+    this.itemsPlan = const {},
+    this.onNotasPiezaChanged,
   });
 
   @override
@@ -253,6 +295,19 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
   }
 
   Diente? _getDiente(int fdi) => _dienteMap[fdi];
+
+  /// Lo que describe el estado de cada pieza, resuelto una vez por construcción
+  /// y no dentro del pintor: son 52 piezas y el pintor se repite en cada hover.
+  Map<int, MarcaClinicaPieza?> get _marcaPorFdi => {
+    for (final entry in _dienteMap.entries)
+      entry.key: marcaDominante(
+        marcasDelDiente(
+          entry.value,
+          itemsPlan: widget.itemsPlan[entry.key] ?? const [],
+          nombreTratamiento: widget.nombreTratamiento,
+        ),
+      ),
+  };
 
   int? _fdiAtPosition(Offset pos, {double hitScale = 1.4}) {
     if (_canvasSize == Size.zero) return null;
@@ -297,10 +352,12 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
           size: Size(w, h),
           painter: _OdontogramPainter(
             dientes: _dienteMap,
+            marcaPorFdi: _marcaPorFdi,
             selectedFdi: _selectedFdi,
             hoveredFdi: _hoveredFdi,
             labelColor: labelColor,
             paleta: PaletaArcada.de(context),
+            paletaClinica: PaletaOdontodiagrama.de(context),
             denticion: _denticion,
           ),
         ),
@@ -312,14 +369,17 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
     key: ValueKey(_selectedFdi),
     fdi: _selectedFdi!,
     diente: _getDiente(_selectedFdi!),
+    itemsPlan: widget.itemsPlan[_selectedFdi!] ?? const [],
     editMode: widget.editMode,
     onClose: () => setState(() => _selectedFdi = null),
+    onNotasChanged: widget.onNotasPiezaChanged,
     onAddDiagnosis: widget.onAddDiagnosis,
     onAddTratamiento: widget.onAddTratamiento,
     onToggleAusente: widget.onToggleAusente,
     onQuitarTratamiento: widget.onQuitarTratamiento,
     onToggleTerminado: widget.onToggleTratamientoTerminado,
     nombreTratamiento: widget.nombreTratamiento,
+    nombreDoctor: widget.nombreDoctor,
   );
 
   Widget _selectorDenticion() => Padding(

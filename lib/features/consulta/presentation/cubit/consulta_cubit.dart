@@ -29,6 +29,24 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/s
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
 
+/// Las tres capas del pasado clínico del paciente, tal como se cargan juntas al
+/// abrir o reanudar una consulta.
+///
+/// Cada capa es nula si su consulta falló, que no es lo mismo que un paciente
+/// sin antecedentes: al reanudar, una capa nula deja intacto lo que ya hubiera
+/// cargado en vez de borrarlo.
+class _HistorialDental {
+  final Map<int, List<TratamientoAplicado>>? tratamientosPorFdi;
+  final Map<int, List<DiagnosticoAplicado>>? diagnosticosPorFdi;
+  final EvaluacionOdontologica? evaluacion;
+
+  const _HistorialDental({
+    this.tratamientosPorFdi,
+    this.diagnosticosPorFdi,
+    this.evaluacion,
+  });
+}
+
 class DocumentoAdjunto {
   final Uint8List bytes;
   final String fileName;
@@ -201,33 +219,15 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (citaId != null) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
       }
-      var historicoPorFdi = const <int, List<TratamientoAplicado>>{};
-      var evaluacionHistorica = EvaluacionOdontologica.vacia;
-      // El historial es contexto, no un requisito: si falla, la consulta se
-      // abre igual y el doctor trabaja sin la capa tenue.
-      try {
-        historicoPorFdi = await _consultaRepository
-            .getTratamientosHistoricosPorDiente(
-              pacienteId,
-              excluyendoConsultaId: consultaId,
-            );
-      } catch (e) {
-        if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
-      }
-      try {
-        evaluacionHistorica = await _consultaRepository.getEvaluacionHistorica(
-          pacienteId,
-          excluyendoConsultaId: consultaId,
-        );
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('No se pudo cargar el odontodiagrama anterior: $e');
-        }
-      }
+      final historial = await _cargarHistorial(
+        pacienteId,
+        excluyendoConsultaId: consultaId,
+      );
 
       final odontograma = Odontograma(
         consultaId: consultaId,
-        evaluacionHistorica: evaluacionHistorica,
+        evaluacionHistorica:
+            historial.evaluacion ?? EvaluacionOdontologica.vacia,
         dientes: kFdiTodas.map((fdi) {
           return Diente(
             odontogramaId: '',
@@ -235,7 +235,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             superficies: superficiesParaFdi(fdi)
                 .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
                 .toList(),
-            tratamientosHistoricos: historicoPorFdi[fdi] ?? const [],
+            tratamientosHistoricos:
+                historial.tratamientosPorFdi?[fdi] ?? const [],
+            diagnosticosHistoricos:
+                historial.diagnosticosPorFdi?[fdi] ?? const [],
           );
         }).toList(),
       );
@@ -251,6 +254,56 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (kDebugMode) debugPrint('Error al crear consulta: $e');
       emit(ConsultaError(_mensajeError(e)));
     }
+  }
+
+  /// Los antecedentes del paciente proyectados sobre la boca de esta consulta.
+  ///
+  /// El historial es contexto, no un requisito: cada pieza se pide por separado
+  /// y un fallo deja esa capa vacía en vez de impedir abrir la consulta.
+  Future<_HistorialDental> _cargarHistorial(
+    String pacienteId, {
+    required String excluyendoConsultaId,
+  }) async {
+    Map<int, List<TratamientoAplicado>>? tratamientos;
+    Map<int, List<DiagnosticoAplicado>>? diagnosticos;
+    EvaluacionOdontologica? evaluacion;
+
+    try {
+      tratamientos = await _consultaRepository
+          .getTratamientosHistoricosPorDiente(
+            pacienteId,
+            excluyendoConsultaId: excluyendoConsultaId,
+          );
+    } catch (e) {
+      if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
+    }
+    try {
+      diagnosticos = await _consultaRepository
+          .getDiagnosticosHistoricosPorDiente(
+            pacienteId,
+            excluyendoConsultaId: excluyendoConsultaId,
+          );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('No se pudieron cargar los hallazgos anteriores: $e');
+      }
+    }
+    try {
+      evaluacion = await _consultaRepository.getEvaluacionHistorica(
+        pacienteId,
+        excluyendoConsultaId: excluyendoConsultaId,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('No se pudo cargar el odontodiagrama anterior: $e');
+      }
+    }
+
+    return _HistorialDental(
+      tratamientosPorFdi: tratamientos,
+      diagnosticosPorFdi: diagnosticos,
+      evaluacion: evaluacion,
+    );
   }
 
   void actualizarSignosVitales(SignosVitales signos) {
@@ -292,6 +345,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         nombreTratamiento: tratamiento.nombre,
         claveOdontograma: tratamiento.claveOdontograma,
         fechaAplicacion: DateTime.now(),
+        // Quién ejecuta y cuándo: sin esto la ficha de la pieza no puede decir
+        // de quién es el procedimiento que muestra (SD-142).
+        doctorEjecutaId: actual.doctorId,
+        fechaEjecucion: DateTime.now(),
       );
 
       final nuevoOdontograma = odonto.copyWith(
@@ -314,6 +371,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     SeveridadDiagnosis? severidad,
     OrigenMarcaOdontograma origen = OrigenMarcaOdontograma.preexistente,
     String notas = '',
+    String? evaluacionId,
   }) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
@@ -326,6 +384,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       notas: notas,
       superficie: diagnostico.alcance == Alcance.puntual ? superficie : null,
       origen: origen,
+      // El hallazgo cuelga del acto de evaluación (SD-135); de ahí sale el
+      // doctor que lo anotó, sin repetir la columna en esta tabla.
+      evaluacionId: evaluacionId,
+      doctorId: actual.doctorId,
       nombreDiagnostico: diagnostico.nombre,
       claveOdontograma: diagnostico.claveOdontograma,
     );
@@ -411,6 +473,55 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  /// Anota una observación clínica sobre una pieza concreta.
+  ///
+  /// Es distinta de las notas de la consulta: aquella describe la sesión y esta
+  /// describe el diente, de modo que al abrir su ficha en otra consulta lo
+  /// anotado sigue pegado a la pieza y no perdido en un párrafo de la visita.
+  /// Se guarda en `dientes.observaciones` con el resto del odontograma.
+  void actualizarNotasPieza(Diente diente, String notas) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odonto = actual.odontograma;
+    if (odonto == null) return;
+
+    final limpias = notas.trim();
+    final nuevas = limpias.isEmpty ? null : limpias;
+    final objetivo = odonto.dientes.firstWhere(
+      (d) => d.fdiCode == diente.fdiCode,
+      orElse: () => diente,
+    );
+    if (objetivo.observaciones == nuevas) return;
+
+    _emitirCambio(
+      actual.copyWith(
+        odontograma: odonto.copyWith(
+          dientes: [
+            for (final d in odonto.dientes)
+              if (d.fdiCode == diente.fdiCode)
+                // `copyWith` no puede volver a null, así que la pieza se
+                // reconstruye cuando el doctor borra la nota entera.
+                Diente(
+                  id: d.id,
+                  odontogramaId: d.odontogramaId,
+                  superficies: d.superficies,
+                  tratamientos: d.tratamientos,
+                  tratamientosHistoricos: d.tratamientosHistoricos,
+                  diagnosticosHistoricos: d.diagnosticosHistoricos,
+                  tratamientosAplicadosIds: d.tratamientosAplicadosIds,
+                  diagnosis: d.diagnosis,
+                  fdiCode: d.fdiCode,
+                  observaciones: nuevas,
+                  estaAusente: d.estaAusente,
+                )
+              else
+                d,
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Anota el odontodiagrama en memoria. Se persiste con el resto de la
   /// consulta al guardar avance o al terminarla, en la misma escritura.
   void actualizarEvaluacionOdontologica(EvaluacionOdontologica evaluacion) {
@@ -467,7 +578,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       final consultaRehidratada = await _rehidratarTratamientos(consulta);
 
-      emit(ConsultaIniciada(consulta: consultaRehidratada));
+      emit(
+        ConsultaIniciada(consulta: await _conHistorial(consultaRehidratada)),
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('Error al reanudar consulta: $e');
       emit(
@@ -476,6 +589,44 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ),
       );
     }
+  }
+
+  /// Vuelve a colgar de la boca los antecedentes del paciente.
+  ///
+  /// Al reanudar no se hacía: la consulta se recuperaba sin capa histórica, de
+  /// modo que la ficha de una pieza mostraba lo de hoy y nada más, y el doctor
+  /// no distinguía una lesión nueva de una que el paciente ya traía.
+  Future<Consulta> _conHistorial(Consulta consulta) async {
+    final odonto = consulta.odontograma;
+    final consultaId = consulta.id;
+    if (odonto == null || consultaId == null) return consulta;
+
+    final historial = await _cargarHistorial(
+      consulta.pacienteId,
+      excluyendoConsultaId: consultaId,
+    );
+
+    // Una capa que no se pudo leer se deja como estaba: sustituirla por vacío
+    // haría pasar un fallo de red por un paciente sin antecedentes.
+    final tratamientos = historial.tratamientosPorFdi;
+    final diagnosticos = historial.diagnosticosPorFdi;
+
+    return consulta.copyWith(
+      odontograma: odonto.copyWith(
+        evaluacionHistorica: historial.evaluacion,
+        dientes: [
+          for (final diente in odonto.dientes)
+            diente.copyWith(
+              tratamientosHistoricos: tratamientos == null
+                  ? null
+                  : (tratamientos[diente.fdiCode] ?? const []),
+              diagnosticosHistoricos: diagnosticos == null
+                  ? null
+                  : (diagnosticos[diente.fdiCode] ?? const []),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<Consulta> _rehidratarTratamientos(Consulta consulta) async {

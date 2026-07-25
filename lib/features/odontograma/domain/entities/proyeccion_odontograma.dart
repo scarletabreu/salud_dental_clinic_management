@@ -36,9 +36,12 @@ EvaluacionOdontologica proyectarEvaluacionOdontologica(
     // se lee en la ficha de la pieza, no se estampa debajo del de hoy.
     if (!soloDiagnosticos) {
       for (final tratamiento in diente.tratamientos) {
-        // Catálogos antiguos aún no tienen clave: se muestran como «Otro» en
-        // vez de desaparecer de la otra vista mientras la clínica los clasifica.
-        agregar(tratamiento.claveOdontograma ?? 'otro', tratamiento.superficie);
+        // Sin clave no hay símbolo que estampar: las claves del papel son un
+        // vocabulario cerrado y la mayoría del catálogo no cabe en ellas.
+        // Caerlas en «Otro» llenaba de asteriscos cada pieza con una corona o
+        // una profilaxis, y las hacía indistinguibles de lo que el doctor sí
+        // quiso marcar como «Otro». El procedimiento se lee en la ficha.
+        agregar(tratamiento.claveOdontograma, tratamiento.superficie);
       }
     }
 

@@ -14,6 +14,15 @@ class Diente {
   /// [tratamientos], la capa "esta consulta").
   final List<TratamientoAplicado> tratamientosHistoricos;
 
+  /// Hallazgos anotados en consultas ANTERIORES sobre esta misma pieza. Misma
+  /// naturaleza que [tratamientosHistoricos]: capa de solo lectura que nunca se
+  /// persiste desde aquí.
+  ///
+  /// Es lo que permite que la ficha de la pieza muestre fecha, consulta y
+  /// doctor de un antecedente. La proyección `EvaluacionOdontologica` del
+  /// odontodiagrama solo conserva la clave y la cara, así que no sirve para eso.
+  final List<DiagnosticoAplicado> diagnosticosHistoricos;
+
   /// Ids de `tratamientos_aplicados` vinculados en la BD
   /// (`dientes.tratamientos_aplicados_ids`); las entidades completas se
   /// cargan aparte cuando hacen falta.
@@ -29,6 +38,7 @@ class Diente {
     required this.superficies,
     this.tratamientos = const [],
     this.tratamientosHistoricos = const [],
+    this.diagnosticosHistoricos = const [],
     this.tratamientosAplicadosIds = const [],
     this.diagnosis = const [],
     required this.fdiCode,
@@ -41,6 +51,7 @@ class Diente {
     List<Superficie>? superficies,
     List<TratamientoAplicado>? tratamientos,
     List<TratamientoAplicado>? tratamientosHistoricos,
+    List<DiagnosticoAplicado>? diagnosticosHistoricos,
     List<String>? tratamientosAplicadosIds,
     List<DiagnosticoAplicado>? diagnosis,
     int? fdiCode,
@@ -54,6 +65,8 @@ class Diente {
       tratamientos: tratamientos ?? this.tratamientos,
       tratamientosHistoricos:
           tratamientosHistoricos ?? this.tratamientosHistoricos,
+      diagnosticosHistoricos:
+          diagnosticosHistoricos ?? this.diagnosticosHistoricos,
       tratamientosAplicadosIds:
           tratamientosAplicadosIds ?? this.tratamientosAplicadosIds,
       diagnosis: diagnosis ?? this.diagnosis,

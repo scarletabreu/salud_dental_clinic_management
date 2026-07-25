@@ -1,13 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
-HallazgoDental _caries(Set<TipoSuperficie> superficies) =>
-    HallazgoDental(estado: EstadoClinicoDental.cariada, superficies: superficies);
+HallazgoDental _caries(Set<TipoSuperficie> superficies) => HallazgoDental(
+  estado: EstadoClinicoDental.cariada,
+  superficies: superficies,
+);
 
 TratamientoAplicado _tratamiento({TipoSuperficie? superficie}) =>
     TratamientoAplicado(
@@ -47,8 +50,12 @@ void main() {
 
     test('la misma cara anotada hoy sí tapa a la histórica', () {
       final restantes = hallazgosRestantes(
-        [_caries({TipoSuperficie.mesial})],
-        [_caries({TipoSuperficie.mesial})],
+        [
+          _caries({TipoSuperficie.mesial}),
+        ],
+        [
+          _caries({TipoSuperficie.mesial}),
+        ],
       );
 
       expect(restantes, isEmpty);
@@ -59,7 +66,9 @@ void main() {
         [
           _caries({TipoSuperficie.mesial, TipoSuperficie.oclusal}),
         ],
-        [_caries({TipoSuperficie.mesial})],
+        [
+          _caries({TipoSuperficie.mesial}),
+        ],
       );
 
       expect(restantes.single.superficies, {TipoSuperficie.oclusal});
@@ -67,21 +76,28 @@ void main() {
 
     test('una clave de pieza completa tapa cualquier cara histórica', () {
       final restantes = hallazgosRestantes(
-        [_caries({TipoSuperficie.mesial})],
+        [
+          _caries({TipoSuperficie.mesial}),
+        ],
         [const HallazgoDental(estado: EstadoClinicoDental.cariada)],
       );
 
       expect(restantes, isEmpty);
     });
 
-    test('una cara anotada hoy no tapa la clave histórica de pieza completa', () {
-      final restantes = hallazgosRestantes(
-        [const HallazgoDental(estado: EstadoClinicoDental.perdida)],
-        [_caries({TipoSuperficie.mesial})],
-      );
+    test(
+      'una cara anotada hoy no tapa la clave histórica de pieza completa',
+      () {
+        final restantes = hallazgosRestantes(
+          [const HallazgoDental(estado: EstadoClinicoDental.perdida)],
+          [
+            _caries({TipoSuperficie.mesial}),
+          ],
+        );
 
-      expect(restantes.single.estado, EstadoClinicoDental.perdida);
-    });
+        expect(restantes.single.estado, EstadoClinicoDental.perdida);
+      },
+    );
 
     test('EvaluacionOdontologica.menos resta por superficie', () {
       final historica = const EvaluacionOdontologica().conHallazgos(16, [
@@ -97,27 +113,24 @@ void main() {
     });
   });
 
-  group('estadoDeSuperficie', () {
-    test('la cara tratada en esta consulta se marca como tratada', () {
+  group('marcaDeSuperficie', () {
+    test('la cara tratada en esta consulta se marca como ejecutada', () {
       final diente = _diente(
         tratamientos: [_tratamiento(superficie: TipoSuperficie.oclusal)],
       );
 
       expect(
-        estadoDeSuperficie(diente, TipoSuperficie.oclusal),
-        EstadoSuperficie.tratada,
+        marcaDeSuperficieDelDiente(diente, TipoSuperficie.oclusal)?.procedencia,
+        ProcedenciaMarca.ejecutado,
       );
-      expect(
-        estadoDeSuperficie(diente, TipoSuperficie.mesial),
-        EstadoSuperficie.sinDatos,
-      );
+      expect(marcaDeSuperficieDelDiente(diente, TipoSuperficie.mesial), isNull);
     });
 
     test('un tratamiento de pieza completa no pinta ninguna cara', () {
       final diente = _diente(tratamientos: [_tratamiento()]);
 
       for (final cara in TipoSuperficie.values) {
-        expect(estadoDeSuperficie(diente, cara), EstadoSuperficie.sinDatos);
+        expect(marcaDeSuperficieDelDiente(diente, cara), isNull);
       }
     });
 
@@ -127,8 +140,11 @@ void main() {
       );
 
       expect(
-        estadoDeSuperficie(diente, TipoSuperficie.vestibular),
-        EstadoSuperficie.historico,
+        marcaDeSuperficieDelDiente(
+          diente,
+          TipoSuperficie.vestibular,
+        )?.procedencia,
+        ProcedenciaMarca.historico,
       );
     });
 
@@ -139,8 +155,8 @@ void main() {
       );
 
       expect(
-        estadoDeSuperficie(diente, TipoSuperficie.oclusal),
-        EstadoSuperficie.tratada,
+        marcaDeSuperficieDelDiente(diente, TipoSuperficie.oclusal)?.procedencia,
+        ProcedenciaMarca.ejecutado,
       );
     });
 
@@ -151,8 +167,8 @@ void main() {
       );
 
       expect(
-        estadoDeSuperficie(diente, TipoSuperficie.oclusal),
-        EstadoSuperficie.sinDatos,
+        marcaDeSuperficieDelDiente(diente, TipoSuperficie.oclusal),
+        isNull,
       );
     });
   });

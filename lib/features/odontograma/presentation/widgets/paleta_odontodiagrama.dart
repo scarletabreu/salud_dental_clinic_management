@@ -143,31 +143,36 @@ class PaletaOdontodiagrama {
         : PaletaOdontodiagrama.claro;
   }
 
-  /// Color con el que se anota una clave sobre este papel.
-  Color tintaDe(EstadoClinicoDental estado) => switch (estado.tintaClinica) {
+  /// Cómo se ve una de las tres tintas del formulario sobre este papel.
+  Color tintaClinica(TintaClinica tinta) => switch (tinta) {
     TintaClinica.roja => tintaRoja,
     TintaClinica.azul => tintaAzul,
     TintaClinica.negra => tintaNegra,
   };
+
+  /// Color con el que se anota una clave sobre este papel.
+  Color tintaDe(EstadoClinicoDental estado) =>
+      tintaClinica(estado.tintaClinica);
 
   /// Alfa del relleno de una superficie anotada en esta consulta.
   double get alfaRelleno => esOscura ? 0.62 : 0.72;
 
   /// Cómo se estampa una marca sobre una cara del diente.
   ///
-  /// El color lo decide siempre la clave clínica —una caries es roja porque es
-  /// una caries, no porque toque—; la procedencia decide con cuánta firmeza se
-  /// dibuja. Ese reparto es lo que permite leer el mapa de superficies sin
-  /// consultar la leyenda: el tono dice *qué* y el trazo dice *cuándo*.
+  /// El color lo decide siempre la tinta clínica de la marca —una caries es
+  /// roja porque es una caries, no porque toque—; la procedencia decide con
+  /// cuánta firmeza se dibuja. Ese reparto es lo que permite leer el mapa de
+  /// superficies sin consultar la leyenda: el tono dice *qué* y el trazo dice
+  /// *cuándo*.
   ///
   /// La procedencia va además codificada en el trazo (sólido, punteado,
   /// ausente) y no solo en la opacidad, para que siga distinguiéndose impresa
   /// en blanco y negro o por quien no separa bien los tonos.
   EstiloMarcaClinica estiloDe(
-    EstadoClinicoDental clave,
+    TintaClinica tinta,
     ProcedenciaMarca procedencia,
   ) {
-    final color = tintaDe(clave);
+    final color = tintaClinica(tinta);
     return switch (procedencia) {
       ProcedenciaMarca.ejecutado => EstiloMarcaClinica(
         color: color,

@@ -156,6 +156,67 @@ void main() {
     );
   });
 
+  group('procedimiento sin clave en el catálogo', () {
+    TratamientoAplicado corona() => TratamientoAplicado(
+      tratamientoId: 't-corona',
+      esContinuo: false,
+      estaTerminado: false,
+      superficie: TipoSuperficie.oclusal,
+      nombreTratamiento: 'Corona de porcelana',
+    );
+
+    test('no se disfraza de «Otro»', () {
+      final marca = marcasDePieza(
+        fdi: 36,
+        diente: _diente(tratamientos: [corona()]),
+      ).single;
+
+      expect(marca.clave, isNull);
+      expect(marca.tipo, TipoMarcaClinica.procedimiento);
+      expect(marca.titulo, 'Corona de porcelana');
+    });
+
+    test('se tiñe de azul, como el trabajo hecho sobre la pieza', () {
+      final marca = marcasDePieza(
+        fdi: 36,
+        diente: _diente(tratamientos: [corona()]),
+      ).single;
+
+      expect(marca.tintaClinica, TintaClinica.azul);
+    });
+
+    test('un hallazgo sin clave se tiñe de rojo', () {
+      final sinClave = DiagnosticoAplicado(
+        diagnosisId: 'dx',
+        severidad: SeveridadDiagnosis.leve,
+        fechaAplicacion: DateTime(2026, 7, 25),
+        notas: '',
+        superficie: TipoSuperficie.mesial,
+        nombreDiagnostico: 'Sensibilidad',
+      );
+
+      final marca = marcasDePieza(
+        fdi: 36,
+        diente: _diente(diagnosis: [sinClave]),
+      ).single;
+
+      expect(marca.clave, isNull);
+      expect(marca.tintaClinica, TintaClinica.roja);
+    });
+
+    test('sigue tiñendo su cara aunque no tenga clave', () {
+      final marcas = marcasDePieza(
+        fdi: 36,
+        diente: _diente(tratamientos: [corona()]),
+      );
+
+      expect(
+        marcaDeSuperficie(marcas, TipoSuperficie.oclusal)?.titulo,
+        'Corona de porcelana',
+      );
+    });
+  });
+
   group('qué tiñe cada cara', () {
     test('lo ejecutado hoy manda sobre lo evaluado en la misma cara', () {
       final marcas = marcasDePieza(

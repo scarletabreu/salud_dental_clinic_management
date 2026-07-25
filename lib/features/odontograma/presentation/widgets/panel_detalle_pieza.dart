@@ -660,7 +660,7 @@ class _MapaSuperficiesPainter extends CustomPainter {
   EstiloMarcaClinica? _estilo(TipoSuperficie cara) {
     final marca = marcaPorCara[cara];
     if (marca == null) return null;
-    return paletaClinica.estiloDe(marca.claveEfectiva, marca.procedencia);
+    return paletaClinica.estiloDe(marca.tintaClinica, marca.procedencia);
   }
 
   @override
@@ -954,7 +954,7 @@ class _FilaMarca extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final tinta = paleta.tintaDe(marca.claveEfectiva);
+    final tinta = paleta.tintaClinica(marca.tintaClinica);
     final procedencia = procedenciaAtenuada(marca, ac);
     final origen = _origen(context);
 

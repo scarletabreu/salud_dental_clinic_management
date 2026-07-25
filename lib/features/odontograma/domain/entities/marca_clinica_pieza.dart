@@ -57,6 +57,13 @@ extension ProcedenciaMarcaX on ProcedenciaMarca {
   };
 }
 
+/// Qué clase de cosa es una marca, con independencia del eje del que venga.
+///
+/// Es lo que decide con qué tinta se dibuja cuando el catálogo todavía no le
+/// asignó una clave del formulario: un hallazgo describe una patología y se
+/// anota en rojo; un procedimiento es trabajo sobre la pieza y va en azul.
+enum TipoMarcaClinica { hallazgo, procedimiento }
+
 /// Una anotación del odontograma sobre una pieza o sobre una de sus caras.
 ///
 /// Unifica en una sola lectura lo que vive en tres tablas distintas para que la
@@ -68,9 +75,16 @@ class MarcaClinicaPieza {
 
   final int fdi;
 
-  /// Clave del odontograma que decide con qué tinta se dibuja. `null` cuando el
-  /// catálogo todavía no clasificó la entrada.
+  /// Clave del formulario en papel, cuando el catálogo se la asignó.
+  ///
+  /// `null` es lo normal en cuanto la clínica añade un procedimiento propio:
+  /// las claves impresas son un vocabulario cerrado y la mayoría del catálogo
+  /// no cabe en ellas. Sin clave la marca no estampa símbolo en el diagrama,
+  /// pero sigue tiñendo su cara y listándose en la ficha.
   final EstadoClinicoDental? clave;
+
+  /// Hallazgo o procedimiento. Decide la tinta cuando no hay clave.
+  final TipoMarcaClinica tipo;
 
   /// Nombre del catálogo («Resina compuesta», «Caries oclusal»).
   final String titulo;
@@ -106,6 +120,7 @@ class MarcaClinicaPieza {
     required this.titulo,
     required this.procedencia,
     required this.estado,
+    required this.tipo,
     this.clave,
     this.superficie,
     this.fecha,
@@ -118,9 +133,20 @@ class MarcaClinicaPieza {
 
   bool get esPiezaCompleta => superficie == null;
 
-  /// La tinta se elige por la clave; sin clave se cae en «Otro», que es la
-  /// entrada que el formulario reserva para lo no codificado.
-  EstadoClinicoDental get claveEfectiva => clave ?? EstadoClinicoDental.otro;
+  /// Con qué tinta se anota. El dato clínico es *cuál* de las tres, no su
+  /// valor RGB: cada papel la resuelve a su manera.
+  ///
+  /// Sin clave manda el tipo. Antes se caía en «Otro», y eso estampaba un
+  /// asterisco sobre cada pieza con un procedimiento que la clínica aún no
+  /// había clasificado —una corona, una profilaxis—, indistinguible de lo que
+  /// el doctor sí quiso marcar como «Otro». «Otro» es una elección explícita,
+  /// no el cajón de lo que falta en el catálogo.
+  TintaClinica get tintaClinica =>
+      clave?.tintaClinica ??
+      switch (tipo) {
+        TipoMarcaClinica.hallazgo => TintaClinica.roja,
+        TipoMarcaClinica.procedimiento => TintaClinica.azul,
+      };
 
   @override
   bool operator ==(Object other) =>
@@ -128,6 +154,7 @@ class MarcaClinicaPieza {
       other.id == id &&
       other.fdi == fdi &&
       other.clave == clave &&
+      other.tipo == tipo &&
       other.titulo == titulo &&
       other.superficie == superficie &&
       other.procedencia == procedencia &&
@@ -144,6 +171,7 @@ class MarcaClinicaPieza {
     id,
     fdi,
     clave,
+    tipo,
     titulo,
     superficie,
     procedencia,
@@ -215,6 +243,7 @@ List<MarcaClinicaPieza> marcasDePieza({
         MarcaClinicaPieza(
           fdi: fdi,
           clave: EstadoClinicoDental.perdida,
+          tipo: TipoMarcaClinica.hallazgo,
           titulo: EstadoClinicoDental.perdida.label,
           procedencia: ProcedenciaMarca.evaluado,
           estado: 'Pieza ausente',
@@ -241,6 +270,7 @@ List<MarcaClinicaPieza> marcasDePieza({
         id: item.id,
         fdi: fdi,
         clave: null,
+        tipo: TipoMarcaClinica.procedimiento,
         titulo:
             item.nombreTratamiento ??
             nombreTratamiento?.call(item.tratamientoId) ??
@@ -315,6 +345,7 @@ MarcaClinicaPieza _deDiagnostico(
     indiceOrigen: indice,
     fdi: fdi,
     clave: clave,
+    tipo: TipoMarcaClinica.hallazgo,
     titulo: diagnostico.nombreDiagnostico ?? clave?.label ?? 'Hallazgo',
     superficie: diagnostico.superficie,
     procedencia: procedencia,
@@ -337,11 +368,10 @@ MarcaClinicaPieza _deTratamiento(
     id: tratamiento.id,
     indiceOrigen: indice,
     fdi: fdi,
-    // Un tratamiento sin clave en el catálogo sigue siendo trabajo hecho sobre
-    // la pieza: se dibuja como «Otro» en vez de desaparecer del mapa.
-    clave:
-        EstadoClinicoDentalX.fromDb(tratamiento.claveOdontograma) ??
-        EstadoClinicoDental.otro,
+    // Sin clave se queda sin clave: no estampa símbolo en el papel, pero sigue
+    // tiñendo su cara en azul de procedimiento y apareciendo en la ficha.
+    clave: EstadoClinicoDentalX.fromDb(tratamiento.claveOdontograma),
+    tipo: TipoMarcaClinica.procedimiento,
     titulo:
         tratamiento.nombreTratamiento ??
         nombreTratamiento?.call(tratamiento.tratamientoId) ??
@@ -363,6 +393,7 @@ MarcaClinicaPieza _deHallazgo(
 ) => MarcaClinicaPieza(
   fdi: fdi,
   clave: hallazgo.estado,
+  tipo: TipoMarcaClinica.hallazgo,
   titulo: hallazgo.estado.label,
   superficie: superficie,
   procedencia: ProcedenciaMarca.historico,

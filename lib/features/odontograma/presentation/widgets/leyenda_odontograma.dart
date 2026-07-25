@@ -155,7 +155,8 @@ class MuestraProcedencia extends StatelessWidget {
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(lado),
     painter: _MuestraProcedenciaPainter(
-      estilo: paleta.estiloDe(EstadoClinicoDental.otro, procedencia),
+      // Tinta neutra a propósito: lo que esta muestra compara es el trazo.
+      estilo: paleta.estiloDe(TintaClinica.negra, procedencia),
       papel: paleta.papel,
     ),
   );

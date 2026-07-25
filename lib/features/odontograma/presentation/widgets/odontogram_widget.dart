@@ -57,7 +57,7 @@ class _OdontogramPainter extends CustomPainter {
   EstiloMarcaClinica? _estilo(int fdi) {
     final marca = marcaPorFdi[fdi];
     if (marca == null) return null;
-    return paletaClinica.estiloDe(marca.claveEfectiva, marca.procedencia);
+    return paletaClinica.estiloDe(marca.tintaClinica, marca.procedencia);
   }
 
   @override

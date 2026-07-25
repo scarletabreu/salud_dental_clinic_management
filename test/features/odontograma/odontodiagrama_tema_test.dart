@@ -299,7 +299,7 @@ void main() {
       );
 
       expect(
-        find.text('El trazo tenue viene de consultas anteriores.'),
+        find.text('Este paciente tiene antecedentes: toca una pieza para verlos.'),
         findsOneWidget,
       );
 
@@ -320,7 +320,7 @@ void main() {
       await _montar(tester, tema: AppTheme.light);
 
       expect(
-        find.text('El trazo tenue viene de consultas anteriores.'),
+        find.text('Este paciente tiene antecedentes: toca una pieza para verlos.'),
         findsNothing,
       );
     });

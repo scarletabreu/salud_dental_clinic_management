@@ -124,6 +124,13 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   bool get _editando =>
       widget.editable && !widget.modoImpresion && widget.dientes.isNotEmpty;
 
+  /// Tocar una pieza abre su ficha también en solo lectura: ahí es donde ahora
+  /// viven los antecedentes, así que el expediente tiene que poder abrirla. Sin
+  /// piezas ni historial no hay ficha que abrir, y la hoja de impresión nunca
+  /// responde al toque.
+  bool get _tocable =>
+      !widget.modoImpresion && (widget.dientes.isNotEmpty || _hayHistorico);
+
   /// Los tejidos blandos siguen siendo texto libre sobre la evaluación.
   bool get _anotandoTejidos =>
       widget.editable && !widget.modoImpresion && widget.onChanged != null;
@@ -131,7 +138,9 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   PaletaOdontodiagrama get _paleta =>
       PaletaOdontodiagrama.de(context, imprimir: widget.modoImpresion);
 
-  bool get _hayHistorico => !widget.historico.estaVacia;
+  bool get _hayHistorico =>
+      !widget.historico.estaVacia ||
+      widget.dientes.values.any((d) => d.tratamientosHistoricos.isNotEmpty);
 
   @override
   void initState() {
@@ -173,7 +182,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   /// parte incómoda; ahora la cara se elige en el mapa grande del panel, que
   /// es el mismo que usa la arcada.
   void _tocarPieza(int fdi) {
-    if (!_editando) return;
+    if (!_tocable) return;
     setState(() => _fdiSeleccionado = _fdiSeleccionado == fdi ? null : fdi);
   }
 
@@ -259,6 +268,8 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
           _editando
               ? 'Toca un diente para abrir su ficha: ahí eliges la cara y le '
                     'asignas diagnósticos o tratamientos.'
+              : _tocable
+              ? 'Toca un diente para ver su ficha y sus antecedentes.'
               : 'Nomenclatura FDI · dentición permanente y temporal',
           style: TextStyle(
             color: paleta.apoyoSobreTarjeta(context),
@@ -289,6 +300,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     key: ValueKey('panel_pieza_$fdi'),
     fdi: fdi,
     diente: widget.dientes[fdi],
+    hallazgosHistoricos: _historicoDe(fdi),
     editMode: _editando,
     onClose: () => setState(() => _fdiSeleccionado = null),
     onAddDiagnosis: widget.onAddDiagnosis,
@@ -434,7 +446,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
       historicos: _historicoDe(fdi),
       lado: lado,
       paleta: paleta,
-      editable: _editando,
+      tocable: _tocable,
       seleccionada: _fdiSeleccionado == fdi,
       onTap: () => _tocarPieza(fdi),
     );
@@ -504,7 +516,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  'El trazo tenue viene de consultas anteriores.',
+                  'Este paciente tiene antecedentes: toca una pieza para verlos.',
                   style: TextStyle(
                     color: paleta.textoVacio,
                     fontSize: 11,
@@ -675,10 +687,16 @@ class OdontodiagramaPapel extends StatelessWidget {
 class _PiezaDental extends StatefulWidget {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
+
+  /// Antecedentes de la pieza. No se dibujan —el papel solo lleva la tinta de
+  /// hoy—; alimentan la descripción accesible y el tooltip, y el detalle
+  /// completo vive en la ficha que abre el toque.
   final List<HallazgoDental> historicos;
   final double lado;
   final PaletaOdontodiagrama paleta;
-  final bool editable;
+
+  /// Si el toque abre la ficha de la pieza. Falso solo en la hoja de impresión.
+  final bool tocable;
 
   /// La pieza cuyo panel está abierto se mantiene resaltada, para no perderla
   /// de vista mientras se trabaja en el panel.
@@ -692,7 +710,7 @@ class _PiezaDental extends StatefulWidget {
     required this.historicos,
     required this.lado,
     required this.paleta,
-    required this.editable,
+    required this.tocable,
     required this.seleccionada,
     required this.onTap,
   });
@@ -730,13 +748,12 @@ class _PiezaDentalState extends State<_PiezaDental> {
       painter: GlifoPiezaPainter(
         glifo: widget.glifo,
         hallazgos: widget.hallazgos,
-        historicos: widget.historicos,
         paleta: widget.paleta,
         resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
       ),
     );
 
-    if (widget.editable) {
+    if (widget.tocable) {
       pieza = MouseRegion(
         cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
@@ -750,7 +767,7 @@ class _PiezaDentalState extends State<_PiezaDental> {
     }
 
     return Semantics(
-      button: widget.editable,
+      button: widget.tocable,
       label: _descripcion,
       child: Tooltip(
         message: _descripcion,

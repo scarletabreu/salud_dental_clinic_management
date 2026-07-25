@@ -327,10 +327,24 @@ void main() {
         diagrama.historico.de(36).single.estado,
         EstadoClinicoDental.perdida,
       );
-      // La capa histórica se anuncia, para que el trazo tenue no se confunda
-      // con algo anotado hoy.
+      // El papel solo lleva la tinta de hoy: el historial se anuncia y se
+      // consulta al tocar la pieza.
       expect(
-        find.text('El trazo tenue viene de consultas anteriores.'),
+        find.text(
+          'Este paciente tiene antecedentes: toca una pieza para verlos.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('pieza_36')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HISTÓRICO'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(PanelDetallePieza),
+          matching: find.text('Pérdida'),
+        ),
         findsOneWidget,
       );
     });

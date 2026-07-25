@@ -13,12 +13,14 @@ import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/dom
 Diente _diente({
   List<DiagnosticoAplicado> diagnosticos = const [],
   List<TratamientoAplicado> tratamientos = const [],
+  List<TratamientoAplicado> historicos = const [],
 }) => Diente(
   odontogramaId: 'o-1',
   fdiCode: 74,
   superficies: const [],
   diagnosis: diagnosticos,
   tratamientos: tratamientos,
+  tratamientosHistoricos: historicos,
 );
 
 void main() {
@@ -51,6 +53,36 @@ void main() {
       final hallazgo = odontograma.evaluacionProyectada.de(74).single;
       expect(hallazgo.estado, EstadoClinicoDental.restaurada);
       expect(hallazgo.superficies, {TipoSuperficie.oclusal});
+    });
+
+    test('un tratamiento de consultas anteriores no se dibuja en el papel', () {
+      final odontograma = Odontograma(
+        consultaId: 'c-1',
+        dientes: [
+          _diente(
+            historicos: [
+              // Sin clave en el catálogo: antes caía en «Otro» y estampaba un
+              // asterisco sobre cada pieza con historial.
+              TratamientoAplicado(
+                tratamientoId: 't-viejo',
+                esContinuo: false,
+                estaTerminado: true,
+              ),
+              TratamientoAplicado(
+                tratamientoId: 't-viejo-2',
+                esContinuo: false,
+                estaTerminado: true,
+                superficie: TipoSuperficie.oclusal,
+                claveOdontograma: 'restaurada',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      // El historial se consulta en la ficha de la pieza, no en el dibujo.
+      expect(odontograma.evaluacionProyectada.de(74), isEmpty);
+      expect(odontograma.dientes.single.tratamientosHistoricos, hasLength(2));
     });
 
     test('pérdida normalizada deja la pieza ausente en la arcada', () {

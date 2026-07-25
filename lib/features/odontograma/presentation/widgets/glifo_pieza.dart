@@ -155,16 +155,14 @@ class GlifoPieza {
   }
 }
 
-/// Dibuja el glifo de una pieza con sus hallazgos encima.
+/// Dibuja el glifo de una pieza con los hallazgos de esta consulta encima.
 ///
-/// Se pintan dos capas: primero [historicos] —lo anotado en consultas
-/// anteriores, en tinta tenue— y encima [hallazgos], lo de esta consulta a
-/// plena tinta. Es la misma convención que la capa histórica del odontograma de
-/// tratamientos: presente, pero claramente en segundo plano.
+/// Una sola capa a plena tinta: lo anotado hoy. Los antecedentes ya no se
+/// estampan en tinta tenue sobre la pieza —con una boca muy tratada el papel
+/// se llenaba de marcas repetidas—; se leen en la ficha de la pieza al tocarla.
 class GlifoPiezaPainter extends CustomPainter {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
-  final List<HallazgoDental> historicos;
   final PaletaOdontodiagrama paleta;
 
   /// Realce de foco/hover; no forma parte del dibujo clínico.
@@ -174,7 +172,6 @@ class GlifoPiezaPainter extends CustomPainter {
     required this.glifo,
     required this.hallazgos,
     required this.paleta,
-    this.historicos = const [],
     this.resalte,
   });
 
@@ -190,9 +187,6 @@ class GlifoPiezaPainter extends CustomPainter {
       canvas.drawPath(exterior, Paint()..color = resalte!);
     }
 
-    if (historicos.isNotEmpty) {
-      _pintarSuperficies(canvas, lado, historicos, paleta.alfaHistorico);
-    }
     _pintarSuperficies(canvas, lado, hallazgos, paleta.alfaRelleno);
 
     final lapiz = Paint()
@@ -207,7 +201,6 @@ class GlifoPiezaPainter extends CustomPainter {
       canvas.drawLine(desde, hasta, lapiz);
     }
 
-    _pintarMarcasDePieza(canvas, lado, exterior, historicos, historico: true);
     _pintarMarcasDePieza(canvas, lado, exterior, hallazgos);
   }
 
@@ -238,10 +231,9 @@ class GlifoPiezaPainter extends CustomPainter {
     Canvas canvas,
     double lado,
     Path exterior,
-    List<HallazgoDental> capa, {
-    bool historico = false,
-  }) {
-    final alfa = historico ? paleta.alfaHistorico : paleta.alfaRelleno;
+    List<HallazgoDental> capa,
+  ) {
+    final alfa = paleta.alfaRelleno;
     for (final hallazgo in capa) {
       final estado = hallazgo.estado;
       final tinta = paleta.tintaDe(estado);
@@ -256,7 +248,7 @@ class GlifoPiezaPainter extends CustomPainter {
         canvas,
         lado: lado,
         marca: estado.marca,
-        tinta: historico ? tinta.withValues(alpha: 0.42) : tinta,
+        tinta: tinta,
         recorte: exterior,
         alfaRelleno: alfa,
       );
@@ -268,8 +260,7 @@ class GlifoPiezaPainter extends CustomPainter {
       old.paleta != paleta ||
       old.resalte != resalte ||
       old.glifo.fdi != glifo.fdi ||
-      !listEquals(old.hallazgos, hallazgos) ||
-      !listEquals(old.historicos, historicos);
+      !listEquals(old.hallazgos, hallazgos);
 }
 
 /// Traza una de las claves del formulario sobre un lienzo de [lado] píxeles.

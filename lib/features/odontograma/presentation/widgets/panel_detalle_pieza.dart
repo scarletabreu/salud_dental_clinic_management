@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
@@ -196,6 +197,12 @@ class PanelDetallePieza extends StatefulWidget {
   final int fdi;
   final Diente? diente;
   final bool editMode;
+
+  /// Claves anotadas sobre esta pieza en consultas anteriores. El diagrama ya
+  /// no las dibuja en tinta tenue —llenaba el papel de marcas en una boca muy
+  /// tratada—, así que este panel es donde se consultan.
+  final List<HallazgoDental> hallazgosHistoricos;
+
   final VoidCallback onClose;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
@@ -210,6 +217,7 @@ class PanelDetallePieza extends StatefulWidget {
     required this.diente,
     required this.editMode,
     required this.onClose,
+    this.hallazgosHistoricos = const [],
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
@@ -339,6 +347,7 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
 
           _InfoPieza(
             diente: d,
+            hallazgosHistoricos: widget.hallazgosHistoricos,
             editMode: widget.editMode,
             selectedSurface: _selectedSurface,
             onAddDiagnosis: widget.onAddDiagnosis,
@@ -562,6 +571,7 @@ class _MapaSuperficiesPainter extends CustomPainter {
 
 class _InfoPieza extends StatelessWidget {
   final Diente? diente;
+  final List<HallazgoDental> hallazgosHistoricos;
   final bool editMode;
   final TipoSuperficie? selectedSurface;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
@@ -572,6 +582,7 @@ class _InfoPieza extends StatelessWidget {
 
   const _InfoPieza({
     required this.diente,
+    required this.hallazgosHistoricos,
     required this.editMode,
     required this.selectedSurface,
     required this.onAddDiagnosis,
@@ -585,11 +596,15 @@ class _InfoPieza extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final d = diente;
-    if (d == null ||
-        (d.diagnosis.isEmpty &&
-            d.tratamientos.isEmpty &&
-            d.tratamientosHistoricos.isEmpty &&
-            !editMode)) {
+    final tratamientosHistoricos =
+        d?.tratamientosHistoricos ?? const <TratamientoAplicado>[];
+    final hayHistorico =
+        tratamientosHistoricos.isNotEmpty || hallazgosHistoricos.isNotEmpty;
+    final hayAnotacionDeHoy =
+        d != null && (d.diagnosis.isNotEmpty || d.tratamientos.isNotEmpty);
+    // Sin pieza normalizada no hay nada que editar, pero sus antecedentes —que
+    // el diagrama ya no dibuja— siguen mereciendo mostrarse.
+    if (!hayAnotacionDeHoy && !hayHistorico && !(editMode && d != null)) {
       return Text(
         'Sin datos registrados',
         style: TextStyle(fontSize: 12, color: ac.textDisabled),
@@ -599,7 +614,7 @@ class _InfoPieza extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (d.diagnosis.isNotEmpty) ...[
+        if (d != null && d.diagnosis.isNotEmpty) ...[
           Text(
             'DIAGNÓSTICOS',
             style: TextStyle(
@@ -672,7 +687,7 @@ class _InfoPieza extends StatelessWidget {
           ),
           if (d.tratamientos.isNotEmpty) const SizedBox(height: 12),
         ],
-        if (d.tratamientos.isNotEmpty) ...[
+        if (d != null && d.tratamientos.isNotEmpty) ...[
           Text(
             'TRATAMIENTOS',
             style: TextStyle(
@@ -700,9 +715,8 @@ class _InfoPieza extends StatelessWidget {
             ),
           ),
         ],
-        if (d.tratamientosHistoricos.isNotEmpty) ...[
-          if (d.diagnosis.isNotEmpty || d.tratamientos.isNotEmpty)
-            const SizedBox(height: 12),
+        if (hayHistorico) ...[
+          if (hayAnotacionDeHoy) const SizedBox(height: 12),
           Row(
             children: [
               Icon(Icons.history_rounded, size: 13, color: ac.textMuted),
@@ -724,7 +738,8 @@ class _InfoPieza extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          ...d.tratamientosHistoricos.map(
+          ...hallazgosHistoricos.map((h) => _HallazgoHistoricoRow(hallazgo: h)),
+          ...tratamientosHistoricos.map(
             (t) => _TratamientoHistoricoRow(
               nombre:
                   t.nombreTratamiento ??
@@ -734,7 +749,9 @@ class _InfoPieza extends StatelessWidget {
             ),
           ),
         ],
-        if (d.observaciones != null && d.observaciones!.isNotEmpty) ...[
+        if (d != null &&
+            d.observaciones != null &&
+            d.observaciones!.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(
             d.observaciones!,
@@ -745,7 +762,7 @@ class _InfoPieza extends StatelessWidget {
             ),
           ),
         ],
-        if (editMode) ...[
+        if (editMode && d != null) ...[
           const SizedBox(height: 14),
           Divider(height: 1, color: ac.divider),
           const SizedBox(height: 12),
@@ -917,6 +934,42 @@ class _TratamientoAplicadoRow extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Historic finding row (clave del odontodiagrama de consultas anteriores)
+// ─────────────────────────────────────────────
+
+/// «Restaurada · oclusal, mesial», o solo la clave cuando es de la pieza
+/// entera. Es lo que antes se estampaba en tinta tenue sobre el papel.
+class _HallazgoHistoricoRow extends StatelessWidget {
+  final HallazgoDental hallazgo;
+
+  const _HallazgoHistoricoRow({required this.hallazgo});
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final caras = hallazgo.superficies.map((s) => s.name).join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(Icons.history_rounded, size: 14, color: ac.textMuted),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              caras.isEmpty
+                  ? hallazgo.estado.label
+                  : '${hallazgo.estado.label} · $caras',
+              style: TextStyle(fontSize: 12, color: ac.textMuted),
+            ),
+          ),
         ],
       ),
     );

@@ -8,6 +8,12 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/enums/
 /// El formulario no es un segundo almacén: solo consume esta proyección. Los
 /// tejidos blandos siguen viniendo de `evaluacion_clinica`, porque no cuelgan
 /// de una pieza ni de un catálogo.
+///
+/// Solo se proyecta lo de **esta** consulta. Los antecedentes
+/// (`Diente.tratamientosHistoricos`) no se dibujan: un tratamiento viejo sin
+/// clave en el catálogo caía en «Otro» y estampaba un asterisco sobre cada
+/// pieza con historial, indistinguible de lo anotado hoy. El historial se lee
+/// en la ficha de la pieza, al tocarla.
 EvaluacionOdontologica proyectarEvaluacionOdontologica(
   Odontograma odontograma,
 ) {
@@ -28,9 +34,6 @@ EvaluacionOdontologica proyectarEvaluacionOdontologica(
     for (final tratamiento in diente.tratamientos) {
       // Catálogos antiguos aún no tienen clave: se muestran como «Otro» en
       // vez de desaparecer de la otra vista mientras la clínica los clasifica.
-      agregar(tratamiento.claveOdontograma ?? 'otro', tratamiento.superficie);
-    }
-    for (final tratamiento in diente.tratamientosHistoricos) {
       agregar(tratamiento.claveOdontograma ?? 'otro', tratamiento.superficie);
     }
 

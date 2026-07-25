@@ -87,3 +87,55 @@ select c.relname, t.tgname, p.proname
 
 1. Ejecutar `supabase/schema.sql` (estructura base).
 2. Aplicar las migraciones en orden: `supabase db push --linked`.
+3. Cargar los datos de desarrollo: `supabase/seed.sql` (lo aplica `supabase db reset`).
+
+---
+
+## 🌱 Seeds
+
+`supabase/seed.sql` deja **un día de caja completo**: la caja de ayer cerrada con un
+faltante de RD$ 120.00 y la caja de hoy abierta con ingresos y egresos mezclados
+(esperado RD$ 27 349.75). Sirve para abrir la pantalla de caja y ver el cierre real
+sin cobrar a mano.
+
+Es idempotente: si ya existe una caja con la fecha de hoy, no inserta nada. Y ese
+27 349.75 está duplicado a propósito en
+`test/features/caja_diaria/cerrar_caja_test.dart`: si el seed y las pruebas dejan de
+coincidir, es que el cálculo contable se movió en un solo lado.
+
+---
+
+## 🧪 Pruebas de base de datos
+
+Los triggers y las RPC no los cubre la suite de Flutter. `supabase/tests/` guarda
+scripts SQL **auto-verificantes**: corren dentro de una transacción que se revierte,
+así que no dejan datos, y abortan con `ERROR` si el contrato se rompe.
+
+| Script | Qué verifica |
+|---|---|
+| `tests/sd_111_trigger_caja_test.sql` | `pagos_registrar_ingreso_caja`: un pago `completado` genera **un** ingreso en la caja abierta de hoy; un pago pendiente no la toca; sin caja abierta el pago se rechaza (P0001) y no se persiste; la caja de ayer no habilita el cobro de hoy; no revivió el trigger duplicado `tr_pago_a_movimiento_caja`. |
+
+```bash
+# Contra la base local levantada por el CLI
+supabase db reset
+psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" \
+  -v ON_ERROR_STOP=1 -f supabase/tests/sd_111_trigger_caja_test.sql
+
+# Contra una instancia remota (usar SIEMPRE una de staging, nunca producción)
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/sd_111_trigger_caja_test.sql
+```
+
+Salida esperada: una línea `NOTICE  OK ...` por caso y un `ROLLBACK` final. Cualquier
+`ERROR` es un fallo real del trigger, no del script.
+
+### Verificación manual equivalente
+
+Si no hay `psql` a mano, el mismo contrato se comprueba desde la app en cinco pasos:
+
+1. **Sin caja abierta**, cobrar una cuenta desde la pre-factura → debe fallar con
+   *"No hay una caja abierta para hoy"* y la cuenta debe quedar sin pago.
+2. Abrir la caja con RD$ 5000 → la pantalla muestra esperado RD$ 5000.
+3. Cobrar RD$ 1500 → aparece **un solo** movimiento *"Cobro a cuenta"* de RD$ 1500 y el
+   esperado sube a RD$ 6500. Si aparecen dos movimientos, hay un trigger duplicado.
+4. Registrar un egreso de RD$ 500 → esperado RD$ 6000.
+5. Cerrar contando RD$ 5900 → el reporte debe decir **faltante de RD$ 100.00**.

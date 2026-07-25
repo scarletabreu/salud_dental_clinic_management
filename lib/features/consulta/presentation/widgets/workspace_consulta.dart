@@ -7,9 +7,10 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_receta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/tarjeta_consulta.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
@@ -223,7 +224,41 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
         }
 
         if (consulta.odontograma == null) {
-          return const Center(child: Text('Odontograma no disponible'));
+          // La consulta se crea con sus 32 piezas, así que llegar aquí
+          // significa que la carga falló: hay que decirlo, no dejar una
+          // pantalla en blanco que parezca «este paciente no tiene nada».
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 32,
+                    color: ac.textDisabled,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No se pudo cargar el odontograma de esta consulta.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Vuelve a abrir la consulta; si persiste, revisa la '
+                    'conexión con el servidor.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: ac.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         final odontograma = consulta.odontograma!;
@@ -232,6 +267,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           (sum, d) => sum + d.tratamientos.length,
         );
         final cargando = state is ConsultaGuardando;
+        final guardado = state is ConsultaIniciada
+            ? state.guardado
+            : EstadoGuardado.guardando;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
@@ -284,6 +322,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     ],
                   ),
                 ),
+                _IndicadorGuardado(estado: guardado),
+                if (totalTratamientos > 0) const SizedBox(width: 8),
                 if (totalTratamientos > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -318,184 +358,88 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
             const SizedBox(height: 24),
 
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: ac.cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
-                boxShadow: [ac.cardShadow],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: ac.teal.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          size: 17,
+            TarjetaConsulta(
+              icon: Icons.assignment_outlined,
+              iconColor: ac.indigo,
+              titulo: 'Odontograma',
+              subtitulo:
+                  'Anota hallazgos en el formulario o asigna tratamientos en '
+                  'la arcada: es la misma boca en dos vistas',
+              child: VistasOdontograma(
+                odontograma: odontograma,
+                editable: true,
+                onEvaluacionChanged: context
+                    .read<ConsultaCubit>()
+                    .actualizarEvaluacionOdontologica,
+                onAddTratamiento: _onAddTratamiento,
+                onToggleAusente: _onToggleAusente,
+                onQuitarTratamiento: _onQuitarTratamiento,
+                onToggleTratamientoTerminado: _onToggleTerminado,
+                nombreTratamiento: _nombreTratamiento,
+                accion: _cargandoCatalogo
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: ac.teal,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Odontograma',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: ac.textPrimary,
-                                height: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Toca un diente para asignar tratamientos',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: ac.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_cargandoCatalogo)
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: ac.teal,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  OdontogramWidget(
-                    odontograma: odontograma,
-                    editMode: true,
-                    onAddTratamiento: _onAddTratamiento,
-                    onToggleAusente: _onToggleAusente,
-                    onQuitarTratamiento: _onQuitarTratamiento,
-                    onToggleTratamientoTerminado: _onToggleTerminado,
-                    nombreTratamiento: _nombreTratamiento,
-                  ),
-                ],
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 16),
 
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: ac.cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
-                boxShadow: [ac.cardShadow],
+            TarjetaConsulta(
+              icon: Icons.edit_note_rounded,
+              iconColor: ac.indigo,
+              titulo: 'Notas clínicas',
+              subtitulo: 'Observaciones para el expediente',
+              // La consulta ya se guarda sola; el botón solo adelanta la
+              // escritura para quien prefiere confirmarlo a mano.
+              accion: TextButton.icon(
+                onPressed: cargando || guardado == EstadoGuardado.guardando
+                    ? null
+                    : () => context.read<ConsultaCubit>().guardarParcial(),
+                icon: const Icon(Icons.save_outlined, size: 16),
+                label: const Text('Guardar ahora'),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: ac.indigo.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.edit_note_rounded,
-                          size: 17,
-                          color: ac.indigo,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Notas clínicas',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: ac.textPrimary,
-                              height: 1,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Observaciones para el expediente',
-                            style: TextStyle(fontSize: 11, color: ac.textMuted),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: cargando
-                            ? null
-                            : () => context
-                                  .read<ConsultaCubit>()
-                                  .guardarParcial(),
-                        icon: const Icon(Icons.save_outlined, size: 16),
-                        label: const Text('Guardar avance'),
-                      ),
-                    ],
+              child: TextField(
+                controller: _notasController,
+                minLines: 4,
+                maxLines: 7,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: ac.textPrimary,
+                  height: 1.5,
+                ),
+                decoration: InputDecoration(
+                  hintText:
+                      'Observaciones, hallazgos adicionales, indicaciones…',
+                  hintStyle: TextStyle(
+                    color: ac.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
                   ),
-                  const SizedBox(height: 16),
-                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _notasController,
-                    minLines: 4,
-                    maxLines: 7,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: ac.textPrimary,
-                      height: 1.5,
-                    ),
-                    decoration: InputDecoration(
-                      hintText:
-                          'Observaciones, hallazgos adicionales, indicaciones…',
-                      hintStyle: TextStyle(
-                        color: ac.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      filled: true,
-                      fillColor: ac.bgPage,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 13,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: ac.divider),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: ac.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: ac.indigo, width: 1.5),
-                      ),
-                    ),
+                  filled: true,
+                  fillColor: ac.bgPage,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
                   ),
-                ],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: ac.divider),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: ac.divider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: ac.indigo, width: 1.5),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -559,6 +503,74 @@ class _TerminarButton extends StatelessWidget {
               )
             : const Icon(Icons.check_circle_outline_rounded, size: 20),
         label: Text(cargando ? 'Finalizando…' : 'Terminar consulta'),
+      ),
+    );
+  }
+}
+
+/// Estado del autoguardado, siempre visible en la cabecera de la consulta.
+///
+/// El doctor tiene que poder saber de un vistazo si lo que acaba de anotar ya
+/// está a salvo, sin abrir nada ni acordarse de pulsar un botón.
+class _IndicadorGuardado extends StatelessWidget {
+  final EstadoGuardado estado;
+
+  const _IndicadorGuardado({required this.estado});
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final (color, icono, texto) = switch (estado) {
+      EstadoGuardado.alDia => (ac.green, Icons.cloud_done_outlined, 'Guardado'),
+      EstadoGuardado.pendiente => (
+        ac.textMuted,
+        Icons.cloud_queue_rounded,
+        'Sin guardar',
+      ),
+      EstadoGuardado.guardando => (
+        ac.textMuted,
+        Icons.cloud_sync_outlined,
+        'Guardando…',
+      ),
+      EstadoGuardado.fallido => (
+        ac.red,
+        Icons.cloud_off_rounded,
+        'No se pudo guardar',
+      ),
+    };
+
+    return Tooltip(
+      message: switch (estado) {
+        EstadoGuardado.alDia => 'Todo el trabajo de esta consulta está en el '
+            'servidor.',
+        EstadoGuardado.pendiente => 'Hay cambios que se guardarán solos en unos '
+            'segundos.',
+        EstadoGuardado.guardando => 'Escribiendo los cambios en el servidor.',
+        EstadoGuardado.fallido => 'Los cambios siguen aquí y se reintentará '
+            'solo. No cierres la consulta.',
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icono, size: 12, color: color),
+            const SizedBox(width: 5),
+            Text(
+              texto,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

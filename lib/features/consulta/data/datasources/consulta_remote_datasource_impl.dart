@@ -8,8 +8,8 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   static const _selectConsulta =
       '*, recetas(*), documentos_clinicos(*), '
-      'odontograma:odontogramas(id, consulta_id, '
-      'dientes(id, odontograma_id, fdi_code, observaciones, '
+      'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
+      'dientes(id, odontograma_id, fdi_code, observaciones, esta_ausente, '
       'tratamientos_aplicados_ids))';
 
   @override
@@ -39,11 +39,12 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
-  Future<void> guardarResultadoConsulta({
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
-    required Map<int, List<Map<String, dynamic>>> tratamientosPorFdi,
+    required Map<int, Map<String, dynamic>> dientesPorFdi,
     required List<Map<String, dynamic>> recetas,
+    required Map<String, dynamic> evaluacionOdontologica,
     String? notas,
     Map<String, dynamic>? signosVitales,
     bool? finalizada,
@@ -72,70 +73,144 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     if (recetas.isNotEmpty) {
       await supabaseClient.from('recetas').insert([
         for (final r in recetas)
-          {
-            ...r,
-            'consulta_id': consultaId,
-            'updated_at': now,
-          },
+          {...r, 'consulta_id': consultaId, 'updated_at': now},
       ]);
     }
 
     final odontograma = await supabaseClient
         .from('odontogramas')
-        .select('id, dientes(id, fdi_code, tratamientos_aplicados_ids)')
+        .select(
+          'id, dientes(id, fdi_code, esta_ausente, observaciones, '
+          'tratamientos_aplicados_ids)',
+        )
         .eq('consulta_id', consultaId)
         .isFilter('deleted_at', null)
         .maybeSingle();
     if (odontograma == null) {
-      if (tratamientosPorFdi.isEmpty) return;
+      if (dientesPorFdi.isEmpty) return const {};
       throw Exception('No se encontró el odontograma de la consulta.');
     }
 
-    final dientes = odontograma['dientes'] as List;
-
     await supabaseClient
-        .from('tratamientos_aplicados')
-        .delete()
-        .eq('consulta_id', consultaId);
+        .from('odontogramas')
+        .update({
+          'evaluacion_clinica': evaluacionOdontologica,
+          'updated_at': now,
+        })
+        .eq('id', odontograma['id'] as String);
+
+    final dientes = odontograma['dientes'] as List;
+    final idsPorFdi = <int, List<String>>{};
 
     for (final d in dientes) {
       final fdi = (d['fdi_code'] as num).toInt();
       final dienteId = d['id'] as String;
       final actualesIds =
           (d['tratamientos_aplicados_ids'] as List?)?.cast<String>() ??
-          const [];
-      final filas = tratamientosPorFdi[fdi] ?? const [];
+          const <String>[];
 
-      if (filas.isEmpty && actualesIds.isEmpty) continue;
+      final entrante = dientesPorFdi[fdi];
+      final filas =
+          (entrante?['tratamientos'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      final ausente = entrante?['esta_ausente'] as bool? ?? false;
+      final observaciones = entrante?['observaciones'] as String?;
 
-      var nuevosIds = const <String>[];
-      if (filas.isNotEmpty) {
-        final insertados = await supabaseClient
-            .from('tratamientos_aplicados')
-            .insert([
-              for (final fila in filas)
-                {
-                  ...fila,
-                  'diente_id': dienteId,
-                  'consulta_id': consultaId,
-                  'created_at': now,
-                  'updated_at': now,
-                },
-            ])
-            .select('id');
-        nuevosIds = [
-          for (final row in insertados as List) row['id'] as String,
-        ];
-      }
+      final cambioEstadoPieza =
+          ausente != (d['esta_ausente'] as bool? ?? false) ||
+          observaciones != d['observaciones'] as String?;
+
+      if (filas.isEmpty && actualesIds.isEmpty && !cambioEstadoPieza) continue;
+
+      final idsFinales = await _reconciliarTratamientos(
+        consultaId: consultaId,
+        dienteId: dienteId,
+        filas: filas,
+        actualesIds: actualesIds,
+        now: now,
+      );
+      if (idsFinales.isNotEmpty) idsPorFdi[fdi] = idsFinales;
 
       await supabaseClient
           .from('dientes')
           .update({
-            'tratamientos_aplicados_ids': nuevosIds,
+            'tratamientos_aplicados_ids': idsFinales,
+            'esta_ausente': ausente,
+            'observaciones': observaciones,
             'updated_at': now,
           })
           .eq('id', dienteId);
     }
+
+    return idsPorFdi;
+  }
+
+  /// Lleva las filas de `tratamientos_aplicados` de un diente al estado que
+  /// describe [filas], conservando los ids de las que ya existían.
+  ///
+  /// Antes esto era un `delete` de toda la consulta seguido de un `insert`:
+  /// cada guardado parcial reescribía los mismos tratamientos con ids nuevos,
+  /// de modo que nada podía referenciarlos y el rastro se perdía.
+  Future<List<String>> _reconciliarTratamientos({
+    required String consultaId,
+    required String dienteId,
+    required List<Map<String, dynamic>> filas,
+    required List<String> actualesIds,
+    required String now,
+  }) async {
+    final conservados = <String>{
+      for (final fila in filas)
+        if (fila['id'] case final String id) id,
+    };
+
+    // Lo que el doctor quitó se anula, no se borra.
+    final anulados = actualesIds.where((id) => !conservados.contains(id));
+    if (anulados.isNotEmpty) {
+      await supabaseClient
+          .from('tratamientos_aplicados')
+          .update({'deleted_at': now, 'updated_at': now})
+          .inFilter('id', anulados.toList());
+    }
+
+    final idsFinales = <String>[];
+    final porInsertar = <int, Map<String, dynamic>>{};
+
+    for (var i = 0; i < filas.length; i++) {
+      final fila = Map<String, dynamic>.from(filas[i]);
+      final id = fila.remove('id') as String?;
+      final campos = {
+        ...fila,
+        'diente_id': dienteId,
+        'consulta_id': consultaId,
+        'updated_at': now,
+      };
+
+      if (id == null) {
+        porInsertar[i] = {...campos, 'created_at': now};
+        idsFinales.add('');
+        continue;
+      }
+      await supabaseClient
+          .from('tratamientos_aplicados')
+          .update(campos)
+          .eq('id', id);
+      idsFinales.add(id);
+    }
+
+    if (porInsertar.isNotEmpty) {
+      final insertados =
+          await supabaseClient
+                  .from('tratamientos_aplicados')
+                  .insert(porInsertar.values.toList())
+                  .select('id')
+              as List;
+      final posiciones = porInsertar.keys.toList();
+      for (var i = 0; i < posiciones.length; i++) {
+        idsFinales[posiciones[i]] = insertados[i]['id'] as String;
+      }
+    }
+
+    return idsFinales;
   }
 
   @override
@@ -221,6 +296,31 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     }
 
     final response = await query.order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    var query = supabaseClient
+        .from('odontogramas')
+        .select('evaluacion_clinica, consulta:consultas!inner(paciente_id, fecha)')
+        .eq('consulta.paciente_id', pacienteId)
+        .isFilter('deleted_at', null);
+
+    if (excluyendoConsultaId != null) {
+      query = query.neq('consulta_id', excluyendoConsultaId);
+    }
+
+    // De la más reciente a la más antigua: al consolidar gana la primera que
+    // anota cada pieza, es decir la última palabra del doctor.
+    final response = await query.order(
+      'fecha',
+      referencedTable: 'consulta',
+      ascending: false,
+    );
     return List<Map<String, dynamic>>.from(response as List);
   }
 

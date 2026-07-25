@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -90,10 +91,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<String> finalizarConsulta({
-    required String consultaId,
-    String? nota,
-  }) {
+  Future<String> finalizarConsulta({required String consultaId, String? nota}) {
     return runGuarded(
       () => remoteDataSource.finalizarConsulta(
         consultaId: consultaId,
@@ -104,7 +102,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<void> guardarResultadoConsulta({
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -114,30 +112,39 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     bool? finalizada,
   }) {
     return runGuarded(() async {
-      final tratamientosPorFdi = <int, List<Map<String, dynamic>>>{
+      final dientesPorFdi = <int, Map<String, dynamic>>{
         for (final diente in odontograma.dientes)
-          if (diente.tratamientos.isNotEmpty)
-            diente.fdiCode: [
+          diente.fdiCode: {
+            'esta_ausente': diente.estaAusente,
+            'observaciones': diente.observaciones,
+            'tratamientos': [
               for (final t in diente.tratamientos)
                 {
+                  if (t.id != null) 'id': t.id,
                   'tratamiento_id': t.tratamientoId,
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
                   'superficie': t.superficie?.name.toLowerCase(),
                   'precio_aplicado': t.precioAplicado,
+                  // La justificación clínica de una contraindicación viaja
+                  // aquí. Sin ella el expediente diría que el tratamiento se
+                  // aplicó a ciegas.
+                  'notas': t.notas,
                 },
             ],
+          },
       };
 
       final recetasJson = [
         for (final r in recetas) RecetaModel.fromEntity(r).toJson(),
       ];
 
-      await remoteDataSource.guardarResultadoConsulta(
+      return remoteDataSource.guardarResultadoConsulta(
         consultaId: consultaId,
         pacienteId: pacienteId,
-        tratamientosPorFdi: tratamientosPorFdi,
+        dientesPorFdi: dientesPorFdi,
         recetas: recetasJson,
+        evaluacionOdontologica: odontograma.evaluacionToJson(),
         notas: notas,
         signosVitales: signosVitales,
         finalizada: finalizada,
@@ -149,7 +156,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<Map<String, TratamientoAplicadoDetalle>>
   getDetalleTratamientosAplicados(List<String> ids) {
     return runGuarded(() async {
-      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(ids);
+      final filas = await remoteDataSource.fetchTratamientosAplicadosPorIds(
+        ids,
+      );
       return {
         for (final fila in filas)
           if (fila['id'] != null)
@@ -192,6 +201,22 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       }
       return porFdi;
     }, context: 'obtener los tratamientos históricos');
+  }
+
+  @override
+  Future<EvaluacionOdontologica> getEvaluacionHistorica(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchEvaluacionesPaciente(
+        pacienteId,
+        excluyendoConsultaId: excluyendoConsultaId,
+      );
+      return EvaluacionOdontologica.consolidar(
+        filas.map((f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica'])),
+      );
+    }, context: 'obtener el odontodiagrama histórico');
   }
 
   @override

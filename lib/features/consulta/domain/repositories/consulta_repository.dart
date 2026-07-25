@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
@@ -18,7 +18,13 @@ abstract class ConsultaRepository {
     String? nota,
   });
 
-  Future<void> guardarResultadoConsulta({
+  /// Persiste el odontograma, las recetas y las notas de la consulta.
+  ///
+  /// Devuelve, por código FDI, los ids de los tratamientos aplicados en el
+  /// mismo orden en que se enviaron: sellarlos sobre el estado en memoria es
+  /// lo que permite que el siguiente guardado actualice esas filas en vez de
+  /// crear duplicados.
+  Future<Map<int, List<String>>> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -33,6 +39,13 @@ abstract class ConsultaRepository {
 
   Future<Map<int, List<TratamientoAplicado>>>
   getTratamientosHistoricosPorDiente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  });
+
+  /// Consolida los odontodiagramas anteriores del paciente en una sola
+  /// evaluación, para dibujarlos como capa histórica bajo la de hoy.
+  Future<EvaluacionOdontologica> getEvaluacionHistorica(
     String pacienteId, {
     String? excluyendoConsultaId,
   });

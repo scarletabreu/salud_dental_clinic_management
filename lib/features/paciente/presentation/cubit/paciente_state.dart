@@ -29,10 +29,18 @@ class PacienteDetailLoading extends PacienteState {
 class PacienteDetailLoaded extends PacienteState {
   final Paciente paciente;
 
-  const PacienteDetailLoaded(this.paciente);
+  /// El paciente cargó pero su historial de consultas no. Sin esta distinción
+  /// un fallo de red se ve igual que un paciente sin consultas, y el expediente
+  /// afirma que no hay odontograma cuando en realidad no pudo leerlo.
+  final bool historialNoDisponible;
+
+  const PacienteDetailLoaded(
+    this.paciente, {
+    this.historialNoDisponible = false,
+  });
 
   @override
-  List<Object?> get props => [paciente];
+  List<Object?> get props => [paciente, historialNoDisponible];
 }
 
 class PacienteError extends PacienteState {

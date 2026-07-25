@@ -27,6 +27,11 @@ class _PacienteCubitDoble extends Cubit<PacienteState>
   @override
   Future<void> loadParaConsulta(String id) async {}
 
+  /// La página consulta esto en `initState` para decidir si pide el registro
+  /// completo; el doble responde que el paciente ya está registrado.
+  @override
+  Future<bool> isPaciente(String id) async => true;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }

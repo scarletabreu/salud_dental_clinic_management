@@ -244,17 +244,11 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
             subtitle: 'Presión, pulso, temperatura y saturación (opcionales)',
             child: Row(
               children: [
-                Expanded(
-                  child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg'),
-                ),
+                Expanded(child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg'),
-                ),
+                Expanded(child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm'),
-                ),
+                Expanded(child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm')),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _campoVital(
@@ -265,9 +259,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(ac, _saturacionCtrl, 'Sat %'),
-                ),
+                Expanded(child: _campoVital(ac, _saturacionCtrl, 'Sat %')),
               ],
             ),
           ),
@@ -293,20 +285,19 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     TextEditingController ctrl,
     String hint, {
     bool decimal = false,
-  }) =>
-      TextField(
-        controller: ctrl,
-        keyboardType: decimal
-            ? const TextInputType.numberWithOptions(decimal: true)
-            : TextInputType.number,
-        inputFormatters: [
-          decimal
-              ? FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
-              : FilteringTextInputFormatter.digitsOnly,
-        ],
-        decoration: _fieldDecoration(c, hint: hint),
-        textAlign: TextAlign.center,
-      );
+  }) => TextField(
+    controller: ctrl,
+    keyboardType: decimal
+        ? const TextInputType.numberWithOptions(decimal: true)
+        : TextInputType.number,
+    inputFormatters: [
+      decimal
+          ? FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+          : FilteringTextInputFormatter.digitsOnly,
+    ],
+    decoration: _fieldDecoration(c, hint: hint),
+    textAlign: TextAlign.center,
+  );
 
   InputDecoration _fieldDecoration(AppColors ac, {required String hint}) =>
       InputDecoration(

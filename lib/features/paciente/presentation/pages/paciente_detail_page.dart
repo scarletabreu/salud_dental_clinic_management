@@ -110,7 +110,10 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           }
 
           if (state is PacienteDetailLoaded) {
-            return _buildContent(state.paciente);
+            return _buildContent(
+              state.paciente,
+              historialNoDisponible: state.historialNoDisponible,
+            );
           }
 
           return const SizedBox.shrink();
@@ -119,7 +122,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildContent(Paciente p) {
+  Widget _buildContent(Paciente p, {bool historialNoDisponible = false}) {
     final sorted = [...p.record.consultas]
       ..sort((a, b) => b.fecha.compareTo(a.fecha));
 
@@ -169,7 +172,10 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             },
           ),
           const SizedBox(height: 16),
-          OdontogramArchWidget(consultas: sorted),
+          OdontogramArchWidget(
+            consultas: sorted,
+            historialNoDisponible: historialNoDisponible,
+          ),
           const SizedBox(height: 16),
           _buildTimelineCard(sorted),
           const SizedBox(height: 24),

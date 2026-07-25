@@ -5,14 +5,24 @@ import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_expediente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 
-/// Odontograma read-only de la consulta y el desglose de tratamientos por
-/// diente (nombre + precio congelado, cargados por [ConsultaDetalleCubit]).
+/// El odontograma archivado de la consulta —en cualquiera de sus dos vistas— y
+/// el desglose de tratamientos por diente (nombre + precio congelado, cargados
+/// por [ConsultaDetalleCubit]).
+///
+/// La vista de formulario se dibuja sobre papel blanco y con botón de imprimir,
+/// porque el expediente es lo que sale por la impresora.
 class OdontogramaTratamientosDetalle extends StatelessWidget {
   final Consulta consulta;
+  final String nombrePaciente;
 
-  const OdontogramaTratamientosDetalle({super.key, required this.consulta});
+  const OdontogramaTratamientosDetalle({
+    super.key,
+    required this.consulta,
+    required this.nombrePaciente,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,40 +42,40 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             .toList()
           ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OdontogramWidget(odontograma: odontograma),
-        const SizedBox(height: 16),
-        if (dientesConTratamientos.isEmpty)
-          Text(
-            'No se registraron tratamientos en esta consulta.',
-            style: TextStyle(color: ac.textMuted, fontSize: 13),
-          )
-        else
-          BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
-            builder: (context, state) {
-              if (state is! ConsultaDetalleListo) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+    return VistasOdontograma(
+      odontograma: odontograma,
+      formularioPersonalizado: OdontodiagramaExpediente(
+        evaluacion: odontograma.evaluacion,
+        nombrePaciente: nombrePaciente,
+        fecha: consulta.fecha,
+      ),
+      pie: dientesConTratamientos.isEmpty
+          ? Text(
+              'No se registraron tratamientos en esta consulta.',
+              style: TextStyle(color: ac.textMuted, fontSize: 13),
+            )
+          : BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
+              builder: (context, state) {
+                if (state is! ConsultaDetalleListo) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
-                  ),
+                  );
+                }
+                return Column(
+                  children: [
+                    for (final diente in dientesConTratamientos)
+                      _filaDiente(context, diente, state),
+                  ],
                 );
-              }
-              return Column(
-                children: [
-                  for (final diente in dientesConTratamientos)
-                    _filaDiente(context, diente, state),
-                ],
-              );
-            },
-          ),
-      ],
+              },
+            ),
     );
   }
 

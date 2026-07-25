@@ -82,7 +82,10 @@ class ConsultaDetallePage extends StatelessWidget {
                   'Odontograma y tratamientos',
                   Icons.healing_rounded,
                   ac.teal,
-                  OdontogramaTratamientosDetalle(consulta: consulta),
+                  OdontogramaTratamientosDetalle(
+                    consulta: consulta,
+                    nombrePaciente: nombrePaciente,
+                  ),
                 ),
                 if (consulta.tieneRecetas) ...[
                   const SizedBox(height: 16),

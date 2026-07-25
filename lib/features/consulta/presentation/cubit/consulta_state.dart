@@ -13,16 +13,43 @@ class ConsultaInactiva extends ConsultaState {
   const ConsultaInactiva();
 }
 
+/// En qué punto está el autoguardado del trabajo clínico. Se muestra en la
+/// pantalla: el doctor tiene que poder saber, sin preguntar, si lo que acaba
+/// de anotar ya está a salvo.
+enum EstadoGuardado {
+  /// No hay nada sin guardar.
+  alDia,
+
+  /// Hay cambios en memoria esperando al autoguardado.
+  pendiente,
+
+  /// Escribiendo en el servidor.
+  guardando,
+
+  /// El último intento falló; los cambios siguen en memoria.
+  fallido,
+}
+
 /// La consulta está activa en memoria. Contiene el odontograma, recetas, notas y signos vitales.
 class ConsultaIniciada extends ConsultaState {
   final Consulta consulta;
 
+  /// Estado del autoguardado de [consulta].
+  final EstadoGuardado guardado;
+
   const ConsultaIniciada({
     required this.consulta,
+    this.guardado = EstadoGuardado.alDia,
   });
 
+  ConsultaIniciada copyWith({Consulta? consulta, EstadoGuardado? guardado}) =>
+      ConsultaIniciada(
+        consulta: consulta ?? this.consulta,
+        guardado: guardado ?? this.guardado,
+      );
+
   @override
-  List<Object?> get props => [consulta];
+  List<Object?> get props => [consulta, guardado];
 }
 
 /// Guardando la consulta (parcial o finalización).

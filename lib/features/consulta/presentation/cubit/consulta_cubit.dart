@@ -282,7 +282,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         tratamientoId: tratamiento.id ?? '',
         esContinuo: false,
         estaTerminado: false,
-        superficie: superficie,
+        // El catálogo manda: una corona es de la pieza entera, y guardarle la
+        // cara que el doctor tenía marcada la haría aparecer como si tratara
+        // solo esa cara. Alcance de arcada y de boca completa no cuelgan de un
+        // diente y quedan fuera de este camino.
+        superficie: tratamiento.alcance == Alcance.puntual ? superficie : null,
         precioAplicado: tratamiento.costo,
         notas: justificacionClinica,
         nombreTratamiento: tratamiento.nombre,
@@ -416,124 +420,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     _emitirCambio(
       actual.copyWith(
         odontograma: odontograma.copyWith(
-          evaluacion: EvaluacionOdontologica(
-            tejidosBlandos: evaluacion.tejidosBlandos,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Convierte la edición del formulario en filas normalizadas. El JSON solo
-  /// retiene tejidos blandos; al volver a construir la pantalla, el mismo
-  /// resultado se proyecta desde estas entidades sobre el papel.
-  void sincronizarHallazgosFormulario(
-    EvaluacionOdontologica evaluacion, {
-    required Map<String, Diagnosis> diagnosticosPorClave,
-    required Map<String, Tratamiento> tratamientosPorClave,
-  }) {
-    if (state is! ConsultaIniciada) return;
-    final actual = state as ConsultaIniciada;
-    final odontograma = actual.consulta.odontograma;
-    if (odontograma == null) return;
-
-    final dientes = <Diente>[];
-    for (final diente in odontograma.dientes) {
-      final deseados = evaluacion.de(diente.fdiCode);
-      final clavesPapel = EstadoClinicoDental.values
-          .map((estado) => estado.dbValue)
-          .toSet();
-      final otrosDiagnosticos = diente.diagnosis
-          .where(
-            (diagnostico) =>
-                !clavesPapel.contains(diagnostico.claveOdontograma),
-          )
-          .toList();
-      final otrosTratamientos = diente.tratamientos
-          .where(
-            (tratamiento) =>
-                tratamiento.claveOdontograma != 'extraccion_indicada',
-          )
-          .toList();
-      final diagnosticos = <DiagnosticoAplicado>[...otrosDiagnosticos];
-      final tratamientos = <TratamientoAplicado>[...otrosTratamientos];
-
-      for (final hallazgo in deseados) {
-        final clave = hallazgo.estado.dbValue;
-        final diagnostico = diagnosticosPorClave[clave];
-        if (diagnostico != null) {
-          final superficies = hallazgo.estado.esPorSuperficie
-              ? hallazgo.superficies.cast<TipoSuperficie?>()
-              : const <TipoSuperficie?>[null];
-          if (hallazgo.estado.esPorSuperficie && superficies.isEmpty) continue;
-          for (final superficie in superficies) {
-            final existente = diente.diagnosis.where(
-              (aplicado) =>
-                  aplicado.claveOdontograma == clave &&
-                  aplicado.superficie ==
-                      (hallazgo.estado.esPorSuperficie ? superficie : null),
-            );
-            if (existente.isNotEmpty) {
-              diagnosticos.add(existente.first);
-              continue;
-            }
-            final yaRepresentadoPorTratamiento = diente.tratamientos.any(
-              (tratamiento) =>
-                  tratamiento.claveOdontograma == clave &&
-                  tratamiento.superficie ==
-                      (hallazgo.estado.esPorSuperficie ? superficie : null),
-            );
-            if (yaRepresentadoPorTratamiento) continue;
-            diagnosticos.add(
-              DiagnosticoAplicado(
-                diagnosisId: diagnostico.id ?? '',
-                severidad: diagnostico.severidadDefault,
-                fechaAplicacion: DateTime.now(),
-                notas: hallazgo.detalle ?? '',
-                superficie: hallazgo.estado.esPorSuperficie ? superficie : null,
-                nombreDiagnostico: diagnostico.nombre,
-                claveOdontograma: clave,
-              ),
-            );
-          }
-        }
-        if (clave == 'extraccion_indicada') {
-          final tratamiento = tratamientosPorClave[clave];
-          if (tratamiento != null) {
-            final existente = diente.tratamientos.where(
-              (aplicado) => aplicado.claveOdontograma == clave,
-            );
-            tratamientos.add(
-              existente.isNotEmpty
-                  ? existente.first
-                  : TratamientoAplicado(
-                      tratamientoId: tratamiento.id ?? '',
-                      esContinuo: false,
-                      estaTerminado: false,
-                      precioAplicado: tratamiento.costo,
-                      notas: hallazgo.detalle,
-                      estado: EstadoTratamientoAplicado.indicado,
-                      nombreTratamiento: tratamiento.nombre,
-                      claveOdontograma: clave,
-                    ),
-            );
-          }
-        }
-      }
-      dientes.add(
-        diente.copyWith(
-          diagnosis: diagnosticos,
-          tratamientos: tratamientos,
-          estaAusente: deseados.any(
-            (hallazgo) => hallazgo.estado == EstadoClinicoDental.perdida,
-          ),
-        ),
-      );
-    }
-    _emitirCambio(
-      actual.consulta.copyWith(
-        odontograma: odontograma.copyWith(
-          dientes: dientes,
           evaluacion: EvaluacionOdontologica(
             tejidosBlandos: evaluacion.tejidosBlandos,
           ),

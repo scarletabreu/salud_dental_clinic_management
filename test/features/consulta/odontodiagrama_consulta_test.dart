@@ -116,7 +116,25 @@ class _CitaRepositorioDoble extends _Vacio implements CitaRepository {}
 class _TratamientoRepositorioDoble extends _Vacio
     implements TratamientoRepository {
   @override
-  Future<List<Tratamiento>> getCatalogoTratamientos() async => const [];
+  Future<List<Tratamiento>> getCatalogoTratamientos() async => [
+    Tratamiento(
+      id: 'trat-resina',
+      nombre: 'Resina compuesta',
+      descripcion: '',
+      costo: 2500,
+      contraindicaciones: const [],
+      alcance: Alcance.puntual,
+      claveOdontograma: 'restaurada',
+    ),
+    Tratamiento(
+      id: 'trat-corona',
+      nombre: 'Corona',
+      descripcion: '',
+      costo: 12000,
+      contraindicaciones: const [],
+      alcance: Alcance.diente,
+    ),
+  ];
 }
 
 class _DiagnosticoRepositorioDoble extends _Vacio
@@ -317,29 +335,125 @@ void main() {
       );
     });
 
-    testWidgets('anotar una pieza llega al estado de la consulta', (
-      tester,
-    ) async {
+    /// Abre el panel de una pieza desde el formulario y marca una cara.
+    Future<void> abrirPieza(WidgetTester tester, int fdi) async {
+      await tester.tap(find.byKey(ValueKey('pieza_$fdi')));
+      await tester.pumpAndSettle();
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('mapa_superficies'))),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Diente pieza(int fdi) => (cubit.state as ConsultaIniciada)
+        .consulta
+        .odontograma!
+        .dientes
+        .firstWhere((diente) => diente.fdiCode == fdi);
+
+    /// Deja correr el autoguardado: cualquier cambio arma su temporizador y el
+    /// test no puede terminar con uno pendiente.
+    Future<void> drenarAutoguardado(WidgetTester tester) async {
+      await tester.pump(ConsultaCubit.esperaAutoguardado);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('asignar un tratamiento desde el formulario llega al estado '
+        'de la consulta', (tester) async {
       await montar(tester);
+      await abrirPieza(tester, 16);
 
-      await tester.tap(find.byKey(const ValueKey('pieza_16')));
-      await tester.pump();
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Resina compuesta'));
+      await tester.pumpAndSettle();
 
-      final estado = cubit.state as ConsultaIniciada;
-      final diagnostico = estado.consulta.odontograma!.dientes
-          .firstWhere((diente) => diente.fdiCode == 16)
-          .diagnosis
-          .single;
-      expect(diagnostico.claveOdontograma, 'cariada');
-      expect(diagnostico.superficie, TipoSuperficie.oclusal);
+      final aplicado = pieza(16).tratamientos.single;
+      expect(aplicado.tratamientoId, 'trat-resina');
+      expect(aplicado.precioAplicado, 2500);
+      // El centro de un posterior es la cara oclusal.
+      expect(aplicado.superficie, TipoSuperficie.oclusal);
 
-      // Anotar deja la consulta pendiente y el autoguardado la escribe solo,
-      // sin que el doctor pulse nada.
-      expect(estado.guardado, EstadoGuardado.pendiente);
+      // Lo asignado en el formulario se proyecta al dibujo sin recargar, que es
+      // lo mismo que ve la arcada.
+      final proyectada = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .evaluacionProyectada;
+      expect(proyectada.de(16).single.estado, EstadoClinicoDental.restaurada);
+
+      // Asignar deja la consulta pendiente y el autoguardado la escribe solo.
+      expect(
+        (cubit.state as ConsultaIniciada).guardado,
+        EstadoGuardado.pendiente,
+      );
       await tester.pump(ConsultaCubit.esperaAutoguardado);
       await tester.pumpAndSettle();
       expect(repo.escrituras, 1);
       expect((cubit.state as ConsultaIniciada).guardado, EstadoGuardado.alDia);
+    });
+
+    testWidgets('un tratamiento de pieza completa ignora la cara marcada', (
+      tester,
+    ) async {
+      await montar(tester);
+      await abrirPieza(tester, 16);
+
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Corona'));
+      await tester.pumpAndSettle();
+
+      // La cara estaba marcada, pero el catálogo dice que la corona es de la
+      // pieza entera: guardarla en oclusal la haría parecer una cara tratada.
+      expect(pieza(16).tratamientos.single.superficie, isNull);
+      await drenarAutoguardado(tester);
+    });
+
+    testWidgets('asignar un diagnóstico desde el formulario llega al estado '
+        'de la consulta', (tester) async {
+      await montar(tester);
+      await abrirPieza(tester, 16);
+
+      await tester.tap(find.text('Diagnóstico'));
+      await tester.pumpAndSettle();
+      // «Cariada» también es una clave de la leyenda impresa: se toca la fila
+      // del catálogo, no la del papel.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ListTile),
+          matching: find.text('Cariada'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Asignar diagnóstico'),
+      );
+      await tester.pumpAndSettle();
+
+      final diagnostico = pieza(16).diagnosis.single;
+      expect(diagnostico.claveOdontograma, 'cariada');
+      expect(diagnostico.superficie, TipoSuperficie.oclusal);
+      expect(diagnostico.severidad, SeveridadDiagnosis.moderada);
+      await drenarAutoguardado(tester);
+    });
+
+    testWidgets('marcar la pieza ausente desde el formulario la deja perdida '
+        'en las dos vistas', (tester) async {
+      await montar(tester);
+      await tester.tap(find.byKey(const ValueKey('pieza_36')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ausente'));
+      await tester.pumpAndSettle();
+
+      expect(pieza(36).estaAusente, isTrue);
+      final proyectada = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .evaluacionProyectada;
+      expect(proyectada.de(36).single.estado, EstadoClinicoDental.perdida);
+      await drenarAutoguardado(tester);
     });
   });
 }

@@ -170,6 +170,19 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                     historico: widget.odontograma.evaluacionHistorica,
                     editable: widget.editable,
                     onChanged: widget.onEvaluacionChanged,
+                    // Las mismas piezas y los mismos callbacks que la arcada:
+                    // el panel de detalle es el mismo widget en las dos vistas.
+                    dientes: {
+                      for (final diente in widget.odontograma.dientes)
+                        diente.fdiCode: diente,
+                    },
+                    onAddDiagnosis: widget.onAddDiagnosis,
+                    onAddTratamiento: widget.onAddTratamiento,
+                    onToggleAusente: widget.onToggleAusente,
+                    onQuitarTratamiento: widget.onQuitarTratamiento,
+                    onToggleTratamientoTerminado:
+                        widget.onToggleTratamientoTerminado,
+                    nombreTratamiento: widget.nombreTratamiento,
                   ),
             VistaOdontograma.arcada => OdontogramWidget(
               odontograma: widget.odontograma,

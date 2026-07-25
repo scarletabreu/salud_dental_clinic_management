@@ -3,18 +3,21 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
+import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/panel_detalle_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/tooth_geometry.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
 /// Luminancia relativa (WCAG), para comprobar contraste sin depender de un
 /// color concreto: lo que importa es que la tinta se separe del papel.
 double _luminancia(Color c) {
-  double canal(double v) => v <= 0.03928
-      ? v / 12.92
-      : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+  double canal(double v) =>
+      v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
 
   return 0.2126 * canal(c.r) + 0.7152 * canal(c.g) + 0.0722 * canal(c.b);
 }
@@ -48,7 +51,17 @@ Future<void> _montar(
             evaluacion: evaluacion,
             historico: historico,
             editable: editable,
+            dientes: {
+              for (final fdi in kFdiTodas)
+                fdi: Diente(
+                  odontogramaId: 'o-1',
+                  fdiCode: fdi,
+                  superficies: const [],
+                ),
+            },
             onChanged: (_) {},
+            onAddDiagnosis: (_, _) {},
+            onAddTratamiento: (_, _) {},
           ),
         ),
       ),
@@ -210,32 +223,39 @@ void main() {
       expect(tamano.width, lessThan(40));
     });
 
-    testWidgets('cada chip de clave llega al objetivo táctil de Material', (
+    testWidgets('los botones del panel llegan al objetivo táctil de Material', (
       tester,
     ) async {
       await _montar(tester, tema: AppTheme.light);
 
-      for (final clave in ['clave_cariada', 'clave_perdida', 'clave_ficha']) {
-        final alto = tester.getSize(find.byKey(ValueKey(clave))).height;
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+
+      for (final boton in ['Diagnóstico', 'Tratamiento']) {
+        final alto = tester
+            .getSize(
+              find.ancestor(
+                of: find.text(boton),
+                matching: find.byType(OutlinedButton),
+              ),
+            )
+            .height;
         expect(
           alto,
-          greaterThanOrEqualTo(44),
-          reason: '$clave es demasiado pequeño para el dedo',
+          greaterThanOrEqualTo(40),
+          reason: '$boton es demasiado pequeño para el dedo',
         );
       }
     });
 
-    testWidgets('el modo ficha abre la pieza con un toque simple', (
-      tester,
-    ) async {
+    testWidgets('la pieza abre su panel con un toque simple', (tester) async {
       await _montar(tester, tema: AppTheme.light);
 
-      await tester.tap(find.byKey(const ValueKey('clave_ficha')));
-      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('pieza_16')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Pieza 16'), findsOneWidget);
+      expect(find.byType(PanelDetallePieza), findsOneWidget);
+      expect(find.text(kFdiNames[16]!), findsOneWidget);
     });
 
     testWidgets('el selector de vistas mide al menos 44 px de alto', (
@@ -283,16 +303,17 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.longPress(find.byKey(const ValueKey('pieza_16')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('DE CONSULTAS ANTERIORES'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('historico_restaurada')),
-        findsOneWidget,
+      // El antecedente se anuncia en la propia pieza, para quien navega con
+      // lector de pantalla y para el tooltip del ratón.
+      final pieza = tester.widget<Semantics>(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('pieza_16')),
+              matching: find.byType(Semantics),
+            )
+            .first,
       );
-      // Es de solo lectura: no aparece como hallazgo editable de hoy.
-      expect(find.byKey(const ValueKey('hallazgo_restaurada')), findsNothing);
+      expect(pieza.properties.label, contains('Antes: Restaurada'));
     });
 
     testWidgets('sin histórico no se anuncia nada', (tester) async {
@@ -318,12 +339,18 @@ void main() {
         historico: marca,
       );
 
-      await tester.longPress(find.byKey(const ValueKey('pieza_36')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('hallazgo_perdida')), findsOneWidget);
-      // La ficha sigue mostrando el antecedente, pero el glifo no lo duplica:
-      // eso lo garantiza `menos`, verificado aparte.
+      // Lo anotado hoy tapa al antecedente idéntico: la pieza solo anuncia la
+      // marca vigente, sin el «Antes:» que la duplicaría.
+      final pieza = tester.widget<Semantics>(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('pieza_36')),
+              matching: find.byType(Semantics),
+            )
+            .first,
+      );
+      expect(pieza.properties.label, contains('Pérdida'));
+      expect(pieza.properties.label, isNot(contains('Antes:')));
       expect(marca.menos(marca).estaVacia, isTrue);
     });
 

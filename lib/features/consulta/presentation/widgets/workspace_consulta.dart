@@ -101,22 +101,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     );
   }
 
+  /// El odontodiagrama ya solo emite tejidos blandos: las claves dentales se
+  /// anotan como diagnósticos y tratamientos desde el panel de la pieza, igual
+  /// que en la arcada.
   void _onEvaluacionChanged(EvaluacionOdontologica evaluacion) {
-    final diagnosticosPorClave = {
-      for (final diagnostico in _catalogoDiagnosticos)
-        if (diagnostico.claveOdontograma != null)
-          diagnostico.claveOdontograma!: diagnostico,
-    };
-    final tratamientosPorClave = {
-      for (final tratamiento in _catalogo)
-        if (tratamiento.claveOdontograma != null)
-          tratamiento.claveOdontograma!: tratamiento,
-    };
-    context.read<ConsultaCubit>().sincronizarHallazgosFormulario(
-      evaluacion,
-      diagnosticosPorClave: diagnosticosPorClave,
-      tratamientosPorClave: tratamientosPorClave,
-    );
+    context.read<ConsultaCubit>().actualizarEvaluacionOdontologica(evaluacion);
   }
 
   @override
@@ -215,21 +204,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     );
   }
 
+  /// La ausencia se guarda en la pieza; la proyección la dibuja como «Pérdida»
+  /// en el formulario, así que las dos vistas siguen contando lo mismo.
   void _onToggleAusente(Diente diente, bool ausente) {
-    final odontograma =
-        (context.read<ConsultaCubit>().state as ConsultaIniciada)
-            .consulta
-            .odontograma;
-    if (odontograma == null) return;
-    final actual = odontograma.evaluacionProyectada;
-    final tienePerdida = actual
-        .de(diente.fdiCode)
-        .any((hallazgo) => hallazgo.estado == EstadoClinicoDental.perdida);
-    if (ausente != tienePerdida) {
-      _onEvaluacionChanged(
-        actual.alternar(diente.fdiCode, EstadoClinicoDental.perdida),
-      );
-    }
+    context.read<ConsultaCubit>().toggleDienteAusente(diente, ausente);
   }
 
   String _nombreTratamiento(String tratamientoId) =>

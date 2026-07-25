@@ -92,12 +92,17 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           final cubit = sl<DashboardCubit>();
           final authState = context.read<AuthCubit>().state;
           final usuario = authState.usuario;
+
+          // Extrae el nombre real del usuario (Doctor o cualquier otro rol)
+          String? nombreUsuario;
+          if (usuario != null) {
+            nombreUsuario = '${usuario.nombre} ${usuario.apellido}'.trim();
+          }
+
           cubit.load(
             roles: authState.roles,
             doctorId: usuario is Doctor ? usuario.id : null,
-            doctorName: usuario is Doctor
-                ? '${usuario.nombre} ${usuario.apellido}'
-                : null,
+            doctorName: nombreUsuario,
           );
           return cubit;
         },
@@ -106,12 +111,15 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
               previous.usuario != current.usuario,
           listener: (context, authState) {
             final usuario = authState.usuario;
+            String? nombreUsuario;
+            if (usuario != null) {
+              nombreUsuario = '${usuario.nombre} ${usuario.apellido}'.trim();
+            }
+
             context.read<DashboardCubit>().load(
               roles: authState.roles,
               doctorId: usuario is Doctor ? usuario.id : null,
-              doctorName: usuario is Doctor
-                  ? '${usuario.nombre} ${usuario.apellido}'
-                  : null,
+              doctorName: nombreUsuario,
             );
           },
           child: InicioPage(
@@ -119,6 +127,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
             onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
             onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
             onNavigateToConfiguracion: () => _navigateToLabel('Configuración'),
+            onNavigateToInventario: () => _navigateToLabel('Inventario'),
+            onNavigateToCaja: () => _navigateToLabel('Caja'),
           ),
         ),
       ),

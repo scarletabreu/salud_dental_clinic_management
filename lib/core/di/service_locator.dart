@@ -33,12 +33,15 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/get_directorio_suplidores.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/eliminar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/usecases/registrar_egreso_caja.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/guardar_suplidor.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 
@@ -403,11 +406,14 @@ Future<void> init() async {
       eliminarConsultaUseCase: EliminarConsultaUseCase(repository: sl()),
     ),
   );
+
   sl.registerFactory<DashboardCubit>(
     () => DashboardCubit(
       citaRepository: sl(),
       pacienteRepository: sl(),
       medicinaRepository: sl(),
+      consumibleRepository: sl(),
+      cajaDiariaRepository: sl(),
     ),
   );
   sl.registerFactory<PersonalPerfilesCubit>(
@@ -511,4 +517,17 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton(() => RegistrarEgresoCaja(sl()));
+
+  // Use Cases Suplidor
+  sl.registerLazySingleton(() => GuardarSuplidor(sl()));
+  sl.registerLazySingleton(() => EliminarSuplidor(sl()));
+
+  // Cubit Suplidor
+  sl.registerFactory(
+    () => SuplidorCubit(
+      getDirectorio: sl(),
+      guardarSuplidor: sl(),
+      eliminarSuplidor: sl(),
+    ),
+  );
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
@@ -10,15 +11,71 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/enums/
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_state.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/entities/suplidor.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/widgets/suplidores_tab_view.dart';
 
-class InventarioPage extends StatefulWidget {
+class InventarioPage extends StatelessWidget {
   const InventarioPage({super.key});
 
   @override
-  State<InventarioPage> createState() => _InventarioPageState();
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        appBar: AppBar(
+          backgroundColor: ac.cardBg,
+          elevation: 0,
+          toolbarHeight: 0, // Oculta la barra de herramientas superior nativa
+          bottom: TabBar(
+            labelColor: ac.primaryBlue,
+            unselectedLabelColor: ac.textSecondary,
+            indicatorColor: ac.primaryBlue,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.inventory_2_outlined, size: 20),
+                text: 'Consumibles',
+              ),
+              Tab(
+                icon: Icon(Icons.local_shipping_outlined, size: 20),
+                text: 'Suplidores',
+              ),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            const _ConsumiblesTabBody(),
+            BlocProvider<SuplidorCubit>(
+              create: (_) => sl<SuplidorCubit>(),
+              child: const SuplidoresTabView(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _InventarioPageState extends State<InventarioPage> {
+// ══════════════════════════════════════════════════════════════════════════
+// VISTA PESTAÑA: CONSUMIBLES (INVENTARIO)
+// ══════════════════════════════════════════════════════════════════════════
+
+class _ConsumiblesTabBody extends StatefulWidget {
+  const _ConsumiblesTabBody();
+
+  @override
+  State<_ConsumiblesTabBody> createState() => _ConsumiblesTabBodyState();
+}
+
+class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
   final _searchController = TextEditingController();
   Timer? _debounce;
 
@@ -49,22 +106,19 @@ class _InventarioPageState extends State<InventarioPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      body: SafeArea(
-        child: BlocBuilder<InventarioCubit, InventarioState>(
-          builder: (context, state) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context, state, colorScheme, ac),
-                if (state is InventarioLoaded)
-                  _buildFilterChips(context, state, colorScheme),
-                Expanded(child: _buildBody(context, state, colorScheme, ac)),
-              ],
-            );
-          },
-        ),
+    return SafeArea(
+      child: BlocBuilder<InventarioCubit, InventarioState>(
+        builder: (context, state) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(context, state, colorScheme, ac),
+              if (state is InventarioLoaded)
+                _buildFilterChips(context, state, colorScheme),
+              Expanded(child: _buildBody(context, state, colorScheme, ac)),
+            ],
+          );
+        },
       ),
     );
   }
@@ -711,7 +765,7 @@ class _EstadoBadge extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// DIÁLOGOS ESTILIZADOS
+// DIÁLOGOS ESTILIZADOS PARA CONSUMIBLES
 // -----------------------------------------------------------------------------
 
 Future<void> _mostrarDialogoFormulario(
@@ -727,7 +781,7 @@ Future<void> _mostrarDialogoFormulario(
     text: consumible?.descripcion ?? '',
   );
   final precioController = TextEditingController(
-    text: consumible?.precio.toStringAsFixed(2) ?? '',
+    text: consumible != null ? consumible.precio.toStringAsFixed(2) : '',
   );
   final stockInicialController = TextEditingController(
     text: consumible?.stockActual.toString() ?? '0',
@@ -738,185 +792,290 @@ Future<void> _mostrarDialogoFormulario(
   String? suplidorId = consumible?.suplidorId;
   final formKey = GlobalKey<FormState>();
 
+  final ac = context.appColors;
+
   final nuevoItem = await showDialog<Consumible>(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          consumible == null ? 'Nuevo consumible' : 'Editar consumible',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nombreController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) {
-                    final nombre = v?.trim() ?? '';
-                    if (nombre.isEmpty) return 'El nombre es obligatorio';
-                    final duplicado = consumibles.any(
-                      (item) =>
-                          item.id != consumible?.id &&
-                          item.nombre.trim().toLowerCase() ==
-                              nombre.toLowerCase(),
-                    );
-                    return duplicado
-                        ? 'Ya existe un consumible con este nombre'
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Descripción',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: precioController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Precio (RD\$) *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) {
-                    final precio = double.tryParse(
-                      (v ?? '').replaceAll(',', '.'),
-                    );
-                    if (precio == null) return 'Ingresa un precio válido';
-                    return precio < 0
-                        ? 'El precio no puede ser negativo'
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                Row(
+      builder: (context, setState) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: ac.cardBg,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: stockInicialController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: consumible == null
-                              ? 'Stock inicial *'
-                              : 'Stock actual',
-                          border: OutlineInputBorder(),
+                    // ── Header Modal ─────────────────────────────────────────
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: ac.primaryBlue.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_rounded,
+                            color: ac.primaryBlue,
+                            size: 24,
+                          ),
                         ),
-                        readOnly: consumible != null,
-                        validator: (v) {
-                          final stock = int.tryParse(v ?? '');
-                          if (stock == null) return 'Inválido';
-                          return stock < 0 ? 'No puede ser negativo' : null;
-                        },
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                consumible == null
+                                    ? 'Nuevo Consumible'
+                                    : 'Editar Consumible',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: ac.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Completa la información del suministro',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: ac.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Divider(height: 1, color: ac.divider),
+                    const SizedBox(height: 20),
+
+                    // ── Campos ───────────────────────────────────────────────
+                    TextFormField(
+                      controller: nombreController,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre del artículo *',
+                        prefixIcon: const Icon(
+                          Icons.medication_liquid_outlined,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (v) {
+                        final nombre = v?.trim() ?? '';
+                        if (nombre.isEmpty) return 'El nombre es obligatorio';
+                        final duplicado = consumibles.any(
+                          (item) =>
+                              item.id != consumible?.id &&
+                              item.nombre.trim().toLowerCase() ==
+                                  nombre.toLowerCase(),
+                        );
+                        return duplicado
+                            ? 'Ya existe un consumible con este nombre'
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: descController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Descripción / Presentación',
+                        prefixIcon: const Icon(Icons.notes_rounded, size: 20),
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: stockMinimoController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Stock mínimo',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) {
-                          final stock = int.tryParse(v ?? '');
-                          if (stock == null) return 'Inválido';
-                          return stock < 0 ? 'No puede ser negativo' : null;
-                        },
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: precioController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      decoration: InputDecoration(
+                        labelText: 'Precio unitario (RD\$) *',
+                        prefixIcon: const Icon(
+                          Icons.attach_money_rounded,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (v) {
+                        final precio = double.tryParse(
+                          (v ?? '').replaceAll(',', '.'),
+                        );
+                        if (precio == null) return 'Ingresa un precio válido';
+                        return precio < 0
+                            ? 'El precio no puede ser negativo'
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: stockInicialController,
+                            keyboardType: TextInputType.number,
+                            readOnly: consumible != null,
+                            decoration: InputDecoration(
+                              labelText: consumible == null
+                                  ? 'Stock inicial *'
+                                  : 'Stock actual',
+                              prefixIcon: const Icon(
+                                Icons.input_rounded,
+                                size: 20,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            validator: (v) {
+                              final stock = int.tryParse(v ?? '');
+                              if (stock == null) return 'Inválido';
+                              return stock < 0 ? 'No negativo' : null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: stockMinimoController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Stock mínimo *',
+                              prefixIcon: const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 20,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            validator: (v) {
+                              final stock = int.tryParse(v ?? '');
+                              if (stock == null) return 'Inválido';
+                              return stock < 0 ? 'No negativo' : null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (consumible != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '💡 Para alterar el stock actual de un artículo registrado usa la acción “Ajustar stock”.',
+                        style: TextStyle(fontSize: 11, color: ac.textSecondary),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+
+                    DropdownButtonFormField<String?>(
+                      initialValue: suplidorId,
+                      decoration: InputDecoration(
+                        labelText: 'Suplidor asignado',
+                        prefixIcon: const Icon(
+                          Icons.local_shipping_outlined,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Sin suplidor principal'),
+                        ),
+                        ...suplidores.map(
+                          (s) => DropdownMenuItem<String?>(
+                            value: s.id,
+                            child: Text(s.nombre),
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) => setState(() => suplidorId = val),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Acciones Modal ───────────────────────────────────────
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Guardar'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: ac.primaryBlue,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              Navigator.pop(
+                                dialogCtx,
+                                Consumible(
+                                  id: consumible?.id,
+                                  nombre: nombreController.text.trim(),
+                                  descripcion: descController.text.trim(),
+                                  precio: double.parse(
+                                    precioController.text.replaceAll(',', '.'),
+                                  ),
+                                  stockActual: int.parse(
+                                    stockInicialController.text,
+                                  ),
+                                  stockMinimo: int.parse(
+                                    stockMinimoController.text,
+                                  ),
+                                  estado:
+                                      consumible?.estado ??
+                                      EstadoConsumible.disponible,
+                                  suplidorId: suplidorId,
+                                  suplidorNombre: suplidores
+                                      .where((s) => s.id == suplidorId)
+                                      .map((s) => s.nombre)
+                                      .firstOrNull,
+                                  activo: consumible?.activo ?? true,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (consumible != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Para cambiar el stock actual usa la acción “Ajustar stock”.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  initialValue: suplidorId,
-                  decoration: const InputDecoration(
-                    labelText: 'Suplidor (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Sin suplidor'),
-                    ),
-                    ...suplidores.map(
-                      (suplidor) => DropdownMenuItem<String?>(
-                        value: suplidor.id,
-                        child: Text(suplidor.nombre),
-                      ),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    setState(() => suplidorId = val);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: context.appColors.primaryBlue,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(
-                  dialogCtx,
-                  Consumible(
-                    id: consumible?.id,
-                    nombre: nombreController.text.trim(),
-                    descripcion: descController.text.trim(),
-                    precio: double.parse(
-                      precioController.text.replaceAll(',', '.'),
-                    ),
-                    stockActual: int.parse(stockInicialController.text),
-                    stockMinimo: int.parse(stockMinimoController.text),
-                    estado: consumible?.estado ?? EstadoConsumible.disponible,
-                    suplidorId: suplidorId,
-                    suplidorNombre: suplidores
-                        .where((suplidor) => suplidor.id == suplidorId)
-                        .map((suplidor) => suplidor.nombre)
-                        .firstOrNull,
-                    activo: consumible?.activo ?? true,
-                  ),
-                );
-              }
-            },
-            child: const Text('Guardar'),
           ),
-        ],
+        ),
       ),
     ),
   );
@@ -926,6 +1085,7 @@ Future<void> _mostrarDialogoFormulario(
   precioController.dispose();
   stockInicialController.dispose();
   stockMinimoController.dispose();
+
   if (nuevoItem == null || !context.mounted) return;
 
   final error = await context.read<InventarioCubit>().guardar(nuevoItem);
@@ -933,7 +1093,7 @@ Future<void> _mostrarDialogoFormulario(
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error),
-        backgroundColor: context.appColors.red,
+        backgroundColor: ac.red,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

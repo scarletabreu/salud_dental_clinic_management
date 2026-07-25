@@ -330,7 +330,10 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
     return BlocListener<CitaCubit, CitaCubitState>(
       listener: (ctx, state) {
-        if (state is CitaCubitLoaded) {
+        if (state is CitaCubitLoaded &&
+            _guardando &&
+            !state.isSubmitting &&
+            state.errorMessage == null) {
           setState(() => _guardando = false);
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -354,7 +357,12 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
               ),
             ),
           );
-        } else if (state is CitaCubitError) {
+        } else if (state is CitaCubitLoaded &&
+            _guardando &&
+            state.errorMessage != null) {
+          setState(() => _guardando = false);
+          _showError(state.errorMessage!);
+        } else if (state is CitaCubitError && _guardando) {
           setState(() => _guardando = false);
           _showError(state.message);
         }

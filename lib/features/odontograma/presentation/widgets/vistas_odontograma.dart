@@ -97,6 +97,7 @@ class VistasOdontograma extends StatefulWidget {
   final bool editable;
 
   final ValueChanged<EvaluacionOdontologica>? onEvaluacionChanged;
+  final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, bool ausente)? onToggleAusente;
   final void Function(Diente, int index)? onQuitarTratamiento;
@@ -121,6 +122,7 @@ class VistasOdontograma extends StatefulWidget {
     required this.odontograma,
     this.editable = false,
     this.onEvaluacionChanged,
+    this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
     this.onQuitarTratamiento,
@@ -164,14 +166,28 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
             VistaOdontograma.formulario =>
               widget.formularioPersonalizado ??
                   OdontodiagramaWidget(
-                    evaluacion: widget.odontograma.evaluacion,
+                    evaluacion: widget.odontograma.evaluacionProyectada,
                     historico: widget.odontograma.evaluacionHistorica,
                     editable: widget.editable,
                     onChanged: widget.onEvaluacionChanged,
+                    // Las mismas piezas y los mismos callbacks que la arcada:
+                    // el panel de detalle es el mismo widget en las dos vistas.
+                    dientes: {
+                      for (final diente in widget.odontograma.dientes)
+                        diente.fdiCode: diente,
+                    },
+                    onAddDiagnosis: widget.onAddDiagnosis,
+                    onAddTratamiento: widget.onAddTratamiento,
+                    onToggleAusente: widget.onToggleAusente,
+                    onQuitarTratamiento: widget.onQuitarTratamiento,
+                    onToggleTratamientoTerminado:
+                        widget.onToggleTratamientoTerminado,
+                    nombreTratamiento: widget.nombreTratamiento,
                   ),
             VistaOdontograma.arcada => OdontogramWidget(
               odontograma: widget.odontograma,
               editMode: widget.editable,
+              onAddDiagnosis: widget.onAddDiagnosis,
               onAddTratamiento: widget.onAddTratamiento,
               onToggleAusente: widget.onToggleAusente,
               onQuitarTratamiento: widget.onQuitarTratamiento,

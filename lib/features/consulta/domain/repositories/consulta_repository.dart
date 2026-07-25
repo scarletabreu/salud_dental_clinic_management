@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -13,10 +14,7 @@ abstract class ConsultaRepository {
 
   /// Genera la pre-factura de la consulta (cuenta ABIERTA + ítems) y marca la
   /// cita como completada. Devuelve el id de la cuenta creada.
-  Future<String> finalizarConsulta({
-    required String consultaId,
-    String? nota,
-  });
+  Future<String> finalizarConsulta({required String consultaId, String? nota});
 
   /// Persiste el odontograma, las recetas y las notas de la consulta.
   ///
@@ -24,7 +22,7 @@ abstract class ConsultaRepository {
   /// mismo orden en que se enviaron: sellarlos sobre el estado en memoria es
   /// lo que permite que el siguiente guardado actualice esas filas en vez de
   /// crear duplicados.
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,

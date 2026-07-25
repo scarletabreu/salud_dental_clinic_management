@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
@@ -29,6 +30,11 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/entiti
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/categoria_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 
 const _consultaId = '33333333-3333-3333-3333-333333333333';
 const _pacienteId = '11111111-1111-1111-1111-111111111111';
@@ -71,7 +77,7 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
   Future<Consulta?> getDetalleConsulta(String id) async => consulta;
 
   @override
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -82,7 +88,7 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
   }) async {
     escrituras++;
     guardado = odontograma;
-    return const {};
+    return const ResultadoGuardadoOdontograma();
   }
 
   @override
@@ -110,7 +116,41 @@ class _CitaRepositorioDoble extends _Vacio implements CitaRepository {}
 class _TratamientoRepositorioDoble extends _Vacio
     implements TratamientoRepository {
   @override
-  Future<List<Tratamiento>> getCatalogoTratamientos() async => const [];
+  Future<List<Tratamiento>> getCatalogoTratamientos() async => [
+    Tratamiento(
+      id: 'trat-resina',
+      nombre: 'Resina compuesta',
+      descripcion: '',
+      costo: 2500,
+      contraindicaciones: const [],
+      alcance: Alcance.puntual,
+      claveOdontograma: 'restaurada',
+    ),
+    Tratamiento(
+      id: 'trat-corona',
+      nombre: 'Corona',
+      descripcion: '',
+      costo: 12000,
+      contraindicaciones: const [],
+      alcance: Alcance.diente,
+    ),
+  ];
+}
+
+class _DiagnosticoRepositorioDoble extends _Vacio
+    implements DiagnosisRepository {
+  @override
+  Future<List<Diagnosis>> getCatalogoCompleto() async => [
+    Diagnosis(
+      id: 'diag-caries',
+      nombre: 'Cariada',
+      descripcion: '',
+      severidadDefault: SeveridadDiagnosis.moderada,
+      alcance: Alcance.puntual,
+      categoria: CategoriaDiagnosis.caries,
+      claveOdontograma: 'cariada',
+    ),
+  ];
 }
 
 class _CondicionesDoble extends _Vacio implements GetCondicionesPaciente {
@@ -160,14 +200,7 @@ void main() {
 
         expect(repo.escrituras, 1);
         final json = repo.guardado!.evaluacionToJson();
-        expect(json['hallazgos'], {
-          '16': [
-            {
-              'estado': 'cariada',
-              'superficies': ['oclusal'],
-            },
-          ],
-        });
+        expect(json['hallazgos'], isEmpty);
         expect(json['tejidos_blandos'], {'lengua': 'Sin alteración aparente'});
       },
     );
@@ -211,6 +244,7 @@ void main() {
         _TratamientoRepositorioDoble.new,
       );
       sl.registerFactory<GetCondicionesPaciente>(_CondicionesDoble.new);
+      sl.registerFactory<DiagnosisRepository>(_DiagnosticoRepositorioDoble.new);
       repo = _ConsultaRepositorioEspia(_consultaConOdontograma());
       cubit = _cubit(repo);
     });
@@ -222,6 +256,9 @@ void main() {
       }
       if (sl.isRegistered<GetCondicionesPaciente>()) {
         sl.unregister<GetCondicionesPaciente>();
+      }
+      if (sl.isRegistered<DiagnosisRepository>()) {
+        sl.unregister<DiagnosisRepository>();
       }
     });
 
@@ -290,37 +327,147 @@ void main() {
         diagrama.historico.de(36).single.estado,
         EstadoClinicoDental.perdida,
       );
-      // La capa histórica se anuncia, para que el trazo tenue no se confunda
-      // con algo anotado hoy.
+      // El papel solo lleva la tinta de hoy: el historial se anuncia y se
+      // consulta al tocar la pieza.
       expect(
-        find.text('El trazo tenue viene de consultas anteriores.'),
+        find.text(
+          'Este paciente tiene antecedentes: toca una pieza para verlos.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('pieza_36')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HISTÓRICO'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(PanelDetallePieza),
+          matching: find.text('Pérdida'),
+        ),
         findsOneWidget,
       );
     });
 
-    testWidgets('anotar una pieza llega al estado de la consulta', (
-      tester,
-    ) async {
+    /// Abre el panel de una pieza desde el formulario y marca una cara.
+    Future<void> abrirPieza(WidgetTester tester, int fdi) async {
+      await tester.tap(find.byKey(ValueKey('pieza_$fdi')));
+      await tester.pumpAndSettle();
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('mapa_superficies'))),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Diente pieza(int fdi) => (cubit.state as ConsultaIniciada)
+        .consulta
+        .odontograma!
+        .dientes
+        .firstWhere((diente) => diente.fdiCode == fdi);
+
+    /// Deja correr el autoguardado: cualquier cambio arma su temporizador y el
+    /// test no puede terminar con uno pendiente.
+    Future<void> drenarAutoguardado(WidgetTester tester) async {
+      await tester.pump(ConsultaCubit.esperaAutoguardado);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('asignar un tratamiento desde el formulario llega al estado '
+        'de la consulta', (tester) async {
       await montar(tester);
+      await abrirPieza(tester, 16);
 
-      await tester.tap(find.byKey(const ValueKey('pieza_16')));
-      await tester.pump();
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Resina compuesta'));
+      await tester.pumpAndSettle();
 
-      final estado = cubit.state as ConsultaIniciada;
-      final hallazgo = estado.consulta.odontograma!.evaluacion.de(16).single;
-      expect(hallazgo.estado, EstadoClinicoDental.cariada);
-      expect(hallazgo.superficies, {TipoSuperficie.oclusal});
+      final aplicado = pieza(16).tratamientos.single;
+      expect(aplicado.tratamientoId, 'trat-resina');
+      expect(aplicado.precioAplicado, 2500);
+      // El centro de un posterior es la cara oclusal.
+      expect(aplicado.superficie, TipoSuperficie.oclusal);
 
-      // Anotar deja la consulta pendiente y el autoguardado la escribe solo,
-      // sin que el doctor pulse nada.
-      expect(estado.guardado, EstadoGuardado.pendiente);
+      // Lo asignado en el formulario se proyecta al dibujo sin recargar, que es
+      // lo mismo que ve la arcada.
+      final proyectada = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .evaluacionProyectada;
+      expect(proyectada.de(16).single.estado, EstadoClinicoDental.restaurada);
+
+      // Asignar deja la consulta pendiente y el autoguardado la escribe solo.
+      expect(
+        (cubit.state as ConsultaIniciada).guardado,
+        EstadoGuardado.pendiente,
+      );
       await tester.pump(ConsultaCubit.esperaAutoguardado);
       await tester.pumpAndSettle();
       expect(repo.escrituras, 1);
-      expect(
-        (cubit.state as ConsultaIniciada).guardado,
-        EstadoGuardado.alDia,
+      expect((cubit.state as ConsultaIniciada).guardado, EstadoGuardado.alDia);
+    });
+
+    testWidgets('un tratamiento de pieza completa ignora la cara marcada', (
+      tester,
+    ) async {
+      await montar(tester);
+      await abrirPieza(tester, 16);
+
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Corona'));
+      await tester.pumpAndSettle();
+
+      // La cara estaba marcada, pero el catálogo dice que la corona es de la
+      // pieza entera: guardarla en oclusal la haría parecer una cara tratada.
+      expect(pieza(16).tratamientos.single.superficie, isNull);
+      await drenarAutoguardado(tester);
+    });
+
+    testWidgets('asignar un diagnóstico desde el formulario llega al estado '
+        'de la consulta', (tester) async {
+      await montar(tester);
+      await abrirPieza(tester, 16);
+
+      await tester.tap(find.text('Diagnóstico'));
+      await tester.pumpAndSettle();
+      // «Cariada» también es una clave de la leyenda impresa: se toca la fila
+      // del catálogo, no la del papel.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ListTile),
+          matching: find.text('Cariada'),
+        ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Asignar diagnóstico'),
+      );
+      await tester.pumpAndSettle();
+
+      final diagnostico = pieza(16).diagnosis.single;
+      expect(diagnostico.claveOdontograma, 'cariada');
+      expect(diagnostico.superficie, TipoSuperficie.oclusal);
+      expect(diagnostico.severidad, SeveridadDiagnosis.moderada);
+      await drenarAutoguardado(tester);
+    });
+
+    testWidgets('marcar la pieza ausente desde el formulario la deja perdida '
+        'en las dos vistas', (tester) async {
+      await montar(tester);
+      await tester.tap(find.byKey(const ValueKey('pieza_36')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ausente'));
+      await tester.pumpAndSettle();
+
+      expect(pieza(36).estaAusente, isTrue);
+      final proyectada = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .evaluacionProyectada;
+      expect(proyectada.de(36).single.estado, EstadoClinicoDental.perdida);
+      await drenarAutoguardado(tester);
     });
   });
 }

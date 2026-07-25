@@ -1,18 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
+import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/models/odontograma_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/panel_detalle_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/tooth_geometry.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
+
+/// Lo que el diagrama pidió aplicar sobre una pieza, para poder afirmarlo sin
+/// montar la consulta entera.
+class PeticionPieza {
+  final Diente diente;
+  final TipoSuperficie? superficie;
+
+  const PeticionPieza(this.diente, this.superficie);
+}
+
+class RegistroDiagrama {
+  EvaluacionOdontologica evaluacion;
+  PeticionPieza? diagnostico;
+  PeticionPieza? tratamiento;
+  (Diente, bool)? ausencia;
+
+  RegistroDiagrama(this.evaluacion);
+}
+
+Diente _pieza(int fdi) =>
+    Diente(odontogramaId: 'o-1', fdiCode: fdi, superficies: const []);
 
 /// Monta el odontodiagrama en un viewport lo bastante ancho para que el
 /// diagrama quepa sin desplazamiento horizontal y se pueda tocar.
-Future<EvaluacionOdontologica Function()> montar(
+///
+/// Con [conPiezas] el diagrama recibe las piezas normalizadas y abre panel al
+/// tocar; sin ellas se comporta como la hoja del expediente y la impresión.
+Future<RegistroDiagrama> montar(
   WidgetTester tester, {
   EvaluacionOdontologica inicial = EvaluacionOdontologica.vacia,
   bool editable = true,
   bool modoImpresion = false,
+  bool conPiezas = true,
   List<EntradaLeyendaOdontograma>? leyenda,
   Size viewport = const Size(1200, 2400),
 }) async {
@@ -21,7 +50,10 @@ Future<EvaluacionOdontologica Function()> montar(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  var evaluacion = inicial;
+  final registro = RegistroDiagrama(inicial);
+  final dientes = conPiezas
+      ? {for (final fdi in kFdiTodas) fdi: _pieza(fdi)}
+      : const <int, Diente>{};
 
   await tester.pumpWidget(
     MaterialApp(
@@ -30,11 +62,18 @@ Future<EvaluacionOdontologica Function()> montar(
         body: StatefulBuilder(
           builder: (context, setState) => SingleChildScrollView(
             child: OdontodiagramaWidget(
-              evaluacion: evaluacion,
+              evaluacion: registro.evaluacion,
               editable: editable,
               modoImpresion: modoImpresion,
               leyenda: leyenda,
-              onChanged: (nueva) => setState(() => evaluacion = nueva),
+              dientes: dientes,
+              onChanged: (nueva) => setState(() => registro.evaluacion = nueva),
+              onAddDiagnosis: (diente, superficie) =>
+                  registro.diagnostico = PeticionPieza(diente, superficie),
+              onAddTratamiento: (diente, superficie) =>
+                  registro.tratamiento = PeticionPieza(diente, superficie),
+              onToggleAusente: (diente, ausente) =>
+                  registro.ausencia = (diente, ausente),
             ),
           ),
         ),
@@ -42,7 +81,7 @@ Future<EvaluacionOdontologica Function()> montar(
     ),
   );
 
-  return () => evaluacion;
+  return registro;
 }
 
 void main() {
@@ -191,81 +230,138 @@ void main() {
       expect(find.text('Cuadrante 4'), findsOneWidget);
     });
 
-    testWidgets('tocar una pieza anota la cara señalada', (tester) async {
-      final leer = await montar(tester);
-
-      // La clave activa por defecto es la primera del formulario: Cariada.
-      await tester.tap(find.byKey(const ValueKey('pieza_16')));
-      await tester.pump();
-
-      final hallazgo = leer().de(16).single;
-      expect(hallazgo.estado, EstadoClinicoDental.cariada);
-      // El centro de un posterior es la cara oclusal.
-      expect(hallazgo.superficies, {TipoSuperficie.oclusal});
-
-      // Un anterior tiene borde incisal en el centro.
-      await tester.tap(find.byKey(const ValueKey('pieza_11')));
-      await tester.pump();
-      expect(leer().de(11).single.superficies, {TipoSuperficie.incisal});
-    });
-
-    testWidgets('una clave de pieza completa no pide cara', (tester) async {
-      final leer = await montar(tester);
-
-      await tester.tap(find.byKey(const ValueKey('clave_perdida')));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('pieza_36')));
-      await tester.pump();
-
-      final hallazgo = leer().de(36).single;
-      expect(hallazgo.estado, EstadoClinicoDental.perdida);
-      expect(hallazgo.esPiezaCompleta, isTrue);
-
-      // Vuelve a tocarla y se borra.
-      await tester.tap(find.byKey(const ValueKey('pieza_36')));
-      await tester.pump();
-      expect(leer().de(36), isEmpty);
-    });
-
-    testWidgets('la ficha de la pieza permite detallar caras y quitar claves', (
+    testWidgets('tocar una pieza abre su panel, y volver a tocarla lo cierra', (
       tester,
     ) async {
-      final leer = await montar(
-        tester,
-        inicial: EvaluacionOdontologica.vacia.alternar(
-          26,
-          EstadoClinicoDental.perdida,
+      await montar(tester);
+
+      expect(find.byType(PanelDetallePieza), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PanelDetallePieza), findsOneWidget);
+      expect(find.text(kFdiNames[16]!), findsOneWidget);
+      // Los mismos dos botones que ofrece la arcada.
+      expect(find.text('Diagnóstico'), findsOneWidget);
+      expect(find.text('Tratamiento'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PanelDetallePieza), findsNothing);
+    });
+
+    testWidgets('la cara se elige en el mapa del panel y viaja con la pieza', (
+      tester,
+    ) async {
+      final registro = await montar(tester);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+
+      // El centro del mapa es la cara oclusal en un posterior.
+      final mapa = find.byKey(const ValueKey('mapa_superficies'));
+      await tester.tapAt(tester.getCenter(mapa));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+
+      expect(registro.tratamiento!.diente.fdiCode, 16);
+      expect(registro.tratamiento!.superficie, TipoSuperficie.oclusal);
+
+      // Sin cara marcada, el diagnóstico sale de la pieza entera.
+      await tester.tapAt(tester.getCenter(mapa));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Diagnóstico'));
+      await tester.pumpAndSettle();
+
+      expect(registro.diagnostico!.diente.fdiCode, 16);
+      expect(registro.diagnostico!.superficie, isNull);
+    });
+
+    testWidgets('el panel de una temporal ofrece lo mismo que el de una '
+        'permanente', (tester) async {
+      final registro = await montar(tester);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_74')));
+      await tester.pumpAndSettle();
+
+      final mapa = find.byKey(const ValueKey('mapa_superficies'));
+      await tester.tapAt(tester.getCenter(mapa));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tratamiento'));
+      await tester.pumpAndSettle();
+
+      expect(registro.tratamiento!.diente.fdiCode, 74);
+      expect(registro.tratamiento!.superficie, TipoSuperficie.oclusal);
+    });
+
+    testWidgets('marcar la pieza como ausente se pide desde el panel', (
+      tester,
+    ) async {
+      final registro = await montar(tester);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_36')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ausente'));
+      await tester.pumpAndSettle();
+
+      expect(registro.ausencia!.$1.fdiCode, 36);
+      expect(registro.ausencia!.$2, isTrue);
+    });
+
+    testWidgets('el panel se abre del lado de su propia pieza', (tester) async {
+      await montar(tester, viewport: const Size(1400, 2400));
+
+      // La 16 es del hemicampo izquierdo de la hoja: su panel va a la
+      // izquierda para no obligar a cruzar la vista.
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getCenter(find.byType(PanelDetallePieza)).dx,
+        lessThan(tester.getCenter(find.byKey(const ValueKey('pieza_16'))).dx),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('pieza_26')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getCenter(find.byType(PanelDetallePieza)).dx,
+        greaterThan(
+          tester.getCenter(find.byKey(const ValueKey('pieza_26'))).dx,
         ),
       );
+    });
 
-      await tester.longPress(find.byKey(const ValueKey('pieza_26')));
+    testWidgets('en un viewport estrecho el panel cae debajo sin desbordar', (
+      tester,
+    ) async {
+      await montar(tester, viewport: const Size(600, 2400));
+
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Pieza 26'), findsOneWidget);
-      expect(find.byKey(const ValueKey('hallazgo_perdida')), findsOneWidget);
-
-      // Añade una caries en dos caras concretas.
-      await tester.tap(find.byKey(const ValueKey('cara_mesial')));
-      await tester.tap(find.byKey(const ValueKey('cara_oclusal')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Añadir'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Guardar'));
-      await tester.pumpAndSettle();
-
-      final hallazgos = leer().de(26);
-      expect(hallazgos.length, 2);
-      final caries = hallazgos.firstWhere(
-        (h) => h.estado == EstadoClinicoDental.cariada,
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getCenter(find.byType(PanelDetallePieza)).dy,
+        greaterThan(
+          tester.getCenter(find.byKey(const ValueKey('pieza_16'))).dy,
+        ),
       );
-      expect(caries.superficies, {
-        TipoSuperficie.mesial,
-        TipoSuperficie.oclusal,
-      });
+    });
+
+    testWidgets('sin piezas normalizadas el diagrama no abre panel', (
+      tester,
+    ) async {
+      await montar(tester, conPiezas: false);
+
+      await tester.tap(find.byKey(const ValueKey('pieza_16')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PanelDetallePieza), findsNothing);
     });
 
     testWidgets('los tejidos blandos se anotan en su tabla', (tester) async {
-      final leer = await montar(tester);
+      final registro = await montar(tester);
 
       expect(find.text('Tejidos Blandos'), findsOneWidget);
       for (final tejido in TejidoBlando.values) {
@@ -279,7 +375,7 @@ void main() {
       await tester.pump();
 
       expect(
-        leer().tejidosBlandos[TejidoBlando.lengua],
+        registro.evaluacion.tejidosBlandos[TejidoBlando.lengua],
         'Úlcera en borde lateral',
       );
     });

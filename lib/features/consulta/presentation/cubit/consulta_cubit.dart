@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
@@ -21,6 +23,9 @@ import 'package:salud_dental_clinic_management/features/superficie/domain/entiti
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
 
@@ -82,7 +87,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   Consulta _sellarIds(
     Consulta vigente,
     Consulta enviada,
-    Map<int, List<String>> idsPorFdi,
+    ResultadoGuardadoOdontograma idsPorFdi,
   ) {
     final odonto = vigente.odontograma;
     if (odonto == null || idsPorFdi.isEmpty) return vigente;
@@ -98,30 +103,55 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             _sellarDiente(
               diente,
               enviadaPorFdi[diente.fdiCode],
-              idsPorFdi[diente.fdiCode],
+              idsPorFdi.tratamientosPorFdi[diente.fdiCode],
+              idsPorFdi.diagnosticosPorFdi[diente.fdiCode],
             ),
         ],
       ),
     );
   }
 
-  Diente _sellarDiente(Diente vigente, Diente? enviado, List<String>? ids) {
-    if (enviado == null || ids == null) return vigente;
+  Diente _sellarDiente(
+    Diente vigente,
+    Diente? enviado,
+    List<String>? ids,
+    List<String>? diagnosticosIds,
+  ) {
+    if (enviado == null) return vigente;
     final actuales = vigente.tratamientos;
-    if (actuales.length != enviado.tratamientos.length ||
-        actuales.length != ids.length) {
+    if (ids != null &&
+        (actuales.length != enviado.tratamientos.length ||
+            actuales.length != ids.length)) {
       return vigente;
     }
     for (var i = 0; i < actuales.length; i++) {
       if (!identical(actuales[i], enviado.tratamientos[i])) return vigente;
     }
+    final diagnosticosActuales = vigente.diagnosis;
+    final debeSellarDiagnosticos =
+        diagnosticosIds != null &&
+        diagnosticosActuales.length == enviado.diagnosis.length &&
+        diagnosticosActuales.length == diagnosticosIds.length &&
+        List.generate(diagnosticosActuales.length, (index) => index).every(
+          (index) =>
+              identical(diagnosticosActuales[index], enviado.diagnosis[index]),
+        );
     return vigente.copyWith(
       tratamientos: [
         for (var i = 0; i < actuales.length; i++)
-          actuales[i].id == null && ids[i].isNotEmpty
+          actuales[i].id == null && ids != null && ids[i].isNotEmpty
               ? actuales[i].copyWith(id: ids[i])
               : actuales[i],
       ],
+      diagnosis: debeSellarDiagnosticos
+          ? [
+              for (var i = 0; i < diagnosticosActuales.length; i++)
+                diagnosticosActuales[i].id == null &&
+                        diagnosticosIds[i].isNotEmpty
+                    ? diagnosticosActuales[i].copyWith(id: diagnosticosIds[i])
+                    : diagnosticosActuales[i],
+            ]
+          : diagnosticosActuales,
     );
   }
 
@@ -198,7 +228,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       final odontograma = Odontograma(
         consultaId: consultaId,
         evaluacionHistorica: evaluacionHistorica,
-        dientes: kFdiPermanentes.map((fdi) {
+        dientes: kFdiTodas.map((fdi) {
           return Diente(
             odontogramaId: '',
             fdiCode: fdi,
@@ -252,9 +282,16 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         tratamientoId: tratamiento.id ?? '',
         esContinuo: false,
         estaTerminado: false,
-        superficie: superficie,
+        // El catálogo manda: una corona es de la pieza entera, y guardarle la
+        // cara que el doctor tenía marcada la haría aparecer como si tratara
+        // solo esa cara. Alcance de arcada y de boca completa no cuelgan de un
+        // diente y quedan fuera de este camino.
+        superficie: tratamiento.alcance == Alcance.puntual ? superficie : null,
         precioAplicado: tratamiento.costo,
         notas: justificacionClinica,
+        nombreTratamiento: tratamiento.nombre,
+        claveOdontograma: tratamiento.claveOdontograma,
+        fechaAplicacion: DateTime.now(),
       );
 
       final nuevoOdontograma = odonto.copyWith(
@@ -268,6 +305,42 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       _emitirCambio(actual.copyWith(odontograma: nuevoOdontograma));
     }
+  }
+
+  void aplicarDiagnostico(
+    Diente diente,
+    TipoSuperficie? superficie,
+    Diagnosis diagnostico, {
+    SeveridadDiagnosis? severidad,
+    OrigenMarcaOdontograma origen = OrigenMarcaOdontograma.preexistente,
+    String notas = '',
+  }) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final odontograma = actual.odontograma;
+    if (odontograma == null) return;
+    final aplicado = DiagnosticoAplicado(
+      diagnosisId: diagnostico.id ?? '',
+      severidad: severidad ?? diagnostico.severidadDefault,
+      fechaAplicacion: DateTime.now(),
+      notas: notas,
+      superficie: diagnostico.alcance == Alcance.puntual ? superficie : null,
+      origen: origen,
+      nombreDiagnostico: diagnostico.nombre,
+      claveOdontograma: diagnostico.claveOdontograma,
+    );
+    final actualizado = odontograma.copyWith(
+      dientes: [
+        for (final actualDiente in odontograma.dientes)
+          if (actualDiente.fdiCode == diente.fdiCode)
+            actualDiente.copyWith(
+              diagnosis: [...actualDiente.diagnosis, aplicado],
+            )
+          else
+            actualDiente,
+      ],
+    );
+    _emitirCambio(actual.copyWith(odontograma: actualizado));
   }
 
   void quitarTratamiento(Diente diente, int index) {
@@ -301,7 +374,13 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         final nuevos = [
           for (var i = 0; i < d.tratamientos.length; i++)
             if (i == index)
-              d.tratamientos[i].copyWith(estaTerminado: terminado)
+              d.tratamientos[i].copyWith(
+                estaTerminado: terminado,
+                // Una indicación solo entra a la pre-factura al ejecutarse.
+                estado: terminado
+                    ? EstadoTratamientoAplicado.aplicado
+                    : d.tratamientos[i].estado,
+              )
             else
               d.tratamientos[i],
         ];
@@ -340,7 +419,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     if (odontograma == null) return;
     _emitirCambio(
       actual.copyWith(
-        odontograma: odontograma.copyWith(evaluacion: evaluacion),
+        odontograma: odontograma.copyWith(
+          evaluacion: EvaluacionOdontologica(
+            tejidosBlandos: evaluacion.tejidosBlandos,
+          ),
+        ),
       ),
     );
   }

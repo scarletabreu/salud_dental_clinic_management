@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
@@ -17,7 +18,7 @@ Future<Tratamiento?> seleccionarTratamiento(
   );
 }
 
-/// Si el tratamiento tiene contraindicaciones específicas que coincidan con las 
+/// Si el tratamiento tiene contraindicaciones específicas que coincidan con las
 /// condiciones registradas del paciente, muestra una advertencia bloqueante.
 /// Devuelve `true` si se puede asignar, `false` si se cancela.
 Future<bool> confirmarRiesgoContraindicaciones(
@@ -63,8 +64,8 @@ Future<bool> confirmarRiesgoContraindicaciones(
           const SizedBox(height: 12),
           // Mostramos únicamente las condiciones del paciente que están en conflicto real
           _Bloque(
-            c, 
-            'Condiciones de riesgo detectadas', 
+            c,
+            'Condiciones de riesgo detectadas',
             condicionesEnConflicto.map((c) => c.nombre).join('\n'),
           ),
           const SizedBox(height: 10),
@@ -200,7 +201,8 @@ class _SelectorTratamiento extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                 itemCount: catalogo.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (_, i) => _TratamientoTile(tratamiento: catalogo[i]),
+                itemBuilder: (_, i) =>
+                    _TratamientoTile(tratamiento: catalogo[i]),
               ),
             ),
         ],
@@ -244,7 +246,13 @@ class _TratamientoTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'RD\$ ${tratamiento.costo.toStringAsFixed(2)}',
+                    // El alcance explica por qué unos tratamientos toman la
+                    // cara marcada y otros la ignoran: es del catálogo, no un
+                    // descuido de la pantalla.
+                    tratamiento.alcance == Alcance.puntual
+                        ? 'RD\$ ${tratamiento.costo.toStringAsFixed(2)} · por cara'
+                        : 'RD\$ ${tratamiento.costo.toStringAsFixed(2)} · '
+                              'pieza completa',
                     style: TextStyle(color: c.textMuted, fontSize: 12),
                   ),
                 ],

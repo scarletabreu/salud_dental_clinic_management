@@ -12,6 +12,36 @@ const List<int> kFdiPermanentes = [
   41, 42, 43, 44, 45, 46, 47, 48,
 ];
 
+/// Códigos FDI de la dentición temporal (20 dientes), por cuadrante.
+const List<int> kFdiTemporales = [
+  51,
+  52,
+  53,
+  54,
+  55,
+  61,
+  62,
+  63,
+  64,
+  65,
+  71,
+  72,
+  73,
+  74,
+  75,
+  81,
+  82,
+  83,
+  84,
+  85,
+];
+
+/// Todas las piezas que la consulta inicial debe materializar.
+///
+/// Guardarlas desde el inicio evita que un tratamiento de odontopediatría
+/// termine dibujado, pero sin diente, historial ni cargo al que asociarse.
+const List<int> kFdiTodas = [...kFdiPermanentes, ...kFdiTemporales];
+
 /// Diente anterior = incisivo o canino (último dígito FDI 1, 2 o 3).
 bool _esAnterior(int fdi) {
   final ultimo = fdi % 10;
@@ -19,7 +49,8 @@ bool _esAnterior(int fdi) {
 }
 
 /// Diente del maxilar superior (cuadrantes 1 y 2).
-bool _esSuperior(int fdi) => fdi >= 11 && fdi <= 28;
+bool _esSuperior(int fdi) =>
+    (fdi >= 11 && fdi <= 28) || (fdi >= 51 && fdi <= 68);
 
 /// Superficies que corresponden a un diente según su código FDI.
 ///

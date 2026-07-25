@@ -109,10 +109,6 @@ class PaletaOdontodiagrama {
   /// Alfa del relleno de una superficie anotada en esta consulta.
   double get alfaRelleno => esOscura ? 0.62 : 0.72;
 
-  /// Alfa de la capa histórica: presente pero claramente en segundo plano,
-  /// igual que el gris apagado del odontograma de tratamientos.
-  double get alfaHistorico => esOscura ? 0.26 : 0.22;
-
   /// Texto de un rótulo del diagrama, ya sea sobre papel o sobre la tarjeta.
   Color tituloSobreTarjeta(BuildContext context) =>
       esOscura ? context.appColors.textPrimary : textoFuerte;

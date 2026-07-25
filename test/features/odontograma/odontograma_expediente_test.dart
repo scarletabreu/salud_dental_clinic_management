@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
@@ -12,10 +14,12 @@ import 'package:salud_dental_clinic_management/features/odontograma/presentation
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 
+/// Una consulta con todas sus piezas y, en las indicadas por [diagnosticos],
+/// el diagnóstico del catálogo que el odontodiagrama proyecta al papel.
 Consulta _consulta({
   required String id,
   required DateTime fecha,
-  EvaluacionOdontologica evaluacion = EvaluacionOdontologica.vacia,
+  Map<int, EstadoClinicoDental> diagnosticos = const {},
 }) => Consulta(
   id: id,
   pacienteId: 'pac-1',
@@ -24,7 +28,6 @@ Consulta _consulta({
   odontograma: Odontograma(
     id: 'odo-$id',
     consultaId: id,
-    evaluacion: evaluacion,
     dientes: [
       for (final fdi in kFdiPermanentes)
         Diente(
@@ -33,6 +36,16 @@ Consulta _consulta({
           superficies: superficiesParaFdi(fdi)
               .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
               .toList(),
+          diagnosis: [
+            if (diagnosticos[fdi] case final estado?)
+              DiagnosticoAplicado(
+                diagnosisId: 'diag-${estado.dbValue}',
+                severidad: SeveridadDiagnosis.moderada,
+                fechaAplicacion: fecha,
+                notas: '',
+                claveOdontograma: estado.dbValue,
+              ),
+          ],
         ),
     ],
   ),
@@ -79,10 +92,7 @@ void main() {
           _consulta(
             id: 'c1',
             fecha: DateTime(2026, 7, 20),
-            evaluacion: EvaluacionOdontologica.vacia.alternar(
-              16,
-              EstadoClinicoDental.cariada,
-            ),
+            diagnosticos: const {16: EstadoClinicoDental.cariada},
           ),
         ],
       );
@@ -120,18 +130,12 @@ void main() {
           _consulta(
             id: 'nueva',
             fecha: DateTime(2026, 7, 24),
-            evaluacion: EvaluacionOdontologica.vacia.alternar(
-              16,
-              EstadoClinicoDental.cariada,
-            ),
+            diagnosticos: const {16: EstadoClinicoDental.cariada},
           ),
           _consulta(
             id: 'vieja',
             fecha: DateTime(2026, 1, 10),
-            evaluacion: EvaluacionOdontologica.vacia.alternar(
-              36,
-              EstadoClinicoDental.perdida,
-            ),
+            diagnosticos: const {36: EstadoClinicoDental.perdida},
           ),
         ],
       );
@@ -139,7 +143,10 @@ void main() {
       final diagrama = tester.widget<OdontodiagramaWidget>(
         find.byType(OdontodiagramaWidget),
       );
-      expect(diagrama.evaluacion.de(16).single.estado, EstadoClinicoDental.cariada);
+      expect(
+        diagrama.evaluacion.de(16).single.estado,
+        EstadoClinicoDental.cariada,
+      );
       expect(
         diagrama.historico.de(36).single.estado,
         EstadoClinicoDental.perdida,
@@ -154,7 +161,10 @@ void main() {
     ) async {
       await _montar(tester, consultas: const [], historialNoDisponible: true);
 
-      expect(find.text('No se pudo cargar el historial clínico.'), findsOneWidget);
+      expect(
+        find.text('No se pudo cargar el historial clínico.'),
+        findsOneWidget,
+      );
       expect(
         find.text('Este paciente aún no tiene consultas con odontograma.'),
         findsNothing,
@@ -170,7 +180,10 @@ void main() {
         find.text('Este paciente aún no tiene consultas con odontograma.'),
         findsOneWidget,
       );
-      expect(find.text('No se pudo cargar el historial clínico.'), findsNothing);
+      expect(
+        find.text('No se pudo cargar el historial clínico.'),
+        findsNothing,
+      );
     });
 
     testWidgets('la vista general consolida todas las consultas', (
@@ -182,18 +195,12 @@ void main() {
           _consulta(
             id: 'nueva',
             fecha: DateTime(2026, 7, 24),
-            evaluacion: EvaluacionOdontologica.vacia.alternar(
-              16,
-              EstadoClinicoDental.cariada,
-            ),
+            diagnosticos: const {16: EstadoClinicoDental.cariada},
           ),
           _consulta(
             id: 'vieja',
             fecha: DateTime(2026, 1, 10),
-            evaluacion: EvaluacionOdontologica.vacia.alternar(
-              36,
-              EstadoClinicoDental.perdida,
-            ),
+            diagnosticos: const {36: EstadoClinicoDental.perdida},
           ),
         ],
       );
@@ -204,8 +211,14 @@ void main() {
       final diagrama = tester.widget<OdontodiagramaWidget>(
         find.byType(OdontodiagramaWidget),
       );
-      expect(diagrama.evaluacion.de(16).single.estado, EstadoClinicoDental.cariada);
-      expect(diagrama.evaluacion.de(36).single.estado, EstadoClinicoDental.perdida);
+      expect(
+        diagrama.evaluacion.de(16).single.estado,
+        EstadoClinicoDental.cariada,
+      );
+      expect(
+        diagrama.evaluacion.de(36).single.estado,
+        EstadoClinicoDental.perdida,
+      );
     });
 
     testWidgets('el expediente se dibuja también en tema oscuro', (

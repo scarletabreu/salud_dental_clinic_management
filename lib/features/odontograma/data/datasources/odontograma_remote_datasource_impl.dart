@@ -13,7 +13,12 @@ class OdontogramaRemoteDatasourceImpl implements OdontogramaRemoteDatasource {
     return await supabaseClient
         .from('odontogramas')
         .select(
-          '*, dientes:dientes(*, diagnosis:diagnosticos_aplicados(*), tratamientos:tratamientos_aplicados(*))',
+          // Los catálogos vienen embebidos porque `clave_odontograma` es lo que
+          // decide cómo se dibuja cada pieza: sin ellos todo cae en «Otro».
+          '*, dientes:dientes(*, '
+          'diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey'
+          '(*, diagnosis:diagnosticos(*)), '
+          'tratamientos:tratamientos_aplicados(*, tratamiento:tratamientos(*)))',
         )
         .eq('consulta_id', consultaId)
         .filter('deleted_at', 'is', null)

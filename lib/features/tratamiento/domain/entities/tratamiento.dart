@@ -6,6 +6,7 @@ class Tratamiento {
   final String nombre;
   final String descripcion;
   final double costo;
+  final String? claveOdontograma;
   final List<Contraindicacion> contraindicaciones;
   final Alcance alcance;
 
@@ -14,6 +15,7 @@ class Tratamiento {
     required this.nombre,
     required this.descripcion,
     required this.costo,
+    this.claveOdontograma,
     required this.contraindicaciones,
     required this.alcance,
   });
@@ -23,6 +25,7 @@ class Tratamiento {
     String? nombre,
     String? descripcion,
     double? costo,
+    String? claveOdontograma,
     List<Contraindicacion>? contraindicaciones,
     Alcance? alcance,
   }) {
@@ -31,6 +34,7 @@ class Tratamiento {
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       costo: costo ?? this.costo,
+      claveOdontograma: claveOdontograma ?? this.claveOdontograma,
       contraindicaciones: contraindicaciones ?? this.contraindicaciones,
       alcance: alcance ?? this.alcance,
     );

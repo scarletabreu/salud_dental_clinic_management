@@ -15,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/reposito
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 
 class _Vacio {
@@ -22,25 +23,52 @@ class _Vacio {
       throw UnimplementedError('${invocation.memberName} no se usa aquí');
 }
 
-/// Datasource que devuelve odontodiagramas ya ordenados como los devuelve
-/// Postgres: de la consulta más reciente a la más antigua.
+/// Datasource que devuelve las filas ya ordenadas como las devuelve Postgres:
+/// de la consulta más reciente a la más antigua.
 class _DatasourceDoble extends _Vacio implements ConsultaRemoteDatasource {
-  final List<Map<String, dynamic>> filas;
+  final List<Map<String, dynamic>> diagnosticos;
+  final List<Map<String, dynamic>> evaluaciones;
   String? pacienteRecibido;
   String? exclusionRecibida;
 
-  _DatasourceDoble(this.filas);
+  _DatasourceDoble({
+    this.diagnosticos = const [],
+    this.evaluaciones = const [],
+  });
 
   @override
-  Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
+  Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
   }) async {
     pacienteRecibido = pacienteId;
     exclusionRecibida = excluyendoConsultaId;
-    return filas;
+    return diagnosticos;
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async => evaluaciones;
 }
+
+/// Una fila de `diagnosticos_aplicados` como llega del embed de Supabase.
+Map<String, dynamic> _fila({
+  required String consultaId,
+  required int fdi,
+  required String clave,
+  String? superficie,
+}) => {
+  'diagnosis_id': 'diag-$clave',
+  'severidad': 'moderada',
+  'fecha_aplicacion': DateTime(2026, 1, 10).toIso8601String(),
+  'notas': '',
+  'consulta_id': consultaId,
+  'superficie': superficie,
+  'diagnosis': {'nombre': clave, 'clave_odontograma': clave},
+  'diente': {'fdi_code': fdi},
+};
 
 class _RepoQueFalla extends _Vacio implements ConsultaRepository {
   @override
@@ -85,32 +113,31 @@ class _CitaRepoDoble extends _Vacio implements CitaRepository {}
 
 void main() {
   group('ConsultaRepositoryImpl.getEvaluacionHistorica', () {
-    test('consolida los odontodiagramas anteriores del paciente', () async {
-      final datasource = _DatasourceDoble([
-        {
-          'evaluacion_clinica': {
-            'hallazgos': {
-              '16': [
-                {'estado': 'restaurada', 'superficies': ['oclusal']},
-              ],
+    test('consolida los diagnósticos anteriores del paciente', () async {
+      final datasource = _DatasourceDoble(
+        diagnosticos: [
+          _fila(
+            consultaId: 'c-nueva',
+            fdi: 16,
+            clave: 'restaurada',
+            superficie: 'oclusal',
+          ),
+          _fila(consultaId: 'c-vieja', fdi: 16, clave: 'cariada'),
+          _fila(consultaId: 'c-vieja', fdi: 36, clave: 'perdida'),
+        ],
+        evaluaciones: [
+          {
+            'evaluacion_clinica': {
+              'tejidos_blandos': {'lengua': 'Sin alteración'},
             },
-            'tejidos_blandos': {'lengua': 'Sin alteración'},
           },
-        },
-        {
-          'evaluacion_clinica': {
-            'hallazgos': {
-              '16': [
-                {'estado': 'cariada'},
-              ],
-              '36': [
-                {'estado': 'perdida'},
-              ],
+          {
+            'evaluacion_clinica': {
+              'tejidos_blandos': {'lengua': 'Úlcera', 'encias': 'Gingivitis'},
             },
-            'tejidos_blandos': {'lengua': 'Úlcera', 'encias': 'Gingivitis'},
           },
-        },
-      ]);
+        ],
+      );
       final repo = ConsultaRepositoryImpl(remoteDataSource: datasource);
 
       final historica = await repo.getEvaluacionHistorica(
@@ -120,38 +147,77 @@ void main() {
 
       expect(datasource.pacienteRecibido, 'pac-1');
       expect(datasource.exclusionRecibida, 'consulta-de-hoy');
-      // Sobre la pieza 16 gana la anotación más reciente.
-      expect(historica.de(16).single.estado, EstadoClinicoDental.restaurada);
+      // Sobre la pieza 16 gana la consulta más reciente.
+      final restaurada = historica.de(16).single;
+      expect(restaurada.estado, EstadoClinicoDental.restaurada);
+      expect(restaurada.superficies, {TipoSuperficie.oclusal});
       // Lo que solo dijo la consulta antigua se conserva.
       expect(historica.de(36).single.estado, EstadoClinicoDental.perdida);
       expect(historica.tejidosBlandos[TejidoBlando.lengua], 'Sin alteración');
       expect(historica.tejidosBlandos[TejidoBlando.encias], 'Gingivitis');
     });
 
-    test('un paciente sin consultas previas no tiene capa histórica', () async {
+    test('una pieza guarda todo lo que dijo la consulta que manda', () async {
       final repo = ConsultaRepositoryImpl(
-        remoteDataSource: _DatasourceDoble(const []),
+        remoteDataSource: _DatasourceDoble(
+          diagnosticos: [
+            _fila(
+              consultaId: 'c-nueva',
+              fdi: 16,
+              clave: 'cariada',
+              superficie: 'oclusal',
+            ),
+            _fila(
+              consultaId: 'c-nueva',
+              fdi: 16,
+              clave: 'cariada',
+              superficie: 'mesial',
+            ),
+            _fila(
+              consultaId: 'c-nueva',
+              fdi: 16,
+              clave: 'pulpectomia_pulpotomia',
+            ),
+          ],
+        ),
       );
+
+      final hallazgos = await repo.getEvaluacionHistorica('pac-1');
+
+      expect(hallazgos.de(16), hasLength(2));
+      expect(
+        hallazgos
+            .de(16)
+            .firstWhere((h) => h.estado == EstadoClinicoDental.cariada)
+            .superficies,
+        {TipoSuperficie.oclusal, TipoSuperficie.mesial},
+      );
+    });
+
+    test('un paciente sin consultas previas no tiene capa histórica', () async {
+      final repo = ConsultaRepositoryImpl(remoteDataSource: _DatasourceDoble());
 
       final historica = await repo.getEvaluacionHistorica('pac-1');
 
       expect(historica.estaVacia, isTrue);
     });
 
-    test('un evaluacion_clinica nulo no rompe la consolidación', () async {
+    test('un diagnóstico sin clave del catálogo no se dibuja', () async {
       final repo = ConsultaRepositoryImpl(
-        remoteDataSource: _DatasourceDoble([
-          {'evaluacion_clinica': null},
-          {
-            'evaluacion_clinica': {
-              'hallazgos': {
-                '48': [
-                  {'estado': 'extraccion_indicada'},
-                ],
-              },
+        remoteDataSource: _DatasourceDoble(
+          diagnosticos: [
+            {
+              'diagnosis_id': 'diag-sin-clave',
+              'severidad': 'leve',
+              'fecha_aplicacion': DateTime(2026, 1, 10).toIso8601String(),
+              'notas': '',
+              'consulta_id': 'c-vieja',
+              'diagnosis': {'nombre': 'Sensibilidad'},
+              'diente': {'fdi_code': 48},
             },
-          },
-        ]),
+            _fila(consultaId: 'c-vieja', fdi: 48, clave: 'extraccion_indicada'),
+          ],
+        ),
       );
 
       final historica = await repo.getEvaluacionHistorica('pac-1');

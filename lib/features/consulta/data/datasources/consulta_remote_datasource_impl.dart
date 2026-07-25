@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
@@ -10,7 +11,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       '*, recetas(*), documentos_clinicos(*), '
       'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
       'dientes(id, odontograma_id, fdi_code, observaciones, esta_ausente, '
-      'tratamientos_aplicados_ids))';
+      'tratamientos_aplicados_ids, diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(*, '
+      'diagnosis:diagnosticos(*)), tratamientos:tratamientos_aplicados(*, '
+      'tratamiento:tratamientos(*))))';
 
   @override
   Future<String> crearConsultaCompleta(Map<String, dynamic> params) async {
@@ -39,7 +42,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Map<int, Map<String, dynamic>> dientesPorFdi,
@@ -81,13 +84,13 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .from('odontogramas')
         .select(
           'id, dientes(id, fdi_code, esta_ausente, observaciones, '
-          'tratamientos_aplicados_ids)',
+          'tratamientos_aplicados_ids, diagnosticos:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(id))',
         )
         .eq('consulta_id', consultaId)
         .isFilter('deleted_at', null)
         .maybeSingle();
     if (odontograma == null) {
-      if (dientesPorFdi.isEmpty) return const {};
+      if (dientesPorFdi.isEmpty) return const ResultadoGuardadoOdontograma();
       throw Exception('No se encontró el odontograma de la consulta.');
     }
 
@@ -100,7 +103,8 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .eq('id', odontograma['id'] as String);
 
     final dientes = odontograma['dientes'] as List;
-    final idsPorFdi = <int, List<String>>{};
+    final tratamientosPorFdi = <int, List<String>>{};
+    final diagnosticosPorFdi = <int, List<String>>{};
 
     for (final d in dientes) {
       final fdi = (d['fdi_code'] as num).toInt();
@@ -108,10 +112,17 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       final actualesIds =
           (d['tratamientos_aplicados_ids'] as List?)?.cast<String>() ??
           const <String>[];
+      final actualesDiagnosticosIds = ((d['diagnosticos'] as List?) ?? const [])
+          .map((diagnostico) => (diagnostico as Map)['id'] as String?)
+          .whereType<String>()
+          .toList();
 
       final entrante = dientesPorFdi[fdi];
       final filas =
           (entrante?['tratamientos'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      final filasDiagnosticos =
+          (entrante?['diagnosticos'] as List?)?.cast<Map<String, dynamic>>() ??
           const <Map<String, dynamic>>[];
       final ausente = entrante?['esta_ausente'] as bool? ?? false;
       final observaciones = entrante?['observaciones'] as String?;
@@ -120,7 +131,13 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           ausente != (d['esta_ausente'] as bool? ?? false) ||
           observaciones != d['observaciones'] as String?;
 
-      if (filas.isEmpty && actualesIds.isEmpty && !cambioEstadoPieza) continue;
+      if (filas.isEmpty &&
+          actualesIds.isEmpty &&
+          filasDiagnosticos.isEmpty &&
+          actualesDiagnosticosIds.isEmpty &&
+          !cambioEstadoPieza) {
+        continue;
+      }
 
       final idsFinales = await _reconciliarTratamientos(
         consultaId: consultaId,
@@ -129,7 +146,17 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         actualesIds: actualesIds,
         now: now,
       );
-      if (idsFinales.isNotEmpty) idsPorFdi[fdi] = idsFinales;
+      if (idsFinales.isNotEmpty) tratamientosPorFdi[fdi] = idsFinales;
+      final diagnosticosFinales = await _reconciliarDiagnosticos(
+        consultaId: consultaId,
+        dienteId: dienteId,
+        filas: filasDiagnosticos,
+        actualesIds: actualesDiagnosticosIds,
+        now: now,
+      );
+      if (diagnosticosFinales.isNotEmpty) {
+        diagnosticosPorFdi[fdi] = diagnosticosFinales;
+      }
 
       await supabaseClient
           .from('dientes')
@@ -142,7 +169,57 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           .eq('id', dienteId);
     }
 
-    return idsPorFdi;
+    return ResultadoGuardadoOdontograma(
+      tratamientosPorFdi: tratamientosPorFdi,
+      diagnosticosPorFdi: diagnosticosPorFdi,
+    );
+  }
+
+  Future<List<String>> _reconciliarDiagnosticos({
+    required String consultaId,
+    required String dienteId,
+    required List<Map<String, dynamic>> filas,
+    required List<String> actualesIds,
+    required String now,
+  }) async {
+    final conservados = <String>{
+      for (final fila in filas)
+        if (fila['id'] case final String id) id,
+    };
+    final anulados = actualesIds.where((id) => !conservados.contains(id));
+    if (anulados.isNotEmpty) {
+      await supabaseClient
+          .from('diagnosticos_aplicados')
+          .update({'deleted_at': now, 'updated_at': now})
+          .inFilter('id', anulados.toList());
+    }
+
+    final ids = <String>[];
+    for (final fila in filas) {
+      final payload = <String, dynamic>{
+        ...fila,
+        'consulta_id': consultaId,
+        'diente_id': dienteId,
+        'updated_at': now,
+      };
+      final id = payload.remove('id') as String?;
+      if (id != null) {
+        await supabaseClient
+            .from('diagnosticos_aplicados')
+            .update(payload)
+            .eq('id', id);
+        ids.add(id);
+      } else {
+        payload['created_at'] = now;
+        final inserted = await supabaseClient
+            .from('diagnosticos_aplicados')
+            .insert(payload)
+            .select('id')
+            .single();
+        ids.add(inserted['id'] as String);
+      }
+    }
+    return ids;
   }
 
   /// Lleva las filas de `tratamientos_aplicados` de un diente al estado que
@@ -284,7 +361,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     var query = supabaseClient
         .from('tratamientos_aplicados')
         .select(
-          '*, tratamiento:tratamientos(nombre), '
+          // La clave del catálogo es lo que decide cómo se dibuja la pieza:
+          // sin ella todo tratamiento previo caía en «Otro».
+          '*, tratamiento:tratamientos(nombre, clave_odontograma), '
           'diente:dientes!inner(fdi_code), '
           'consulta:consultas!inner(paciente_id, fecha)',
         )
@@ -300,13 +379,44 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    var query = supabaseClient
+        .from('diagnosticos_aplicados')
+        .select(
+          '*, diagnosis:diagnosticos(nombre, clave_odontograma), '
+          'diente:dientes!inner(fdi_code), '
+          'consulta:consultas!inner(paciente_id, fecha)',
+        )
+        .eq('consulta.paciente_id', pacienteId)
+        .isFilter('deleted_at', null);
+
+    if (excluyendoConsultaId != null) {
+      query = query.neq('consulta_id', excluyendoConsultaId);
+    }
+
+    // De la más reciente a la más antigua: al consolidar gana la primera que
+    // anota cada pieza, es decir la última palabra del doctor.
+    final response = await query.order(
+      'fecha',
+      referencedTable: 'consulta',
+      ascending: false,
+    );
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
   }) async {
     var query = supabaseClient
         .from('odontogramas')
-        .select('evaluacion_clinica, consulta:consultas!inner(paciente_id, fecha)')
+        .select(
+          'evaluacion_clinica, consulta:consultas!inner(paciente_id, fecha)',
+        )
         .eq('consulta.paciente_id', pacienteId)
         .isFilter('deleted_at', null);
 

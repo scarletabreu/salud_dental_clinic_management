@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
 import 'odontogram_widget.dart';
 import 'vistas_odontograma.dart';
 
@@ -12,6 +13,9 @@ import 'vistas_odontograma.dart';
 // ─────────────────────────────────────────────
 
 int _statusRank(Diente d) {
+  // Una pieza perdida se dibuja como sana (`empty`) pero no lo está: si no
+  // gana el resumen, la consulta siguiente la borra del expediente.
+  if (dienteEstaAusente(d)) return 5;
   final s = statusForDiente(d);
   return switch (s) {
     ToothStatus.critical => 4,
@@ -43,6 +47,8 @@ Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
   return Odontograma(
     consultaId: '',
     dientes: worst.values.toList(),
+    // Las piezas salen de la proyección de [dientes]; de `evaluacion` solo
+    // sobreviven los tejidos blandos, que no cuelgan de ninguna pieza.
     evaluacion: EvaluacionOdontologica.consolidar(
       consultas.map((c) => c.odontograma?.evaluacion).nonNulls,
     ),
@@ -54,15 +60,17 @@ Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
 /// lista llega de la más reciente a la más antigua, lo anterior es la cola.
 Odontograma _conHistorico(List<Consulta> consultas, int indice) {
   final odontograma = consultas[indice].odontograma!;
+  // La capa histórica se lee de la proyección, igual que el dibujo: tras la
+  // unificación `evaluacion` ya no guarda hallazgos por pieza.
   final anteriores = consultas
       .skip(indice + 1)
-      .map((c) => c.odontograma?.evaluacion)
+      .map((c) => c.odontograma?.evaluacionComoAntecedente)
       .nonNulls;
   return odontograma.copyWith(
     // Lo que ya está anotado hoy no se repite en tenue debajo.
     evaluacionHistorica: EvaluacionOdontologica.consolidar(
       anteriores,
-    ).menos(odontograma.evaluacion),
+    ).menos(odontograma.evaluacionProyectada),
   );
 }
 

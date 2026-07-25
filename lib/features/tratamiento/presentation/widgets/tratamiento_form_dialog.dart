@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 
 class TratamientoFormDialog extends StatefulWidget {
   final Tratamiento? tratamiento;
@@ -19,6 +20,7 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
   late final TextEditingController _descripcionCtrl;
   late final TextEditingController _costoCtrl;
   late Alcance _alcance;
+  String? _claveOdontograma;
   bool _saving = false;
 
   bool get _isEditing => widget.tratamiento != null;
@@ -33,6 +35,7 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
       text: t != null ? t.costo.toString() : '',
     );
     _alcance = t?.alcance ?? Alcance.diente;
+    _claveOdontograma = t?.claveOdontograma;
   }
 
   @override
@@ -52,13 +55,14 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
       nombre: _nombreCtrl.text.trim(),
       descripcion: _descripcionCtrl.text.trim(),
       costo: double.parse(_costoCtrl.text),
+      claveOdontograma: _claveOdontograma,
       alcance: _alcance,
       contraindicaciones: widget.tratamiento?.contraindicaciones ?? [],
     );
 
-    final exito = await context
-        .read<TratamientoCubit>()
-        .guardarTratamiento(tratamiento);
+    final exito = await context.read<TratamientoCubit>().guardarTratamiento(
+      tratamiento,
+    );
     if (mounted) {
       setState(() => _saving = false);
       if (exito) Navigator.of(context).pop();
@@ -213,6 +217,31 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
                     onChanged: (v) {
                       if (v != null) setState(() => _alcance = v);
                     },
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                _FormField(
+                  ac: ac,
+                  icon: Icons.draw_outlined,
+                  label: 'Marca en odontograma',
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _claveOdontograma,
+                    decoration: _inputDeco(ac, hint: 'Sin marca específica'),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Sin marca específica'),
+                      ),
+                      ...EstadoClinicoDental.values.map(
+                        (estado) => DropdownMenuItem<String?>(
+                          value: estado.dbValue,
+                          child: Text(estado.label),
+                        ),
+                      ),
+                    ],
+                    onChanged: (clave) =>
+                        setState(() => _claveOdontograma = clave),
                   ),
                 ),
                 const SizedBox(height: 24),

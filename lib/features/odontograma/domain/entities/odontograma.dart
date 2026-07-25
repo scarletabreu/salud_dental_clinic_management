@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/entitie
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
 
 class Odontograma {
   final String? id;
@@ -50,5 +51,19 @@ class Odontograma {
     );
   }
 
-  Map<String, dynamic> evaluacionToJson() => evaluacion.toJson();
+  /// Persistencia residual de SD-141. Los hallazgos dentales se guardan en
+  /// `diagnosticos_aplicados` / `tratamientos_aplicados`, no en este JSON.
+  Map<String, dynamic> evaluacionToJson() => EvaluacionOdontologica(
+    tejidosBlandos: evaluacion.tejidosBlandos,
+  ).toJson();
+
+  /// Datos visuales de las claves dentales más tejidos blandos. Nunca se
+  /// persiste como JSON: la fuente de las claves son las filas normalizadas.
+  EvaluacionOdontologica get evaluacionProyectada =>
+      proyectarEvaluacionOdontologica(this);
+
+  /// Lo mismo, pero como se ve *debajo* de otra consulta: solo diagnósticos,
+  /// para que un tratamiento previo no se estampe en tenue sobre la pieza.
+  EvaluacionOdontologica get evaluacionComoAntecedente =>
+      proyectarEvaluacionOdontologica(this, soloDiagnosticos: true);
 }

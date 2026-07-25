@@ -1,5 +1,7 @@
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
+enum EstadoTratamientoAplicado { indicado, aplicado }
+
 class TratamientoAplicado {
   final String? id;
   final String tratamientoId;
@@ -21,6 +23,10 @@ class TratamientoAplicado {
 
   /// Justificación clínica del tratamiento (HOTFIX-5).
   final String? notas;
+  final EstadoTratamientoAplicado estado;
+  final String? nombreTratamiento;
+  final String? claveOdontograma;
+  final DateTime? fechaAplicacion;
 
   TratamientoAplicado({
     this.id,
@@ -33,6 +39,10 @@ class TratamientoAplicado {
     this.superficie,
     this.precioAplicado,
     this.notas,
+    this.estado = EstadoTratamientoAplicado.aplicado,
+    this.nombreTratamiento,
+    this.claveOdontograma,
+    this.fechaAplicacion,
   });
 
   TratamientoAplicado copyWith({
@@ -48,6 +58,10 @@ class TratamientoAplicado {
     TipoSuperficie? superficie,
     double? precioAplicado,
     String? notas,
+    EstadoTratamientoAplicado? estado,
+    String? nombreTratamiento,
+    String? claveOdontograma,
+    DateTime? fechaAplicacion,
   }) {
     return TratamientoAplicado(
       id: id ?? this.id,
@@ -60,6 +74,10 @@ class TratamientoAplicado {
       superficie: superficie ?? this.superficie,
       precioAplicado: precioAplicado ?? this.precioAplicado,
       notas: notas ?? this.notas,
+      estado: estado ?? this.estado,
+      nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
+      claveOdontograma: claveOdontograma ?? this.claveOdontograma,
+      fechaAplicacion: fechaAplicacion ?? this.fechaAplicacion,
     );
   }
 }

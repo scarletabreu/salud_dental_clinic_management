@@ -1,13 +1,16 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
+import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
@@ -102,7 +105,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -130,6 +133,21 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   // aquí. Sin ella el expediente diría que el tratamiento se
                   // aplicó a ciegas.
                   'notas': t.notas,
+                  'estado': t.estado.name,
+                },
+            ],
+            'diagnosticos': [
+              for (final diagnostico in diente.diagnosis)
+                {
+                  if (diagnostico.id != null) 'id': diagnostico.id,
+                  'diagnosis_id': diagnostico.diagnosisId,
+                  'severidad': diagnostico.severidad.name,
+                  'fecha_aplicacion': diagnostico.fechaAplicacion
+                      .toUtc()
+                      .toIso8601String(),
+                  'superficie': diagnostico.superficie?.name.toLowerCase(),
+                  'origen': diagnostico.origen.name,
+                  'notas': diagnostico.notas,
                 },
             ],
           },
@@ -209,12 +227,64 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     String? excluyendoConsultaId,
   }) {
     return runGuarded(() async {
-      final filas = await remoteDataSource.fetchEvaluacionesPaciente(
+      // Las piezas salen de `diagnosticos_aplicados`: desde SD-150 el jsonb de
+      // `odontogramas` solo guarda tejidos blandos. Los tratamientos previos no
+      // se dibujan en tenue, se leen en la ficha de la pieza.
+      final diagnosticos = await remoteDataSource
+          .fetchDiagnosticosHistoricosPaciente(
+            pacienteId,
+            excluyendoConsultaId: excluyendoConsultaId,
+          );
+
+      // Las filas llegan de la consulta más reciente a la más antigua: sobre
+      // cada pieza manda la última que la anotó, con todo lo que dijo de ella.
+      final consultaQueMandaPorFdi = <int, String?>{};
+      final porFdi = <int, Map<EstadoClinicoDental, Set<TipoSuperficie>>>{};
+
+      for (final fila in diagnosticos) {
+        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+        if (fdi == null) continue;
+        final diagnostico = DiagnosticoAplicadoModel.fromJson(fila);
+        final estado = EstadoClinicoDentalX.fromDb(
+          diagnostico.claveOdontograma,
+        );
+        if (estado == null) continue;
+
+        final consultaQueManda = consultaQueMandaPorFdi.putIfAbsent(
+          fdi,
+          () => diagnostico.consultaId,
+        );
+        if (diagnostico.consultaId != consultaQueManda) continue;
+
+        final caras = porFdi
+            .putIfAbsent(fdi, () => {})
+            .putIfAbsent(estado, () => <TipoSuperficie>{});
+        final superficie = diagnostico.superficie;
+        if (superficie != null && estado.esPorSuperficie) caras.add(superficie);
+      }
+
+      final evaluaciones = await remoteDataSource.fetchEvaluacionesPaciente(
         pacienteId,
         excluyendoConsultaId: excluyendoConsultaId,
       );
-      return EvaluacionOdontologica.consolidar(
-        filas.map((f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica'])),
+      final tejidos = EvaluacionOdontologica.consolidar(
+        evaluaciones.map(
+          (f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica']),
+        ),
+      ).tejidosBlandos;
+
+      return EvaluacionOdontologica(
+        hallazgos: {
+          for (final entry in porFdi.entries)
+            entry.key: [
+              for (final hallazgo in entry.value.entries)
+                HallazgoDental(
+                  estado: hallazgo.key,
+                  superficies: hallazgo.value,
+                ),
+            ],
+        },
+        tejidosBlandos: tejidos,
       );
     }, context: 'obtener el odontodiagrama histórico');
   }

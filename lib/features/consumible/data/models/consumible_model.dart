@@ -20,6 +20,7 @@ class ConsumibleModel extends Consumible {
       id: json['id'] as String?,
       nombre: json['nombre'] as String? ?? '',
       descripcion: json['descripcion'] as String? ?? '',
+      precio: (json['precio'] ?? 0 as num).toDouble(),
       stockActual: (json['stock_actual'] ?? json['stockActual'] ?? 0 as num)
           .toInt(),
       stockMinimo: (json['stock_minimo'] ?? json['stockMinimo'] ?? 0 as num)

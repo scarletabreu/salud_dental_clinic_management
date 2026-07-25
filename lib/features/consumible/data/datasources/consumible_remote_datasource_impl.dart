@@ -18,6 +18,17 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   }
 
   @override
+  Future<void> adjustStock(String id, int nuevoStock, String motivo) async {
+    await supabaseClient
+        .from('consumibles')
+        .update({
+          'stock_actual': nuevoStock,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
+  }
+
+  @override
   Future<void> updateStock(String id, int nuevoStock) async {
     await supabaseClient
         .from('consumibles')

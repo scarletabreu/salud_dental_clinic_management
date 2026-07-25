@@ -9,21 +9,34 @@ class MovimientoCajaModel extends MovimientoCaja {
     required super.monto,
     required super.descripcion,
     required super.fecha,
-    required super.referenciaId,
+    super.referenciaId,
   });
 
   factory MovimientoCajaModel.fromJson(Map<String, dynamic> json) {
+    final rawMonto = json['monto'];
+    final double montoParsed = rawMonto is num
+        ? rawMonto.toDouble()
+        : double.tryParse(rawMonto?.toString() ?? '0') ?? 0.0;
+
+    final rawFecha = json['fecha'] ?? json['created_at'];
+    final DateTime fechaParsed = rawFecha != null
+        ? DateTime.parse(rawFecha.toString()).toLocal()
+        : DateTime.now();
+
+    final rawReferencia = json['referencia_id'] ?? json['referenciaId'];
+
     return MovimientoCajaModel(
       id: json['id'] as String?,
-      cajaDiariaId: json['caja_diaria_id'] ?? json['cajaDiariaId'],
+      cajaDiariaId: (json['caja_diaria_id'] ?? json['cajaDiariaId'] ?? '')
+          .toString(),
       tipo: TipoMovimiento.values.firstWhere(
         (e) => e.name == json['tipo'],
         orElse: () => TipoMovimiento.ingreso,
       ),
-      monto: (json['monto'] as num).toDouble(),
-      descripcion: json['descripcion'] as String,
-      fecha: DateTime.parse(json['fecha'] as String).toLocal(),
-      referenciaId: json['referencia_id'] ?? json['referenciaId'] as String,
+      monto: montoParsed,
+      descripcion: (json['descripcion'] ?? json['concepto'] ?? '').toString(),
+      fecha: fechaParsed,
+      referenciaId: rawReferencia?.toString(),
     );
   }
 
@@ -34,8 +47,11 @@ class MovimientoCajaModel extends MovimientoCaja {
       'monto': monto,
       'descripcion': descripcion,
       'fecha': fecha.toUtc().toIso8601String(),
-      'referencia_id': referenciaId,
     };
+
+    if (referenciaId != null) {
+      data['referencia_id'] = referenciaId;
+    }
 
     if (id != null && id!.contains('-') && id!.length == 36) {
       data['id'] = id;

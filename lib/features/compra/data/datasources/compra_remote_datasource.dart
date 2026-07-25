@@ -6,4 +6,8 @@ abstract class CompraRemoteDatasource {
   Future<void> createCompra(CompraModel compra);
   Future<void> updateCompraEstado(String id, String nuevoEstado);
   Future<void> deleteCompra(String id);
+  Future<void> recibirCompra({
+    required String compraId,
+    required String usuarioId,
+  });
 }

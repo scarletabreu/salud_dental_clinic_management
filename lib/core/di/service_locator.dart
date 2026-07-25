@@ -4,6 +4,16 @@ import 'package:salud_dental_clinic_management/core/network/connectivity_check.d
 import 'package:salud_dental_clinic_management/core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+
+// Módulo Compras
+import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/compra/data/repositories/compra_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/compra/domain/repositories/compra_repository.dart';
+import 'package:salud_dental_clinic_management/features/compra/domain/usecases/recibir_compra.dart';
+import 'package:salud_dental_clinic_management/features/compra/presentation/cubit/compra_cubit.dart';
+
+// Módulo Consulta
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
@@ -14,6 +24,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/usecases
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
+
+// Core & Auth
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/core/data/repositories/persona_repository_impl.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
@@ -23,6 +35,8 @@ import 'package:salud_dental_clinic_management/features/auth/data/repositories/u
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
+
+// Módulo Consumibles / Inventario
 import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/consumible/data/repositories/consumible_repository_impl.dart';
@@ -33,15 +47,23 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+
+// Módulo Suplidores
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/get_directorio_suplidores.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/guardar_suplidor.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/data/datasources/suplidor_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/data/datasources/suplidor_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/data/repositories/suplidor_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/repositories/suplidor_repository.dart';
+
+// Módulo Equipos & Caja
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/eliminar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/usecases/registrar_egreso_caja.dart';
-import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/guardar_suplidor.dart';
-import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 
@@ -83,7 +105,6 @@ import 'package:salud_dental_clinic_management/features/personal/domain/reposito
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/record/data/datasources/record_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/superficie/data/datasources/superficie_remote_datasource_impl.dart';
-import 'package:salud_dental_clinic_management/features/suplidor/data/datasources/suplidor_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/datasources/tratamiento_aplicado_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/data/datasources/tratamiento_remote_datasource_impl.dart';
 
@@ -152,9 +173,7 @@ import '../../features/condicion/data/datasources/condicion_remote_datasource.da
 import '../../features/condicion/data/datasources/condicion_remote_datasource_impl.dart';
 import '../../features/condicion/data/repositories/condicion_repository_impl.dart';
 import '../../features/condicion/domain/repositories/condicion_repository.dart';
-import '../../features/suplidor/data/datasources/suplidor_remote_datasource.dart';
-import '../../features/suplidor/data/repositories/suplidor_repository_impl.dart';
-import '../../features/suplidor/domain/repositories/suplidor_repository.dart';
+
 import 'package:salud_dental_clinic_management/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/i_auth_repository.dart';
@@ -185,7 +204,6 @@ Future<void> init() async {
 
   // --- Red / conectividad ---
   sl.registerLazySingleton<ConnectivityCheck>(() => ConnectivityCheckImpl());
-  // El guard falla rapido ante ausencia de red sin esperar el timeout.
   guardConnectivityCheck = () => sl<ConnectivityCheck>().hasConnection;
   sl.registerFactory<ConnectivityCubit>(() => ConnectivityCubit(sl())..start());
 
@@ -226,9 +244,6 @@ Future<void> init() async {
   sl.registerLazySingleton<TratamientoAplicadoDatasource>(
     () => TratamientoAplicadoDatasourceImpl(supabaseClient: sl()),
   );
-  // CORREGIDO: solo un registro LazySingleton para EquipoRemoteDatasource.
-  // El bloque anterior tenía registros duplicados (LazySingleton + Factory)
-  // que causaban conflicto en GetIt en tiempo de ejecución.
   sl.registerLazySingleton<EquipoRemoteDatasource>(
     () => EquipoRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -312,7 +327,6 @@ Future<void> init() async {
   sl.registerFactory<RegistrarTratamientoAplicado>(
     () => RegistrarTratamientoAplicado(sl()),
   );
-  // CORREGIDO: solo un registro LazySingleton para EquipoRepository.
   sl.registerLazySingleton<EquipoRepository>(
     () => EquipoRepositoryImpl(remoteDataSource: sl()),
   );
@@ -487,25 +501,19 @@ Future<void> init() async {
     ),
   );
 
-  // Datasource
+  // ── Módulo Consumibles ───────────────────────────────────────────────────
   sl.registerLazySingleton<ConsumibleRemoteDatasource>(
     () => ConsumibleRemoteDatasourceImpl(supabaseClient: sl()),
   );
-
-  // Repository
   sl.registerLazySingleton<ConsumibleRepository>(
     () => ConsumibleRepositoryImpl(remoteDataSource: sl()),
   );
-
-  // Use Cases
   sl.registerLazySingleton(() => GetInventario(sl()));
   sl.registerLazySingleton(() => GuardarConsumible(sl()));
   sl.registerLazySingleton(() => ActualizarExistencia(sl()));
   sl.registerLazySingleton(() => EliminarConsumible(sl()));
-  sl.registerLazySingleton(() => GetDirectorioSuplidores(sl()));
   sl.registerLazySingleton(() => ObtenerArticulosBajoMinimo(sl()));
 
-  // Cubit
   sl.registerFactory(
     () => InventarioCubit(
       getInventario: sl(),
@@ -518,16 +526,31 @@ Future<void> init() async {
 
   sl.registerLazySingleton(() => RegistrarEgresoCaja(sl()));
 
-  // Use Cases Suplidor
+  // ── Módulo Suplidores ────────────────────────────────────────────────────
+  sl.registerLazySingleton(() => GetDirectorioSuplidores(sl()));
   sl.registerLazySingleton(() => GuardarSuplidor(sl()));
   sl.registerLazySingleton(() => EliminarSuplidor(sl()));
 
-  // Cubit Suplidor
   sl.registerFactory(
     () => SuplidorCubit(
       getDirectorio: sl(),
       guardarSuplidor: sl(),
       eliminarSuplidor: sl(),
     ),
+  );
+
+  // ── Módulo Compras ───────────────────────────────────────────────────────
+  sl.registerLazySingleton<CompraRemoteDatasource>(
+    () => CompraRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+
+  sl.registerLazySingleton<CompraRepository>(
+    () => CompraRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  sl.registerLazySingleton(() => RecibirCompra(sl()));
+
+  sl.registerFactory(
+    () => CompraCubit(repository: sl(), recibirCompraUseCase: sl()),
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -9,7 +10,6 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/presentation
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/resumen_cierre_page.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class CajaDiariaPage extends StatefulWidget {
   const CajaDiariaPage({super.key});
@@ -570,7 +570,7 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    fechaLargaEs(widget.state.caja.fecha),
+                    fechaLargaEs(DateTime.now().toLocal()),
                     style: TextStyle(color: ac.textSecondary),
                   ),
                 ],
@@ -808,7 +808,7 @@ class _MovementRow extends StatelessWidget {
         ? context.appColors.green
         : context.appColors.orange;
     final hora =
-        '${movimiento.fecha.hour.toString().padLeft(2, '0')}:${movimiento.fecha.minute.toString().padLeft(2, '0')}';
+        '${movimiento.fecha.toLocal().hour.toString().padLeft(2, '0')}:${movimiento.fecha.toLocal().minute.toString().padLeft(2, '0')}';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
       leading: CircleAvatar(

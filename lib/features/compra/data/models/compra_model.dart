@@ -19,7 +19,7 @@ class CompraModel extends Compra {
           .toList(),
       estado: EstadoCompra.values.firstWhere(
         (e) => e.name == json['estado'],
-        orElse: () => EstadoCompra.pendente,
+        orElse: () => EstadoCompra.pendiente,
       ),
     );
   }

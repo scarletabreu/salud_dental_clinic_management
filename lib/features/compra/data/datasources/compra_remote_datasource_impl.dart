@@ -10,23 +10,62 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchCompras() async {
-    final response = await supabaseClient
+    // 1. Obtener las compras
+    final comprasResponse = await supabaseClient
         .from('compras')
-        .select('*, items:consumibles_compra(*)')
+        .select()
         .filter('deleted_at', 'is', null)
         .order('fecha', ascending: false);
 
-    return List<Map<String, dynamic>>.from(response);
+    final compras = List<Map<String, dynamic>>.from(comprasResponse);
+    if (compras.isEmpty) return [];
+
+    final compraIds = compras
+        .map((c) => c['id'] as String?)
+        .whereType<String>()
+        .toList();
+
+    if (compraIds.isEmpty) return compras;
+
+    // 2. Obtener los consumibles asociados
+    final itemsResponse = await supabaseClient
+        .from('consumibles_compras')
+        .select()
+        .filter('compra_id', 'in', compraIds);
+
+    final items = List<Map<String, dynamic>>.from(itemsResponse);
+
+    // 3. Unir los ítems dentro de su respectiva compra
+    for (var compra in compras) {
+      final itemsDeCompra = items
+          .where((item) => item['compra_id'] == compra['id'])
+          .toList();
+      compra['items'] = itemsDeCompra;
+    }
+
+    return compras;
   }
 
   @override
   Future<Map<String, dynamic>?> fetchCompraById(String id) async {
-    return await supabaseClient
+    final compra = await supabaseClient
         .from('compras')
-        .select('*, items:consumibles_compra(*)')
+        .select()
         .eq('id', id)
         .filter('deleted_at', 'is', null)
         .maybeSingle();
+
+    if (compra == null) return null;
+
+    final itemsResponse = await supabaseClient
+        .from('consumibles_compras')
+        .select()
+        .eq('compra_id', id);
+
+    final compraMap = Map<String, dynamic>.from(compra);
+    compraMap['items'] = List<Map<String, dynamic>>.from(itemsResponse);
+
+    return compraMap;
   }
 
   @override
@@ -52,7 +91,7 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
       return json;
     }).toList();
 
-    await supabaseClient.from('consumibles_compra').insert(itemsData);
+    await supabaseClient.from('consumibles_compras').insert(itemsData);
   }
 
   @override
@@ -75,5 +114,16 @@ class CompraRemoteDatasourceImpl implements CompraRemoteDatasource {
           'deleted_at': DateTime.now().toIso8601String(),
         })
         .eq('id', id);
+  }
+
+  @override
+  Future<void> recibirCompra({
+    required String compraId,
+    required String usuarioId,
+  }) async {
+    await supabaseClient.rpc(
+      'recibir_compra',
+      params: {'p_compra_id': compraId, 'p_usuario_id': usuarioId},
+    );
   }
 }

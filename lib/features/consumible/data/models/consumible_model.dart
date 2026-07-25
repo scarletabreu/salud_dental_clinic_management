@@ -18,23 +18,43 @@ class ConsumibleModel extends Consumible {
   factory ConsumibleModel.fromJson(Map<String, dynamic> json) {
     return ConsumibleModel(
       id: json['id'] as String?,
-      nombre: json['nombre'] as String,
-      descripcion: json['descripcion'] ?? '',
-      precio: (json['precio'] as num? ?? 0).toDouble(),
-      stockActual: ((json['stock_actual'] ?? json['stockActual']) as num? ?? 0)
+      nombre: json['nombre'] as String? ?? '',
+      descripcion: json['descripcion'] as String? ?? '',
+      stockActual: (json['stock_actual'] ?? json['stockActual'] ?? 0 as num)
           .toInt(),
-      stockMinimo: ((json['stock_minimo'] ?? json['stockMinimo']) as num? ?? 0)
+      stockMinimo: (json['stock_minimo'] ?? json['stockMinimo'] ?? 0 as num)
           .toInt(),
-      estado: EstadoConsumible.values.firstWhere(
-        (e) => e.name == json['estado'],
-        orElse: () => EstadoConsumible.disponible,
-      ),
-      suplidorId: json['suplidor_id'] as String?,
-      suplidorNombre: json['suplidor'] is Map<String, dynamic>
-          ? json['suplidor']['nombre'] as String?
-          : null,
-      activo: json['activo'] as bool? ?? true,
+      estado: _parseEstado(json['estado'] as String?),
     );
+  }
+
+  static EstadoConsumible _parseEstado(String? estadoStr) {
+    if (estadoStr == null) return EstadoConsumible.disponible;
+    switch (estadoStr) {
+      case 'bajo_stock':
+      case 'bajoStock':
+        return EstadoConsumible.bajoStock;
+      case 'agotado':
+        return EstadoConsumible.agotado;
+      case 'descontinuado':
+        return EstadoConsumible.descontinuado;
+      case 'disponible':
+      default:
+        return EstadoConsumible.disponible;
+    }
+  }
+
+  static String _estadoToPg(EstadoConsumible estado) {
+    switch (estado) {
+      case EstadoConsumible.bajoStock:
+        return 'bajo_stock';
+      case EstadoConsumible.disponible:
+        return 'disponible';
+      case EstadoConsumible.agotado:
+        return 'agotado';
+      case EstadoConsumible.descontinuado:
+        return 'descontinuado';
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -44,10 +64,12 @@ class ConsumibleModel extends Consumible {
       'precio': precio,
       'stock_actual': stockActual,
       'stock_minimo': stockMinimo,
-      'estado': estado.name,
-      'suplidor_id': suplidorId,
-      'activo': activo,
+      'estado': _estadoToPg(estado),
     };
+
+    if (id != null && id!.trim().isNotEmpty && id!.contains('-')) {
+      data['id'] = id;
+    }
 
     return data;
   }

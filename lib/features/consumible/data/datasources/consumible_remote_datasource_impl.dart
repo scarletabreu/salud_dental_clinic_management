@@ -10,23 +10,34 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchConsumibles() async {
     final response = await supabaseClient
         .from('consumibles')
-        .select('*, suplidor:suplidores(nombre)')
-        .eq('activo', true)
+        .select()
+        .filter('deleted_at', 'is', null)
         .order('nombre', ascending: true);
 
     return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override
-  Future<void> adjustStock(String id, int nuevoStock, String motivo) async {
-    await supabaseClient.rpc(
-      'ajustar_stock_consumible',
-      params: {
-        'p_consumible_id': id,
-        'p_nuevo_stock': nuevoStock,
-        'p_motivo': motivo,
-      },
-    );
+  Future<void> updateStock(String id, int nuevoStock) async {
+    await supabaseClient
+        .from('consumibles')
+        .update({
+          'stock_actual': nuevoStock,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', id);
+  }
+
+  @override
+  Future<void> upsertConsumible(Map<String, dynamic> data) async {
+    data['updated_at'] = DateTime.now().toIso8601String();
+
+    if (data['id'] == null) {
+      data['created_at'] = DateTime.now().toIso8601String();
+      await supabaseClient.from('consumibles').insert(data);
+    } else {
+      await supabaseClient.from('consumibles').upsert(data);
+    }
   }
 
   @override

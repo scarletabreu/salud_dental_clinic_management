@@ -10,7 +10,6 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_expediente.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 /// Resumen clínico de solo lectura de una consulta cerrada: datos del paciente,
@@ -77,27 +76,16 @@ class ConsultaDetallePage extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (consulta.odontograma != null) ...[
-                  const SizedBox(height: 16),
-                  _seccion(
-                    context,
-                    'Odontodiagrama',
-                    Icons.assignment_outlined,
-                    ac.indigo,
-                    OdontodiagramaExpediente(
-                      evaluacion: consulta.odontograma!.evaluacion,
-                      nombrePaciente: nombrePaciente,
-                      fecha: consulta.fecha,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 16),
                 _seccion(
                   context,
                   'Odontograma y tratamientos',
                   Icons.healing_rounded,
                   ac.teal,
-                  OdontogramaTratamientosDetalle(consulta: consulta),
+                  OdontogramaTratamientosDetalle(
+                    consulta: consulta,
+                    nombrePaciente: nombrePaciente,
+                  ),
                 ),
                 if (consulta.tieneRecetas) ...[
                   const SizedBox(height: 16),

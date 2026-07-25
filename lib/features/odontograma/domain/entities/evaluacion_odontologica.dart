@@ -1,12 +1,25 @@
 import 'package:flutter/painting.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
-/// Tintas del formulario en papel. Los doctores solo escriben en rojo y azul,
-/// así que son datos clínicos —no colores de tema— y no cambian con el modo
-/// oscuro: el negro queda reservado para estados acordados fuera de las claves.
+/// Tintas del formulario en papel, tal como se imprimen. Los doctores solo
+/// escriben en rojo y azul; el negro queda reservado para estados acordados
+/// fuera de las claves.
 const Color kTintaRoja = Color(0xFFC81E1E);
 const Color kTintaAzul = Color(0xFF1D4ED8);
 const Color kTintaNegra = Color(0xFF1F2937);
+
+/// Qué tinta usa una clave. El dato clínico es *cuál* de las tres, no el valor
+/// RGB: sobre papel oscuro esas mismas tintas se dibujan con otra luminancia
+/// para seguir siendo legibles sin dejar de ser «la roja» y «la azul».
+enum TintaClinica { roja, azul, negra }
+
+extension TintaClinicaX on TintaClinica {
+  Color get impresa => switch (this) {
+    TintaClinica.roja => kTintaRoja,
+    TintaClinica.azul => kTintaAzul,
+    TintaClinica.negra => kTintaNegra,
+  };
+}
 
 /// Trazo con el que se dibuja un hallazgo sobre el glifo del diente. Reproduce
 /// la columna de símbolos de las CLAVES del formulario.
@@ -72,12 +85,16 @@ extension EstadoClinicoDentalX on EstadoClinicoDental {
     EstadoClinicoDental.otro => MarcaClinica.asterisco,
   };
 
-  Color get tinta => switch (this) {
-    EstadoClinicoDental.restaurada => kTintaAzul,
-    EstadoClinicoDental.noErupcionado => kTintaAzul,
-    EstadoClinicoDental.otro => kTintaNegra,
-    _ => kTintaRoja,
+  TintaClinica get tintaClinica => switch (this) {
+    EstadoClinicoDental.restaurada => TintaClinica.azul,
+    EstadoClinicoDental.noErupcionado => TintaClinica.azul,
+    EstadoClinicoDental.otro => TintaClinica.negra,
+    _ => TintaClinica.roja,
   };
+
+  /// Color de la clave sobre papel blanco. En pantalla se resuelve contra la
+  /// paleta del tema, que remapea [tintaClinica] al mismo rol en otro fondo.
+  Color get tinta => tintaClinica.impresa;
 
   /// Caries y restauraciones se anotan sobre superficies concretas; el resto
   /// de las claves afectan a la pieza entera.
@@ -286,6 +303,50 @@ class EvaluacionOdontologica {
   }
 
   EvaluacionOdontologica sinPieza(int fdi) => conHallazgos(fdi, const []);
+
+  /// Quita de esta evaluación lo que ya aparece igual en [actual], para que la
+  /// capa histórica no repita en tenue lo que ya está anotado en firme.
+  EvaluacionOdontologica menos(EvaluacionOdontologica actual) {
+    final piezas = <int, List<HallazgoDental>>{};
+    for (final entry in hallazgos.entries) {
+      final vigentes = actual.de(entry.key);
+      final restantes = entry.value
+          .where((h) => !vigentes.any((v) => v.estado == h.estado))
+          .toList();
+      if (restantes.isNotEmpty) piezas[entry.key] = List.unmodifiable(restantes);
+    }
+    final tejidos = {
+      for (final entry in tejidosBlandos.entries)
+        if (actual.tejidosBlandos[entry.key] != entry.value)
+          entry.key: entry.value,
+    };
+    return EvaluacionOdontologica(
+      hallazgos: Map.unmodifiable(piezas),
+      tejidosBlandos: Map.unmodifiable(tejidos),
+    );
+  }
+
+  /// Consolida varias evaluaciones en una sola. [evaluaciones] llega de la más
+  /// reciente a la más antigua y gana la primera que anota cada pieza o tejido,
+  /// igual que el resumen del expediente: lo último que dijo el doctor.
+  static EvaluacionOdontologica consolidar(
+    Iterable<EvaluacionOdontologica> evaluaciones,
+  ) {
+    final piezas = <int, List<HallazgoDental>>{};
+    final tejidos = <TejidoBlando, String>{};
+    for (final evaluacion in evaluaciones) {
+      evaluacion.hallazgos.forEach(
+        (fdi, lista) => piezas.putIfAbsent(fdi, () => lista),
+      );
+      evaluacion.tejidosBlandos.forEach(
+        (tejido, anotacion) => tejidos.putIfAbsent(tejido, () => anotacion),
+      );
+    }
+    return EvaluacionOdontologica(
+      hallazgos: Map.unmodifiable(piezas),
+      tejidosBlandos: Map.unmodifiable(tejidos),
+    );
+  }
 
   EvaluacionOdontologica conTejido(TejidoBlando tejido, String anotacion) {
     final copia = {

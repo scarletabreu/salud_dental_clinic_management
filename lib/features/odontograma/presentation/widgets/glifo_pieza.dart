@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
 /// Fracción del lado en la que empieza el recuadro central del glifo. Es la
@@ -155,11 +156,16 @@ class GlifoPieza {
 }
 
 /// Dibuja el glifo de una pieza con sus hallazgos encima.
+///
+/// Se pintan dos capas: primero [historicos] —lo anotado en consultas
+/// anteriores, en tinta tenue— y encima [hallazgos], lo de esta consulta a
+/// plena tinta. Es la misma convención que la capa histórica del odontograma de
+/// tratamientos: presente, pero claramente en segundo plano.
 class GlifoPiezaPainter extends CustomPainter {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
-  final Color trazo;
-  final Color papel;
+  final List<HallazgoDental> historicos;
+  final PaletaOdontodiagrama paleta;
 
   /// Realce de foco/hover; no forma parte del dibujo clínico.
   final Color? resalte;
@@ -167,8 +173,8 @@ class GlifoPiezaPainter extends CustomPainter {
   const GlifoPiezaPainter({
     required this.glifo,
     required this.hallazgos,
-    required this.trazo,
-    required this.papel,
+    required this.paleta,
+    this.historicos = const [],
     this.resalte,
   });
 
@@ -178,16 +184,19 @@ class GlifoPiezaPainter extends CustomPainter {
     final exterior = glifo.contornoExterior(lado);
     final interior = glifo.contornoInterior(lado);
 
-    canvas.drawPath(exterior, Paint()..color = papel);
+    canvas.drawPath(exterior, Paint()..color = paleta.papel);
 
     if (resalte != null) {
       canvas.drawPath(exterior, Paint()..color = resalte!);
     }
 
-    _pintarSuperficies(canvas, lado);
+    if (historicos.isNotEmpty) {
+      _pintarSuperficies(canvas, lado, historicos, paleta.alfaHistorico);
+    }
+    _pintarSuperficies(canvas, lado, hallazgos, paleta.alfaRelleno);
 
     final lapiz = Paint()
-      ..color = trazo
+      ..color = paleta.trazo
       ..style = PaintingStyle.stroke
       ..strokeWidth = math.max(0.9, lado * 0.028)
       ..strokeJoin = StrokeJoin.miter;
@@ -198,15 +207,21 @@ class GlifoPiezaPainter extends CustomPainter {
       canvas.drawLine(desde, hasta, lapiz);
     }
 
-    _pintarMarcasDePieza(canvas, lado, exterior);
+    _pintarMarcasDePieza(canvas, lado, exterior, historicos, historico: true);
+    _pintarMarcasDePieza(canvas, lado, exterior, hallazgos);
   }
 
-  void _pintarSuperficies(Canvas canvas, double lado) {
+  void _pintarSuperficies(
+    Canvas canvas,
+    double lado,
+    List<HallazgoDental> capa,
+    double alfa,
+  ) {
     final porSuperficie = <TipoSuperficie, Color>{};
-    for (final hallazgo in hallazgos) {
+    for (final hallazgo in capa) {
       if (hallazgo.estado.marca != MarcaClinica.relleno) continue;
       for (final superficie in hallazgo.superficies) {
-        porSuperficie[superficie] = hallazgo.estado.tinta;
+        porSuperficie[superficie] = paleta.tintaDe(hallazgo.estado);
       }
     }
     if (porSuperficie.isEmpty) return;
@@ -215,20 +230,25 @@ class GlifoPiezaPainter extends CustomPainter {
     porSuperficie.forEach((superficie, tinta) {
       final region = regiones[superficie];
       if (region == null) return;
-      canvas.drawPath(region, Paint()..color = tinta.withValues(alpha: 0.72));
+      canvas.drawPath(region, Paint()..color = tinta.withValues(alpha: alfa));
     });
   }
 
-  void _pintarMarcasDePieza(Canvas canvas, double lado, Path exterior) {
-    for (final hallazgo in hallazgos) {
+  void _pintarMarcasDePieza(
+    Canvas canvas,
+    double lado,
+    Path exterior,
+    List<HallazgoDental> capa, {
+    bool historico = false,
+  }) {
+    final alfa = historico ? paleta.alfaHistorico : paleta.alfaRelleno;
+    for (final hallazgo in capa) {
       final estado = hallazgo.estado;
+      final tinta = paleta.tintaDe(estado);
       if (estado.marca == MarcaClinica.relleno) {
         // Una clave por superficie sin superficies anotadas cubre la pieza.
         if (hallazgo.esPiezaCompleta) {
-          canvas.drawPath(
-            exterior,
-            Paint()..color = estado.tinta.withValues(alpha: 0.72),
-          );
+          canvas.drawPath(exterior, Paint()..color = tinta.withValues(alpha: alfa));
         }
         continue;
       }
@@ -236,19 +256,20 @@ class GlifoPiezaPainter extends CustomPainter {
         canvas,
         lado: lado,
         marca: estado.marca,
-        tinta: estado.tinta,
+        tinta: historico ? tinta.withValues(alpha: 0.42) : tinta,
         recorte: exterior,
+        alfaRelleno: alfa,
       );
     }
   }
 
   @override
   bool shouldRepaint(GlifoPiezaPainter old) =>
-      old.trazo != trazo ||
-      old.papel != papel ||
+      old.paleta != paleta ||
       old.resalte != resalte ||
       old.glifo.fdi != glifo.fdi ||
-      !listEquals(old.hallazgos, hallazgos);
+      !listEquals(old.hallazgos, hallazgos) ||
+      !listEquals(old.historicos, historicos);
 }
 
 /// Traza una de las claves del formulario sobre un lienzo de [lado] píxeles.
@@ -260,6 +281,7 @@ void dibujarMarcaClinica(
   required MarcaClinica marca,
   required Color tinta,
   Path? recorte,
+  double alfaRelleno = 0.72,
 }) {
   final pincel = Paint()
     ..color = tinta
@@ -272,7 +294,7 @@ void dibujarMarcaClinica(
     case MarcaClinica.relleno:
       final path =
           recorte ?? (Path()..addRect(Rect.fromLTWH(0, 0, lado, lado)));
-      canvas.drawPath(path, Paint()..color = tinta.withValues(alpha: 0.72));
+      canvas.drawPath(path, Paint()..color = tinta.withValues(alpha: alfaRelleno));
 
     case MarcaClinica.rayado:
       canvas.save();
@@ -312,55 +334,65 @@ void dibujarMarcaClinica(
   }
 }
 
-/// Símbolo de una clave, dibujado con el mismo trazo que el diagrama.
+/// Símbolo de una clave, dibujado con el mismo trazo y sobre el mismo papel que
+/// el diagrama, para que la leyenda y el dibujo no puedan divergir.
 class MarcaClinicaIcono extends StatelessWidget {
   final MarcaClinica marca;
-  final Color tinta;
+  final PaletaOdontodiagrama paleta;
+
+  /// Tinta explícita. Por defecto la de [estado] resuelta contra la paleta.
+  final Color? tinta;
+  final EstadoClinicoDental? estado;
   final double lado;
-  final Color trazo;
 
   const MarcaClinicaIcono({
     super.key,
     required this.marca,
-    required this.tinta,
-    required this.trazo,
+    required this.paleta,
+    this.tinta,
+    this.estado,
     this.lado = 16,
-  });
+  }) : assert(tinta != null || estado != null, 'Hace falta una tinta');
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(lado),
-    painter: _MarcaIconoPainter(marca: marca, tinta: tinta, trazo: trazo),
+    painter: _MarcaIconoPainter(
+      marca: marca,
+      tinta: tinta ?? paleta.tintaDe(estado!),
+      paleta: paleta,
+    ),
   );
 }
 
 class _MarcaIconoPainter extends CustomPainter {
   final MarcaClinica marca;
   final Color tinta;
-  final Color trazo;
+  final PaletaOdontodiagrama paleta;
 
   const _MarcaIconoPainter({
     required this.marca,
     required this.tinta,
-    required this.trazo,
+    required this.paleta,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final lado = math.min(size.width, size.height);
     final marco = Path()..addRect(Rect.fromLTWH(0, 0, lado, lado));
-    canvas.drawPath(marco, Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawPath(marco, Paint()..color = paleta.papel);
     dibujarMarcaClinica(
       canvas,
       lado: lado,
       marca: marca,
       tinta: tinta,
       recorte: marco,
+      alfaRelleno: paleta.alfaRelleno,
     );
     canvas.drawPath(
       marco,
       Paint()
-        ..color = trazo
+        ..color = paleta.trazo
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -368,5 +400,5 @@ class _MarcaIconoPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MarcaIconoPainter old) =>
-      old.marca != marca || old.tinta != tinta || old.trazo != trazo;
+      old.marca != marca || old.tinta != tinta || old.paleta != paleta;
 }

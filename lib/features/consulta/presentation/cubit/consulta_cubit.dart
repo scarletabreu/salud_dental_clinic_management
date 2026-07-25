@@ -96,6 +96,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
       }
       var historicoPorFdi = const <int, List<TratamientoAplicado>>{};
+      var evaluacionHistorica = EvaluacionOdontologica.vacia;
+      // El historial es contexto, no un requisito: si falla, la consulta se
+      // abre igual y el doctor trabaja sin la capa tenue.
       try {
         historicoPorFdi = await _consultaRepository
             .getTratamientosHistoricosPorDiente(
@@ -105,9 +108,20 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       } catch (e) {
         if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
       }
+      try {
+        evaluacionHistorica = await _consultaRepository.getEvaluacionHistorica(
+          pacienteId,
+          excluyendoConsultaId: consultaId,
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('No se pudo cargar el odontodiagrama anterior: $e');
+        }
+      }
 
       final odontograma = Odontograma(
         consultaId: consultaId,
+        evaluacionHistorica: evaluacionHistorica,
         dientes: kFdiPermanentes.map((fdi) {
           return Diente(
             odontogramaId: '',

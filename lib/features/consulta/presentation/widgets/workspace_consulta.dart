@@ -10,8 +10,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/tarjeta_consulta.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
@@ -225,7 +224,41 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
         }
 
         if (consulta.odontograma == null) {
-          return const Center(child: Text('Odontograma no disponible'));
+          // La consulta se crea con sus 32 piezas, así que llegar aquí
+          // significa que la carga falló: hay que decirlo, no dejar una
+          // pantalla en blanco que parezca «este paciente no tiene nada».
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 32,
+                    color: ac.textDisabled,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No se pudo cargar el odontograma de esta consulta.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Vuelve a abrir la consulta; si persiste, revisa la '
+                    'conexión con el servidor.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: ac.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         final odontograma = consulta.odontograma!;
@@ -323,43 +356,31 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             TarjetaConsulta(
               icon: Icons.assignment_outlined,
               iconColor: ac.indigo,
-              titulo: 'Odontodiagrama',
+              titulo: 'Odontograma',
               subtitulo:
-                  'Hallazgos por pieza y tejidos blandos, como en el formulario',
-              child: OdontodiagramaWidget(
-                evaluacion: odontograma.evaluacion,
+                  'Anota hallazgos en el formulario o asigna tratamientos en '
+                  'la arcada: es la misma boca en dos vistas',
+              child: VistasOdontograma(
+                odontograma: odontograma,
                 editable: true,
-                onChanged: context
+                onEvaluacionChanged: context
                     .read<ConsultaCubit>()
                     .actualizarEvaluacionOdontologica,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TarjetaConsulta(
-              icon: Icons.grid_view_rounded,
-              iconColor: ac.teal,
-              titulo: 'Tratamientos por pieza',
-              subtitulo:
-                  'Toca un diente para asignar tratamientos y superficies',
-              accion: _cargandoCatalogo
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: ac.teal,
-                      ),
-                    )
-                  : null,
-              child: OdontogramWidget(
-                odontograma: odontograma,
-                editMode: true,
                 onAddTratamiento: _onAddTratamiento,
                 onToggleAusente: _onToggleAusente,
                 onQuitarTratamiento: _onQuitarTratamiento,
                 onToggleTratamientoTerminado: _onToggleTerminado,
                 nombreTratamiento: _nombreTratamiento,
+                accion: _cargandoCatalogo
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ac.teal,
+                        ),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 16),

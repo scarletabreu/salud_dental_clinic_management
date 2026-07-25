@@ -36,6 +36,13 @@ abstract class ConsultaRemoteDatasource {
     String? excluyendoConsultaId,
   });
 
+  /// Odontodiagramas de las consultas anteriores del paciente, de la más
+  /// reciente a la más antigua.
+  Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  });
+
   Future<void> updateConsulta(String id, Map<String, dynamic> consultaData);
   Future<void> deleteConsulta(String id);
 }

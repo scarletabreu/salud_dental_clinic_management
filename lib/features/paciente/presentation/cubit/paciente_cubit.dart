@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -35,12 +36,13 @@ class PacienteCubit extends Cubit<PacienteState> {
     await result.fold(
       (failure) async => emit(PacienteError(failure.message)),
       (paciente) async {
-        final consultas = await _historialDe(paciente.id);
+        final historial = await _historialDe(paciente.id);
         emit(
           PacienteDetailLoaded(
             paciente.copyWith(
-              record: paciente.record.copyWith(consultas: consultas),
+              record: paciente.record.copyWith(consultas: historial.consultas),
             ),
+            historialNoDisponible: historial.fallo,
           ),
         );
       },
@@ -72,13 +74,19 @@ class PacienteCubit extends Cubit<PacienteState> {
   }
 
   /// El expediente no debe romperse si falla el historial (p. ej. pacientes
-  /// de prueba con id no-uuid): se degrada a lista vacía.
-  Future<List<Consulta>> _historialDe(String? pacienteId) async {
-    if (pacienteId == null) return const [];
+  /// de prueba con id no-uuid): se degrada a lista vacía, pero el fallo se
+  /// arrastra hasta la vista para que no se confunda con «no tiene consultas».
+  Future<_Historial> _historialDe(String? pacienteId) async {
+    if (pacienteId == null) return const _Historial(const []);
     try {
-      return await _consultaRepository.getHistorialPaciente(pacienteId);
-    } catch (_) {
-      return const [];
+      return _Historial(
+        await _consultaRepository.getHistorialPaciente(pacienteId),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('No se pudo cargar el historial de $pacienteId: $e');
+      }
+      return const _Historial(const [], fallo: true);
     }
   }
 
@@ -176,4 +184,12 @@ class PacienteCubit extends Cubit<PacienteState> {
       emit(PacienteError('Error al verificar citas: $e'));
     }
   }
+}
+/// Resultado de leer el historial: las consultas y si la lectura falló. Sin el
+/// segundo dato, una lista vacía es ambigua.
+class _Historial {
+  final List<Consulta> consultas;
+  final bool fallo;
+
+  const _Historial(this.consultas, {this.fallo = false});
 }

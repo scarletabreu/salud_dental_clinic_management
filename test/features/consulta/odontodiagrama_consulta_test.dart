@@ -18,6 +18,9 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_widget.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -32,6 +35,7 @@ const _pacienteId = '11111111-1111-1111-1111-111111111111';
 
 Consulta _consultaConOdontograma({
   EvaluacionOdontologica evaluacion = EvaluacionOdontologica.vacia,
+  EvaluacionOdontologica historico = EvaluacionOdontologica.vacia,
 }) => Consulta(
   id: _consultaId,
   pacienteId: _pacienteId,
@@ -41,6 +45,7 @@ Consulta _consultaConOdontograma({
     id: 'odo-1',
     consultaId: _consultaId,
     evaluacion: evaluacion,
+    evaluacionHistorica: historico,
     dientes: [
       for (final fdi in kFdiPermanentes)
         Diente(
@@ -192,6 +197,9 @@ void main() {
     late ConsultaCubit cubit;
 
     setUp(() {
+      // La vista elegida se recuerda durante la sesión, así que cada test debe
+      // partir del mismo estado.
+      vistaOdontogramaPreferida.value = VistaOdontograma.formulario;
       if (sl.isRegistered<TratamientoRepository>()) {
         sl.unregister<TratamientoRepository>();
       }
@@ -238,15 +246,55 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('separa el odontodiagrama del odontograma de tratamientos', (
+    testWidgets('ofrece las dos vistas y solo dibuja la elegida', (
       tester,
     ) async {
       await montar(tester);
 
-      expect(find.text('Odontodiagrama'), findsOneWidget);
-      expect(find.text('Tratamientos por pieza'), findsOneWidget);
-      // Un solo diagrama clínico, no tres apilados.
+      // Una sola tarjeta con el conmutador, no dos diagramas apilados.
+      expect(find.byType(SelectorVistaOdontograma), findsOneWidget);
+      expect(find.text('Formulario'), findsOneWidget);
+      expect(find.text('Arcada'), findsOneWidget);
+
+      // La vista por defecto es el formulario del papel.
       expect(find.text('ODONTODIAGRAMA'), findsOneWidget);
+      expect(find.byType(OdontogramWidget), findsNothing);
+
+      await tester.tap(find.text('Arcada'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OdontogramWidget), findsOneWidget);
+      expect(find.text('ODONTODIAGRAMA'), findsNothing);
+    });
+
+    testWidgets('el odontodiagrama anterior del paciente llega a la vista', (
+      tester,
+    ) async {
+      final previo = EvaluacionOdontologica.vacia.alternar(
+        36,
+        EstadoClinicoDental.perdida,
+      );
+      repo = _ConsultaRepositorioEspia(
+        _consultaConOdontograma(historico: previo),
+      );
+      await cubit.close();
+      cubit = _cubit(repo);
+
+      await montar(tester);
+
+      final diagrama = tester.widget<OdontodiagramaWidget>(
+        find.byType(OdontodiagramaWidget),
+      );
+      expect(
+        diagrama.historico.de(36).single.estado,
+        EstadoClinicoDental.perdida,
+      );
+      // La capa histórica se anuncia, para que el trazo tenue no se confunda
+      // con algo anotado hoy.
+      expect(
+        find.text('El trazo tenue viene de consultas anteriores.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('anotar una pieza llega al estado de la consulta', (

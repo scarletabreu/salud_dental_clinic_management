@@ -15,6 +15,12 @@ class Odontograma {
   /// que sigue normalizado porque de él cuelgan tratamientos y facturación.
   final EvaluacionOdontologica evaluacion;
 
+  /// Lo anotado en el odontodiagrama de consultas anteriores del mismo
+  /// paciente. Es un campo derivado —igual que `Diente.tratamientosHistoricos`—
+  /// que se calcula al cargar y no se persiste: la fuente sigue siendo la
+  /// `evaluacion` de cada consulta.
+  final EvaluacionOdontologica evaluacionHistorica;
+
   Odontograma({
     this.id,
     required this.consultaId,
@@ -22,6 +28,7 @@ class Odontograma {
     this.tratamientos = const [],
     this.diagnosis = const [],
     this.evaluacion = EvaluacionOdontologica.vacia,
+    this.evaluacionHistorica = EvaluacionOdontologica.vacia,
   });
 
   Odontograma copyWith({
@@ -30,6 +37,7 @@ class Odontograma {
     List<Tratamiento>? tratamientos,
     List<Diagnosis>? diagnosis,
     EvaluacionOdontologica? evaluacion,
+    EvaluacionOdontologica? evaluacionHistorica,
   }) {
     return Odontograma(
       id: id,
@@ -38,6 +46,7 @@ class Odontograma {
       tratamientos: tratamientos ?? List.from(this.tratamientos),
       diagnosis: diagnosis ?? List.from(this.diagnosis),
       evaluacion: evaluacion ?? this.evaluacion,
+      evaluacionHistorica: evaluacionHistorica ?? this.evaluacionHistorica,
     );
   }
 

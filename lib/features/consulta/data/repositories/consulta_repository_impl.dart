@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -192,6 +193,22 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       }
       return porFdi;
     }, context: 'obtener los tratamientos históricos');
+  }
+
+  @override
+  Future<EvaluacionOdontologica> getEvaluacionHistorica(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchEvaluacionesPaciente(
+        pacienteId,
+        excluyendoConsultaId: excluyendoConsultaId,
+      );
+      return EvaluacionOdontologica.consolidar(
+        filas.map((f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica'])),
+      );
+    }, context: 'obtener el odontodiagrama histórico');
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive_widg
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/glifo_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
 /// Las seis claves del papel más el estado abierto que la clínica usa para lo
@@ -31,6 +32,11 @@ final List<EntradaLeyendaOdontograma> leyendaClinicaPredeterminada =
 class OdontodiagramaWidget extends StatefulWidget {
   final EvaluacionOdontologica evaluacion;
 
+  /// Lo anotado en consultas anteriores, dibujado en tinta tenue debajo de
+  /// [evaluacion]. Es la misma capa histórica del odontograma de tratamientos:
+  /// el doctor ve de un vistazo qué traía el paciente y qué añade hoy.
+  final EvaluacionOdontologica historico;
+
   /// Permite anotar. Requiere [onChanged].
   final bool editable;
 
@@ -45,6 +51,7 @@ class OdontodiagramaWidget extends StatefulWidget {
   const OdontodiagramaWidget({
     super.key,
     required this.evaluacion,
+    this.historico = EvaluacionOdontologica.vacia,
     this.editable = false,
     this.modoImpresion = false,
     this.leyenda,
@@ -56,17 +63,21 @@ class OdontodiagramaWidget extends StatefulWidget {
 }
 
 class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
-  /// Color del papel. El diagrama no se adapta al tema: las claves están
-  /// definidas en tinta roja y azul y deben leerse igual en pantalla, en modo
-  /// oscuro y en el PDF impreso.
-  static const Color _papel = Color(0xFFFDFDFC);
-  static const Color _trazo = Color(0xFF334155);
-  static const Color _reglaTabla = Color(0xFFB6BFCC);
+  /// Lado mínimo de una pieza cuando se puede tocar. Por debajo de 44 px el
+  /// dedo no acierta la cara del diente, y esta pantalla se usa en tablet.
+  static const double _celdaTactil = 44;
 
-  static const double _anchoMinimoDiagrama = 468;
-  static const double _anchoMaximoDiagrama = 860;
+  /// En solo lectura la pieza no es un objetivo, así que puede apretarse para
+  /// que el diagrama entero quepa sin desplazamiento.
+  static const double _celdaLectura = 30;
+
+  static const double _anchoMaximoDiagrama = 940;
   static const double _lineaMedia = 1.4;
 
+  /// Ficha en vez de clave: el toque abre la pieza en lugar de anotarla. En
+  /// escritorio basta la pulsación larga, pero en tablet hace falta un modo
+  /// visible.
+  bool _modoFicha = false;
   late EstadoClinicoDental _claveActiva;
   final Map<TejidoBlando, TextEditingController> _tejidoControllers = {};
 
@@ -75,6 +86,11 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
 
   bool get _editando =>
       widget.editable && !widget.modoImpresion && widget.onChanged != null;
+
+  PaletaOdontodiagrama get _paleta =>
+      PaletaOdontodiagrama.de(context, imprimir: widget.modoImpresion);
+
+  bool get _hayHistorico => !widget.historico.estaVacia;
 
   @override
   void initState() {
@@ -112,11 +128,26 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   void _emitir(EvaluacionOdontologica evaluacion) =>
       widget.onChanged?.call(evaluacion);
 
-  void _tocarPieza(int fdi, TipoSuperficie? superficie) {
+  void _tocarPieza(int fdi, FilaOdontodiagrama fila, TipoSuperficie? superficie) {
     if (!_editando) return;
+    if (_modoFicha) {
+      _abrirDetallePieza(fdi, fila);
+      return;
+    }
     _emitir(
       widget.evaluacion.alternar(fdi, _claveActiva, superficie: superficie),
     );
+  }
+
+  /// Solo se muestra en la capa tenue lo que no está ya anotado en firme, para
+  /// que una clave repetida no se dibuje dos veces sobre la misma pieza.
+  List<HallazgoDental> _historicoDe(int fdi) {
+    if (!_hayHistorico) return const [];
+    final vigentes = widget.evaluacion.de(fdi);
+    return widget.historico
+        .de(fdi)
+        .where((h) => !vigentes.any((v) => v.estado == h.estado))
+        .toList(growable: false);
   }
 
   @override
@@ -127,38 +158,36 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
             ? constraints.maxWidth
             : _anchoMaximoDiagrama;
         final compacto = AppLayoutResolution.ofWidth(disponible).isCompact;
+        final paleta = _paleta;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _encabezado(context),
+            _encabezado(context, paleta),
             if (_editando) ...[
               const SizedBox(height: 12),
-              _paletaClaves(context),
+              _paletaClaves(context, paleta),
             ],
             const SizedBox(height: 12),
-            _panelPapel(disponible),
+            _panelPapel(disponible, paleta),
             const SizedBox(height: 14),
-            _claves(context, compacto),
+            _claves(context, compacto, paleta),
             const SizedBox(height: 18),
-            _tejidosBlandos(context, compacto),
+            _tejidosBlandos(context, compacto, paleta),
           ],
         );
       },
     );
   }
 
-  Widget _encabezado(BuildContext context) {
-    final ac = context.appColors;
-    final titulo = widget.modoImpresion ? _trazo : ac.textPrimary;
-    final apoyo = widget.modoImpresion ? _trazo : ac.textMuted;
+  Widget _encabezado(BuildContext context, PaletaOdontodiagrama paleta) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'ODONTODIAGRAMA',
           style: TextStyle(
-            color: titulo,
+            color: paleta.tituloSobreTarjeta(context),
             fontSize: 13,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
@@ -168,90 +197,119 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
         Text(
           _editando
               ? 'Elige una clave y toca la cara del diente que quieras anotar. '
-                    'Mantén pulsada una pieza para ver o quitar sus hallazgos.'
+                    'Con «Ficha de pieza» el toque abre sus hallazgos.'
               : 'Nomenclatura FDI · dentición permanente y temporal',
-          style: TextStyle(color: apoyo, fontSize: 11, height: 1.35),
+          style: TextStyle(
+            color: paleta.apoyoSobreTarjeta(context),
+            fontSize: 11,
+            height: 1.35,
+          ),
         ),
       ],
     );
   }
 
-  Widget _paletaClaves(BuildContext context) {
+  Widget _paletaClaves(BuildContext context, PaletaOdontodiagrama paleta) {
     return Wrap(
-      spacing: 7,
-      runSpacing: 7,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final entrada in _leyenda)
           ChoiceChip(
             key: ValueKey('clave_${entrada.estado.dbValue}'),
-            selected: _claveActiva == entrada.estado,
-            onSelected: (_) => setState(() => _claveActiva = entrada.estado),
+            selected: !_modoFicha && _claveActiva == entrada.estado,
+            onSelected: (_) => setState(() {
+              _claveActiva = entrada.estado;
+              _modoFicha = false;
+            }),
             avatar: MarcaClinicaIcono(
               marca: entrada.marca,
-              tinta: entrada.tinta,
-              trazo: _trazo,
-              lado: 15,
+              estado: entrada.estado,
+              paleta: paleta,
+              lado: 18,
             ),
             label: Text(entrada.label),
             labelStyle: const TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
-            visualDensity: VisualDensity.compact,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // Sin densidad compacta: el chip conserva el objetivo táctil de
+            // 48 px que Material da por defecto.
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           ),
+        ChoiceChip(
+          key: const ValueKey('clave_ficha'),
+          selected: _modoFicha,
+          onSelected: (_) => setState(() => _modoFicha = !_modoFicha),
+          avatar: Icon(
+            Icons.assignment_outlined,
+            size: 18,
+            color: context.appColors.textSecondary,
+          ),
+          label: const Text('Ficha de pieza'),
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        ),
       ],
     );
   }
 
-  Widget _panelPapel(double disponible) {
+  Widget _panelPapel(double disponible, PaletaOdontodiagrama paleta) {
     const padding = 12.0;
+    // El diagrama nunca se comprime por debajo del objetivo táctil: si no cabe,
+    // se desplaza en horizontal, como haría una hoja más ancha que el escritorio.
+    final minimo =
+        (_editando ? _celdaTactil : _celdaLectura) * kColumnasPorHemicampo * 2 +
+        _lineaMedia;
     final util = disponible - padding * 2;
     final ancho = util.isFinite
-        ? math.max(_anchoMinimoDiagrama, math.min(util, _anchoMaximoDiagrama))
-        : _anchoMaximoDiagrama;
+        ? math.max(minimo, math.min(util, _anchoMaximoDiagrama))
+        : math.max(minimo, _anchoMaximoDiagrama);
 
     return Container(
       decoration: BoxDecoration(
-        color: _papel,
+        color: paleta.papel,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _reglaTabla),
+        border: Border.all(color: paleta.regla),
       ),
       padding: const EdgeInsets.all(padding),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: SizedBox(width: ancho, child: _diagrama(ancho)),
+        child: SizedBox(width: ancho, child: _diagrama(ancho, paleta)),
       ),
     );
   }
 
-  Widget _diagrama(double ancho) {
+  Widget _diagrama(double ancho, PaletaOdontodiagrama paleta) {
     final celda = (ancho - _lineaMedia) / (kColumnasPorHemicampo * 2);
     final filas = kFilasOdontodiagrama;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _rotulos(filas[0]),
+        _rotulos(filas[0], paleta),
         const SizedBox(height: 4),
-        _filaDoble(filas[0], celda),
-        _filaDoble(filas[1], celda),
-        Container(height: _lineaMedia, color: _trazo),
-        _filaDoble(filas[2], celda),
-        _filaDoble(filas[3], celda),
+        _filaDoble(filas[0], celda, paleta),
+        _filaDoble(filas[1], celda, paleta),
+        Container(height: _lineaMedia, color: paleta.trazo),
+        _filaDoble(filas[2], celda, paleta),
+        _filaDoble(filas[3], celda, paleta),
         const SizedBox(height: 4),
-        _rotulos(filas[3]),
+        _rotulos(filas[3], paleta),
       ],
     );
   }
 
-  Widget _rotulos(List<FilaOdontodiagrama> par) {
+  Widget _rotulos(List<FilaOdontodiagrama> par, PaletaOdontodiagrama paleta) {
     Widget lado(FilaOdontodiagrama fila) => Expanded(
       child: Text(
         fila.rotulo ?? '',
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: _trazo,
+        style: TextStyle(
+          color: paleta.trazo,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
@@ -267,27 +325,37 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     );
   }
 
-  Widget _filaDoble(List<FilaOdontodiagrama> par, double celda) {
+  Widget _filaDoble(
+    List<FilaOdontodiagrama> par,
+    double celda,
+    PaletaOdontodiagrama paleta,
+  ) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _hemifila(par[0], celda),
-          Container(width: _lineaMedia, color: _trazo),
-          _hemifila(par[1], celda),
+          _hemifila(par[0], celda, paleta),
+          Container(width: _lineaMedia, color: paleta.trazo),
+          _hemifila(par[1], celda, paleta),
         ],
       ),
     );
   }
 
-  Widget _hemifila(FilaOdontodiagrama fila, double celda) {
+  Widget _hemifila(
+    FilaOdontodiagrama fila,
+    double celda,
+    PaletaOdontodiagrama paleta,
+  ) {
     final huecos = kColumnasPorHemicampo - fila.piezas.length;
     final relleno = List.generate(
       huecos,
       (_) => SizedBox(width: celda),
       growable: false,
     );
-    final piezas = [for (final fdi in fila.piezas) _celda(fdi, fila, celda)];
+    final piezas = [
+      for (final fdi in fila.piezas) _celda(fdi, fila, celda, paleta),
+    ];
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: fila.hemicampoIzquierdo
@@ -296,13 +364,18 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     );
   }
 
-  Widget _celda(int fdi, FilaOdontodiagrama fila, double celda) {
-    final lado = math.max(16.0, celda - 6);
+  Widget _celda(
+    int fdi,
+    FilaOdontodiagrama fila,
+    double celda,
+    PaletaOdontodiagrama paleta,
+  ) {
+    final lado = math.max(16.0, celda - 4);
     final numero = Text(
       '$fdi',
       style: TextStyle(
-        color: _trazo,
-        fontSize: math.min(10, math.max(7, celda * 0.24)),
+        color: paleta.trazo,
+        fontSize: math.min(11, math.max(7, celda * 0.24)),
         fontWeight: FontWeight.w600,
         height: 1.1,
       ),
@@ -316,18 +389,18 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
         mesialALaDerecha: fila.hemicampoIzquierdo,
       ),
       hallazgos: widget.evaluacion.de(fdi),
+      historicos: _historicoDe(fdi),
       lado: lado,
-      papel: _papel,
-      trazo: _trazo,
+      paleta: paleta,
       editable: _editando,
-      onTap: (superficie) => _tocarPieza(fdi, superficie),
+      onTap: (superficie) => _tocarPieza(fdi, fila, superficie),
       onDetalle: () => _abrirDetallePieza(fdi, fila),
     );
 
     return SizedBox(
       width: celda,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: fila.superior
@@ -338,16 +411,19 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     );
   }
 
-  Widget _claves(BuildContext context, bool compacto) {
-    final ac = context.appColors;
-    final texto = widget.modoImpresion ? _trazo : ac.textSecondary;
+  Widget _claves(
+    BuildContext context,
+    bool compacto,
+    PaletaOdontodiagrama paleta,
+  ) {
+    final texto = paleta.apoyoSobreTarjeta(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'CLAVES',
           style: TextStyle(
-            color: widget.modoImpresion ? _trazo : ac.textPrimary,
+            color: paleta.tituloSobreTarjeta(context),
             fontSize: 10,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.9,
@@ -364,9 +440,9 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
                 children: [
                   MarcaClinicaIcono(
                     marca: entrada.marca,
-                    tinta: entrada.tinta,
-                    trazo: _trazo,
-                    lado: 15,
+                    estado: entrada.estado,
+                    paleta: paleta,
+                    lado: 16,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -377,35 +453,57 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
               ),
           ],
         ),
+        if (_hayHistorico) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.history_rounded, size: 13, color: paleta.textoVacio),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'El trazo tenue viene de consultas anteriores.',
+                  style: TextStyle(
+                    color: paleta.textoVacio,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
 
-  Widget _tejidosBlandos(BuildContext context, bool compacto) {
-    final ac = context.appColors;
-    final borde = Border.all(color: _reglaTabla);
+  Widget _tejidosBlandos(
+    BuildContext context,
+    bool compacto,
+    PaletaOdontodiagrama paleta,
+  ) {
     final anchoEtiqueta = compacto ? 104.0 : 128.0;
 
     return Container(
       decoration: BoxDecoration(
-        color: _papel,
+        color: paleta.papel,
         borderRadius: BorderRadius.circular(10),
-        border: borde,
+        border: Border.all(color: paleta.regla),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: _reglaTabla)),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: paleta.regla)),
             ),
-            child: const Text(
+            child: Text(
               'Tejidos Blandos',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _trazo,
+                color: paleta.textoFuerte,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.4,
@@ -417,7 +515,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
               TejidoBlando.values[i],
               anchoEtiqueta,
               ultima: i == TejidoBlando.values.length - 1,
-              ac: ac,
+              paleta: paleta,
             ),
         ],
       ),
@@ -428,9 +526,10 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     TejidoBlando tejido,
     double anchoEtiqueta, {
     required bool ultima,
-    required AppColors ac,
+    required PaletaOdontodiagrama paleta,
   }) {
     final anotacion = widget.evaluacion.tejidosBlandos[tejido] ?? '';
+    final previo = widget.historico.tejidosBlandos[tejido];
 
     final valor = _editando
         ? TextField(
@@ -438,33 +537,40 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
             controller: _tejidoControllers[tejido],
             onChanged: (texto) =>
                 _emitir(widget.evaluacion.conTejido(tejido, texto)),
-            style: const TextStyle(color: _trazo, fontSize: 12),
-            cursorColor: _trazo,
-            decoration: const InputDecoration(
+            style: TextStyle(color: paleta.textoFuerte, fontSize: 13),
+            cursorColor: paleta.trazo,
+            decoration: InputDecoration(
               isDense: true,
               border: InputBorder.none,
-              hintText: 'Sin alteración',
-              hintStyle: TextStyle(color: Color(0xFF9AA4B2), fontSize: 12),
-              contentPadding: EdgeInsets.symmetric(vertical: 6),
+              hintText: previo ?? 'Sin alteración',
+              hintStyle: TextStyle(
+                color: paleta.textoVacio,
+                fontSize: 13,
+                fontStyle: previo == null ? FontStyle.normal : FontStyle.italic,
+              ),
+              // 12 px arriba y abajo dejan la fila en el objetivo táctil de
+              // 44 px sin que la tabla parezca un formulario suelto.
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
           )
         : Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
+            padding: const EdgeInsets.symmetric(vertical: 11),
             child: Text(
-              anotacion.isEmpty ? '—' : anotacion,
+              anotacion.isNotEmpty ? anotacion : (previo ?? '—'),
               key: ValueKey('tejido_valor_${tejido.dbValue}'),
               style: TextStyle(
-                color: anotacion.isEmpty ? const Color(0xFF9AA4B2) : _trazo,
-                fontSize: 12,
+                color: anotacion.isEmpty ? paleta.textoVacio : paleta.textoFuerte,
+                fontSize: 13,
+                fontStyle: anotacion.isEmpty && previo != null
+                    ? FontStyle.italic
+                    : FontStyle.normal,
               ),
             ),
           );
 
     return Container(
       decoration: BoxDecoration(
-        border: ultima
-            ? null
-            : const Border(bottom: BorderSide(color: _reglaTabla)),
+        border: ultima ? null : Border(bottom: BorderSide(color: paleta.regla)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Row(
@@ -473,18 +579,18 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
           SizedBox(
             width: anchoEtiqueta,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
+              padding: const EdgeInsets.symmetric(vertical: 11),
               child: Text(
                 tejido.label,
-                style: const TextStyle(
-                  color: _trazo,
+                style: TextStyle(
+                  color: paleta.textoFuerte,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-          Container(width: 1, height: 26, color: _reglaTabla),
+          Container(width: 1, height: 30, color: paleta.regla),
           const SizedBox(width: 10),
           Expanded(child: valor),
         ],
@@ -500,7 +606,9 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
         fdi: fdi,
         fila: fila,
         hallazgos: widget.evaluacion.de(fdi),
+        historicos: widget.historico.de(fdi),
         leyenda: _leyenda,
+        paleta: _paleta,
       ),
     );
     if (resultado == null || !mounted) return;
@@ -509,23 +617,30 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
 }
 
 /// El odontodiagrama sobre papel y sin controles, para el expediente, el
-/// histórico y la captura a PDF. Fija el fondo blanco para que la tinta roja y
-/// azul se lea igual en modo claro, en modo oscuro y en la impresión.
+/// histórico y la captura a PDF. Fija el papel blanco y las tintas impresas
+/// para que la hoja capturada salga igual por la impresora, sin importar el
+/// tema con el que se estuviera viendo la aplicación.
 class OdontodiagramaPapel extends StatelessWidget {
   final EvaluacionOdontologica evaluacion;
+  final EvaluacionOdontologica historico;
   final EdgeInsetsGeometry padding;
 
   const OdontodiagramaPapel({
     super.key,
     required this.evaluacion,
+    this.historico = EvaluacionOdontologica.vacia,
     this.padding = const EdgeInsets.all(14),
   });
 
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
+    color: PaletaOdontodiagrama.impresion.papel,
     padding: padding,
-    child: OdontodiagramaWidget(evaluacion: evaluacion, modoImpresion: true),
+    child: OdontodiagramaWidget(
+      evaluacion: evaluacion,
+      historico: historico,
+      modoImpresion: true,
+    ),
   );
 }
 
@@ -534,9 +649,9 @@ class OdontodiagramaPapel extends StatelessWidget {
 class _PiezaDental extends StatefulWidget {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
+  final List<HallazgoDental> historicos;
   final double lado;
-  final Color papel;
-  final Color trazo;
+  final PaletaOdontodiagrama paleta;
   final bool editable;
   final ValueChanged<TipoSuperficie?> onTap;
   final VoidCallback onDetalle;
@@ -545,9 +660,9 @@ class _PiezaDental extends StatefulWidget {
     super.key,
     required this.glifo,
     required this.hallazgos,
+    required this.historicos,
     required this.lado,
-    required this.papel,
-    required this.trazo,
+    required this.paleta,
     required this.editable,
     required this.onTap,
     required this.onDetalle,
@@ -560,16 +675,24 @@ class _PiezaDental extends StatefulWidget {
 class _PiezaDentalState extends State<_PiezaDental> {
   bool _hover = false;
 
+  String _resumen(List<HallazgoDental> lista) => lista
+      .map((h) {
+        final caras = h.superficies.isEmpty
+            ? 'pieza completa'
+            : h.superficies.map((s) => s.name.toLowerCase()).join(', ');
+        return '${h.estado.label} ($caras)';
+      })
+      .join('; ');
+
   String get _descripcion {
     final fdi = widget.glifo.fdi;
-    if (widget.hallazgos.isEmpty) return 'Pieza $fdi, sin hallazgos';
-    final partes = widget.hallazgos.map((h) {
-      final caras = h.superficies.isEmpty
-          ? 'pieza completa'
-          : h.superficies.map((s) => s.name.toLowerCase()).join(', ');
-      return '${h.estado.label} ($caras)';
-    });
-    return 'Pieza $fdi: ${partes.join('; ')}';
+    final partes = [
+      if (widget.hallazgos.isNotEmpty) _resumen(widget.hallazgos),
+      if (widget.historicos.isNotEmpty)
+        'Antes: ${_resumen(widget.historicos)}',
+    ];
+    if (partes.isEmpty) return 'Pieza $fdi, sin hallazgos';
+    return 'Pieza $fdi: ${partes.join(' · ')}';
   }
 
   @override
@@ -579,11 +702,9 @@ class _PiezaDentalState extends State<_PiezaDental> {
       painter: GlifoPiezaPainter(
         glifo: widget.glifo,
         hallazgos: widget.hallazgos,
-        trazo: widget.trazo,
-        papel: widget.papel,
-        resalte: _hover
-            ? context.appColors.primaryBlue.withValues(alpha: 0.12)
-            : null,
+        historicos: widget.historicos,
+        paleta: widget.paleta,
+        resalte: _hover ? widget.paleta.resalte : null,
       ),
     );
 
@@ -617,18 +738,23 @@ class _PiezaDentalState extends State<_PiezaDental> {
 }
 
 /// Ficha de una pieza: lista sus hallazgos, permite quitarlos y añadir uno
-/// eligiendo caras concretas y una anotación libre.
+/// eligiendo caras concretas y una anotación libre. Los hallazgos de consultas
+/// anteriores se listan aparte y no se pueden editar desde aquí.
 class _DetallePiezaDialog extends StatefulWidget {
   final int fdi;
   final FilaOdontodiagrama fila;
   final List<HallazgoDental> hallazgos;
+  final List<HallazgoDental> historicos;
   final List<EntradaLeyendaOdontograma> leyenda;
+  final PaletaOdontodiagrama paleta;
 
   const _DetallePiezaDialog({
     required this.fdi,
     required this.fila,
     required this.hallazgos,
+    required this.historicos,
     required this.leyenda,
+    required this.paleta,
   });
 
   @override
@@ -679,11 +805,19 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
     });
   }
 
+  String _caras(HallazgoDental hallazgo) => [
+    if (hallazgo.superficies.isEmpty)
+      'Pieza completa'
+    else
+      hallazgo.superficies.map((s) => s.name).join(' · '),
+    if (hallazgo.detalle != null) hallazgo.detalle!,
+  ].join(' — ');
+
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     return AppDialog(
-      preferredWidth: 440,
+      preferredWidth: 460,
       title: Text(
         'Pieza ${widget.fdi}',
         style: TextStyle(
@@ -705,31 +839,24 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
             for (final hallazgo in _hallazgos)
               ListTile(
                 key: ValueKey('hallazgo_${hallazgo.estado.dbValue}'),
-                dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: MarcaClinicaIcono(
                   marca: hallazgo.estado.marca,
-                  tinta: hallazgo.estado.tinta,
-                  trazo: ac.textSecondary,
-                  lado: 18,
+                  estado: hallazgo.estado,
+                  paleta: widget.paleta,
+                  lado: 20,
                 ),
                 title: Text(
                   hallazgo.estado.label,
                   style: TextStyle(fontSize: 13, color: ac.textPrimary),
                 ),
                 subtitle: Text(
-                  [
-                    if (hallazgo.superficies.isEmpty)
-                      'Pieza completa'
-                    else
-                      hallazgo.superficies.map((s) => s.name).join(' · '),
-                    if (hallazgo.detalle != null) hallazgo.detalle!,
-                  ].join(' — '),
+                  _caras(hallazgo),
                   style: TextStyle(fontSize: 11, color: ac.textMuted),
                 ),
                 trailing: IconButton(
                   tooltip: 'Quitar',
-                  icon: Icon(Icons.close_rounded, size: 17, color: ac.red),
+                  icon: Icon(Icons.close_rounded, size: 20, color: ac.red),
                   onPressed: () => setState(
                     () => _hallazgos = _hallazgos
                         .where((h) => h != hallazgo)
@@ -737,6 +864,34 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
                   ),
                 ),
               ),
+          if (widget.historicos.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.history_rounded, size: 13, color: ac.textMuted),
+                const SizedBox(width: 5),
+                Text(
+                  'DE CONSULTAS ANTERIORES',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: ac.textMuted,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            for (final hallazgo in widget.historicos)
+              Padding(
+                key: ValueKey('historico_${hallazgo.estado.dbValue}'),
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${hallazgo.estado.label} — ${_caras(hallazgo)}',
+                  style: TextStyle(fontSize: 11, color: ac.textDisabled),
+                ),
+              ),
+          ],
           const Divider(height: 22),
           Text(
             'Añadir hallazgo',
@@ -749,12 +904,11 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
           const SizedBox(height: 8),
           DropdownButtonFormField<EstadoClinicoDental>(
             initialValue: _estado,
-            isDense: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 10,
+                horizontal: 12,
+                vertical: 14,
               ),
             ),
             style: TextStyle(fontSize: 13, color: ac.textPrimary),
@@ -773,8 +927,8 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
           if (_estado.esPorSuperficie) ...[
             const SizedBox(height: 10),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 for (final superficie in _glifo.superficies)
                   FilterChip(
@@ -786,8 +940,11 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
                           : _superficies.remove(superficie),
                     ),
                     label: Text(superficie.name),
-                    labelStyle: const TextStyle(fontSize: 11),
-                    visualDensity: VisualDensity.compact,
+                    labelStyle: const TextStyle(fontSize: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
                   ),
               ],
             ),
@@ -804,7 +961,6 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
             decoration: const InputDecoration(
               labelText: 'Anotación (opcional)',
               border: OutlineInputBorder(),
-              isDense: true,
             ),
           ),
           const SizedBox(height: 10),
@@ -812,7 +968,7 @@ class _DetallePiezaDialogState extends State<_DetallePiezaDialog> {
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               onPressed: _agregar,
-              icon: const Icon(Icons.add_rounded, size: 16),
+              icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Añadir'),
             ),
           ),

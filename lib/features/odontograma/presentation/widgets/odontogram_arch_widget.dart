@@ -4,8 +4,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'odontodiagrama_widget.dart';
 import 'odontogram_widget.dart';
+import 'vistas_odontograma.dart';
 
 // ─────────────────────────────────────────────
 //  Aggregate helper
@@ -28,8 +28,6 @@ int _statusRank(Diente d) {
 /// odontodiagrama se queda con la última anotación de cada pieza y tejido.
 Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
   final Map<int, Diente> worst = {};
-  final hallazgos = <int, List<HallazgoDental>>{};
-  final tejidos = <TejidoBlando, String>{};
 
   for (final c in consultas) {
     final odo = c.odontograma;
@@ -40,21 +38,31 @@ Odontograma _buildAggregateOdontograma(List<Consulta> consultas) {
         worst[d.fdiCode] = d;
       }
     }
-    odo.evaluacion.hallazgos.forEach(
-      (fdi, lista) => hallazgos.putIfAbsent(fdi, () => lista),
-    );
-    odo.evaluacion.tejidosBlandos.forEach(
-      (tejido, anotacion) => tejidos.putIfAbsent(tejido, () => anotacion),
-    );
   }
 
   return Odontograma(
     consultaId: '',
     dientes: worst.values.toList(),
-    evaluacion: EvaluacionOdontologica(
-      hallazgos: hallazgos,
-      tejidosBlandos: tejidos,
+    evaluacion: EvaluacionOdontologica.consolidar(
+      consultas.map((c) => c.odontograma?.evaluacion).nonNulls,
     ),
+  );
+}
+
+/// El odontograma de [consultas]`[indice]` con la capa histórica que le
+/// corresponde: todo lo anotado en las consultas *anteriores* a esa. Como la
+/// lista llega de la más reciente a la más antigua, lo anterior es la cola.
+Odontograma _conHistorico(List<Consulta> consultas, int indice) {
+  final odontograma = consultas[indice].odontograma!;
+  final anteriores = consultas
+      .skip(indice + 1)
+      .map((c) => c.odontograma?.evaluacion)
+      .nonNulls;
+  return odontograma.copyWith(
+    // Lo que ya está anotado hoy no se repite en tenue debajo.
+    evaluacionHistorica: EvaluacionOdontologica.consolidar(
+      anteriores,
+    ).menos(odontograma.evaluacion),
   );
 }
 
@@ -173,7 +181,7 @@ class _Legend extends StatelessWidget {
       spacing: 12,
       runSpacing: 6,
       children: items.map((item) {
-        final color = colorForStatus(item.$1);
+        final color = PaletaArcada.de(context).status(item.$1);
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -250,7 +258,17 @@ class _TogglePill extends StatelessWidget {
 
 class OdontogramArchWidget extends StatefulWidget {
   final List<Consulta> consultas;
-  const OdontogramArchWidget({super.key, required this.consultas});
+
+  /// El historial no se pudo leer. Sin esto, un fallo de carga y un paciente
+  /// nuevo se ven exactamente igual —«no tiene consultas»— y el doctor no sabe
+  /// que le falta información.
+  final bool historialNoDisponible;
+
+  const OdontogramArchWidget({
+    super.key,
+    required this.consultas,
+    this.historialNoDisponible = false,
+  });
 
   @override
   State<OdontogramArchWidget> createState() => _OdontogramArchWidgetState();
@@ -275,7 +293,7 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
         ? null
         : _aggregate
         ? _buildAggregateOdontograma(withOdo)
-        : withOdo[clampedIdx].odontograma;
+        : _conHistorico(withOdo, clampedIdx);
 
     return Container(
       width: double.infinity,
@@ -353,29 +371,48 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  'Este paciente aún no tiene consultas con odontograma.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: ac.textMuted,
-                  ),
+                child: Column(
+                  children: [
+                    Icon(
+                      widget.historialNoDisponible
+                          ? Icons.cloud_off_rounded
+                          : Icons.medical_information_outlined,
+                      size: 28,
+                      color: ac.textDisabled,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.historialNoDisponible
+                          ? 'No se pudo cargar el historial clínico.'
+                          : 'Este paciente aún no tiene consultas con '
+                                'odontograma.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: widget.historialNoDisponible
+                            ? ac.textSecondary
+                            : ac.textMuted,
+                      ),
+                    ),
+                    if (widget.historialNoDisponible) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Revisa la conexión y vuelve a abrir el expediente.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: ac.textMuted),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
           ] else ...[
             const SizedBox(height: 12),
             const _Legend(),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
 
-            OdontogramWidget(odontograma: currentOdo, editMode: false),
-
-            if (!currentOdo.evaluacion.estaVacia) ...[
-              const SizedBox(height: 18),
-              Divider(height: 1, color: ac.divider.withValues(alpha: 0.6)),
-              const SizedBox(height: 14),
-              OdontodiagramaPapel(evaluacion: currentOdo.evaluacion),
-            ],
+            VistasOdontograma(odontograma: currentOdo),
           ],
         ],
       ),

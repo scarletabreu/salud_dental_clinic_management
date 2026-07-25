@@ -225,6 +225,31 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchEvaluacionesPaciente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  }) async {
+    var query = supabaseClient
+        .from('odontogramas')
+        .select('evaluacion_clinica, consulta:consultas!inner(paciente_id, fecha)')
+        .eq('consulta.paciente_id', pacienteId)
+        .isFilter('deleted_at', null);
+
+    if (excluyendoConsultaId != null) {
+      query = query.neq('consulta_id', excluyendoConsultaId);
+    }
+
+    // De la más reciente a la más antigua: al consolidar gana la primera que
+    // anota cada pieza, es decir la última palabra del doctor.
+    final response = await query.order(
+      'fecha',
+      referencedTable: 'consulta',
+      ascending: false,
+    );
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
   Future<void> updateConsulta(
     String id,
     Map<String, dynamic> consultaData,

@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
@@ -33,6 +33,13 @@ abstract class ConsultaRepository {
 
   Future<Map<int, List<TratamientoAplicado>>>
   getTratamientosHistoricosPorDiente(
+    String pacienteId, {
+    String? excluyendoConsultaId,
+  });
+
+  /// Consolida los odontodiagramas anteriores del paciente en una sola
+  /// evaluación, para dibujarlos como capa histórica bajo la de hoy.
+  Future<EvaluacionOdontologica> getEvaluacionHistorica(
     String pacienteId, {
     String? excluyendoConsultaId,
   });

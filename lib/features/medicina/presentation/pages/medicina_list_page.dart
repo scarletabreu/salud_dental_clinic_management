@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
@@ -27,6 +28,11 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   late final DeleteMedicina _deleteMedicina;
   final _searchController = TextEditingController();
   Timer? _debounce;
+
+  // Filtro adicional (en cliente) por efectos adversos de las
+  // contraindicaciones — el cubit no lo maneja, así que se aplica aquí
+  // sobre la lista ya filtrada por búsqueda/efecto secundario.
+  final Set<EfectoAdverso> _efectosAdversosSeleccionados = {};
 
   @override
   void initState() {
@@ -61,6 +67,186 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
       ),
     );
     _cubit.loadMedicinas();
+  }
+
+  List<Medicina> _applyEfectosAdversosFilter(List<Medicina> medicinas) {
+    if (_efectosAdversosSeleccionados.isEmpty) return medicinas;
+    return medicinas.where((m) {
+      return m.contraindicaciones.any(
+        (c) => c.efectosAdversos.any(_efectosAdversosSeleccionados.contains),
+      );
+    }).toList();
+  }
+
+  Future<void> _showEfectosAdversosFilterSheet(AppColors ac) async {
+    var seleccionActual = Set<EfectoAdverso>.from(
+      _efectosAdversosSeleccionados,
+    );
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: ac.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: ac.divider,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: ac.red.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.filter_alt_outlined,
+                          size: 17,
+                          color: ac.red,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Filtrar por efecto adverso',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: ac.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (seleccionActual.isNotEmpty)
+                        TextButton(
+                          onPressed: () =>
+                              setSheetState(() => seleccionActual.clear()),
+                          child: const Text('Limpiar'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Muestra medicinas cuyas contraindicaciones incluyen '
+                    'alguno de estos efectos adversos.',
+                    style: TextStyle(fontSize: 12, color: ac.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: EfectoAdverso.values.map((efecto) {
+                      final selected = seleccionActual.contains(efecto);
+                      return GestureDetector(
+                        onTap: () => setSheetState(() {
+                          selected
+                              ? seleccionActual.remove(efecto)
+                              : seleccionActual.add(efecto);
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? ac.red.withValues(alpha: 0.10)
+                                : ac.bgPage,
+                            borderRadius: BorderRadius.circular(100),
+                            border: Border.all(
+                              color: selected
+                                  ? ac.red.withValues(alpha: 0.50)
+                                  : ac.divider,
+                              width: selected ? 1.0 : 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (selected) ...[
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 12,
+                                  color: ac.red,
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                efecto.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: selected ? ac.red : ac.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _efectosAdversosSeleccionados
+                            ..clear()
+                            ..addAll(seleccionActual);
+                        });
+                        Navigator.pop(sheetContext);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ac.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text(
+                        seleccionActual.isEmpty
+                            ? 'Mostrar todas'
+                            : 'Aplicar filtro (${seleccionActual.length})',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -244,7 +430,15 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (state is MedicinasLoaded) _buildFilterChips(ac, state),
+              if (state is MedicinasLoaded)
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _buildEfectoSecundarioFilterButton(ac, state),
+                    _buildEfectosAdversosFilterButton(ac),
+                  ],
+                ),
             ],
           ),
         );
@@ -252,75 +446,294 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
     );
   }
 
-  Widget _buildFilterChips(AppColors ac, MedicinasLoaded state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+  Widget _buildEfectosAdversosFilterButton(AppColors ac) {
+    final activo = _efectosAdversosSeleccionados.isNotEmpty;
+    return SizedBox(
+      height: 44,
+      child: OutlinedButton.icon(
+        onPressed: () => _showEfectosAdversosFilterSheet(ac),
+        icon: Icon(
+          Icons.block_rounded,
+          size: 17,
+          color: activo ? ac.red : ac.textSecondary,
+        ),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.filter_list_rounded, size: 12, color: ac.textMuted),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                'FILTRADO RÁPIDO POR EFECTO ADVERSO:',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: ac.textMuted,
-                  letterSpacing: 0.5,
+            const Text('Efecto adverso'),
+            if (activo) ...[
+              const SizedBox(width: 7),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: ac.red,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_efectosAdversosSeleccionados.length}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
+            ],
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: activo ? ac.red : ac.textMuted,
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final chips = EfectoSecundario.values.map((efecto) {
-              final isSelected = state.selectedEfectos.contains(efecto);
-              return Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: FilterChip(
-                  label: Text(efecto.label),
-                  selected: isSelected,
-                  onSelected: (_) => _cubit.toggleEfectoSecundario(efecto),
-                  selectedColor: const Color(0xFFFEF3C7),
-                  checkmarkColor: const Color(0xFFB45309),
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? const Color(0xFFB45309)
-                        : ac.textSecondary,
-                  ),
-                  backgroundColor: ac.cardBg,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: isSelected
-                          ? const Color(0xFFD97706)
-                          : ac.divider.withValues(alpha: 0.5),
-                      width: isSelected ? 1 : 0.5,
-                    ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: activo ? ac.red : ac.textSecondary,
+          side: BorderSide(
+            color: activo ? ac.red.withValues(alpha: 0.5) : ac.divider,
+            width: activo ? 1.0 : 0.5,
+          ),
+          backgroundColor: activo ? ac.red.withValues(alpha: 0.06) : ac.bgPage,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEfectoSecundarioFilterButton(
+    AppColors ac,
+    MedicinasLoaded state,
+  ) {
+    final activo = state.selectedEfectos.isNotEmpty;
+    const amber = Color(0xFFB45309);
+    return SizedBox(
+      height: 44,
+      child: OutlinedButton.icon(
+        onPressed: () => _showEfectoSecundarioFilterSheet(ac),
+        icon: Icon(
+          Icons.medication_liquid_outlined,
+          size: 17,
+          color: activo ? amber : ac.textSecondary,
+        ),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Efecto secundario'),
+            if (activo) ...[
+              const SizedBox(width: 7),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: amber,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${state.selectedEfectos.length}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
-              );
-            }).toList();
-            return constraints.maxWidth < 600
-                ? SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(children: chips),
-                  )
-                : Wrap(spacing: 6, runSpacing: 6, children: chips);
-          },
+              ),
+            ],
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: activo ? amber : ac.textMuted,
+            ),
+          ],
         ),
-      ],
+        style: OutlinedButton.styleFrom(
+          foregroundColor: activo ? amber : ac.textSecondary,
+          side: BorderSide(
+            color: activo ? amber.withValues(alpha: 0.5) : ac.divider,
+            width: activo ? 1.0 : 0.5,
+          ),
+          backgroundColor: activo
+              ? const Color(0xFFFEF3C7).withValues(alpha: 0.5)
+              : ac.bgPage,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showEfectoSecundarioFilterSheet(AppColors ac) async {
+    const amber = Color(0xFFB45309);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return BlocBuilder<MedicinasCubit, MedicinasState>(
+          bloc: _cubit,
+          builder: (context, state) {
+            final selected = state is MedicinasLoaded
+                ? state.selectedEfectos
+                : const <EfectoSecundario>{};
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: ac.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: ac.divider,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.medication_liquid_outlined,
+                          size: 17,
+                          color: amber,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Filtrar por efecto secundario',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: ac.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (selected.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            for (final e in List.of(selected)) {
+                              _cubit.toggleEfectoSecundario(e);
+                            }
+                          },
+                          child: const Text('Limpiar'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Muestra medicinas que reportan alguno de estos efectos '
+                    'secundarios comunes.',
+                    style: TextStyle(fontSize: 12, color: ac.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: EfectoSecundario.values.map((efecto) {
+                      final isSelected = selected.contains(efecto);
+                      return GestureDetector(
+                        onTap: () => _cubit.toggleEfectoSecundario(efecto),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFFFEF3C7)
+                                : ac.bgPage,
+                            borderRadius: BorderRadius.circular(100),
+                            border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFFD97706)
+                                  : ac.divider,
+                              width: isSelected ? 1.0 : 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected) ...[
+                                const Icon(
+                                  Icons.check_rounded,
+                                  size: 12,
+                                  color: amber,
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                efecto.label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected ? amber : ac.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ac.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Listo'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildListContent(AppColors ac, MedicinasLoaded state) {
-    if (state.filteredMedicinas.isEmpty) {
+    final medicinasFiltradas = _applyEfectosAdversosFilter(
+      state.filteredMedicinas,
+    );
+
+    if (medicinasFiltradas.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -347,20 +760,16 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         Expanded(
           child: ListView.separated(
             padding: context.pageInsets(top: 4, bottom: 24),
-            itemCount: state.filteredMedicinas.length,
+            itemCount: medicinasFiltradas.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (_, i) => _MedicinaRow(
-              medicina: state.filteredMedicinas[i],
-              onEdit: () => _openForm(medicina: state.filteredMedicinas[i]),
-              onDelete: () => _confirmDelete(state.filteredMedicinas[i]),
+              medicina: medicinasFiltradas[i],
+              onEdit: () => _openForm(medicina: medicinasFiltradas[i]),
+              onDelete: () => _confirmDelete(medicinasFiltradas[i]),
             ),
           ),
         ),
-        _buildFooter(
-          ac,
-          state.filteredMedicinas.length,
-          state.allMedicinas.length,
-        ),
+        _buildFooter(ac, medicinasFiltradas.length, state.allMedicinas.length),
       ],
     );
   }

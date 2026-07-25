@@ -9,9 +9,6 @@ abstract class IPacienteRepository {
   Future<Either<Failure, void>> deletePaciente(String id);
   Future<Either<Failure, bool>> faltaRegistro(String id);
   Future<Either<Failure, Paciente>> getPacienteById(String id);
-
-  /// Paciente asociado a la persona [personaId]; si aún no existe, lo crea
-  /// con valores por defecto (el paciente nace en su primera consulta).
   Future<Either<Failure, Paciente>> getOrCreatePacienteByPersonaId(
     String personaId,
   );

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
@@ -113,12 +112,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   late final TextEditingController _trabajoController;
   late final TextEditingController _referenciaController;
   late final List<_ContactoEntry> _contactos;
+  late final TextEditingController _pesoController;
+  late final TextEditingController _alturaController;
 
   DateTime? _fechaNacimiento;
   Genero _genero = Genero.masculino;
   TipoPaciente _tipoPaciente = TipoPaciente.integrado;
 
-  // ── Condiciones médicas (catálogo + selección) ──────────────────────────
   List<Condicion> _condicionesIniciales = [];
   List<Condicion> _condicionesSeleccionadas = [];
   List<Condicion> _condicionesDisponibles = [];
@@ -126,7 +126,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   bool _guardandoCondiciones = false;
   bool _isProcessingSave = false;
 
-  bool get _isCompletarRegistro => widget.modo == PacienteFormModo.completarRegistro;
+  bool get _isCompletarRegistro =>
+      widget.modo == PacienteFormModo.completarRegistro;
 
   @override
   void initState() {
@@ -137,6 +138,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController = TextEditingController(text: p.govID);
     _trabajoController = TextEditingController(text: p.trabajo);
     _referenciaController = TextEditingController(text: p.referencia);
+    _pesoController = TextEditingController(
+      text: p.peso != null ? p.peso.toString() : '',
+    );
+    _alturaController = TextEditingController(
+      text: p.altura != null ? p.altura.toString() : '',
+    );
     _fechaNacimiento = p.birthDate;
     _genero = p.genero;
     _tipoPaciente = p.tipoPaciente;
@@ -181,6 +188,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController.dispose();
     _trabajoController.dispose();
     _referenciaController.dispose();
+    _pesoController.dispose();
+    _alturaController.dispose();
     for (final c in _contactos) {
       c.dispose();
     }
@@ -203,7 +212,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         _contactos.first.isExpanded = true;
       }
     });
-    // Defer disposal until after build frame to avoid assertion exceptions
     WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
   }
 
@@ -262,6 +270,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       tipoPaciente: _tipoPaciente,
       trabajo: _trabajoController.text.trim(),
       referencia: _referenciaController.text.trim(),
+      peso: double.tryParse(_pesoController.text.trim()),
+      altura: double.tryParse(_alturaController.text.trim()),
       record: widget.paciente.record,
       citas: widget.paciente.citas,
     );
@@ -294,12 +304,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
 
     setState(() => _guardandoCondiciones = true);
     final recordRepo = sl<RecordRepository>();
-
-    print('DEBUG creando condiciones para pacienteId=$pacienteId agregadas=$agregadas');
     try {
-      // Secuencial, no Future.wait en paralelo: la primera llamada crea el
-      // `record` si no existe; las siguientes ya lo encuentran, evitando
-      // inserts duplicados por condiciones de carrera.
       for (final id in agregadas) {
         await recordRepo.agregarCondicion(pacienteId, id!);
       }
@@ -386,7 +391,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         }
       },
       builder: (context, state) {
-        final isSaving = state is PacienteLoading ||
+        final isSaving =
+            state is PacienteLoading ||
             _guardandoCondiciones ||
             _isProcessingSave;
 
@@ -513,10 +519,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 ),
               ),
               if (!_isCompletarRegistro) ...[
-                // En pantallas estrechas la flecha de la cabecera ya cancela; un
-              // segundo botón solo empujaría "Guardar" fuera de la barra.
-              if (!context.appLayout.isCompact) ...[
-                OutlinedButton(
+                if (!context.appLayout.isCompact) ...[
+                  OutlinedButton(
                     onPressed: isSaving ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: ac.textSecondary,
@@ -536,7 +540,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     child: const Text('Cancelar'),
                   ),
                   const SizedBox(width: 8),
-              ],
+                ],
               ],
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
@@ -553,7 +557,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 label: Text(
                   isSaving
                       ? 'Guardando...'
-                      : (_isCompletarRegistro ? 'Completar registro' : 'Guardar'),
+                      : (_isCompletarRegistro
+                            ? 'Completar registro'
+                            : 'Guardar'),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: ac.primaryBlue,
@@ -795,17 +801,16 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withOpacity(0.10),
+                      color: isFirst
+                          ? ac.primaryBlue.withOpacity(0.10)
+                          : ac.red.withOpacity(0.10),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: ac.primaryBlue,
-                      ),
+                    child: Icon(
+                      isFirst ? Icons.phone : Icons.contact_emergency,
+                      size: 14,
+                      color: isFirst ? ac.primaryBlue : ac.red,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -814,11 +819,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFirst ? 'Contacto principal *' : entry.resumen,
+                          isFirst
+                              ? 'Contacto principal *'
+                              : 'Contacto de emergencia #${index}',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: ac.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            color: isFirst ? ac.textPrimary : ac.red,
                           ),
                         ),
                         if (!entry.isExpanded && entry.telefono.text.isNotEmpty)
@@ -835,9 +842,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       child: Container(
                         width: 28,
                         height: 28,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                         child: Icon(
                           Icons.delete_outline_rounded,
                           size: 16,
@@ -870,15 +874,13 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   _FormField(
                     ac: ac,
                     icon: Icons.phone_outlined,
-                    label: isFirst ? 'Teléfono *' : 'Teléfono',
+                    label: isFirst ? 'Teléfono *' : 'Teléfono de emergencia *',
                     child: TextFormField(
                       controller: entry.telefono,
                       keyboardType: TextInputType.phone,
                       decoration: _inputDeco(ac, hint: '809-000-0000'),
-                      validator: isFirst
-                          ? (v) => (v == null || v.trim().isEmpty)
-                                ? 'El teléfono del contacto principal es obligatorio'
-                                : null
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'El teléfono es obligatorio'
                           : null,
                     ),
                   ),
@@ -891,16 +893,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       controller: entry.email,
                       keyboardType: TextInputType.emailAddress,
                       decoration: _inputDeco(ac, hint: 'correo@ejemplo.com'),
-                      validator: (v) {
-                        if (v != null &&
-                            v.trim().isNotEmpty &&
-                            !RegExp(
-                              r'^[^@]+@[^@]+\.[^@]+',
-                            ).hasMatch(v.trim())) {
-                          return 'Correo inválido';
-                        }
-                        return null;
-                      },
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -952,6 +944,42 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
             ),
           ),
           const SizedBox(height: 14),
+
+          Row(
+            children: [
+              Expanded(
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.monitor_weight_outlined,
+                  label: 'Peso (kg/lbs)',
+                  child: TextFormField(
+                    controller: _pesoController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: _inputDeco(ac, hint: 'Ej. 70.5'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.height_rounded,
+                  label: 'Altura (cm)',
+                  child: TextFormField(
+                    controller: _alturaController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: _inputDeco(ac, hint: 'Ej. 170'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
           _FormField(
             ac: ac,
             icon: Icons.work_outline_rounded,
@@ -997,35 +1025,36 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               ),
             )
           : _condicionesDisponibles.isEmpty
-              ? Text(
-                  'No hay condiciones registradas en el catálogo.',
-                  style: TextStyle(fontSize: 12, color: ac.textMuted),
-                )
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _condicionesDisponibles.map((c) {
-                    final isActive =
-                        _condicionesSeleccionadas.any((s) => s.id == c.id);
-                    return FilterChip(
-                      label: Text(c.nombre),
-                      selected: isActive,
-                      onSelected: (v) => _toggleCondicion(c, v),
-                      selectedColor: ac.red.withOpacity(0.12),
-                      checkmarkColor: ac.red,
-                      backgroundColor: ac.bgPage,
-                      labelStyle: TextStyle(
-                        color: isActive ? ac.red : ac.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      side: BorderSide(
-                        color: isActive ? ac.red.withOpacity(0.4) : ac.divider,
-                        width: isActive ? 1.0 : 0.5,
-                      ),
-                    );
-                  }).toList(),
-                ),
+          ? Text(
+              'No hay condiciones registradas en el catálogo.',
+              style: TextStyle(fontSize: 12, color: ac.textMuted),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _condicionesDisponibles.map((c) {
+                final isActive = _condicionesSeleccionadas.any(
+                  (s) => s.id == c.id,
+                );
+                return FilterChip(
+                  label: Text(c.nombre),
+                  selected: isActive,
+                  onSelected: (v) => _toggleCondicion(c, v),
+                  selectedColor: ac.red.withOpacity(0.12),
+                  checkmarkColor: ac.red,
+                  backgroundColor: ac.bgPage,
+                  labelStyle: TextStyle(
+                    color: isActive ? ac.red : ac.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  side: BorderSide(
+                    color: isActive ? ac.red.withOpacity(0.4) : ac.divider,
+                    width: isActive ? 1.0 : 0.5,
+                  ),
+                );
+              }).toList(),
+            ),
     );
   }
 

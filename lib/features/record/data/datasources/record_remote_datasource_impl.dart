@@ -45,8 +45,6 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
         .eq('id', id);
   }
 
-  // ── Condiciones del paciente (puente record_condicion) ────────────────────
-
   @override
   Future<String?> fetchRecordId(String pacienteId) async {
     final res = await supabaseClient
@@ -65,9 +63,6 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
     print('DEBUG fetchRecordId existente=$existente');
     if (existente != null) return existente;
 
-    // Solo columnas garantizadas en la BD real: `paciente_id` y `tipo_sangre`
-    // son NOT NULL; el resto tiene default. (El `schema.sql` del repo está
-    // desfasado: no incluir `condiciones`, que no existe en la tabla real.)
     final now = DateTime.now().toIso8601String();
     print('DEBUG creando nueva fila records');
     final creado = await supabaseClient
@@ -86,9 +81,10 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchAflicciones(String recordId) async {
+    // 💡 Trae '*' de record_condicion (incluye medicamento, dosis, activo, etc.)
     final response = await supabaseClient
         .from('record_condicion')
-        .select('record_id, condicion_id, fecha_deteccion, condiciones(*)')
+        .select('*, condiciones(*)')
         .eq('record_id', recordId);
 
     return List<Map<String, dynamic>>.from(response);
@@ -96,10 +92,6 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
 
   @override
   Future<void> addAfliccion(String recordId, String condicionId) async {
-    // `record_condicion` no tiene constraint única en (record_id, condicion_id)
-    // en la BD real (el dump miente), así que no se puede usar upsert/onConflict:
-    // se verifica existencia y solo se inserta si falta (la UI además ya excluye
-    // las condiciones ya asignadas del selector).
     final existente = await supabaseClient
         .from('record_condicion')
         .select('condicion_id')
@@ -112,6 +104,7 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
       'record_id': recordId,
       'condicion_id': condicionId,
       'fecha_deteccion': DateTime.now().toIso8601String(),
+      'activo': true,
     });
   }
 
@@ -122,5 +115,23 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
         .delete()
         .eq('record_id', recordId)
         .eq('condicion_id', condicionId);
+  }
+
+  @override
+  Future<void> actualizarDetalleCondicion(
+    Map<String, dynamic> recordCondicionData,
+  ) async {
+    final id = recordCondicionData['id'] as String?;
+    if (id == null) {
+      throw Exception('Se requiere el ID de record_condicion para actualizar.');
+    }
+
+    final updateData = Map<String, dynamic>.from(recordCondicionData)
+      ..remove('id');
+
+    await supabaseClient
+        .from('record_condicion')
+        .update(updateData)
+        .eq('id', id);
   }
 }

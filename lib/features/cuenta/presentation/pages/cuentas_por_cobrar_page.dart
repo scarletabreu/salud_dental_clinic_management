@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_state.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/widgets/cuenta_card.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class CuentasPorCobrarPage extends StatefulWidget {
   const CuentasPorCobrarPage({super.key});
@@ -41,6 +41,143 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
         context.read<CuentasPorCobrarCubit>().aplicarFiltros(query: query);
       }
     });
+  }
+
+  void _abrirModalFiltrosAvanzados(
+    BuildContext context,
+    CuentasPorCobrarLoaded state,
+  ) {
+    final cubit = context.read<CuentasPorCobrarCubit>();
+    final ac = context.appColors;
+    OrdenCuenta orden = state.orden;
+    DateTimeRange? rangoCreacion = state.rangoCreacion;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ac.cardBg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: ac.primaryBlue),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Filtros y Ordenamiento de Cuentas',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Divider(color: ac.divider),
+
+              Text(
+                'ORDENAR POR',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                  color: ac.textMuted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<OrdenCuenta>(
+                value: orden,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: OrdenCuenta.mayorBalance,
+                    child: Text('Mayor Balance Pendiente'),
+                  ),
+                  DropdownMenuItem(
+                    value: OrdenCuenta.deudaMasAntigua,
+                    child: Text('Deuda más Antigua'),
+                  ),
+                  DropdownMenuItem(
+                    value: OrdenCuenta.actualizacionReciente,
+                    child: Text('Actualización Reciente'),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) setModalState(() => orden = val);
+                },
+              ),
+
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    initialDateRange: rangoCreacion,
+                  );
+                  if (picked != null) {
+                    setModalState(() => rangoCreacion = picked);
+                  }
+                },
+                icon: const Icon(Icons.date_range_rounded, size: 16),
+                label: Text(
+                  rangoCreacion == null
+                      ? 'Filtrar por Rango de Fechas'
+                      : 'Rango: ${rangoCreacion!.start.day}/${rangoCreacion!.start.month} - ${rangoCreacion!.end.day}/${rangoCreacion!.end.month}',
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () {
+                      cubit.aplicarFiltros(
+                        orden: orden,
+                        rangoCreacion: () => rangoCreacion,
+                      );
+                      Navigator.pop(ctx);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.primaryBlue,
+                    ),
+                    child: const Text('Aplicar'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmarEliminacion(String id, String etiqueta) async {
@@ -146,19 +283,18 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Resumen financiero de todas las consultas.',
+            'Resumen financiero dinámico del catálogo de consultas.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             ),
           ),
-
           if (state is CuentasPorCobrarLoaded) ...[
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: _SummaryCard(
-                    label: 'Por cobrar',
+                    label: 'Por cobrar (filtrado)',
                     value: currFmt.format(state.totalPorCobrar),
                     color: ac.red,
                     icon: Icons.pending_actions_rounded,
@@ -168,7 +304,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _SummaryCard(
-                    label: 'Cobrado',
+                    label: 'Cobrado (filtrado)',
                     value: currFmt.format(state.totalCobrado),
                     color: ac.green,
                     icon: Icons.check_circle_outline_rounded,
@@ -178,48 +314,81 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
               ],
             ),
           ],
-
           const SizedBox(height: 16),
-          TextField(
-            controller: _searchController,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Buscar por consulta o nota...',
-              hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-                fontSize: 14,
-              ),
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                size: 20,
-              ),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear_rounded,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 18,
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Buscar por paciente, teléfono, cuenta o notas...',
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.45,
                       ),
-                      onPressed: () {
-                        _searchController.clear();
-                        context.read<CuentasPorCobrarCubit>().aplicarFiltros(
-                          query: '',
-                        );
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                      size: 20,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(
+                              Icons.clear_rounded,
+                              color: colorScheme.onSurfaceVariant,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                              context
+                                  .read<CuentasPorCobrarCubit>()
+                                  .aplicarFiltros(query: '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-            ),
+              if (state is CuentasPorCobrarLoaded) ...[
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () => _abrirModalFiltrosAvanzados(context, state),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text('Filtros'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: state.hayFiltrosActivos
+                        ? ac.primaryBlue
+                        : ac.searchFill,
+                    foregroundColor: state.hayFiltrosActivos
+                        ? Colors.white
+                        : ac.textPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -231,6 +400,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
     CuentasPorCobrarLoaded state,
     ColorScheme colorScheme,
   ) {
+    final cubit = context.read<CuentasPorCobrarCubit>();
     final filtros = [
       (label: 'Todas', valor: null),
       (label: 'Sin pago', valor: EstadoCuenta.abierta),
@@ -240,28 +410,35 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: context.pageInsets(top: 8, bottom: 8),
+      padding: context.pageInsets(top: 4, bottom: 8),
       child: Row(
-        children: filtros.map((f) {
-          final isSelected = state.filtroEstado == f.valor;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(f.label),
-              selected: isSelected,
-              onSelected: (_) {
-                context.read<CuentasPorCobrarCubit>().aplicarFiltros(
-                  estado: () => f.valor,
-                );
-              },
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+        children: [
+          for (final f in filtros)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(f.label),
+                selected: state.filtroEstado == f.valor,
+                onSelected: (_) {
+                  cubit.aplicarFiltros(estado: () => f.valor);
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                selectedColor: colorScheme.secondaryContainer,
+                showCheckmark: false,
               ),
-              selectedColor: colorScheme.secondaryContainer,
-              showCheckmark: false,
             ),
-          );
-        }).toList(),
+          if (state.hayFiltrosActivos)
+            TextButton.icon(
+              onPressed: () {
+                _searchController.clear();
+                cubit.limpiarFiltros();
+              },
+              icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+              label: const Text('Limpiar todos'),
+            ),
+        ],
       ),
     );
   }
@@ -323,8 +500,8 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                state.searchQuery.isNotEmpty || state.filtroEstado != null
-                    ? 'Sin resultados para el filtro aplicado'
+                state.hayFiltrosActivos
+                    ? 'Sin resultados para los criterios aplicados'
                     : 'No hay cuentas registradas',
                 style: TextStyle(
                   color: colorScheme.onSurfaceVariant,

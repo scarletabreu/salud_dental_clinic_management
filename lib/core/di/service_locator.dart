@@ -440,7 +440,7 @@ Future<void> init() async {
     () => GetCuentasPorCobrarUseCase(repository: sl()),
   );
   sl.registerFactory<CuentasPorCobrarCubit>(
-    () => CuentasPorCobrarCubit(getCuentas: sl(), repository: sl()),
+    () => CuentasPorCobrarCubit(sl<CuentaRepository>()),
   );
 
   sl.registerFactory<GetCuentaByIdUseCase>(

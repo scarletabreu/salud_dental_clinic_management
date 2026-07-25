@@ -33,6 +33,7 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/get_directorio_suplidores.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/eliminar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
@@ -495,6 +496,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GuardarConsumible(sl()));
   sl.registerLazySingleton(() => ActualizarExistencia(sl()));
   sl.registerLazySingleton(() => EliminarConsumible(sl()));
+  sl.registerLazySingleton(() => GetDirectorioSuplidores(sl()));
   sl.registerLazySingleton(() => ObtenerArticulosBajoMinimo(sl()));
 
   // Cubit
@@ -504,6 +506,7 @@ Future<void> init() async {
       guardarConsumible: sl(),
       actualizarExistencia: sl(),
       eliminarConsumible: sl(),
+      getDirectorioSuplidores: sl(),
     ),
   );
 

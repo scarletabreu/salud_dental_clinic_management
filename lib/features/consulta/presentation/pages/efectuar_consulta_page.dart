@@ -15,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 
 class EfectuarConsultaPage extends StatefulWidget {
   final String? citaId;
@@ -80,6 +81,9 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
       providers: [
         BlocProvider.value(value: _pacienteCubit),
         BlocProvider(create: (_) => sl<ConsultaCubit>()),
+        // El plan vive junto a la consulta que lo origina (SD-135): se propone
+        // y se decide con el paciente delante.
+        BlocProvider(create: (_) => sl<PlanTratamientoCubit>()),
       ],
       child: Builder(
         builder: (innerContext) {

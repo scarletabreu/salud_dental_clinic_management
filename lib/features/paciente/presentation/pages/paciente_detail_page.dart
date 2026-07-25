@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
@@ -191,6 +192,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             },
           ),
           const SizedBox(height: 16),
+          // SD-135: lo que se decidió tratar, separado de lo ya ejecutado que
+          // cuenta el odontograma de abajo.
+          PlanesTratamientoCard(pacienteId: p.id ?? widget.pacienteId),
           OdontogramArchWidget(
             consultas: sortedConsultas,
             historialNoDisponible: historialNoDisponible,

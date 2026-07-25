@@ -376,10 +376,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             if (i == index)
               d.tratamientos[i].copyWith(
                 estaTerminado: terminado,
-                // Una indicación solo entra a la pre-factura al ejecutarse.
+                // Todo lo que está en este eje ya se ejecutó (SD-135): el
+                // estado solo distingue una ejecución cerrada de una abierta.
                 estado: terminado
-                    ? EstadoTratamientoAplicado.aplicado
-                    : d.tratamientos[i].estado,
+                    ? EstadoTratamientoAplicado.completado
+                    : EstadoTratamientoAplicado.enProceso,
               )
             else
               d.tratamientos[i],

@@ -133,7 +133,15 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   // aquí. Sin ella el expediente diría que el tratamiento se
                   // aplicó a ciegas.
                   'notas': t.notas,
-                  'estado': t.estado.name,
+                  'estado': t.estado.dbValue,
+                  // Auditoría de la ejecución (SD-135). `item_plan_id` solo
+                  // viaja cuando la ejecución cumple una actividad ya decidida
+                  // del plan; la base rechaza vincularla a una propuesta.
+                  'item_plan_id': t.itemPlanId,
+                  'doctor_ejecuta_id': t.doctorEjecutaId,
+                  'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
+                      ?.toUtc()
+                      .toIso8601String(),
                 },
             ],
             'diagnosticos': [

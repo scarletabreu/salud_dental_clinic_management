@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -22,6 +24,11 @@ import 'package:salud_dental_clinic_management/features/tratamiento/domain/repos
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/entities/evaluacion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/repositories/evaluacion_clinica_repository.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -38,6 +45,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
   List<Diagnosis> _catalogoDiagnosticos = const [];
+
+  /// Evaluación de esta consulta (SD-135). Se asegura una sola vez: es el
+  /// contenedor al que se cuelgan los hallazgos y del que nace el plan.
+  String? _evaluacionId;
+  String? _consultaConEvaluacion;
 
   /// Condiciones estructuradas del paciente cargadas async desde `record_condicion`.
   /// Si están vacías se usan las del record embebido como respaldo.
@@ -147,6 +159,34 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       setState(() => _condicionesAsync = condiciones);
     } catch (_) {
       // Se mantiene vacío: _condicionesPaciente() cae al record embebido.
+    }
+  }
+
+  /// Deja registrada la evaluación de la consulta y carga su plan. Idempotente
+  /// en la base, y aquí se llama una sola vez por consulta.
+  Future<void> _prepararPlan(Consulta consulta) async {
+    final consultaId = consulta.id;
+    if (consultaId == null || _consultaConEvaluacion == consultaId) return;
+    _consultaConEvaluacion = consultaId;
+
+    final planCubit = context.read<PlanTratamientoCubit>();
+    unawaited(planCubit.cargarDeConsulta(consultaId));
+
+    try {
+      final id = await sl<EvaluacionClinicaRepository>()
+          .registrarEvaluacionDeConsulta(
+            EvaluacionClinica(
+              pacienteId: consulta.pacienteId,
+              consultaId: consultaId,
+              doctorId: consulta.doctorId,
+              fecha: consulta.fecha,
+              motivo: consulta.motivoConsulta,
+            ),
+          );
+      if (mounted) setState(() => _evaluacionId = id);
+    } catch (_) {
+      // El plan sigue siendo utilizable sin el vínculo a la evaluación; se
+      // recupera en el siguiente guardado en vez de bloquear la consulta.
     }
   }
 
@@ -313,6 +353,12 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           );
         }
 
+        // La evaluación y el plan se preparan cuando la consulta ya tiene id;
+        // fuera del build para no tocar el cubit durante la construcción.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _prepararPlan(consulta);
+        });
+
         final odontograma = consulta.odontograma!;
         final totalTratamientos = odontograma.dientes.fold(
           0,
@@ -437,6 +483,27 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                         ),
                       )
                     : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // SD-135: evaluar y planificar son dos actos distintos. Aquí se
+            // decide cuáles de los hallazgos anotados arriba se van a tratar.
+            TarjetaConsulta(
+              icon: Icons.fact_check_outlined,
+              iconColor: ac.primaryBlue,
+              titulo: 'Plan de tratamiento',
+              subtitulo:
+                  'Decide qué hallazgos se tratan y registra la respuesta del '
+                  'paciente; nada se cobra hasta ejecutarse',
+              child: SeccionPlanTratamiento(
+                dientes: odontograma.dientes,
+                pacienteId: consulta.pacienteId,
+                doctorId: consulta.doctorId,
+                consultaId: consulta.id ?? '',
+                evaluacionId: _evaluacionId,
+                onElegirTratamiento: () =>
+                    seleccionarTratamiento(context, _catalogo),
               ),
             ),
             const SizedBox(height: 16),

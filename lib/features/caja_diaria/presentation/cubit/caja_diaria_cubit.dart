@@ -1,16 +1,19 @@
 import 'dart:async';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/repositories/movimiento_caja_repository.dart';
 
 class CajaDiariaCubit extends Cubit<CajaDiariaState> {
-  CajaDiariaCubit(this._repository) : super(const CajaDiariaLoading());
+  CajaDiariaCubit(this._repository, this._movimientoCajaRepository)
+    : super(const CajaDiariaLoading());
 
   final CajaDiariaRepository _repository;
+  final MovimientoCajaRepository _movimientoCajaRepository;
   StreamSubscription<List<MovimientoCaja>>? _movimientosSubscription;
   CajaDiaria? _cajaActual;
 
@@ -29,21 +32,14 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
 
       _cajaActual = caja;
       emit(CajaDiariaAbierta(caja: caja));
-      _movimientosSubscription = _repository
-          .watchMovimientos(caja.id!)
-          .listen(
-            (movimientos) {
-              final cajaActual = _cajaActual;
-              if (cajaActual != null && !isClosed) {
-                emit(
-                  CajaDiariaAbierta(caja: cajaActual, movimientos: movimientos),
-                );
-              }
-            },
-            onError: (_, _) {
-              // La caja sigue siendo útil aunque se retrase el stream de movimientos.
-            },
-          );
+      _movimientosSubscription = _repository.watchMovimientos(caja.id!).listen((
+        movimientos,
+      ) {
+        final cajaActual = _cajaActual;
+        if (cajaActual != null && !isClosed) {
+          emit(CajaDiariaAbierta(caja: cajaActual, movimientos: movimientos));
+        }
+      }, onError: (_, _) {});
     } catch (_) {
       emit(const CajaDiariaError('No se pudo consultar la caja de hoy.'));
     }
@@ -69,10 +65,48 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
     }
   }
 
-  @override
-  Future<void> close() async {
-    await _movimientosSubscription?.cancel();
-    return super.close();
+  Future<String?> registrarEgreso({
+    required double monto,
+    required String descripcion,
+  }) async {
+    final currentState = state;
+    if (currentState is! CajaDiariaAbierta) {
+      return 'No hay una caja abierta para registrar movimientos.';
+    }
+
+    final cajaId = currentState.caja.id;
+    if (cajaId == null) {
+      return 'Identificador de caja no disponible.';
+    }
+
+    if (monto <= 0) {
+      return 'El monto del egreso debe ser mayor a cero.';
+    }
+
+    final descLimpia = descripcion.trim();
+    if (descLimpia.isEmpty) {
+      return 'La descripción del egreso es obligatoria.';
+    }
+
+    if (monto > currentState.montoEsperado) {
+      return 'El monto supera el dinero esperado actualmente en caja (RD\$ ${currentState.montoEsperado.toStringAsFixed(2)}).';
+    }
+
+    try {
+      final movimiento = MovimientoCaja(
+        cajaDiariaId: cajaId,
+        tipo: TipoMovimiento.egreso,
+        monto: monto,
+        descripcion: descLimpia,
+        fecha: DateTime.now(),
+        referenciaId: cajaId,
+      );
+
+      await _movimientoCajaRepository.crearMovimiento(movimiento);
+      return null;
+    } catch (e) {
+      return 'Error al registrar el egreso: ${e.toString().replaceAll('Exception: ', '')}';
+    }
   }
 
   ResumenCierre? obtenerResumenCierre() {
@@ -105,5 +139,11 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
     } catch (e) {
       return 'Error al cerrar la caja: ${e.toString().replaceAll('Exception: ', '')}';
     }
+  }
+
+  @override
+  Future<void> close() async {
+    await _movimientosSubscription?.cancel();
+    return super.close();
   }
 }

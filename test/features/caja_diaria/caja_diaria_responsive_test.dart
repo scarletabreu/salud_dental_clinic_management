@@ -10,6 +10,16 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/presentation
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/repositories/movimiento_caja_repository.dart';
+
+class _MovimientoRepositoryFake implements MovimientoCajaRepository {
+  @override
+  Future<void> crearMovimiento(MovimientoCaja movimiento) async {}
+
+  @override
+  Future<List<MovimientoCaja>> getMovimientosDeHoy(String cajaDiariaId) async =>
+      [];
+}
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
   _CajaRepositoryFake({this.caja});
@@ -60,7 +70,7 @@ Widget _app(CajaDiariaRepository repositorio, {double textScale = 1}) =>
         child: inner!,
       ),
       home: BlocProvider<CajaDiariaCubit>(
-        create: (_) => CajaDiariaCubit(repositorio),
+        create: (_) => CajaDiariaCubit(repositorio, _MovimientoRepositoryFake()),
         child: const CajaDiariaPage(),
       ),
     );

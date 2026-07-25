@@ -8,6 +8,16 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/presentation
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/repositories/movimiento_caja_repository.dart';
+
+class _MovimientoRepositoryFake implements MovimientoCajaRepository {
+  @override
+  Future<void> crearMovimiento(MovimientoCaja movimiento) async {}
+
+  @override
+  Future<List<MovimientoCaja>> getMovimientosDeHoy(String cajaDiariaId) async =>
+      [];
+}
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
   CajaDiaria? caja;
@@ -69,7 +79,7 @@ void main() {
     'abre caja y calcula el esperado con ingresos y egresos en vivo',
     () async {
       final repository = _CajaRepositoryFake();
-      final cubit = CajaDiariaCubit(repository);
+      final cubit = CajaDiariaCubit(repository, _MovimientoRepositoryFake());
 
       expect(await cubit.abrirCaja(500), isNull);
       expect(repository.montoAbierto, 500);

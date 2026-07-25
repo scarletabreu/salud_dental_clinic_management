@@ -1,6 +1,6 @@
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
-import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/enums/tipo_movimiento.dart';
 
 sealed class CajaDiariaState {
   const CajaDiariaState();
@@ -22,15 +22,14 @@ class CajaDiariaAbierta extends CajaDiariaState {
   final CajaDiaria caja;
   final List<MovimientoCaja> movimientos;
 
-  double get ingresos => movimientos
-      .where((movimiento) => movimiento.tipo == TipoMovimiento.ingreso)
-      .fold(0, (total, movimiento) => total + movimiento.monto);
+  double get ingresos => BalanceCaja.ingresos(movimientos);
 
-  double get egresos => movimientos
-      .where((movimiento) => movimiento.tipo == TipoMovimiento.egreso)
-      .fold(0, (total, movimiento) => total + movimiento.monto);
+  double get egresos => BalanceCaja.egresos(movimientos);
 
-  double get montoEsperado => caja.montoApertura + ingresos - egresos;
+  double get montoEsperado => BalanceCaja.esperado(
+    montoApertura: caja.montoApertura,
+    movimientos: movimientos,
+  );
 }
 
 class CajaDiariaError extends CajaDiariaState {

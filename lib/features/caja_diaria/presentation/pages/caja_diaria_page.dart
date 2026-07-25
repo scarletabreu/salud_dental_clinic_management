@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/resumen_cierre_page.dart';
@@ -508,10 +509,7 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
     if (resumen == null) return;
 
     setState(() => _cerrando = true);
-    final error = await cubit.cerrarCaja(
-      montoReal: montoContado,
-      montoEsperado: widget.state.montoEsperado,
-    );
+    final error = await cubit.cerrarCaja(montoReal: montoContado);
 
     if (!mounted) return;
     setState(() => _cerrando = false);
@@ -528,7 +526,10 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
         ),
       );
     } else {
-      final diferencia = montoContado - widget.state.montoEsperado;
+      final diferencia = BalanceCaja.diferencia(
+        montoReal: montoContado,
+        montoEsperado: resumen.montoEsperado,
+      );
       final fechaCierre = DateTime.now();
 
       Navigator.of(context).push(

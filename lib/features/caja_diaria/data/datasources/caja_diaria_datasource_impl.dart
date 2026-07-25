@@ -1,4 +1,6 @@
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
+import 'package:salud_dental_clinic_management/features/movimiento_caja/data/models/movimiento_caja_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
@@ -84,17 +86,10 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     if (caja == null) return 0.0;
 
     final movimientos = await fetchMovimientosDelDia();
-    double balance = (caja['monto_apertura'] as num).toDouble();
-
-    for (var mov in movimientos) {
-      double monto = (mov['monto'] as num).toDouble();
-      if (mov['tipo'] == 'ingreso') {
-        balance += monto;
-      } else {
-        balance -= monto;
-      }
-    }
-    return balance;
+    return BalanceCaja.esperado(
+      montoApertura: (caja['monto_apertura'] as num).toDouble(),
+      movimientos: movimientos.map(MovimientoCajaModel.fromJson),
+    );
   }
 
   @override

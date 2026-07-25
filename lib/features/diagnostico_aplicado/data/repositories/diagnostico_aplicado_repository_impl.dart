@@ -19,6 +19,12 @@ class DiagnosticoAplicadoRepositoryImpl
         severidad: diagnostico.severidad,
         fechaAplicacion: diagnostico.fechaAplicacion,
         notas: diagnostico.notas,
+        consultaId: diagnostico.consultaId,
+        dienteId: diagnostico.dienteId,
+        superficie: diagnostico.superficie,
+        origen: diagnostico.origen,
+        nombreDiagnostico: diagnostico.nombreDiagnostico,
+        claveOdontograma: diagnostico.claveOdontograma,
       );
       await remoteDataSource.insertDiagnostico(model.toJson());
     }, context: 'aplicar el diagnóstico');

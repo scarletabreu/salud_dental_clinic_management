@@ -4,7 +4,8 @@
 --
 --  Crea:
 --    1. La función RPC `crear_consulta_completa` (transaccional/atómica): inserta
---       la consulta, su odontograma (1:1), los 32 dientes (FDI 11-48) con sus
+--       la consulta, su odontograma (1:1), las 52 piezas FDI que recibe la
+--       app (permanentes y temporales) con sus
 --       superficies y los documentos clínicos en UNA sola transacción. Si algo
 --       falla (p. ej. pérdida de conexión) NO quedan registros huérfanos.
 --    2. El bucket público `documentos-clinicos` y sus políticas para subir

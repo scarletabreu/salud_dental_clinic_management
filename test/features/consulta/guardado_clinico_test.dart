@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
@@ -14,10 +17,10 @@ class _Vacio {
 /// Captura lo que el repositorio manda a persistir.
 class _DatasourceEspia extends _Vacio implements ConsultaRemoteDatasource {
   Map<int, Map<String, dynamic>>? dientesRecibidos;
-  Map<int, List<String>> respuesta = const {};
+  ResultadoGuardadoOdontograma respuesta = const ResultadoGuardadoOdontograma();
 
   @override
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Map<int, Map<String, dynamic>> dientesPorFdi,
@@ -100,19 +103,22 @@ void main() {
       expect(enviado['observaciones'], 'Ausente de larga data.');
     });
 
-    test('un diente sin tratamientos igual viaja, para poder marcarlo', () async {
-      final datasource = _DatasourceEspia();
-      final diente = Diente(
-        odontogramaId: 'o-1',
-        fdiCode: 21,
-        superficies: const [],
-      );
+    test(
+      'un diente sin tratamientos igual viaja, para poder marcarlo',
+      () async {
+        final datasource = _DatasourceEspia();
+        final diente = Diente(
+          odontogramaId: 'o-1',
+          fdiCode: 21,
+          superficies: const [],
+        );
 
-      final enviado = await _guardar(datasource, diente);
+        final enviado = await _guardar(datasource, diente);
 
-      expect(enviado['esta_ausente'], isFalse);
-      expect(enviado['tratamientos'], isEmpty);
-    });
+        expect(enviado['esta_ausente'], isFalse);
+        expect(enviado['tratamientos'], isEmpty);
+      },
+    );
 
     test(
       'un tratamiento ya persistido viaja con su id, para actualizarlo en vez '
@@ -144,6 +150,36 @@ void main() {
         expect(tratamientos.first['id'], 'ta-existente');
         // El nuevo no lleva id: lo asigna la base de datos al insertarlo.
         expect(tratamientos.last.containsKey('id'), isFalse);
+      },
+    );
+
+    test(
+      'un diagnóstico conserva pieza, cara, fecha y origen al guardarse',
+      () async {
+        final datasource = _DatasourceEspia();
+        final diente = Diente(
+          odontogramaId: 'o-1',
+          fdiCode: 74,
+          superficies: const [],
+          diagnosis: [
+            DiagnosticoAplicado(
+              diagnosisId: 'diag-caries',
+              severidad: SeveridadDiagnosis.moderada,
+              fechaAplicacion: DateTime.utc(2026, 7, 24, 10),
+              notas: 'Lesión profunda',
+              superficie: TipoSuperficie.oclusal,
+              origen: OrigenMarcaOdontograma.preexistente,
+            ),
+          ],
+        );
+
+        final enviado = await _guardar(datasource, diente);
+        final diagnostico = (enviado['diagnosticos'] as List).single;
+
+        expect(diagnostico['diagnosis_id'], 'diag-caries');
+        expect(diagnostico['superficie'], 'oclusal');
+        expect(diagnostico['origen'], 'preexistente');
+        expect(diagnostico['fecha_aplicacion'], contains('2026-07-24'));
       },
     );
   });

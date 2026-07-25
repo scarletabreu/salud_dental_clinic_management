@@ -1,3 +1,5 @@
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+
 abstract class ConsultaRemoteDatasource {
   Future<String> crearConsultaCompleta(Map<String, dynamic> params);
 
@@ -21,7 +23,7 @@ abstract class ConsultaRemoteDatasource {
   /// Devuelve, por FDI, los ids de los tratamientos en el mismo orden en que
   /// llegaron, para que quien llama pueda sellarlos sobre su estado en memoria
   /// y el siguiente guardado los reconozca en vez de duplicarlos.
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Map<int, Map<String, dynamic>> dientesPorFdi,

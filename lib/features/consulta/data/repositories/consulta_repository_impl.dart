@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
@@ -102,7 +103,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<Map<int, List<String>>> guardarResultadoConsulta({
+  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
     required String consultaId,
     required String? pacienteId,
     required Odontograma odontograma,
@@ -130,6 +131,21 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   // aquí. Sin ella el expediente diría que el tratamiento se
                   // aplicó a ciegas.
                   'notas': t.notas,
+                  'estado': t.estado.name,
+                },
+            ],
+            'diagnosticos': [
+              for (final diagnostico in diente.diagnosis)
+                {
+                  if (diagnostico.id != null) 'id': diagnostico.id,
+                  'diagnosis_id': diagnostico.diagnosisId,
+                  'severidad': diagnostico.severidad.name,
+                  'fecha_aplicacion': diagnostico.fechaAplicacion
+                      .toUtc()
+                      .toIso8601String(),
+                  'superficie': diagnostico.superficie?.name.toLowerCase(),
+                  'origen': diagnostico.origen.name,
+                  'notas': diagnostico.notas,
                 },
             ],
           },
@@ -214,7 +230,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         excluyendoConsultaId: excluyendoConsultaId,
       );
       return EvaluacionOdontologica.consolidar(
-        filas.map((f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica'])),
+        filas.map(
+          (f) => EvaluacionOdontologica.fromJson(f['evaluacion_clinica']),
+        ),
       );
     }, context: 'obtener el odontodiagrama histórico');
   }

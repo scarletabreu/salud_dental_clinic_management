@@ -1,4 +1,9 @@
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
+
+/// Distingue lo que el paciente ya traía de lo realizado en la consulta.
+/// Solo los procedimientos de esta consulta pasan al eje de facturación.
+enum OrigenMarcaOdontograma { preexistente, estaConsulta }
 
 class DiagnosticoAplicado {
   final String? id;
@@ -6,6 +11,15 @@ class DiagnosticoAplicado {
   final SeveridadDiagnosis severidad;
   final DateTime fechaAplicacion;
   final String notas;
+  final String? consultaId;
+  final String? dienteId;
+  final TipoSuperficie? superficie;
+  final OrigenMarcaOdontograma origen;
+
+  /// Datos del catálogo incluidos por el JOIN; permiten proyectar el glifo sin
+  /// convertir el catálogo en un mapa codificado en la interfaz.
+  final String? nombreDiagnostico;
+  final String? claveOdontograma;
 
   DiagnosticoAplicado({
     this.id,
@@ -13,20 +27,39 @@ class DiagnosticoAplicado {
     required this.severidad,
     required this.fechaAplicacion,
     required this.notas,
+    this.consultaId,
+    this.dienteId,
+    this.superficie,
+    this.origen = OrigenMarcaOdontograma.preexistente,
+    this.nombreDiagnostico,
+    this.claveOdontograma,
   });
 
   DiagnosticoAplicado copyWith({
+    String? id,
     String? diagnosisId,
     SeveridadDiagnosis? severidad,
     DateTime? fechaAplicacion,
     String? notas,
+    String? consultaId,
+    String? dienteId,
+    TipoSuperficie? superficie,
+    OrigenMarcaOdontograma? origen,
+    String? nombreDiagnostico,
+    String? claveOdontograma,
   }) {
     return DiagnosticoAplicado(
-      id: id,
+      id: id ?? this.id,
       diagnosisId: diagnosisId ?? this.diagnosisId,
       severidad: severidad ?? this.severidad,
       fechaAplicacion: fechaAplicacion ?? this.fechaAplicacion,
       notas: notas ?? this.notas,
+      consultaId: consultaId ?? this.consultaId,
+      dienteId: dienteId ?? this.dienteId,
+      superficie: superficie ?? this.superficie,
+      origen: origen ?? this.origen,
+      nombreDiagnostico: nombreDiagnostico ?? this.nombreDiagnostico,
+      claveOdontograma: claveOdontograma ?? this.claveOdontograma,
     );
   }
 }

@@ -8,6 +8,7 @@ class TratamientoModel extends Tratamiento {
     required super.nombre,
     required super.descripcion,
     required super.costo,
+    super.claveOdontograma,
     required super.contraindicaciones,
     required super.alcance,
   });
@@ -18,6 +19,7 @@ class TratamientoModel extends Tratamiento {
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] ?? '',
       costo: (json['costo'] as num).toDouble(),
+      claveOdontograma: json['clave_odontograma'] ?? json['claveOdontograma'],
       contraindicaciones: json['contraindicaciones'] != null
           ? (json['contraindicaciones'] as List)
                 .map((e) => ContraindicacionModel.fromJson(e))
@@ -35,6 +37,7 @@ class TratamientoModel extends Tratamiento {
       'nombre': nombre,
       'descripcion': descripcion,
       'costo': costo,
+      'clave_odontograma': claveOdontograma,
       'alcance': alcance.dbValue,
     };
 

@@ -6,7 +6,8 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/superficie/domain/entities/superficie.dart';
 
 /// Facade que crea, en una sola operación transaccional, la consulta junto a
-/// su odontograma inicializado: 32 dientes (FDI 11-48) cada uno con sus
+/// su odontograma inicializado: las 52 piezas FDI (permanentes y temporales)
+/// cada una con sus
 /// superficies. La atomicidad la garantiza el RPC en la base de datos, de modo
 /// que un fallo (p. ej. pérdida de conexión) no deja registros huérfanos.
 class CrearConsultaUseCase {
@@ -20,7 +21,7 @@ class CrearConsultaUseCase {
     // base de datos dentro del RPC; aquí solo describimos la estructura.
     final odontograma = Odontograma(
       consultaId: '',
-      dientes: kFdiPermanentes.map((fdi) {
+      dientes: kFdiTodas.map((fdi) {
         return Diente(
           odontogramaId: '',
           fdiCode: fdi,

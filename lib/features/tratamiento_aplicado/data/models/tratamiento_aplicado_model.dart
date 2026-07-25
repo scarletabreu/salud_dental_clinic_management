@@ -13,9 +13,17 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.superficie,
     super.precioAplicado,
     super.notas,
+    super.estado,
+    super.nombreTratamiento,
+    super.claveOdontograma,
+    super.fechaAplicacion,
   });
 
   factory TratamientoAplicadoModel.fromJson(Map<String, dynamic> json) {
+    final tratamiento = json['tratamiento'];
+    final catalogo = tratamiento is Map
+        ? Map<String, dynamic>.from(tratamiento)
+        : json;
     return TratamientoAplicadoModel(
       id: json['id'] as String?,
       tratamientoId: json['tratamiento_id'] ?? json['tratamientoId'],
@@ -30,6 +38,17 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
         json['precio_aplicado'] ?? json['precioAplicado'],
       ),
       notas: json['notas'],
+      estado: EstadoTratamientoAplicado.values.firstWhere(
+        (estado) => estado.name == json['estado'],
+        orElse: () => EstadoTratamientoAplicado.aplicado,
+      ),
+      nombreTratamiento: catalogo['nombre'] as String?,
+      claveOdontograma:
+          catalogo['clave_odontograma'] as String? ??
+          catalogo['claveOdontograma'] as String?,
+      fechaAplicacion: _parseFecha(
+        json['fecha_aplicacion'] ?? json['created_at'],
+      ),
     );
   }
 
@@ -37,6 +56,9 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     if (raw == null) return null;
     return (raw as num).toDouble();
   }
+
+  static DateTime? _parseFecha(dynamic raw) =>
+      raw == null ? null : DateTime.tryParse(raw.toString());
 
   /// El enum `tipo_superficie` en BD es minúscula; el getter `name` del enum
   /// devuelve capitalizado, por eso comparamos sin distinguir mayúsculas.
@@ -61,6 +83,8 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'superficie': superficie?.name.toLowerCase(),
       'precio_aplicado': precioAplicado,
       'notas': notas,
+      'estado': estado.name,
+      'fecha_aplicacion': fechaAplicacion?.toIso8601String(),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

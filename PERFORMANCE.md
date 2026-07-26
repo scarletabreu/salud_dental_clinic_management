@@ -50,9 +50,20 @@ desde el primer día y dejaría de leerse.
 
 ---
 
-## 2. Qué se puede medir sin dispositivo y qué no
+## 2. Qué corre en CI y qué es manual
 
-Esta separación importa porque marca qué corre en CI y qué es manual.
+**En CI** (`.github/workflows/ci.yml`, en cada PR a `dev` o `main`):
+
+- `flutter analyze lib` — cero errores. Se gatea `lib/` y no todo el repo
+  porque `test/` arrastra 4 errores heredados de `dev`.
+- `dart run tool/ci/verificar_pruebas.dart` — compara la suite con
+  `tool/ci/pruebas_conocidas_rojas.txt`. Falla si aparece un fallo nuevo **y
+  también** si uno conocido empieza a pasar sin quitarlo de la lista: si no,
+  esa prueba dejaría de estar protegida al volver a romperse.
+- `tool/perf/medir_artefactos.sh web` — presupuesto de tamaño.
+
+El APK se vigila una vez por semana (`presupuestos-semanales.yml`): tarda ~4
+min de Gradle y su tamaño no cambia en un PR normal.
 
 **Corre en CI, sin dispositivo** (`flutter test` + `medir_artefactos.sh`):
 tamaño de artefactos, número de pantallas construidas al arrancar, capas de
@@ -187,6 +198,43 @@ transferido. Medido sobre `main.dart.js` de este proyecto:
 Servir con brotli no es una optimización opcional: es la diferencia entre
 descargar 5 MB y 1 MB en cada primera visita. Debe estar activo en el servidor
 o el CDN que sirva `build/web`.
+
+
+### Dónde se despliega, y por qué importa para el rendimiento
+
+El destino es Azure. Para el rendimiento web la elección concreta del servicio
+no es un detalle: decide si el usuario descarga 1 MB o 5 MB.
+
+| Servicio de Azure | ¿Comprime? | Veredicto |
+|---|---|---|
+| **Static Web Apps** | brotli y gzip automáticos en su CDN | **Es el adecuado.** Pensado para SPAs, capa gratuita, HTTPS y dominio propio incluidos, y se despliega desde GitHub Actions |
+| Blob Storage (static website) | **no** | Sirve los 5 MB en crudo salvo que se pre-compriman los ficheros a mano y se fije `Content-Encoding`. Necesita Front Door delante para comprimir |
+| App Service | gzip; brotli requiere trabajo extra | Pensado para servidores de aplicación; para ficheros estáticos es pagar de más por menos |
+
+Por eso el repo trae `staticwebapp.config.json` y
+`.github/workflows/deploy-web-azure.yml`: van con Static Web Apps.
+
+La configuración no es solo compresión. `navigationFallback` hace que las
+rutas profundas no den 404; el MIME de `.wasm` es obligatorio para que
+CanvasKit cargue; y el `Cache-Control` distingue lo que puede cachearse para
+siempre (`/assets`, `/canvaskit`, con hash en el nombre) de lo que nunca debe
+cachearse (`index.html`, el service worker), que es lo que permite que un
+despliegue nuevo se vea de inmediato sin que el usuario vacíe la caché.
+
+**Verificar después de desplegar** —la compresión es justo el ajuste que se da
+por hecho y nadie comprueba:
+
+```bash
+tool/perf/verificar_brotli.sh https://<tu-app>.azurestaticapps.net
+```
+
+### Escritorio y móvil no son «hosting»
+
+Windows y Android no se sirven: se distribuyen como artefactos de una versión.
+Ponerlos en Blob Storage funciona, pero para un repositorio público de GitHub
+**GitHub Releases** sale gratis, versiona solo y no necesita cuenta de Azure.
+Lo que sí importa es repartir el APK **por arquitectura** y no el universal
+(§3.bis).
 
 ---
 

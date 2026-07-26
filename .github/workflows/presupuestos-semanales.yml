@@ -34,6 +34,13 @@ jobs:
       - name: Web
         run: tool/perf/medir_artefactos.sh web
 
+      # El release ya no se firma con la clave de depuración, así que sin una
+      # clave el build falla a propósito. Aquí solo se mide tamaño —que no
+      # depende de con qué se firme—, así que sirve una desechable. La de
+      # publicación no vive en CI: se custodia fuera.
+      - name: Clave desechable para poder construir
+        run: tool/android/generar_keystore.sh --efimero
+
       - name: APK universal
         run: tool/perf/medir_artefactos.sh apk
 

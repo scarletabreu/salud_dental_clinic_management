@@ -2,10 +2,20 @@ import 'package:salud_dental_clinic_management/features/consulta/data/datasource
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+typedef CrearConsultaRpc =
+    Future<dynamic> Function(Map<String, dynamic> params);
+
 class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   final SupabaseClient supabaseClient;
+  final CrearConsultaRpc _crearConsultaRpc;
 
-  ConsultaRemoteDatasourceImpl({required this.supabaseClient});
+  ConsultaRemoteDatasourceImpl({
+    required this.supabaseClient,
+    CrearConsultaRpc? crearConsultaRpc,
+  }) : _crearConsultaRpc =
+           crearConsultaRpc ??
+           ((params) =>
+               supabaseClient.rpc('crear_consulta_completa', params: params));
 
   static const _selectConsulta =
       '*, recetas(*), documentos_clinicos(*), '
@@ -20,12 +30,33 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   @override
   Future<String> crearConsultaCompleta(Map<String, dynamic> params) async {
-    final res = await supabaseClient.rpc(
-      'crear_consulta_completa',
-      params: params,
-    );
-    return res as String;
+    try {
+      return await _crearConsultaRpc(params) as String;
+    } on PostgrestException catch (error) {
+      if (!_esFirmaNuevaAusente(error)) rethrow;
+
+      // La firma anterior representa siempre una consulta de ejecución. Usarla
+      // para una evaluación perdería su tipo y falsearía el expediente.
+      if (params['p_tipo_atencion'] != 'consulta') {
+        throw const PostgrestException(
+          message:
+              'La base de datos clínica aún no permite separar evaluaciones '
+              'de tratamientos. Aplica las migraciones pendientes antes de '
+              'registrar una evaluación.',
+          code: 'PGRST202',
+        );
+      }
+
+      final paramsCompatibles = Map<String, dynamic>.from(params)
+        ..remove('p_tipo_atencion');
+      return await _crearConsultaRpc(paramsCompatibles) as String;
+    }
   }
+
+  bool _esFirmaNuevaAusente(PostgrestException error) =>
+      error.code == 'PGRST202' &&
+      error.message.contains('crear_consulta_completa') &&
+      error.message.contains('p_tipo_atencion');
 
   @override
   Future<String> finalizarConsulta({

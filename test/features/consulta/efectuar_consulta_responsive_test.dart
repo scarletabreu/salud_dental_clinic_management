@@ -131,7 +131,7 @@ void main() {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(find.text('Efectuar consulta'), findsOneWidget);
+      expect(find.text('Realizar tratamiento'), findsWidgets);
       expect(
         tester.takeException(),
         isNull,
@@ -147,8 +147,8 @@ void main() {
     await tester.pumpWidget(_app(tipo: TipoAtencionClinica.evaluacion));
     await tester.pumpAndSettle();
 
-    expect(find.text('Registrar evaluación'), findsWidgets);
-    expect(find.text('Efectuar consulta'), findsNothing);
+    expect(find.text('Evaluar y planificar'), findsWidgets);
+    expect(find.text('Realizar tratamiento'), findsNothing);
     expect(find.text('Motivo de evaluación'), findsOneWidget);
   });
 

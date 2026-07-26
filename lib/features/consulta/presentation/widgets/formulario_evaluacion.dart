@@ -121,7 +121,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
         padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
         children: [
           _PageHeader(
-            title: esEvaluacion ? 'Registrar evaluación' : 'Preparar consulta',
+            title: widget.tipoAtencion.accion,
             subtitle: esEvaluacion
                 ? 'Documenta el motivo y el contexto clínico inicial'
                 : 'Confirma el motivo antes de registrar lo realizado',

@@ -1231,26 +1231,32 @@ class _CitaCard extends StatelessWidget {
           runSpacing: 8,
           alignment: WrapAlignment.end,
           children: [
-            OutlinedButton.icon(
-              onPressed: () => _abrirAtencion(
-                context,
-                pacienteId,
-                doctorId,
-                TipoAtencionClinica.evaluacion,
+            Tooltip(
+              message: TipoAtencionClinica.evaluacion.descripcion,
+              child: OutlinedButton.icon(
+                onPressed: () => _abrirAtencion(
+                  context,
+                  pacienteId,
+                  doctorId,
+                  TipoAtencionClinica.evaluacion,
+                ),
+                icon: const Icon(Icons.assignment_outlined, size: 16),
+                label: Text(TipoAtencionClinica.evaluacion.accion),
               ),
-              icon: const Icon(Icons.assignment_outlined, size: 16),
-              label: const Text('Registrar evaluación'),
             ),
-            FilledButton.icon(
-              onPressed: () => _abrirAtencion(
-                context,
-                pacienteId,
-                doctorId,
-                TipoAtencionClinica.consulta,
+            Tooltip(
+              message: TipoAtencionClinica.consulta.descripcion,
+              child: FilledButton.icon(
+                onPressed: () => _abrirAtencion(
+                  context,
+                  pacienteId,
+                  doctorId,
+                  TipoAtencionClinica.consulta,
+                ),
+                style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+                icon: const Icon(Icons.medical_services_outlined, size: 16),
+                label: Text(TipoAtencionClinica.consulta.accion),
               ),
-              style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
-              icon: const Icon(Icons.medical_services_outlined, size: 16),
-              label: const Text('Efectuar consulta'),
             ),
           ],
         ),

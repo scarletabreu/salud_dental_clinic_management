@@ -341,9 +341,7 @@ class _FloatingBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        esEvaluacion
-                            ? 'Registrar evaluación'
-                            : 'Efectuar consulta',
+                        tipoAtencion.accion,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,

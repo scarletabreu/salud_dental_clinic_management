@@ -8,7 +8,7 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/pa
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
-/// Valor centinela para la opción "Efectuar Consulta" del menú de la cita.
+/// Valores centinela para las acciones clínicas del menú de la cita.
 const _kEfectuarConsulta = 'efectuar_consulta';
 const _kRegistrarEvaluacion = 'registrar_evaluacion';
 
@@ -470,11 +470,9 @@ class _CitaBlock extends StatelessWidget {
               children: [
                 Icon(Icons.assignment_outlined, size: 16, color: ac.indigo),
                 const SizedBox(width: 10),
-                Text(
-                  'Registrar evaluación',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: _AccionClinicaMenu(
+                    tipo: TipoAtencionClinica.evaluacion,
                     color: ac.indigo,
                   ),
                 ),
@@ -491,11 +489,9 @@ class _CitaBlock extends StatelessWidget {
                   color: ac.primaryBlue,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Efectuar consulta',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: _AccionClinicaMenu(
+                    tipo: TipoAtencionClinica.consulta,
                     color: ac.primaryBlue,
                   ),
                 ),
@@ -709,6 +705,39 @@ class _CitaBlock extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AccionClinicaMenu extends StatelessWidget {
+  const _AccionClinicaMenu({required this.tipo, required this.color});
+
+  final TipoAtencionClinica tipo;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          tipo.accion,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        Text(
+          tipo.descripcion,
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.25,
+            color: context.appColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

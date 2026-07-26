@@ -14,6 +14,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/wi
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/pages/resumen_plan_page.dart';
 
 enum _VistaConsultas { cronologica, lista }
 

@@ -64,6 +64,7 @@ class TratamientoAplicado {
   /// Auditoría de la ejecución: quién la hizo y cuándo (SD-135).
   final String? doctorEjecutaId;
   final DateTime? fechaEjecucion;
+  final double cantidadRealizada;
 
   TratamientoAplicado({
     this.id,
@@ -83,6 +84,7 @@ class TratamientoAplicado {
     this.itemPlanId,
     this.doctorEjecutaId,
     this.fechaEjecucion,
+    this.cantidadRealizada = 1,
   });
 
   TratamientoAplicado copyWith({
@@ -105,6 +107,7 @@ class TratamientoAplicado {
     String? itemPlanId,
     String? doctorEjecutaId,
     DateTime? fechaEjecucion,
+    double? cantidadRealizada,
   }) {
     return TratamientoAplicado(
       id: id ?? this.id,
@@ -124,6 +127,7 @@ class TratamientoAplicado {
       itemPlanId: itemPlanId ?? this.itemPlanId,
       doctorEjecutaId: doctorEjecutaId ?? this.doctorEjecutaId,
       fechaEjecucion: fechaEjecucion ?? this.fechaEjecucion,
+      cantidadRealizada: cantidadRealizada ?? this.cantidadRealizada,
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
@@ -36,6 +37,9 @@ class ItemPlanTratamiento {
   /// pintar la lista.
   final String? nombreTratamiento;
 
+  final TipoEjecucionItemPlan tipoEjecucion;
+  final int? sesionesPlanificadas;
+
   const ItemPlanTratamiento({
     this.id,
     required this.planId,
@@ -55,6 +59,8 @@ class ItemPlanTratamiento {
     this.fechaInicio,
     this.fechaCompletado,
     this.nombreTratamiento,
+    this.tipoEjecucion = TipoEjecucionItemPlan.unica,
+    this.sesionesPlanificadas,
   });
 
   /// Aplica una transición y sella su fecha. Devuelve `null` si el paso no es
@@ -103,6 +109,8 @@ class ItemPlanTratamiento {
     DateTime? fechaInicio,
     DateTime? fechaCompletado,
     String? nombreTratamiento,
+    final TipoEjecucionItemPlan? tipoEjecucion,
+    final int? sesionesPlanificadas,
   }) {
     return ItemPlanTratamiento(
       id: id ?? this.id,
@@ -124,6 +132,8 @@ class ItemPlanTratamiento {
       fechaInicio: fechaInicio ?? this.fechaInicio,
       fechaCompletado: fechaCompletado ?? this.fechaCompletado,
       nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
+      tipoEjecucion: tipoEjecucion ?? this.tipoEjecucion,
+      sesionesPlanificadas: sesionesPlanificadas ?? this.sesionesPlanificadas,
     );
   }
 }

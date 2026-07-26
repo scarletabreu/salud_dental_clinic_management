@@ -18,6 +18,9 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 import 'package:salud_dental_clinic_management/features/record/presentation/cubit/condiciones_paciente_cubit.dart';
@@ -89,6 +92,46 @@ Paciente _paciente() => Paciente(
   ),
 );
 
+/// El paciente vacío con el que la app abre el alta: la pantalla siempre recibe
+/// uno, y en el alta viene sin datos.
+Paciente _pacienteEnBlanco() => Paciente(
+  nombre: '',
+  apellido: '',
+  birthDate: DateTime(1990),
+  govID: '',
+  contactos: const [],
+  estatus: EstatusPersona.activo,
+  genero: Genero.femenino,
+  trabajo: '',
+  referencia: '',
+  citas: const [],
+  tipoPaciente: TipoPaciente.integrado,
+  record: Record(
+    pacienteId: '',
+    tipoSangre: TipoSangre.oPositivo,
+    condiciones: const [],
+    cirugiasPrevias: const [],
+    historialFamiliar: '',
+  ),
+);
+
+/// Plan vacío: `PlanesTratamientoCard` construye su cubit con `sl()`, así que
+/// el expediente no se puede montar sin este repositorio registrado.
+class _PlanRepoDoble implements PlanTratamientoRepository {
+  @override
+  Future<List<PlanTratamiento>> getPlanesPaciente(String pacienteId) async =>
+      const [];
+
+  @override
+  Future<List<ItemPlanTratamiento>> getItemsEjecutables(
+    String pacienteId,
+  ) async => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} no se usa aquí');
+}
+
 void _registrarCondiciones() {
   if (sl.isRegistered<CondicionesPacienteCubit>()) {
     sl.unregister<CondicionesPacienteCubit>();
@@ -96,6 +139,10 @@ void _registrarCondiciones() {
   if (sl.isRegistered<HistorialFinancieroCubit>()) {
     sl.unregister<HistorialFinancieroCubit>();
   }
+  if (sl.isRegistered<PlanTratamientoRepository>()) {
+    sl.unregister<PlanTratamientoRepository>();
+  }
+  sl.registerFactory<PlanTratamientoRepository>(_PlanRepoDoble.new);
   sl.registerFactory<HistorialFinancieroCubit>(
     () => _HistorialCubitDoble(const HistorialFinancieroInitial()),
   );
@@ -152,6 +199,9 @@ void main() {
     if (sl.isRegistered<HistorialFinancieroCubit>()) {
       sl.unregister<HistorialFinancieroCubit>();
     }
+    if (sl.isRegistered<PlanTratamientoRepository>()) {
+      sl.unregister<PlanTratamientoRepository>();
+    }
   });
 
   _viewports.forEach((nombre, tamano) {
@@ -161,12 +211,14 @@ void main() {
       _viewport(tester, tamano);
       await tester.pumpWidget(
         _app(
-          const PacienteFormPage(),
+          PacienteFormPage(paciente: _pacienteEnBlanco()),
           const PacienteLoaded(todos: [], filtrados: []),
         ),
       );
       await tester.pumpAndSettle();
 
+      // 'Ana' es el hint del campo Nombre, no su valor: así se localiza el
+      // campo en un formulario vacío.
       final nombreCampo = find.widgetWithText(TextFormField, 'Ana');
       expect(nombreCampo, findsOneWidget);
       await tester.enterText(nombreCampo, 'Ana Mercedes');
@@ -206,7 +258,7 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        const PacienteFormPage(),
+        PacienteFormPage(paciente: _pacienteEnBlanco()),
         const PacienteLoaded(todos: [], filtrados: []),
       ),
     );

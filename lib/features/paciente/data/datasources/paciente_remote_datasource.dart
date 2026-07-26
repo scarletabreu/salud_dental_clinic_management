@@ -467,19 +467,17 @@ class PacienteRemoteDatasource {
 
           final condiciones = <CondicionModel>[];
           for (final item in condicionesRes) {
-            if (item is Map<String, dynamic>) {
-              Map<String, dynamic>? condicionJson;
-              if (item['condiciones'] is Map<String, dynamic>) {
-                condicionJson = item['condiciones'] as Map<String, dynamic>?;
-              } else if (item['condicion'] is Map<String, dynamic>) {
-                condicionJson = item['condicion'] as Map<String, dynamic>?;
-              } else if (item.containsKey('id') && item.containsKey('nombre')) {
-                condicionJson = Map<String, dynamic>.from(item);
-              }
+            Map<String, dynamic>? condicionJson;
+            if (item['condiciones'] is Map<String, dynamic>) {
+              condicionJson = item['condiciones'] as Map<String, dynamic>?;
+            } else if (item['condicion'] is Map<String, dynamic>) {
+              condicionJson = item['condicion'] as Map<String, dynamic>?;
+            } else if (item.containsKey('id') && item.containsKey('nombre')) {
+              condicionJson = Map<String, dynamic>.from(item);
+            }
 
-              if (condicionJson != null) {
-                condiciones.add(CondicionModel.fromJson(condicionJson));
-              }
+            if (condicionJson != null) {
+              condiciones.add(CondicionModel.fromJson(condicionJson));
             }
           }
 

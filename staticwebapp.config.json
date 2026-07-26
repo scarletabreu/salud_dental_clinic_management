@@ -1,19 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/staticwebapp.config.json",
-
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [
       "/assets/*",
       "/canvaskit/*",
       "/icons/*",
-      "*.js",
-      "*.wasm",
-      "*.json",
-      "*.png"
+      "/*.{js,mjs,wasm,json,png,ico,otf,ttf,symbols,map}"
     ]
   },
-
   "mimeTypes": {
     ".wasm": "application/wasm",
     ".js": "text/javascript",
@@ -23,32 +18,76 @@
     ".ttf": "font/ttf",
     ".symbols": "application/octet-stream"
   },
-
   "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.gstatic.com; worker-src 'self' blob:; frame-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "strict-origin-when-cross-origin"
+    "X-Frame-Options": "DENY"
   },
-
   "routes": [
     {
-      "route": "/canvaskit/*",
-      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+      "route": "/assets/*",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, must-revalidate"
+      }
     },
     {
-      "route": "/assets/*",
-      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+      "route": "/canvaskit/*",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, must-revalidate"
+      }
+    },
+    {
+      "route": "/icons/*",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, must-revalidate"
+      }
     },
     {
       "route": "/main.dart.js",
-      "headers": { "Cache-Control": "public, max-age=604800" }
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     },
     {
-      "route": "/index.html",
-      "headers": { "Cache-Control": "no-cache" }
+      "route": "/flutter.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    {
+      "route": "/flutter_bootstrap.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     },
     {
       "route": "/flutter_service_worker.js",
-      "headers": { "Cache-Control": "no-cache" }
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    {
+      "route": "/index.html",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    {
+      "route": "/manifest.json",
+      "headers": {
+        "Cache-Control": "no-cache, must-revalidate"
+      }
+    },
+    {
+      "route": "/version.json",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
     }
   ]
 }

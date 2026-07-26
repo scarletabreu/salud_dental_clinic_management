@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'core/config/app_config.dart';
 import 'core/di/service_locator.dart' as di;
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
@@ -12,10 +13,11 @@ import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final config = AppConfig.fromEnvironment();
 
   await Supabase.initialize(
-    url: 'https://xcuvywvltttephakzmwu.supabase.co',
-    anonKey: 'sb_publishable_3VHcOI-RR6w4_E8GFSkj6A_w2qa5PBG',
+    url: config.supabaseUrl,
+    publishableKey: config.supabasePublishableKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),

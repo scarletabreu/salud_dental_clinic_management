@@ -46,10 +46,9 @@
     hay que volver a añadirlo *con* `defer` y desde un origen propio, no desde
     una URL de releases de GitHub.
 
-    Precalentar la conexión a Supabase sí vale la pena: el primer arranque
-    resuelve DNS y negocia TLS mientras el motor de Flutter todavía se carga.
+    No se fija aquí un preconnect a Supabase: prueba y producción usan
+    proyectos distintos, seleccionados mediante --dart-define en el pipeline.
   -->
-  <link rel="preconnect" href="https://xcuvywvltttephakzmwu.supabase.co" crossorigin>
 </head>
 <body>
   <!--

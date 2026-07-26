@@ -745,10 +745,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (isClosed) return;
       final vigente = state;
       if (vigente is! ConsultaIniciada) return;
-      // El trabajo sigue en memoria y se reintenta solo: se avisa sin sacar al
-      // doctor de la consulta.
+      // El trabajo sigue en memoria y se avisa sin sacar al doctor de la
+      // consulta. Un error permanente (permisos o schema desactualizado) no se
+      // reintenta en bucle: el próximo cambio o «Guardar avance» vuelve a
+      // intentarlo.
       emit(vigente.copyWith(guardado: EstadoGuardado.fallido));
-      _autoguardado = Timer(esperaAutoguardado, guardarParcial);
     }
   }
 

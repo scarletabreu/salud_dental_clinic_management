@@ -238,6 +238,15 @@ void main() {
           estado.consulta.odontograma!.dientes.single.tratamientos,
           hasLength(1),
         );
+
+        await Future<void>.delayed(
+          ConsultaCubit.esperaAutoguardado + const Duration(milliseconds: 200),
+        );
+        expect(
+          repo.guardados,
+          1,
+          reason: 'un fallo permanente no debe generar reintentos infinitos',
+        );
       },
     );
 

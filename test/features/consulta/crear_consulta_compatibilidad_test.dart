@@ -36,6 +36,17 @@ void main() {
       expect(llamadas, hasLength(2));
       expect(llamadas.first['p_tipo_atencion'], 'consulta');
       expect(llamadas.last, isNot(contains('p_tipo_atencion')));
+
+      await datasource.crearConsultaCompleta({
+        'p_paciente_id': 'paciente-2',
+        'p_tipo_atencion': 'consulta',
+      });
+      expect(llamadas, hasLength(3));
+      expect(
+        llamadas.last,
+        isNot(contains('p_tipo_atencion')),
+        reason: 'el datasource recuerda la capacidad y evita otro 404',
+      );
     },
   );
 
@@ -87,5 +98,42 @@ void main() {
       ),
     );
     expect(llamadas, 1);
+  });
+
+  group('compatibilidad del tratamiento con el esquema anterior', () {
+    test('conserva la justificación clínica dentro de las notas', () {
+      final original = <String, dynamic>{
+        'tratamiento_id': 'tratamiento-1',
+        'notas': 'Paciente anticoagulado.',
+        'justificacion_no_planificada': 'Dolor agudo',
+      };
+
+      final payload =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaEsquemaAnterior(
+            original,
+          );
+
+      expect(payload, isNot(contains('justificacion_no_planificada')));
+      expect(
+        payload['notas'],
+        'Paciente anticoagulado.\nEjecución no planificada: Dolor agudo',
+      );
+      expect(
+        original['justificacion_no_planificada'],
+        'Dolor agudo',
+        reason: 'adaptar el payload no debe mutar el estado clínico en memoria',
+      );
+    });
+
+    test('retira la columna ausente aunque la justificación esté vacía', () {
+      final payload =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaEsquemaAnterior({
+            'tratamiento_id': 'tratamiento-1',
+            'justificacion_no_planificada': null,
+          });
+
+      expect(payload, isNot(contains('justificacion_no_planificada')));
+      expect(payload, isNot(contains('notas')));
+    });
   });
 }

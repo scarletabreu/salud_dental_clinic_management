@@ -8,7 +8,6 @@ import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart'
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/panel_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -73,10 +72,7 @@ Paciente _paciente() => Paciente(
   ),
 );
 
-Widget _app({
-  double textScale = 1,
-  TipoAtencionClinica tipo = TipoAtencionClinica.consulta,
-}) {
+Widget _app({double textScale = 1}) {
   if (sl.isRegistered<PacienteCubit>()) sl.unregister<PacienteCubit>();
   if (sl.isRegistered<ConsultaCubit>()) sl.unregister<ConsultaCubit>();
   sl.registerFactory<PacienteCubit>(
@@ -98,7 +94,6 @@ Widget _app({
       citaId: 'cita-1',
       pacienteId: _pacienteId,
       doctorId: _doctorId,
-      tipoAtencion: tipo,
     ),
   );
 }
@@ -131,7 +126,7 @@ void main() {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(find.text('Efectuar consulta'), findsOneWidget);
+      expect(find.text('Consulta clínica'), findsWidgets);
       expect(
         tester.takeException(),
         isNull,
@@ -140,16 +135,16 @@ void main() {
     });
   });
 
-  testWidgets('la evaluación se identifica como un flujo independiente', (
+  testWidgets('la pantalla inicial presenta un único flujo clínico', (
     tester,
   ) async {
     _viewport(tester, const Size(390, 900));
-    await tester.pumpWidget(_app(tipo: TipoAtencionClinica.evaluacion));
+    await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Registrar evaluación'), findsWidgets);
-    expect(find.text('Efectuar consulta'), findsNothing);
-    expect(find.text('Motivo de evaluación'), findsOneWidget);
+    expect(find.text('Consulta clínica'), findsWidgets);
+    expect(find.text('Motivo de consulta'), findsOneWidget);
+    expect(find.text('Evaluar y planificar'), findsNothing);
   });
 
   testWidgets('en escritorio la ficha del paciente va anclada al workspace', (

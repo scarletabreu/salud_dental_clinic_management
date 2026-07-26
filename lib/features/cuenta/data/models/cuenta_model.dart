@@ -45,12 +45,7 @@ class CuentaModel extends Cuenta {
           _parseDate(json['created_at']) ??
           DateTime.now(),
       fechaPago: _parseDate(json['fecha_pago']),
-      metodoPago: MetodoPago.values.firstWhere(
-        (e) =>
-            e.name.toLowerCase() ==
-            (json['metodo_pago'] as String? ?? '').toLowerCase(),
-        orElse: () => MetodoPago.contado,
-      ),
+      metodoPago: MetodoPago.fromDbValue(json['metodo_pago'] as String?),
       pagos: pagos,
       estado: EstadoCuenta.values.firstWhere(
         (e) =>
@@ -68,7 +63,7 @@ class CuentaModel extends Cuenta {
       'consulta_id': consultaId,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_pago': fechaPago?.toIso8601String(),
-      'metodo_pago': metodoPago.name,
+      'metodo_pago': metodoPago.dbValue,
       'estado': estado.name,
       'nota': nota,
     };

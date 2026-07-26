@@ -207,24 +207,17 @@ begin
   set deleted_at = null, updated_at = now()
   where item_plan_id = v_item_id;
 
-  -- REGLA SD-138: una ejecución fuera del plan solo es válida si explica por
-  -- qué fue necesaria. El estado sí es ejecutable para aislar esta regla.
-  v_fallo := false;
-  begin
-    insert into tratamientos_aplicados (
-      tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
-      precio_aplicado, estado, created_at, updated_at
-    ) values (
-      v_tratamiento_id, v_consulta_id, v_diente_id, false, true,
-      2500.00, 'aplicado', now(), now()
-    );
-    v_fallo := true;
-  exception when check_violation then
-    null;
-  end;
-  if v_fallo then
-    raise exception 'Se aceptó una ejecución no planificada sin justificación.';
-  end if;
+  -- REGLA DEL FLUJO UNIFICADO: una intervención agregada durante la consulta
+  -- puede ejecutarse sin item del plan ni justificación obligatoria. La
+  -- auditoría clínica (doctor y fecha) se conserva.
+  insert into tratamientos_aplicados (
+    tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
+    precio_aplicado, estado, doctor_ejecuta_id, fecha_ejecucion,
+    created_at, updated_at
+  ) values (
+    v_tratamiento_id, v_consulta_id, v_diente_id, false, true,
+    2500.00, 'aplicado', v_doctor_id, now(), now(), now()
+  );
 
   -- Un segundo item queda propuesto y nunca se ejecuta: no debe facturar.
   insert into items_plan_tratamiento (
@@ -239,13 +232,13 @@ begin
   v_cuenta_id := finalizar_consulta(v_consulta_id, 'Contado', 'Prueba SD-135');
 
   select monto_total into v_total from cuentas where id = v_cuenta_id;
-  if v_total <> 2500.00 then
-    raise exception 'La pre-factura cobró % en vez de 2500.00 (solo lo ejecutado).', v_total;
+  if v_total <> 5000.00 then
+    raise exception 'La pre-factura cobró % en vez de 5000.00 (solo lo ejecutado).', v_total;
   end if;
 
   select count(*) into v_conteo from items_cuenta where cuenta_id = v_cuenta_id;
-  if v_conteo <> 1 then
-    raise exception 'La pre-factura tiene % ítems; debía tener 1 (una sola ejecución).', v_conteo;
+  if v_conteo <> 2 then
+    raise exception 'La pre-factura tiene % ítems; debía tener 2 (dos ejecuciones).', v_conteo;
   end if;
 
   -- Idempotencia: reintentar no duplica la cuenta.
@@ -260,11 +253,11 @@ begin
     and deleted_at is null
     and doctor_ejecuta_id is not null
     and fecha_ejecucion is not null;
-  if v_conteo <> 1 then
+  if v_conteo <> 2 then
     raise exception 'La ejecución no quedó auditada (doctor y fecha).';
   end if;
 
-  raise notice 'SD-135 OK · evaluación 3 hallazgos → plan 2 actividades → 1 ejecución → cuenta 2500.00';
+  raise notice 'SD-135 OK · evaluación 3 hallazgos → plan 2 actividades → 2 ejecuciones → cuenta 5000.00';
 end $$;
 
 rollback;

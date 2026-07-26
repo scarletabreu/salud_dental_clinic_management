@@ -1,11 +1,25 @@
+import 'package:flutter/foundation.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+typedef CrearConsultaRpc =
+    Future<dynamic> Function(Map<String, dynamic> params);
+
 class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   final SupabaseClient supabaseClient;
+  final CrearConsultaRpc _crearConsultaRpc;
+  bool? _soportaFlujoClinicoSeparado;
+  bool? _soportaJustificacionNoPlanificada;
+  bool? _requiereJustificacionNoPlanificada;
 
-  ConsultaRemoteDatasourceImpl({required this.supabaseClient});
+  ConsultaRemoteDatasourceImpl({
+    required this.supabaseClient,
+    CrearConsultaRpc? crearConsultaRpc,
+  }) : _crearConsultaRpc =
+           crearConsultaRpc ??
+           ((params) =>
+               supabaseClient.rpc('crear_consulta_completa', params: params));
 
   static const _selectConsulta =
       '*, recetas(*), documentos_clinicos(*), '
@@ -20,12 +34,44 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   @override
   Future<String> crearConsultaCompleta(Map<String, dynamic> params) async {
-    final res = await supabaseClient.rpc(
-      'crear_consulta_completa',
-      params: params,
-    );
-    return res as String;
+    if (_soportaFlujoClinicoSeparado == false) {
+      return _crearConsultaConFirmaAnterior(params);
+    }
+    try {
+      final id = await _crearConsultaRpc(params) as String;
+      _soportaFlujoClinicoSeparado = true;
+      return id;
+    } on PostgrestException catch (error) {
+      if (!_esFirmaNuevaAusente(error)) rethrow;
+      _soportaFlujoClinicoSeparado = false;
+      return _crearConsultaConFirmaAnterior(params);
+    }
   }
+
+  Future<String> _crearConsultaConFirmaAnterior(
+    Map<String, dynamic> params,
+  ) async {
+    // La firma anterior representa siempre una consulta de ejecución. Usarla
+    // para una evaluación perdería su tipo y falsearía el expediente.
+    if (params['p_tipo_atencion'] != 'consulta') {
+      throw const PostgrestException(
+        message:
+            'La base de datos clínica aún no permite separar evaluaciones '
+            'de tratamientos. Aplica las migraciones pendientes antes de '
+            'registrar una evaluación.',
+        code: 'PGRST202',
+      );
+    }
+
+    final paramsCompatibles = Map<String, dynamic>.from(params)
+      ..remove('p_tipo_atencion');
+    return await _crearConsultaRpc(paramsCompatibles) as String;
+  }
+
+  bool _esFirmaNuevaAusente(PostgrestException error) =>
+      error.code == 'PGRST202' &&
+      error.message.contains('crear_consulta_completa') &&
+      error.message.contains('p_tipo_atencion');
 
   @override
   Future<String> finalizarConsulta({
@@ -270,20 +316,14 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         idsFinales.add('');
         continue;
       }
-      await supabaseClient
-          .from('tratamientos_aplicados')
-          .update(campos)
-          .eq('id', id);
+      await _actualizarTratamiento(id, campos);
       idsFinales.add(id);
     }
 
     if (porInsertar.isNotEmpty) {
-      final insertados =
-          await supabaseClient
-                  .from('tratamientos_aplicados')
-                  .insert(porInsertar.values.toList())
-                  .select('id')
-              as List;
+      final insertados = await _insertarTratamientos(
+        porInsertar.values.toList(),
+      );
       final posiciones = porInsertar.keys.toList();
       for (var i = 0; i < posiciones.length; i++) {
         idsFinales[posiciones[i]] = insertados[i]['id'] as String;
@@ -292,6 +332,155 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
     return idsFinales;
   }
+
+  Future<void> _actualizarTratamiento(
+    String id,
+    Map<String, dynamic> campos,
+  ) async {
+    final payload = _payloadTratamientoCompatible(
+      payloadTratamientoParaActualizacion(campos),
+    );
+    try {
+      await supabaseClient
+          .from('tratamientos_aplicados')
+          .update(payload)
+          .eq('id', id);
+      _soportaJustificacionNoPlanificada ??= true;
+    } on PostgrestException catch (error) {
+      if (_esColumnaJustificacionAusente(error)) {
+        _soportaJustificacionNoPlanificada = false;
+        await supabaseClient
+            .from('tratamientos_aplicados')
+            .update(
+              _payloadTratamientoCompatible(
+                payloadTratamientoParaActualizacion(campos),
+              ),
+            )
+            .eq('id', id);
+        return;
+      }
+      if (!_esRestriccionJustificacionRequerida(error)) rethrow;
+      _requiereJustificacionNoPlanificada = true;
+      await supabaseClient
+          .from('tratamientos_aplicados')
+          .update(
+            payloadTratamientoParaEsquemaConJustificacionRequerida(payload),
+          )
+          .eq('id', id);
+    }
+  }
+
+  Future<List<dynamic>> _insertarTratamientos(
+    List<Map<String, dynamic>> filas,
+  ) async {
+    final payload = filas.map(_payloadTratamientoCompatible).toList();
+    try {
+      final insertados =
+          await supabaseClient
+                  .from('tratamientos_aplicados')
+                  .insert(payload)
+                  .select('id')
+              as List;
+      _soportaJustificacionNoPlanificada ??= true;
+      return insertados;
+    } on PostgrestException catch (error) {
+      if (_esColumnaJustificacionAusente(error)) {
+        _soportaJustificacionNoPlanificada = false;
+        return await supabaseClient
+                .from('tratamientos_aplicados')
+                .insert(filas.map(_payloadTratamientoCompatible).toList())
+                .select('id')
+            as List;
+      }
+      if (!_esRestriccionJustificacionRequerida(error)) rethrow;
+      _requiereJustificacionNoPlanificada = true;
+      return await supabaseClient
+              .from('tratamientos_aplicados')
+              .insert(
+                filas
+                    .map(_payloadTratamientoCompatible)
+                    .map(payloadTratamientoParaEsquemaConJustificacionRequerida)
+                    .toList(),
+              )
+              .select('id')
+          as List;
+    }
+  }
+
+  Map<String, dynamic> _payloadTratamientoCompatible(
+    Map<String, dynamic> original,
+  ) {
+    final payload = _soportaJustificacionNoPlanificada == false
+        ? payloadTratamientoParaEsquemaAnterior(original)
+        : Map<String, dynamic>.from(original);
+    return _requiereJustificacionNoPlanificada == true
+        ? payloadTratamientoParaEsquemaConJustificacionRequerida(payload)
+        : payload;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> payloadTratamientoParaActualizacion(
+    Map<String, dynamic> original,
+  ) {
+    final payload = Map<String, dynamic>.from(original);
+
+    // Estos campos describen la procedencia y autoría originales de la
+    // ejecución. Un null en el estado de la UI significa "no se cargó", no
+    // "borrar la auditoría que ya existe en la base".
+    for (final campo in const [
+      'item_plan_id',
+      'justificacion_no_planificada',
+      'doctor_ejecuta_id',
+      'fecha_ejecucion',
+    ]) {
+      if (payload[campo] == null) payload.remove(campo);
+    }
+    return payload;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic>
+  payloadTratamientoParaEsquemaConJustificacionRequerida(
+    Map<String, dynamic> original,
+  ) {
+    final payload = Map<String, dynamic>.from(original);
+    final itemPlanId = payload['item_plan_id'] as String?;
+    final justificacion = (payload['justificacion_no_planificada'] as String?)
+        ?.trim();
+    if (itemPlanId == null &&
+        (justificacion == null || justificacion.isEmpty)) {
+      payload['justificacion_no_planificada'] =
+          'Tratamiento agregado durante la consulta clínica.';
+    }
+    return payload;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> payloadTratamientoParaEsquemaAnterior(
+    Map<String, dynamic> original,
+  ) {
+    final payload = Map<String, dynamic>.from(original);
+    final justificacion =
+        (payload.remove('justificacion_no_planificada') as String?)?.trim();
+    if (justificacion == null || justificacion.isEmpty) return payload;
+
+    // SD-138 todavía no existe en algunas instancias. No se descarta el motivo
+    // clínico: se conserva en `notas`, que sí forma parte del esquema anterior.
+    final detalle = 'Ejecución no planificada: $justificacion';
+    final notas = (payload['notas'] as String?)?.trim();
+    payload['notas'] = notas == null || notas.isEmpty
+        ? detalle
+        : '$notas\n$detalle';
+    return payload;
+  }
+
+  bool _esColumnaJustificacionAusente(PostgrestException error) =>
+      error.message.contains('justificacion_no_planificada') &&
+      error.message.contains('schema cache');
+
+  bool _esRestriccionJustificacionRequerida(PostgrestException error) =>
+      error.code == '23514' &&
+      error.message.contains('tratamientos_origen_ejecucion_requerido');
 
   @override
   Future<List<Map<String, dynamic>>> fetchConsultas() async {
@@ -368,7 +557,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           // La clave del catálogo es lo que decide cómo se dibuja la pieza:
           // sin ella todo tratamiento previo caía en «Otro».
           '*, tratamiento:tratamientos(nombre, clave_odontograma), '
-          'diente:dientes!inner(fdi_code), '
+          'diente:dientes!tratamientos_aplicados_diente_id_fkey!inner(fdi_code), '
           'consulta:consultas!inner(paciente_id, fecha)',
         )
         .eq('consulta.paciente_id', pacienteId);
@@ -396,7 +585,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .select(
           '*, diagnosis:diagnosticos(nombre, clave_odontograma), '
           'evaluacion:evaluaciones_clinicas(doctor_id), '
-          'diente:dientes!inner(fdi_code), '
+          'diente:dientes!diagnosticos_aplicados_diente_id_fkey!inner(fdi_code), '
           // `doctor_id` de la consulta es el respaldo para las filas anteriores
           // a SD-135, que no cuelgan de ninguna evaluación.
           'consulta:consultas!inner(paciente_id, fecha, doctor_id)',
@@ -459,7 +648,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .from('items_plan_tratamiento')
         .select(
           '*, tratamiento:tratamientos(id, nombre, costo, alcance), '
-          'diente:dientes!inner(id, fdi_code), '
+          'diente:dientes!items_plan_tratamiento_diente_id_fkey!inner(id, fdi_code), '
           'plan:planes_tratamiento!inner(id, paciente_id, consulta_origen_id, '
           'deleted_at)',
         )
@@ -473,9 +662,32 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchReferenciasConsultasPaciente(
     String pacienteId,
   ) async {
+    if (_soportaFlujoClinicoSeparado == false) {
+      return _fetchReferenciasConsultasAnteriores(pacienteId);
+    }
+    try {
+      final filas = await supabaseClient
+          .from('consultas')
+          .select('id, fecha, motivo_consulta, tipo_atencion, doctor_id')
+          .eq('paciente_id', pacienteId)
+          .order('fecha', ascending: false);
+      _soportaFlujoClinicoSeparado = true;
+      return List<Map<String, dynamic>>.from(filas as List);
+    } on PostgrestException catch (error) {
+      if (!error.message.contains('tipo_atencion')) rethrow;
+      _soportaFlujoClinicoSeparado = false;
+      return _fetchReferenciasConsultasAnteriores(pacienteId);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchReferenciasConsultasAnteriores(
+    String pacienteId,
+  ) async {
+    // Antes de SD-138 todas las atenciones eran consultas. El modelo ya
+    // interpreta la ausencia del campo con ese mismo valor por defecto.
     final filas = await supabaseClient
         .from('consultas')
-        .select('id, fecha, motivo_consulta, tipo_atencion, doctor_id')
+        .select('id, fecha, motivo_consulta, doctor_id')
         .eq('paciente_id', pacienteId)
         .order('fecha', ascending: false);
     return List<Map<String, dynamic>>.from(filas as List);

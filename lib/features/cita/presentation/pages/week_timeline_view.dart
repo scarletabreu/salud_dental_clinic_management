@@ -274,7 +274,7 @@ class WeekTimelineView extends StatelessWidget {
       context,
       personaRepository: sl<PersonaRepository>(),
       doctorRepository: sl<DoctorRepository>(),
-      // fechaInicial: fechaPrellenada,
+      fechaInicial: fechaPrellenada,
     );
 
     if (context.mounted) {

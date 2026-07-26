@@ -5,7 +5,6 @@ import 'package:salud_dental_clinic_management/core/data/models/contacto_model.d
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
@@ -491,6 +490,11 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       _isCompletarRegistro
                           ? 'Completar ficha clínica'
                           : 'Editar paciente',
+                      // La barra mide 72 px fijos: sin recortar, el título se
+                      // parte en varias líneas en una pantalla estrecha y
+                      // desborda su propia cabecera.
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,

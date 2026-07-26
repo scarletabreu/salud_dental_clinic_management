@@ -26,7 +26,23 @@ class ConsumibleModel extends Consumible {
       stockMinimo: (json['stock_minimo'] ?? json['stockMinimo'] ?? 0 as num)
           .toInt(),
       estado: _parseEstado(json['estado'] as String?),
+      suplidorId:
+          json['suplidor_id'] as String? ?? json['suplidorId'] as String?,
+      suplidorNombre: _nombreSuplidor(json),
+      // `activo` es la baja lógica del catálogo: `deleteConsumible` lo pone en
+      // false en vez de borrar la fila. Sin leerlo, un consumible dado de baja
+      // seguía apareciendo como disponible y `estadoCalculado` nunca decía
+      // «descontinuado».
+      activo: json['activo'] as bool? ?? true,
     );
+  }
+
+  /// El nombre del suplidor llega del embed `suplidor:suplidores(nombre)`; se
+  /// acepta también plano por si la fila viene de una consulta sin join.
+  static String? _nombreSuplidor(Map<String, dynamic> json) {
+    final suplidor = json['suplidor'] ?? json['suplidores'];
+    if (suplidor is Map) return suplidor['nombre'] as String?;
+    return json['suplidor_nombre'] as String?;
   }
 
   static EstadoConsumible _parseEstado(String? estadoStr) {
@@ -66,6 +82,10 @@ class ConsumibleModel extends Consumible {
       'stock_actual': stockActual,
       'stock_minimo': stockMinimo,
       'estado': _estadoToPg(estado),
+      // Sin estas dos, guardar un consumible desvinculaba su suplidor y lo
+      // reactivaba: el formulario las recoge y aquí se perdían.
+      'suplidor_id': suplidorId,
+      'activo': activo,
     };
 
     if (id != null && id!.trim().isNotEmpty && id!.contains('-')) {

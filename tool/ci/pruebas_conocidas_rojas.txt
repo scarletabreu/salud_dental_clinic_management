@@ -3,15 +3,3 @@
 # nueva o si alguna de estas empieza a pasar sin quitarla de aquí.
 #
 # Regenerar:  dart run tool/ci/verificar_pruebas.dart --actualizar
-
-test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en 320 px
-test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en 360 px
-test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en 390 px
-test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en tablet
-test/features/consulta/guardado_clinico_test.dart :: guardarResultadoConsulta · lo que llega a la base de datos la justificación clínica de una contraindicación se persiste
-test/features/consumible/consumible_model_test.dart :: Consumible mapea precio, suplidor y activo desde Supabase
-test/features/cuenta/cuenta_model_test.dart :: mapea credito de Postgres sin confundirlo con la etiqueta Crédito
-test/features/cuenta/pre_factura_cubit_test.dart :: Cuenta.estadoCuenta pago parcial -> pendiente
-test/features/cuenta/pre_factura_cubit_test.dart :: Cuenta.estadoCuenta pago total -> saldada
-test/features/medicina/medicina_responsive_test.dart :: el catálogo resiste el texto ampliado en 320 px
-test/features/paciente/paciente_responsive_test.dart :: loading test/features/paciente/paciente_responsive_test.dart

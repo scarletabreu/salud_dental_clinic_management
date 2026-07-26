@@ -17,6 +17,7 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
     super.doctorId,
     super.nombreDiagnostico,
     super.claveOdontograma,
+    super.anuladoEn,
   });
 
   factory DiagnosticoAplicadoModel.fromJson(Map<String, dynamic> json) {
@@ -48,6 +49,9 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
       claveOdontograma:
           catalogo['clave_odontograma'] as String? ??
           catalogo['claveOdontograma'] as String?,
+      anuladoEn: json['deleted_at'] == null
+          ? null
+          : DateTime.tryParse(json['deleted_at'].toString()),
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -131,6 +132,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             return _buildContent(
               state.paciente,
               historialNoDisponible: state.historialNoDisponible,
+              historialPiezas: state.historialPiezas,
             );
           }
 
@@ -140,7 +142,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildContent(Paciente p, {bool historialNoDisponible = false}) {
+  Widget _buildContent(
+    Paciente p, {
+    bool historialNoDisponible = false,
+    HistorialPiezas historialPiezas = HistorialPiezas.vacio,
+  }) {
     final sortedConsultas = [...p.record.consultas]
       ..sort(
         (a, b) => _ordenDescendente
@@ -198,6 +204,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           OdontogramArchWidget(
             consultas: sortedConsultas,
             historialNoDisponible: historialNoDisponible,
+            historialPiezas: historialPiezas,
           ),
           const SizedBox(height: 16),
           _buildTimelineCard(sortedConsultas),

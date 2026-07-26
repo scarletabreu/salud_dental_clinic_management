@@ -13,8 +13,10 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/tarjeta_consulta.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
@@ -60,6 +62,11 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   /// anotó cada cosa en vez de mostrar un uuid.
   Map<String, String> _nombrePorDoctorId = const {};
 
+  /// La historia de cada pieza del paciente (SD-144). El doctor que atiende hoy
+  /// necesita poder abrir un diente y ver todo lo que se le hizo antes, no solo
+  /// la capa tenue que dibuja el odontograma.
+  HistorialPiezas? _historialPiezas;
+
   /// Evaluación de esta consulta (SD-135). Se asegura una sola vez: es el
   /// contenedor al que se cuelgan los hallazgos y del que nace el plan.
   String? _evaluacionId;
@@ -76,6 +83,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     _cargarDiagnosticos();
     _cargarCondicionesPaciente();
     _cargarDoctores();
+    _cargarHistorialPiezas();
 
     final state = context.read<ConsultaCubit>().state;
     if (state is ConsultaIniciada && state.consulta.notas != null) {
@@ -121,6 +129,26 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   /// El nombre del doctor, o cadena vacía si aún no se cargó el personal: la
   /// ficha prefiere no decir nada a mostrar un identificador.
   String _nombreDoctor(String doctorId) => _nombrePorDoctorId[doctorId] ?? '';
+
+  /// Trae la historia por pieza del paciente de esta consulta. Es contexto: si
+  /// falla, la ficha se queda con lo de hoy y la consulta sigue operable.
+  Future<void> _cargarHistorialPiezas() async {
+    final state = context.read<PacienteCubit>().state;
+    if (state is! PacienteDetailLoaded) return;
+    final pacienteId = state.paciente.id;
+    if (pacienteId == null) return;
+
+    try {
+      final historial = await sl<ConsultaRepository>().getHistorialPiezas(
+        pacienteId,
+      );
+      if (!mounted) return;
+      setState(() => _historialPiezas = historial);
+    } catch (_) {
+      // Sin historial la ficha sigue mostrando lo evaluado, planificado y
+      // ejecutado de esta consulta.
+    }
+  }
 
   Future<void> _onAddDiagnosis(
     Diente diente,
@@ -696,6 +724,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                   odontograma: odontograma,
                   editable: true,
                   itemsPlan: _itemsPlanPorFdi(odontograma, planState),
+                  historialPiezas: _historialPiezas,
                   onEvaluacionChanged: esEvaluacion
                       ? _onEvaluacionChanged
                       : null,

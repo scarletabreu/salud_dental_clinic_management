@@ -37,6 +37,18 @@ class ItemPlanTratamiento {
   /// pintar la lista.
   final String? nombreTratamiento;
 
+  /// Cuándo se retiró la actividad del plan (`deleted_at`). Retirarla no borra
+  /// que se propuso: la línea de tiempo de la pieza la sigue mostrando como
+  /// anulada (SD-144).
+  final DateTime? anuladoEn;
+
+  bool get estaAnulado => anuladoEn != null;
+
+  /// Id de la consulta en la que nació el plan del que cuelga. No es columna de
+  /// la actividad: llega del JOIN con `planes_tratamiento` y sitúa la actividad
+  /// en la línea de tiempo del expediente.
+  final String? consultaOrigenId;
+
   const ItemPlanTratamiento({
     this.id,
     required this.planId,
@@ -57,6 +69,8 @@ class ItemPlanTratamiento {
     this.fechaInicio,
     this.fechaCompletado,
     this.nombreTratamiento,
+    this.anuladoEn,
+    this.consultaOrigenId,
   });
 
   /// Aplica una transición y sella su fecha. Devuelve `null` si el paso no es
@@ -106,6 +120,8 @@ class ItemPlanTratamiento {
     DateTime? fechaInicio,
     DateTime? fechaCompletado,
     String? nombreTratamiento,
+    DateTime? anuladoEn,
+    String? consultaOrigenId,
   }) {
     return ItemPlanTratamiento(
       id: id ?? this.id,
@@ -128,6 +144,8 @@ class ItemPlanTratamiento {
       fechaInicio: fechaInicio ?? this.fechaInicio,
       fechaCompletado: fechaCompletado ?? this.fechaCompletado,
       nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
+      anuladoEn: anuladoEn ?? this.anuladoEn,
+      consultaOrigenId: consultaOrigenId ?? this.consultaOrigenId,
     );
   }
 }

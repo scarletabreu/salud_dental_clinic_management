@@ -21,6 +21,7 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.justificacionNoPlanificada,
     super.doctorEjecutaId,
     super.fechaEjecucion,
+    super.anuladoEn,
   });
 
   factory TratamientoAplicadoModel.fromJson(Map<String, dynamic> json) {
@@ -55,6 +56,7 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
           json['justificacion_no_planificada'] as String?,
       doctorEjecutaId: json['doctor_ejecuta_id'] as String?,
       fechaEjecucion: _parseFecha(json['fecha_ejecucion']),
+      anuladoEn: _parseFecha(json['deleted_at']),
     );
   }
 

@@ -360,6 +360,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchTratamientosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
+    bool incluyendoAnulados = false,
   }) async {
     var query = supabaseClient
         .from('tratamientos_aplicados')
@@ -370,8 +371,11 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           'diente:dientes!inner(fdi_code), '
           'consulta:consultas!inner(paciente_id, fecha)',
         )
-        .eq('consulta.paciente_id', pacienteId)
-        .isFilter('deleted_at', null);
+        .eq('consulta.paciente_id', pacienteId);
+
+    if (!incluyendoAnulados) {
+      query = query.isFilter('deleted_at', null);
+    }
 
     if (excluyendoConsultaId != null) {
       query = query.neq('consulta_id', excluyendoConsultaId);
@@ -385,6 +389,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
+    bool incluyendoAnulados = false,
   }) async {
     var query = supabaseClient
         .from('diagnosticos_aplicados')
@@ -396,8 +401,11 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           // a SD-135, que no cuelgan de ninguna evaluación.
           'consulta:consultas!inner(paciente_id, fecha, doctor_id)',
         )
-        .eq('consulta.paciente_id', pacienteId)
-        .isFilter('deleted_at', null);
+        .eq('consulta.paciente_id', pacienteId);
+
+    if (!incluyendoAnulados) {
+      query = query.isFilter('deleted_at', null);
+    }
 
     if (excluyendoConsultaId != null) {
       query = query.neq('consulta_id', excluyendoConsultaId);
@@ -438,6 +446,51 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       ascending: false,
     );
     return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchItemsPlanPorPaciente(
+    String pacienteId,
+  ) async {
+    // Sin filtro por `deleted_at` de la actividad: una actividad retirada del
+    // plan sigue siendo parte de la historia de la pieza. El plan sí se exige
+    // vivo, porque un plan borrado se retiró entero.
+    final filas = await supabaseClient
+        .from('items_plan_tratamiento')
+        .select(
+          '*, tratamiento:tratamientos(id, nombre, costo, alcance), '
+          'diente:dientes!inner(id, fdi_code), '
+          'plan:planes_tratamiento!inner(id, paciente_id, consulta_origen_id, '
+          'deleted_at)',
+        )
+        .eq('plan.paciente_id', pacienteId)
+        .isFilter('plan.deleted_at', null)
+        .order('fecha_propuesta', ascending: false);
+    return List<Map<String, dynamic>>.from(filas as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchReferenciasConsultasPaciente(
+    String pacienteId,
+  ) async {
+    final filas = await supabaseClient
+        .from('consultas')
+        .select('id, fecha, motivo_consulta, tipo_atencion, doctor_id')
+        .eq('paciente_id', pacienteId)
+        .order('fecha', ascending: false);
+    return List<Map<String, dynamic>>.from(filas as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchNombresDoctores(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return const [];
+    final filas = await supabaseClient
+        .from('doctores')
+        .select('id, usuarios(personas(nombre, apellido))')
+        .inFilter('id', ids);
+    return List<Map<String, dynamic>>.from(filas as List);
   }
 
   @override

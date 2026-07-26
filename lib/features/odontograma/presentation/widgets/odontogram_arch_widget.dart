@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
 import 'odontogram_widget.dart';
@@ -224,10 +225,16 @@ class OdontogramArchWidget extends StatefulWidget {
   /// que le falta información.
   final bool historialNoDisponible;
 
+  /// La línea de tiempo de cada pieza (SD-144). Es lo que permite que tocar un
+  /// diente cuente su historia completa aunque se esté mirando la Vista
+  /// General, que por definición se queda con una sola anotación por pieza.
+  final HistorialPiezas? historialPiezas;
+
   const OdontogramArchWidget({
     super.key,
     required this.consultas,
     this.historialNoDisponible = false,
+    this.historialPiezas,
   });
 
   @override
@@ -373,7 +380,10 @@ class _OdontogramArchWidgetState extends State<OdontogramArchWidget> {
             // `LeyendaOdontograma`, con el mismo vocabulario que el color de
             // las piezas. La que había aquí describía una escala de severidad
             // que la arcada dejó de usar.
-            VistasOdontograma(odontograma: currentOdo),
+            VistasOdontograma(
+              odontograma: currentOdo,
+              historialPiezas: widget.historialPiezas,
+            ),
           ],
         ],
       ),

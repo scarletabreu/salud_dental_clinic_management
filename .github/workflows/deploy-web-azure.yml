@@ -101,7 +101,9 @@ jobs:
           flutter analyze \
             lib/main.dart \
             lib/core/config/app_config.dart \
-            test/core/app_config_test.dart
+            lib/core/presentation/bootstrap_error_screen.dart \
+            test/core/app_config_test.dart \
+            test/core/presentation/bootstrap_error_screen_test.dart
 
       - name: Suite de pruebas
         run: dart run tool/ci/verificar_pruebas.dart

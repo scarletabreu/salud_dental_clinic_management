@@ -36,6 +36,14 @@ void main() {
       );
       expect(
         () => AppConfig.validated(
+          environment: 'staging',
+          supabaseUrl: 'https://example.supabase.co',
+          supabasePublishableKey: 'sb_publishable_example',
+        ),
+        throwsStateError,
+      );
+      expect(
+        () => AppConfig.validated(
           environment: 'production',
           supabaseUrl: '',
           supabasePublishableKey: 'sb_publishable_example',
@@ -79,5 +87,46 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('distingue el ambiente vacío del ambiente desconocido', () {
+      // El mensaje es lo que ve quien ejecuta sin `--dart-define`: tiene que
+      // decir que la variable falta, no que su valor esté mal escrito.
+      expect(
+        () => AppEnvironment.parse('  '),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'Falta APP_ENVIRONMENT.',
+          ),
+        ),
+      );
+      expect(
+        () => AppEnvironment.parse('staging'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('debe ser development, test o production'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'sin variables inyectadas el arranque falla y lo declara como ausencia',
+      () {
+        // Es exactamente el estado de un `flutter run` sin
+        // `--dart-define-from-file`: `main()` necesita las dos señales para
+        // elegir el mensaje correcto en lugar de dejar la página en blanco.
+        expect(AppConfig.sinConfiguracionInyectada, isTrue);
+        expect(AppConfig.fromEnvironment, throwsStateError);
+      },
+      // La suite se ejecuta sin variables; si alguien se las pasa, el caso deja
+      // de aplicar en vez de fallar por un motivo ajeno a lo que verifica.
+      skip: AppConfig.sinConfiguracionInyectada
+          ? null
+          : 'La suite recibió --dart-define.',
+    );
   });
 }

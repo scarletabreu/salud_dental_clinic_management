@@ -21,6 +21,35 @@ class PlanTratamientoRemoteDatasourceImpl
     return fila['id'] as String;
   }
 
+    @override
+  Future<List<Map<String, dynamic>>> fetchResumenPorPlan(
+    String planId,
+  ) async {
+    final response = await supabaseClient
+        .from('resumen_actividad_plan')
+        .select()
+        .eq('plan_id', planId);
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchResumenPorPaciente(
+    String pacienteId,
+  ) async {
+    final response = await supabaseClient
+        .from('resumen_actividad_plan')
+        .select()
+        .eq('paciente_id', pacienteId);
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<void> insertEjecucion(Map<String, dynamic> data) async {
+    data['created_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
+    await supabaseClient.from('tratamientos_aplicados').insert(data);
+  }
+
   @override
   Future<void> updatePlan(String id, Map<String, dynamic> data) async {
     await supabaseClient

@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/errors/transicion_plan_invalida.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 /// Gobierna el plan de tratamiento de una consulta: qué se propone tratar y en
 /// qué punto está cada decisión.
@@ -26,6 +27,65 @@ class PlanTratamientoCubit extends Cubit<PlanTratamientoState> {
       emit(PlanTratamientoCargado(plan: plan));
     } catch (e) {
       emit(PlanTratamientoError('No se pudo cargar el plan.\n$e'));
+    }
+  }
+
+  /// Registra que la actividad se ejecutó (total o parcialmente) y refleja el
+  /// cambio de estado del plan junto con la ejecución real, en la misma
+  /// operación. Sin esto, mover el estado del plan es solo una etiqueta.
+  Future<void> registrarEjecucion(
+    ItemPlanTratamiento item, {
+    required EstadoItemPlan destinoEstado,
+    required double cantidadRealizada,
+    required String consultaId,
+    required String doctorId,
+    String? notas,
+  }) async {
+    final actual = state is PlanTratamientoCargado
+        ? state as PlanTratamientoCargado
+        : null;
+    final plan = actual?.plan;
+    if (actual == null || plan == null) return;
+
+    emit(actual.copyWith(guardando: true, limpiarAviso: true));
+    try {
+      // 1. Registra la ejecución real (crea o suma sobre la existente).
+      await _repository.registrarEjecucionItem(
+        item: item,
+        consultaId: consultaId,
+        doctorId: doctorId,
+        cantidadRealizada: cantidadRealizada,
+        notas: notas,
+        estadoTratamientoAplicado: destinoEstado == EstadoItemPlan.completado
+            ? EstadoTratamientoAplicado.completado
+            : EstadoTratamientoAplicado.enProceso,
+      );
+
+      // 2. Refleja el nuevo estado en el plan (misma transición de siempre).
+      final actualizado = await _repository.cambiarEstadoItem(
+        item,
+        destinoEstado,
+      );
+
+      emit(
+        PlanTratamientoCargado(
+          plan: plan.copyWith(
+            items: [
+              for (final existente in plan.items)
+                if (existente.id == actualizado.id) actualizado else existente,
+            ],
+          ),
+        ),
+      );
+    } on TransicionPlanInvalida catch (e) {
+      emit(actual.copyWith(guardando: false, aviso: e.mensaje));
+    } catch (e) {
+      emit(
+        actual.copyWith(
+          guardando: false,
+          aviso: 'No se pudo registrar la ejecución: $e',
+        ),
+      );
     }
   }
 

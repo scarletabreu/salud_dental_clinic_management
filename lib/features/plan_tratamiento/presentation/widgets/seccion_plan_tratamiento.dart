@@ -211,6 +211,8 @@ class SeccionPlanTratamiento extends StatelessWidget {
                   item: item,
                   habilitado: !cargado.guardando,
                   fdiCode: _fdiDe(item.dienteId),
+                  consultaId: consultaId,
+                  doctorId: doctorId,
                 ),
               const SizedBox(height: 14),
               _ResumenPlan(plan: plan!),
@@ -326,11 +328,15 @@ class _FilaActividad extends StatelessWidget {
   final ItemPlanTratamiento item;
   final bool habilitado;
   final int? fdiCode;
+  final String consultaId;
+  final String doctorId;
 
   const _FilaActividad({
     required this.item,
     required this.habilitado,
     this.fdiCode,
+    required this.consultaId,
+    required this.doctorId,
   });
 
   String get _descripcion {
@@ -424,14 +430,36 @@ class _FilaActividad extends StatelessWidget {
     final cubit = context.read<PlanTratamientoCubit>();
     String? motivo;
 
-    // Un rechazo sin motivo no dice nada al que lea el expediente dentro de un
-    // año; se pide antes de cerrarlo.
     if (destino == EstadoItemPlan.rechazado) {
       motivo = await _pedirMotivo(context);
       if (motivo == null) return;
     }
 
+    // Ejecutar (no solo etiquetar) es lo que genera el cargo real (SD-135 /
+    // ticket de sesiones): se pide cantidad y notas antes de tocar el estado.
+    if (destino == EstadoItemPlan.enProceso ||
+        destino == EstadoItemPlan.completado) {
+      final datos = await _pedirDatosEjecucion(context);
+      if (datos == null) return;
+      await cubit.registrarEjecucion(
+        item,
+        destinoEstado: destino,
+        cantidadRealizada: datos.cantidad,
+        consultaId: consultaId,
+        doctorId: doctorId,
+        notas: datos.notas,
+      );
+      return;
+    }
+
     await cubit.cambiarEstadoActividad(item, destino, motivoRechazo: motivo);
+  }
+
+  Future<_DatosEjecucion?> _pedirDatosEjecucion(BuildContext context) {
+    return showDialog<_DatosEjecucion>(
+      context: context,
+      builder: (ctx) => _DialogoRegistrarEjecucion(item: item),
+    );
   }
 
   Future<String?> _pedirMotivo(BuildContext context) {
@@ -588,6 +616,103 @@ class _Aviso extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+class _DatosEjecucion {
+  final double cantidad;
+  final String? notas;
+  const _DatosEjecucion({required this.cantidad, this.notas});
+}
+
+class _DialogoRegistrarEjecucion extends StatefulWidget {
+  const _DialogoRegistrarEjecucion({required this.item});
+  final ItemPlanTratamiento item;
+
+  @override
+  State<_DialogoRegistrarEjecucion> createState() =>
+      _DialogoRegistrarEjecucionState();
+}
+
+class _DialogoRegistrarEjecucionState
+    extends State<_DialogoRegistrarEjecucion> {
+  final _cantidadController = TextEditingController(text: '1');
+  final _notasController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _cantidadController.dispose();
+    _notasController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Registrar ejecución',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _cantidadController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Cantidad realizada *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) {
+                final n = double.tryParse((v ?? '').replaceAll(',', '.'));
+                if (n == null || n <= 0) return 'Ingresa una cantidad válida';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notasController,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Notas de la ejecución',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(
+                context,
+                _DatosEjecucion(
+                  cantidad: double.parse(
+                    _cantidadController.text.replaceAll(',', '.'),
+                  ),
+                  notas: _notasController.text.trim().isEmpty
+                      ? null
+                      : _notasController.text.trim(),
+                ),
+              );
+            }
+          },
+          child: const Text('Registrar'),
+        ),
+      ],
     );
   }
 }

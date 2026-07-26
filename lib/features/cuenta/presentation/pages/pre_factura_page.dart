@@ -22,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/entities
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/recibo_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/presentation/pages/recibo_pago_page.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/pages/resumen_plan_page.dart';
 
 /// Detalle de cuenta / pre-factura de una consulta. Punto de llegada al cerrar
 /// una consulta (SD-96) y accesible desde el expediente del paciente.
@@ -206,7 +207,11 @@ class _ContenidoState extends State<_Contenido> {
           ),
           const SizedBox(height: 16),
         ],
-        _Acciones(cuenta: cuenta, cuotas: widget.cuotas),
+        _Acciones(
+          cuenta: cuenta,
+          cuotas: widget.cuotas,
+          pacienteId: widget.paciente?.id,
+        ),
         const SizedBox(height: 8),
       ],
     );
@@ -757,7 +762,8 @@ class _FilaPago extends StatelessWidget {
 class _Acciones extends StatelessWidget {
   final Cuenta cuenta;
   final List<Cuota> cuotas;
-  const _Acciones({required this.cuenta, required this.cuotas});
+  final String? pacienteId;
+  const _Acciones({required this.cuenta, required this.cuotas, required this.pacienteId});
 
   @override
   Widget build(BuildContext context) {
@@ -832,6 +838,26 @@ class _Acciones extends StatelessWidget {
             ),
           ],
         ),
+        if (pacienteId != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ResumenPlanPage.porPaciente(pacienteId!),
+                    ),
+                  ),
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Ver plan de tratamiento completo'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.primaryBlue,
+                    side: BorderSide(color: ac.primaryBlue.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
       ],
     );
   }

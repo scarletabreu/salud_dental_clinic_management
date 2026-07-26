@@ -623,7 +623,14 @@ class _MapaSuperficies extends StatelessWidget {
       );
     }
 
-    return SizedBox(width: _size, height: _size, child: map);
+    // El mapa de caras convive con el formulario de la ficha. Sin frontera,
+    // escribir una nota obliga a redibujar el mapa en cada pulsación de tecla,
+    // y tocar una cara redibuja el formulario entero.
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: RepaintBoundary(child: map),
+    );
   }
 }
 

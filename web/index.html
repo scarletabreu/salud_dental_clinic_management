@@ -18,24 +18,38 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Gestión de clínica dental">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="salud_dental_clinic_management">
+  <meta name="apple-mobile-web-app-title" content="Salud Dental">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>salud_dental_clinic_management</title>
+  <title>Salud Dental</title>
   <link rel="manifest" href="manifest.json">
 
-  <script
-  src="https://github.com/corbado/flutter-passkeys/releases/download/2.4.0/bundle.js"
-  type="application/javascript">
-</script>
+  <!--
+    SD-132. Aquí había un <script> síncrono al bundle de passkeys de Corbado,
+    servido desde github.com. Al no llevar `async` ni `defer`, el navegador
+    detenía el parseo del documento hasta descargarlo y ejecutarlo: en el
+    <head>, antes de que Flutter empezara siquiera a cargar. Sobre una conexión
+    de clínica eso son segundos de pantalla en blanco, y el fallo del host
+    dejaba la app sin arrancar.
+
+    Se retira porque no se usa: `passkeys_platform_interface` entra como
+    dependencia transitiva de supabase_flutter, pero la autenticación real de
+    esta app es `signInWithPassword`. Si algún día se adoptan passkeys en web,
+    hay que volver a añadirlo *con* `defer` y desde un origen propio, no desde
+    una URL de releases de GitHub.
+
+    Precalentar la conexión a Supabase sí vale la pena: el primer arranque
+    resuelve DNS y negocia TLS mientras el motor de Flutter todavía se carga.
+  -->
+  <link rel="preconnect" href="https://xcuvywvltttephakzmwu.supabase.co" crossorigin>
 </head>
 <body>
   <!--

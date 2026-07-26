@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
@@ -20,17 +20,12 @@ class CitaRemoteDataSource {
           .filter('deleted_at', 'is', null);
 
       final raw = citasRes as List;
-      debugPrint('RAW citas desde Supabase: ${raw.length} filas');
-
       if (raw.isEmpty) return _citasPrueba;
 
       final real = await _assembleCitas(raw);
-      debugPrint('Citas ensambladas: ${real.length}');
-
       return real.isEmpty ? _citasPrueba : real;
     } catch (e, stack) {
-      debugPrint('fetchCitas error: $e');
-      debugPrint('Stack: $stack');
+      AppLog.error('fetchCitas', e, stack);
       return _citasPrueba;
     }
   }
@@ -70,9 +65,6 @@ class CitaRemoteDataSource {
         .toSet()
         .toList();
 
-    debugPrint('doctor_ids buscados: $doctorIds');
-    debugPrint('persona_ids buscados: $personaIds');
-
     final Map<String, Map<String, dynamic>> doctorPersonas = {};
     if (doctorIds.isNotEmpty) {
       final res = await supabase
@@ -84,8 +76,6 @@ class CitaRemoteDataSource {
         doctorPersonas[m['id'] as String] = m;
       }
     }
-    debugPrint('doctorPersonas encontrados: ${doctorPersonas.keys}');
-
     final Map<String, Map<String, dynamic>> pacientes = {};
     if (personaIds.isNotEmpty) {
       final res = await supabase
@@ -103,7 +93,6 @@ class CitaRemoteDataSource {
           .where((id) => !pacientes.containsKey(id))
           .toList();
       if (missing.isNotEmpty) {
-        debugPrint('persona_ids no encontrados en pacientes: $missing');
         final fallback = await supabase
             .from('personas')
             .select('*')
@@ -114,8 +103,6 @@ class CitaRemoteDataSource {
         }
       }
     }
-    debugPrint('pacientes encontrados: ${pacientes.keys}');
-
     final List<CitaModel> result = [];
 
     for (final c in rawCitas) {
@@ -155,7 +142,7 @@ class CitaRemoteDataSource {
 
         result.add(CitaModel.fromJson(json));
       } catch (e) {
-        debugPrint('Error ensamblando cita ${(c as Map)['id']}: $e');
+        AppLog.error('ensamblar cita ${(c as Map)['id']}', e);
       }
     }
 
@@ -189,7 +176,6 @@ class CitaRemoteDataSource {
       'estado': cita.estado.dbValue,
       'updated_at': DateTime.now().toIso8601String(),
     };
-    debugPrint('updateCita payload: $data para id=${cita.id}');
     await supabase.from('citas').update(data).eq('id', cita.id!);
   }
 

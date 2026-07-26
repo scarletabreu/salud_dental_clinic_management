@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -255,7 +256,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       emit(ConsultaIniciada(consulta: consultaActiva));
     } catch (e) {
-      if (kDebugMode) debugPrint('Error al crear consulta: $e');
+      AppLog.error('crear consulta', e);
       emit(ConsultaError(_mensajeError(e)));
     }
   }
@@ -279,7 +280,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             excluyendoConsultaId: excluyendoConsultaId,
           );
     } catch (e) {
-      if (kDebugMode) debugPrint('No se pudo cargar el historial dental: $e');
+      AppLog.error('historial dental', e);
     }
     try {
       diagnosticos = await _consultaRepository
@@ -288,9 +289,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             excluyendoConsultaId: excluyendoConsultaId,
           );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('No se pudieron cargar los hallazgos anteriores: $e');
-      }
+      AppLog.error('hallazgos anteriores', e);
     }
     try {
       evaluacion = await _consultaRepository.getEvaluacionHistorica(
@@ -298,9 +297,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         excluyendoConsultaId: excluyendoConsultaId,
       );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('No se pudo cargar el odontodiagrama anterior: $e');
-      }
+      AppLog.error('odontodiagrama anterior', e);
     }
 
     return _HistorialDental(
@@ -605,7 +602,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ConsultaIniciada(consulta: await _conHistorial(consultaRehidratada)),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('Error al reanudar consulta: $e');
+      AppLog.error('reanudar consulta', e);
       emit(
         ConsultaError(
           _mensajeError(e, fallback: 'No se pudo reanudar la consulta.'),
@@ -728,7 +725,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }
     } catch (e) {
       _guardando = false;
-      if (kDebugMode) debugPrint('Error en guardado parcial: $e');
+      AppLog.error('guardado parcial', e);
       if (isClosed) return;
       final vigente = state;
       if (vigente is! ConsultaIniciada) return;
@@ -785,7 +782,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       emit(ConsultaTerminada(cuentaId: cuentaId));
     } catch (e) {
       _guardando = false;
-      if (kDebugMode) debugPrint('Error al terminar consulta: $e');
+      AppLog.error('terminar consulta', e);
       emit(
         ConsultaError(
           _mensajeError(

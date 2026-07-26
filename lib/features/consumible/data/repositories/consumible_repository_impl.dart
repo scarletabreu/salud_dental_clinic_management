@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/data/cache_catalogo.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
@@ -6,16 +7,32 @@ import 'package:salud_dental_clinic_management/features/consumible/data/datasour
 import 'package:salud_dental_clinic_management/features/consumible/data/models/consumible_model.dart';
 
 class ConsumibleRepositoryImpl implements ConsumibleRepository {
+  static const _clave = 'inventario';
+
   final ConsumibleRemoteDatasource remoteDataSource;
 
-  ConsumibleRepositoryImpl({required this.remoteDataSource});
+  /// El inventario lo piden el inicio, la sección de insumos de la consulta y
+  /// el propio listado. Se comparte aquí en vez de que cada uno lo baje.
+  ///
+  /// La vigencia es corta y toda escritura lo invalida porque el stock sí
+  /// cambia dentro de una sesión: servir existencias viejas llevaría a
+  /// descontar sobre un número que ya no es cierto.
+  final CacheCatalogo _cache;
+
+  ConsumibleRepositoryImpl({
+    required this.remoteDataSource,
+    CacheCatalogo? cache,
+  }) : _cache = cache ?? CacheCatalogo();
 
   @override
   Future<List<Consumible>> getInventario() {
-    return runGuarded(() async {
-      final data = await remoteDataSource.fetchConsumibles();
-      return data.map((json) => ConsumibleModel.fromJson(json)).toList();
-    }, context: 'obtener el inventario');
+    return _cache.obtener(
+      _clave,
+      () => runGuarded(() async {
+        final data = await remoteDataSource.fetchConsumibles();
+        return data.map((json) => ConsumibleModel.fromJson(json)).toList();
+      }, context: 'obtener el inventario'),
+    );
   }
 
   @override
@@ -31,10 +48,10 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
         'No puede ser negativo',
       );
     }
-    return runGuarded(
-      () => remoteDataSource.adjustStock(id, nuevoStock, motivo.name),
-      context: 'actualizar la existencia',
-    );
+    return runGuarded(() async {
+      await remoteDataSource.adjustStock(id, nuevoStock, motivo.name);
+      _cache.invalidar(_clave);
+    }, context: 'actualizar la existencia');
   }
 
   @override
@@ -59,6 +76,7 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
       } else {
         await remoteDataSource.updateConsumible(consumible.id!, data);
       }
+      _cache.invalidar(_clave);
     }, context: 'guardar el consumible');
   }
 
@@ -70,17 +88,17 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
     if (cantidad <= 0) {
       throw ArgumentError.value(cantidad, 'cantidad', 'Debe ser positiva');
     }
-    return runGuarded(
-      () => remoteDataSource.registrarConsumoClinico(consumibleId, cantidad),
-      context: 'descontar stock por consumo',
-    );
+    return runGuarded(() async {
+      await remoteDataSource.registrarConsumoClinico(consumibleId, cantidad);
+      _cache.invalidar(_clave);
+    }, context: 'descontar stock por consumo');
   }
 
   @override
   Future<void> eliminarConsumible(String id) {
-    return runGuarded(
-      () => remoteDataSource.deleteConsumible(id),
-      context: 'eliminar el consumible',
-    );
+    return runGuarded(() async {
+      await remoteDataSource.deleteConsumible(id);
+      _cache.invalidar(_clave);
+    }, context: 'eliminar el consumible');
   }
 }

@@ -6,7 +6,12 @@ enum AppEnvironment {
   production;
 
   static AppEnvironment parse(String value) {
-    return switch (value.trim().toLowerCase()) {
+    final normalizado = value.trim().toLowerCase();
+    if (normalizado.isEmpty) {
+      throw StateError('Falta APP_ENVIRONMENT.');
+    }
+
+    return switch (normalizado) {
       'development' || 'dev' => AppEnvironment.development,
       'test' || 'testing' => AppEnvironment.test,
       'production' || 'prod' => AppEnvironment.production,
@@ -30,18 +35,28 @@ class AppConfig {
   });
 
   factory AppConfig.fromEnvironment() {
-    const environment = String.fromEnvironment('APP_ENVIRONMENT');
-    const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-    const supabasePublishableKey = String.fromEnvironment(
-      'SUPABASE_PUBLISHABLE_KEY',
-    );
-
     return AppConfig.validated(
-      environment: environment,
-      supabaseUrl: supabaseUrl,
-      supabasePublishableKey: supabasePublishableKey,
+      environment: _environment,
+      supabaseUrl: _supabaseUrl,
+      supabasePublishableKey: _supabasePublishableKey,
     );
   }
+
+  static const _environment = String.fromEnvironment('APP_ENVIRONMENT');
+  static const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const _supabasePublishableKey = String.fromEnvironment(
+    'SUPABASE_PUBLISHABLE_KEY',
+  );
+
+  /// `true` cuando la compilación no recibió ninguna variable `--dart-define`.
+  ///
+  /// Distingue el olvido del flag —el caso habitual al ejecutar en local— de un
+  /// valor mal escrito: ambos abortan el arranque, pero solo el primero se
+  /// resuelve añadiendo `--dart-define-from-file`.
+  static bool get sinConfiguracionInyectada =>
+      _environment.isEmpty &&
+      _supabaseUrl.isEmpty &&
+      _supabasePublishableKey.isEmpty;
 
   factory AppConfig.validated({
     required String environment,

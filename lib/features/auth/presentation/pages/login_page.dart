@@ -31,12 +31,23 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    context.read<AuthCubit>().login(
-      _usernameCtrl.text.trim(),
-      _passwordCtrl.text,
-    );
+  /// Hay un intento de sesión en vuelo. El estado de autenticación no lo dice
+  /// —solo distingue autenticado de no autenticado—, así que se lleva aquí:
+  /// sin él el botón quedaba siempre activo y dos toques seguidos lanzaban dos
+  /// autenticaciones contra el servidor.
+  bool _enviando = false;
+
+  Future<void> _submit() async {
+    if (_enviando || !_formKey.currentState!.validate()) return;
+    setState(() => _enviando = true);
+    try {
+      await context.read<AuthCubit>().login(
+        _usernameCtrl.text.trim(),
+        _passwordCtrl.text,
+      );
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
   }
 
   @override
@@ -244,7 +255,7 @@ class _LoginPageState extends State<LoginPage> {
       buildWhen: (p, c) =>
           p.isAuthenticated != c.isAuthenticated || (p.error != c.error),
       builder: (context, state) {
-        final loading = false;
+        final loading = _enviando;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -269,16 +280,25 @@ class _LoginPageState extends State<LoginPage> {
             child: InkWell(
               onTap: loading ? null : _submit,
               borderRadius: BorderRadius.circular(13),
-              child: const Center(
-                child: Text(
-                  'Iniciar sesión',
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.2,
-                  ),
-                ),
+              child: Center(
+                child: loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Iniciar sesión',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
               ),
             ),
           ),

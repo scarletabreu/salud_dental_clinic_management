@@ -314,12 +314,18 @@ class _Shell extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Planes de tratamiento',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: ac.textPrimary,
+                Flexible(
+                  child: Text(
+                    'Planes de tratamiento',
+                    // El título cede antes que el contador: en 320 px no cabe
+                    // entero junto al icono y la tarjeta desbordaba.
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: ac.textPrimary,
+                    ),
                   ),
                 ),
                 if (conteo != null) ...[

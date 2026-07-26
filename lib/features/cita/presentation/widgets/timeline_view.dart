@@ -5,12 +5,10 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
-/// Valor centinela para la opción "Efectuar Consulta" del menú de la cita.
+/// Valor centinela para iniciar el flujo clínico unificado.
 const _kEfectuarConsulta = 'efectuar_consulta';
-const _kRegistrarEvaluacion = 'registrar_evaluacion';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -465,23 +463,6 @@ class _CitaBlock extends StatelessWidget {
       items: [
         if (puedeEfectuar) ...[
           PopupMenuItem<Object>(
-            value: _kRegistrarEvaluacion,
-            child: Row(
-              children: [
-                Icon(Icons.assignment_outlined, size: 16, color: ac.indigo),
-                const SizedBox(width: 10),
-                Text(
-                  'Registrar evaluación',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: ac.indigo,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuItem<Object>(
             value: _kEfectuarConsulta,
             child: Row(
               children: [
@@ -491,14 +472,7 @@ class _CitaBlock extends StatelessWidget {
                   color: ac.primaryBlue,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Efectuar consulta',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: ac.primaryBlue,
-                  ),
-                ),
+                Expanded(child: _AccionClinicaMenu(color: ac.primaryBlue)),
               ],
             ),
           ),
@@ -533,7 +507,7 @@ class _CitaBlock extends StatelessWidget {
       ],
     ).then((value) {
       if (!context.mounted) return;
-      if (value == _kEfectuarConsulta || value == _kRegistrarEvaluacion) {
+      if (value == _kEfectuarConsulta) {
         Navigator.of(context)
             .push(
               MaterialPageRoute(
@@ -541,9 +515,6 @@ class _CitaBlock extends StatelessWidget {
                   citaId: cita.id!,
                   pacienteId: pacienteId!,
                   doctorId: doctorId!,
-                  tipoAtencion: value == _kRegistrarEvaluacion
-                      ? TipoAtencionClinica.evaluacion
-                      : TipoAtencionClinica.consulta,
                 ),
               ),
             )
@@ -709,6 +680,38 @@ class _CitaBlock extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AccionClinicaMenu extends StatelessWidget {
+  const _AccionClinicaMenu({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Iniciar consulta',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        Text(
+          'Diagnostica, planifica y registra tratamientos sin salir.',
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.25,
+            color: context.appColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

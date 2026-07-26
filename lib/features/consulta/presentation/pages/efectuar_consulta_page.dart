@@ -6,7 +6,6 @@ import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/formulario_evaluacion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/panel_paciente.dart';
@@ -23,7 +22,6 @@ class EfectuarConsultaPage extends StatefulWidget {
   final String pacienteId;
   final String doctorId;
   final String? consultaId;
-  final TipoAtencionClinica tipoAtencion;
 
   const EfectuarConsultaPage({
     super.key,
@@ -31,7 +29,6 @@ class EfectuarConsultaPage extends StatefulWidget {
     required this.pacienteId,
     required this.doctorId,
     this.consultaId,
-    this.tipoAtencion = TipoAtencionClinica.consulta,
   });
 
   @override
@@ -162,7 +159,6 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                   _FloatingBar(
                     enWorkspace: _enWorkspace,
                     showPacienteAction: !panelInline,
-                    tipoAtencion: widget.tipoAtencion,
                   ),
                   const SizedBox(height: 12),
                   Expanded(
@@ -190,14 +186,12 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                                 ? WorkspaceConsulta(
                                     key: const ValueKey('workspace'),
                                     citaId: widget.citaId,
-                                    tipoAtencion: widget.tipoAtencion,
                                   )
                                 : FormularioEvaluacion(
                                     key: const ValueKey('formulario'),
                                     pacienteId: widget.pacienteId,
                                     doctorId: widget.doctorId,
                                     citaId: widget.citaId,
-                                    tipoAtencion: widget.tipoAtencion,
                                   ),
                           ),
                         ),
@@ -251,9 +245,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
     } else if (state is ConsultaTerminada) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${widget.tipoAtencion.etiqueta} finalizada con éxito.',
-          ),
+          content: const Text('Consulta finalizada con éxito.'),
           backgroundColor: context.appColors.green,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
@@ -289,22 +281,17 @@ class _FloatingBar extends StatelessWidget {
   const _FloatingBar({
     required this.enWorkspace,
     this.showPacienteAction = false,
-    required this.tipoAtencion,
   });
   final bool enWorkspace;
   final bool showPacienteAction;
-  final TipoAtencionClinica tipoAtencion;
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final layout = context.appLayout;
 
-    final esEvaluacion = tipoAtencion == TipoAtencionClinica.evaluacion;
     final subtitle = enWorkspace
-        ? esEvaluacion
-              ? 'Documenta hallazgos y decide cuáles pasan al plan'
-              : 'Distingue lo planificado de lo realizado hoy'
+        ? 'Diagnostica, planifica y registra tratamientos sin salir'
         : 'Completa el contexto clínico para continuar';
 
     return Padding(
@@ -341,9 +328,7 @@ class _FloatingBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        esEvaluacion
-                            ? 'Registrar evaluación'
-                            : 'Efectuar consulta',
+                        'Consulta clínica',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -373,15 +358,15 @@ class _FloatingBar extends StatelessWidget {
                         ? _StatusBadge(
                             key: const ValueKey('ws'),
                             icon: Icons.radio_button_checked_rounded,
-                            label: esEvaluacion ? 'Evaluando' : 'En consulta',
-                            color: esEvaluacion ? ac.primaryBlue : ac.green,
+                            label: 'En consulta',
+                            color: ac.green,
                             ac: ac,
                           )
                         : _StatusBadge(
                             key: const ValueKey('ev'),
                             icon: Icons.assignment_outlined,
-                            label: tipoAtencion.etiqueta,
-                            color: esEvaluacion ? ac.primaryBlue : ac.teal,
+                            label: 'Consulta',
+                            color: ac.teal,
                             ac: ac,
                           ),
                   ),
@@ -392,11 +377,7 @@ class _FloatingBar extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _StepRow(
-              enWorkspace: enWorkspace,
-              ac: ac,
-              tipoAtencion: tipoAtencion,
-            ),
+            _StepRow(enWorkspace: enWorkspace, ac: ac),
           ],
         ),
       ),
@@ -458,14 +439,9 @@ class _BackButton extends StatelessWidget {
 }
 
 class _StepRow extends StatelessWidget {
-  const _StepRow({
-    required this.enWorkspace,
-    required this.ac,
-    required this.tipoAtencion,
-  });
+  const _StepRow({required this.enWorkspace, required this.ac});
   final bool enWorkspace;
   final AppColors ac;
-  final TipoAtencionClinica tipoAtencion;
 
   @override
   Widget build(BuildContext context) {
@@ -490,7 +466,7 @@ class _StepRow extends StatelessWidget {
         Flexible(
           child: _StepPill(
             number: '02',
-            label: tipoAtencion.etiqueta,
+            label: 'Consulta clínica',
             active: enWorkspace,
             done: false,
             ac: ac,

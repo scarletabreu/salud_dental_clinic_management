@@ -751,8 +751,14 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Wrap y no Row: el conmutador de vista con sus dos etiquetas y el
+          // botón de orden no caben en una línea de 320 px, y comprimirlos
+          // dejaría los objetivos táctiles por debajo del mínimo (SD-130).
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               SegmentedButton<_VistaConsultas>(
                 segments: const [

@@ -144,13 +144,13 @@ Set<String> _leerLista() {
 
 void _escribirLista(Set<String> fallos) {
   final ordenados = fallos.toList()..sort();
+  final entradas = ordenados.isEmpty ? '' : '\n${ordenados.join('\n')}\n';
   _listaConocidos.writeAsStringSync(
     '# Pruebas rojas heredadas, no rotas por el cambio en curso.\n'
     '# Las comprueba tool/ci/verificar_pruebas.dart: CI falla si aparece una\n'
     '# nueva o si alguna de estas empieza a pasar sin quitarla de aquí.\n'
     '#\n'
     '# Regenerar:  dart run tool/ci/verificar_pruebas.dart --actualizar\n'
-    '\n'
-    '${ordenados.join('\n')}\n',
+    '$entradas',
   );
 }

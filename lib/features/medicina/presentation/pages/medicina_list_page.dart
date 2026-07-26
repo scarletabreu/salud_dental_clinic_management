@@ -460,7 +460,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Efecto adverso'),
+            // El rótulo cede antes que el contador y la flecha: con el texto
+            // ampliado en 320 px la etiqueta entera no cabe, y sin holgura el
+            // botón desbordaba en vez de recortarse.
+            const Flexible(
+              child: Text('Efecto adverso', overflow: TextOverflow.ellipsis),
+            ),
             if (activo) ...[
               const SizedBox(width: 7),
               Container(
@@ -522,7 +527,9 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Efecto secundario'),
+            const Flexible(
+              child: Text('Efecto secundario', overflow: TextOverflow.ellipsis),
+            ),
             if (activo) ...[
               const SizedBox(width: 7),
               Container(

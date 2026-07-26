@@ -11,7 +11,9 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchConsumibles() async {
     final response = await supabaseClient
         .from('consumibles')
-        .select()
+        // El suplidor viaja en el mismo viaje: el listado lo muestra y pedirlo
+        // aparte era una consulta por fila.
+        .select('*, suplidor:suplidores(nombre)')
         .filter('deleted_at', 'is', null)
         .order('nombre', ascending: true);
 

@@ -95,7 +95,6 @@ class PacienteModel extends Paciente {
     );
   }
 
-  @override
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'genero': genero.name,

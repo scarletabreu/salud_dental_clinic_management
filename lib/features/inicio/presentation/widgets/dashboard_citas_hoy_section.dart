@@ -141,7 +141,6 @@ class _CitaRow extends StatelessWidget {
     final h = cita.date.hour.toString().padLeft(2, '0');
     final m = cita.date.minute.toString().padLeft(2, '0');
     final waitLabel = _waitLabel();
-    final canChange = onCambiarEstado != null && cita.id != null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),

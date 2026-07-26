@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/reposito
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/exceptions/cuenta_exception.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuenta_by_id_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/pre_factura_cubit.dart';
@@ -20,6 +21,7 @@ import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo
     as pago_enums;
 import 'package:salud_dental_clinic_management/features/pago/domain/repositories/pago_repository.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/usecases/registrar_pago.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 /// Fake del repositorio: solo implementa lo que consume el use case bajo prueba.
@@ -284,20 +286,66 @@ void main() {
     });
   });
 
-  group('Cuenta.estadoCuenta', () {
-    test('sin pagos -> abierta', () {
+  // `estado` es la única fuente de verdad desde que se retiró el getter
+  // derivado `estadoCuenta`: cobrar no cambia el estado por sí solo, lo
+  // cambian las transiciones explícitas. Un pago parcial deja la cuenta
+  // pendiente porque alguien emitió la factura, no porque entrara dinero.
+  group('Cuenta · transiciones de estado', () {
+    test('una cuenta nace abierta aunque ya tenga items', () {
       final cuenta = _cuenta(items: [_item(1000)]);
       expect(cuenta.estado, EstadoCuenta.abierta);
     });
 
-    test('pago parcial -> pendiente', () {
-      final cuenta = _cuenta(items: [_item(1000)], pagos: [_pago(400)]);
+    test('emitir factura la deja pendiente y fija el modo de pago', () {
+      final cuenta = _cuenta(items: [_item(1000)]).emitirFactura(
+        modoPago: MetodoPago.credito,
+        tipoPaciente: TipoPaciente.integrado,
+      );
+
       expect(cuenta.estado, EstadoCuenta.pendiente);
+      expect(cuenta.metodoPago, MetodoPago.credito);
     });
 
-    test('pago total -> saldada', () {
-      final cuenta = _cuenta(items: [_item(1000)], pagos: [_pago(1000)]);
-      expect(cuenta.estado, EstadoCuenta.saldada);
+    test('un paciente de emergencia no puede quedar a crédito', () {
+      expect(
+        () => _cuenta(items: [_item(1000)]).emitirFactura(
+          modoPago: MetodoPago.credito,
+          tipoPaciente: TipoPaciente.emergencia,
+        ),
+        throwsA(isA<ModoPagoNoPermitidoException>()),
+      );
     });
+
+    test('cerrar con el total cobrado la salda y sella la fecha', () {
+      final cuenta = _cuenta(
+        items: [_item(1000)],
+        pagos: [_pago(1000)],
+      ).copyWith(estado: EstadoCuenta.pendiente).cerrarCuenta();
+
+      expect(cuenta.estado, EstadoCuenta.saldada);
+      expect(cuenta.fechaPago, isNotNull);
+      expect(cuenta.balancePendiente, 0);
+    });
+
+    test('con un pago parcial no se puede cerrar', () {
+      final cuenta = _cuenta(
+        items: [_item(1000)],
+        pagos: [_pago(400)],
+      ).copyWith(estado: EstadoCuenta.pendiente);
+
+      expect(cuenta.balancePendiente, 600);
+      expect(cuenta.cerrarCuenta, throwsA(isA<SaldoInsuficienteException>()));
+    });
+
+    test(
+      'saldar una cuenta que nunca se facturó es una transición inválida',
+      () {
+        final cuenta = _cuenta(items: [_item(1000)], pagos: [_pago(1000)]);
+        expect(
+          cuenta.cerrarCuenta,
+          throwsA(isA<TransicionInvalidaException>()),
+        );
+      },
+    );
   });
 }

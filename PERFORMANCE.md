@@ -22,8 +22,11 @@ desde el primer día y dejaría de leerse.
 | `main.dart.js` (web, sin comprimir) | 5115 KiB | ≤ 5250 | ≤ 3400 | `tool/perf/medir_artefactos.sh web` |
 | `main.dart.js` servido con brotli | 1095 KiB ✅ | — | ≤ 1200 | ver §4 |
 | `build/web` completo | 44300 KiB | ≤ 45000 | ≤ 32000 | `tool/perf/medir_artefactos.sh web` |
-| APK universal de release | ver §3 | ≤ 65000 | ≤ 32000 | `tool/perf/medir_artefactos.sh apk` |
-| Primer frame (perfil, gama baja) | sin medir ⚠️ | — | ≤ 2500 ms | `tool/perf/medir_arranque.sh` |
+| APK universal de release | 67344 KiB | ≤ 68000 | — (no se distribuye) | `tool/perf/medir_artefactos.sh apk` |
+| APK `arm64-v8a` (lo que se descarga) | 23264 KiB ✅ | ≤ 25500 | ≤ 20000 | `tool/perf/medir_artefactos.sh apk-abi` |
+| Primer pintado web, CPU 4x | 3608 ms ✅ | ≤ 4500 ms | ≤ 2500 ms | `tool/perf/medir_web_cpu_limitada.ts` |
+| Primer frame (perfil, Android gama baja) | sin medir ⚠️ | — | ≤ 2500 ms | `tool/perf/medir_arranque.sh` |
+| Animaciones en bucle sin motivo | 0 ✅ | **0** | 0 | `test/features/inicio/inicio_responsive_test.dart` |
 | Pantallas construidas al arrancar | 1 ✅ | **1** | 1 | `test/shell/lazy_destination_stack_test.dart` |
 | Pantallas vivas a la vez | 4 ✅ | ≤ 4 | ≤ 4 | idem |
 | Capas de repintado del odontograma | 1 por pieza ✅ | 1 por pieza | — | `test/features/odontograma/aislamiento_repintado_test.dart` |
@@ -36,10 +39,10 @@ desde el primer día y dejaría de leerse.
 > es un refactor propio y no cabía aquí. Lo que **sí** cumple hoy es lo que el
 > navegador descarga de verdad (§4): 1095 KiB con brotli.
 >
-> **Por qué el arranque está sin medir.** Requiere un Android de gama baja y
-> un Windows conectados, que no había disponibles al cerrar el ticket. El
-> procedimiento y el script quedan listos (§3); falta ejecutarlos sobre el
-> hardware real y anotar aquí el número.
+> **Qué falta por medir.** De los tres entornos del ticket, el navegador con
+> CPU limitada ya está cubierto y automatizado (§3). Faltan el Android de gama
+> baja y el Windows, que necesitan el hardware delante: el script y el
+> procedimiento están listos, falta ejecutarlos y anotar el número.
 >
 > **Al reducir un artefacto, baja también su trinquete** en
 > `tool/perf/medir_artefactos.sh`. Un trinquete que no se aprieta deja de
@@ -112,11 +115,25 @@ Los flujos que hay que recorrer, por ser los más caros: **inicio** (gráfico),
 **odontograma de una consulta** (32-52 piezas dibujadas a mano) y **listado de
 pacientes** con varios cientos de filas.
 
-### Navegador con CPU limitada
+### Navegador con CPU limitada — automatizado
 
-Chrome DevTools → *Performance* → **CPU: 4x/6x slowdown**, y *Network* →
-**Slow 4G**. Es la aproximación más cercana a la máquina de recepción sin
-tenerla delante.
+```bash
+flutter build web --release
+deno run -A tool/perf/medir_web_cpu_limitada.ts             # freno 4x
+deno run -A tool/perf/medir_web_cpu_limitada.ts --cpu 6     # más severo
+```
+
+Sirve `build/web`, abre Chromium sin interfaz con el freno de CPU puesto
+*antes* de navegar y cronometra hasta el primer pintado con contenido (FCP).
+Reporta la **mediana** de varias repeticiones, para que un pico de ruido de la
+máquina no mueva el número. Sale con código 1 si se pasa del presupuesto.
+
+Medido en SD-132: **3608 ms** con freno 4x (mejor 3065, peor 3648). Es el
+coste de descargar y compilar `main.dart.js` más arrancar el motor — de ahí
+que la meta de 2500 ms dependa de la carga diferida (§1).
+
+Para inspeccionar a mano: Chrome DevTools → *Performance* → **CPU: 4x/6x
+slowdown**, y *Network* → **Slow 4G**.
 
 ---
 
@@ -230,6 +247,26 @@ widgets—, tiene vigencia corta (2 min), agrupa las peticiones simultáneas en
 una sola y se invalida en cada escritura, para que el stock nunca se sirva
 viejo.
 
+### Una animación que no paraba nunca
+
+`dashboard_alert_center.dart`.
+
+El indicador de alertas críticas arrancaba su `AnimationController` con
+`repeat(reverse: true)` en `initState`, **sin condición**. El punto solo se
+dibuja si hay alertas críticas, pero el controlador seguía pidiendo un frame
+cada 16 ms durante toda la sesión, hubiera alertas o no, con el inicio abierto
+o retenido en segundo plano: gasto de CPU y batería por un dibujo que nadie
+estaba viendo.
+
+Ahora el pulso arranca y se detiene según haga falta, y el punto vive en su
+propio `RepaintBoundary` para que sus 60 repintados por segundo no arrastren a
+la cabecera de la tarjeta.
+
+Efecto secundario que delató el problema: al no cesar nunca, `pumpAndSettle`
+no terminaba y las once pruebas responsive del inicio no podían llegar a sus
+aserciones. Una animación en bucle perpetuo hace la pantalla no comprobable,
+además de cara.
+
 ### Logs en rutas calientes
 
 33 `print`/`debugPrint` en citas, pacientes, consultas y expedientes,
@@ -271,5 +308,8 @@ módulos— al módulo de pacientes.
 5. **Los catálogos se piden al repositorio,** que ya los comparte. Un
    `FutureBuilder` que llame al datasource desde un widget vuelve a introducir
    el problema.
-6. **Antes de dar por terminada una entrega que toque UI**, correr
+6. **Ninguna animación en bucle perpetuo.** Un `repeat()` se arranca solo
+   cuando su dibujo está en pantalla y se detiene cuando deja de estarlo. Si
+   `pumpAndSettle` se queda colgado en una prueba, es que hay una.
+7. **Antes de dar por terminada una entrega que toque UI**, correr
    `flutter test` y `tool/perf/medir_artefactos.sh`.

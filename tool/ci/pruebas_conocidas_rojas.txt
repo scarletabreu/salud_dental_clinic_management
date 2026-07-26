@@ -8,9 +8,7 @@ test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra e
 test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en 360 px
 test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en 390 px
 test/features/cita/agenda_responsive_test.dart :: la agenda mensual se muestra en tablet
-test/features/consulta/autoguardado_consulta_test.dart :: loading test/features/consulta/autoguardado_consulta_test.dart
 test/features/consulta/guardado_clinico_test.dart :: guardarResultadoConsulta · lo que llega a la base de datos la justificación clínica de una contraindicación se persiste
-test/features/consulta/odontodiagrama_consulta_test.dart :: loading test/features/consulta/odontodiagrama_consulta_test.dart
 test/features/consumible/consumible_model_test.dart :: Consumible mapea precio, suplidor y activo desde Supabase
 test/features/cuenta/cuenta_model_test.dart :: mapea credito de Postgres sin confundirlo con la etiqueta Crédito
 test/features/cuenta/pre_factura_cubit_test.dart :: Cuenta.estadoCuenta pago parcial -> pendiente

@@ -314,6 +314,15 @@ CREATE TYPE "public"."tipo_condicion" AS ENUM (
 ALTER TYPE "public"."tipo_condicion" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."tipo_atencion_clinica" AS ENUM (
+    'evaluacion',
+    'consulta'
+);
+
+
+ALTER TYPE "public"."tipo_atencion_clinica" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."tipo_contraindicacion" AS ENUM (
     'absoluta',
     'relativa'
@@ -566,6 +575,28 @@ $$;
 
 
 ALTER FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_consulta_id uuid;
+begin
+  v_consulta_id := public.crear_consulta_completa(
+    p_paciente_id, p_doctor_id, p_cita_id, p_fecha, p_motivo_consulta,
+    p_temp_condiciones, p_dientes, p_documentos
+  );
+  update public.consultas
+     set tipo_atencion = p_tipo_atencion, updated_at = now()
+   where id = v_consulta_id;
+  return v_consulta_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."es_admin"() RETURNS boolean
@@ -1474,6 +1505,51 @@ $$;
 
 ALTER FUNCTION "public"."verificar_item_plan_ejecutable"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."marcar_item_plan_ejecutado"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.item_plan_id is null then
+    return new;
+  end if;
+
+  if new.deleted_at is not null then
+    if not exists (
+      select 1
+      from public.tratamientos_aplicados otra
+      where otra.item_plan_id = new.item_plan_id
+        and otra.id <> new.id
+        and otra.deleted_at is null
+    ) then
+      update public.items_plan_tratamiento
+         set estado = 'pendiente', fecha_completado = null, updated_at = now()
+       where id = new.item_plan_id and deleted_at is null;
+    end if;
+    return new;
+  end if;
+
+  update public.items_plan_tratamiento
+     set estado = case
+           when new.estado = 'en_proceso' then 'en_proceso'::public.estado_item_plan
+           else 'completado'::public.estado_item_plan
+         end,
+         fecha_inicio = coalesce(fecha_inicio, new.fecha_ejecucion, now()),
+         fecha_completado = case
+           when new.estado = 'en_proceso' then fecha_completado
+           else coalesce(fecha_completado, new.fecha_ejecucion, now())
+         end,
+         updated_at = now()
+   where id = new.item_plan_id
+     and deleted_at is null;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -1601,7 +1677,8 @@ CREATE TABLE IF NOT EXISTS "public"."consultas" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "notas" "text",
     "signos_vitales" "jsonb",
-    "finalizada" boolean DEFAULT false
+    "finalizada" boolean DEFAULT false,
+    "tipo_atencion" "public"."tipo_atencion_clinica" DEFAULT 'consulta'::"public"."tipo_atencion_clinica" NOT NULL
 );
 
 
@@ -1609,6 +1686,8 @@ ALTER TABLE "public"."consultas" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."consultas"."finalizada" IS 'Has the consult ended?';
+
+COMMENT ON COLUMN "public"."consultas"."tipo_atencion" IS 'Evaluación = documenta hallazgos y plan; consulta = registra ejecución clínica.';
 
 
 
@@ -2259,11 +2338,16 @@ CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
     "item_plan_id" "uuid",
     "doctor_ejecuta_id" "uuid",
     "fecha_ejecucion" timestamp with time zone,
+    "justificacion_no_planificada" "text",
+    CONSTRAINT "tratamientos_origen_ejecucion_requerido" CHECK ((("item_plan_id" IS NOT NULL) OR (NULLIF("btrim"("justificacion_no_planificada"), ''::"text") IS NOT NULL))),
     CONSTRAINT "tratamientos_aplicados_solo_ejecucion" CHECK ((("deleted_at" IS NOT NULL) OR ("estado" = ANY (ARRAY['aplicado'::"text", 'en_proceso'::"text", 'completado'::"text"]))))
 );
 
 
 ALTER TABLE "public"."tratamientos_aplicados" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico obligatorio cuando item_plan_id es NULL (SD-138).';
 
 
 CREATE TABLE IF NOT EXISTS "public"."usuarios" (
@@ -2722,6 +2806,10 @@ CREATE OR REPLACE TRIGGER "trg_aplicar_movimiento_stock" BEFORE INSERT ON "publi
 
 
 CREATE OR REPLACE TRIGGER "trg_item_plan_ejecutable" BEFORE INSERT OR UPDATE OF "item_plan_id" ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."verificar_item_plan_ejecutable"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_marcar_item_plan_ejecutado" AFTER INSERT OR UPDATE OF "estado", "item_plan_id", "deleted_at" ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."marcar_item_plan_ejecutado"();
 
 
 
@@ -4148,6 +4236,8 @@ GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid",
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "authenticated";
+
 
 
 GRANT ALL ON FUNCTION "public"."es_admin"() TO "anon";
@@ -4609,12 +4699,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
-
-
-
-
 
 
 

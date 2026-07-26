@@ -13,6 +13,8 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 
 class _Vacio {
   dynamic noSuchMethod(Invocation invocation) =>
@@ -22,6 +24,8 @@ class _Vacio {
 class _StorageDoble extends _Vacio implements SupabaseStorageHelper {}
 
 class _CitaRepoDoble extends _Vacio implements CitaRepository {}
+
+class _ConsumibleRepoDoble extends _Vacio implements ConsumibleRepository {}
 
 class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
   _ConsultaRepoDoble({required this.consulta});
@@ -72,6 +76,7 @@ ConsultaCubit _cubitCon(_ConsultaRepoDoble repo) => ConsultaCubit(
   _StorageDoble(),
   _CitaRepoDoble(),
   repo,
+  DescontarStockPorConsumo(_ConsumibleRepoDoble()),
 );
 
 final _resina = Tratamiento(
@@ -85,6 +90,55 @@ final _resina = Tratamiento(
 
 void main() {
   group('autoguardado de la consulta', () {
+    test('una ejecución no planificada exige justificación', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+
+      expect(
+        () => cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+      'una ejecución planificada conserva el vínculo con su actividad',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+
+        cubit.aplicarTratamiento(
+          diente,
+          TipoSuperficie.oclusal,
+          _resina,
+          itemPlanId: 'item-plan-1',
+        );
+
+        final aplicado = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single
+            .tratamientos
+            .single;
+        expect(aplicado.itemPlanId, 'item-plan-1');
+        expect(aplicado.justificacionNoPlanificada, isNull);
+      },
+    );
+
     test('un cambio queda pendiente y se guarda solo', () async {
       final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
       final cubit = _cubitCon(repo);
@@ -96,7 +150,12 @@ void main() {
           .odontograma!
           .dientes
           .single;
-      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+      cubit.aplicarTratamiento(
+        diente,
+        TipoSuperficie.oclusal,
+        _resina,
+        justificacionNoPlanificada: 'Urgencia clínica',
+      );
 
       // Sin tocar nada más: el trabajo aún no está a salvo y se avisa.
       expect(
@@ -130,7 +189,12 @@ void main() {
           .odontograma!
           .dientes
           .single;
-      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+      cubit.aplicarTratamiento(
+        diente,
+        TipoSuperficie.oclusal,
+        _resina,
+        justificacionNoPlanificada: 'Urgencia clínica',
+      );
       await cubit.guardarParcial();
 
       final tratamiento = (cubit.state as ConsultaIniciada)
@@ -159,7 +223,12 @@ void main() {
             .odontograma!
             .dientes
             .single;
-        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+        cubit.aplicarTratamiento(
+          diente,
+          TipoSuperficie.oclusal,
+          _resina,
+          justificacionNoPlanificada: 'Urgencia clínica',
+        );
         await cubit.guardarParcial();
 
         final estado = cubit.state as ConsultaIniciada;

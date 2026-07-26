@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
@@ -186,6 +187,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     required List<String> tempCondiciones,
     required List<DocumentoAdjunto> adjuntos,
     SignosVitales? signosVitales,
+    TipoAtencionClinica tipoAtencion = TipoAtencionClinica.consulta,
   }) async {
     emit(const ConsultaGuardando());
     try {
@@ -217,6 +219,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         tempCondiciones: tempCondiciones,
         documentosClinicos: documentos,
         signosVitales: signosVitales,
+        tipoAtencion: tipoAtencion,
       );
 
       final consultaId = await _crearConsulta(consultaInicial);
@@ -326,7 +329,18 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     TipoSuperficie? superficie,
     Tratamiento tratamiento, {
     String? justificacionClinica,
+    String? itemPlanId,
+    String? justificacionNoPlanificada,
   }) {
+    if (itemPlanId == null &&
+        (justificacionNoPlanificada == null ||
+            justificacionNoPlanificada.trim().isEmpty)) {
+      throw ArgumentError.value(
+        justificacionNoPlanificada,
+        'justificacionNoPlanificada',
+        'Una actividad no planificada requiere justificación clínica.',
+      );
+    }
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
       final odonto = actual.odontograma;
@@ -343,6 +357,8 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         superficie: tratamiento.alcance == Alcance.puntual ? superficie : null,
         precioAplicado: tratamiento.costo,
         notas: justificacionClinica,
+        itemPlanId: itemPlanId,
+        justificacionNoPlanificada: justificacionNoPlanificada,
         nombreTratamiento: tratamiento.nombre,
         claveOdontograma: tratamiento.claveOdontograma,
         fechaAplicacion: DateTime.now(),
@@ -790,6 +806,55 @@ class ConsultaCubit extends Cubit<ConsultaState> {
             fallback:
                 'No se pudo guardar el resultado de la consulta. Inténtalo de nuevo.',
           ),
+        ),
+      );
+      emit(ConsultaIniciada(consulta: consulta));
+    }
+  }
+
+  /// Cierra una evaluación sin producir cuenta ni descontar inventario. Los
+  /// hallazgos y el plan quedan en el expediente; facturar corresponde a una
+  /// consulta que haya ejecutado actividades.
+  Future<void> terminarEvaluacion() async {
+    if (state is! ConsultaIniciada) return;
+    final consulta = (state as ConsultaIniciada).consulta;
+    final consultaId = consulta.id;
+    final odontograma = consulta.odontograma;
+    if (consultaId == null || odontograma == null) {
+      emit(const ConsultaError('No hay una evaluación activa.'));
+      return;
+    }
+
+    _autoguardado?.cancel();
+    for (var espera = 0; _guardando && espera < 50; espera++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    _guardando = true;
+    emit(ConsultaGuardando(consulta: consulta));
+    try {
+      await _consultaRepository.guardarResultadoConsulta(
+        consultaId: consultaId,
+        pacienteId: consulta.pacienteId,
+        odontograma: odontograma,
+        recetas: const [],
+        notas: consulta.notas,
+        signosVitales: consulta.signosVitales?.toJson(),
+        finalizada: true,
+      );
+      if (consulta.citaId != null) {
+        await _citaRepository.updateCitaEstado(
+          consulta.citaId!,
+          EstadoCita.completada,
+        );
+      }
+      _guardando = false;
+      emit(const ConsultaTerminada());
+    } catch (e) {
+      _guardando = false;
+      AppLog.error('terminar evaluación', e);
+      emit(
+        ConsultaError(
+          _mensajeError(e, fallback: 'No se pudo cerrar la evaluación.'),
         ),
       );
       emit(ConsultaIniciada(consulta: consulta));

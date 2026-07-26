@@ -1,94 +1,140 @@
-name: Desplegar web (Azure Static Web Apps)
+name: Desplegar Flutter Web en Azure
 
-# SD-132. Despliega `build/web` en Azure Static Web Apps, que sirve los
-# ficheros ya comprimidos con brotli desde su CDN. Es la pieza que convierte
-# los 5115 KiB de `main.dart.js` en ~1095 KiB reales de descarga; ver
-# PERFORMANCE.md §4.
-#
-# REQUISITO ANTES DE QUE ESTO FUNCIONE:
-#   El secreto `AZURE_STATIC_WEB_APPS_API_TOKEN` tiene que existir en
-#   Settings → Secrets and variables → Actions. Se obtiene del recurso de
-#   Azure Static Web Apps (portal → Manage deployment token). Crear secretos
-#   requiere permiso de admin en el repositorio.
-#
-# Mientras el secreto no exista, el workflow se salta solo en vez de fallar:
-# un despliegue roto no debe teñir de rojo el CI de todos.
+# SD-133: cada rama autorizada publica en un recurso y un proyecto de Supabase
+# distintos. Los pull requests solo pasan por CI; nunca reciben credenciales de
+# despliegue ni crean entornos efímeros con acceso a datos clínicos.
 on:
   push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - dev
+      - main
+
+concurrency:
+  group: azure-web-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   FLUTTER_VERSION: 3.44.1
 
 jobs:
   desplegar:
-    name: Construir y desplegar
-    # `closed` se maneja en el job de abajo; aquí solo lo que hay que publicar.
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    name: Validar, construir y desplegar ${{ github.ref_name }}
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 45
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'test' }}
+      url: ${{ vars.AZURE_STATIC_WEB_APP_URL }}
+    env:
+      APP_TARGET: ${{ github.ref == 'refs/heads/main' && 'production' || 'test' }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
 
-      - name: Comprobar que hay token
-        id: token
+    steps:
+      - name: Obtener el commit autorizado
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verificar configuración del ambiente
+        shell: bash
         run: |
-          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
-            echo "::warning::Falta AZURE_STATIC_WEB_APPS_API_TOKEN; no se despliega."
-            echo "hay=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "hay=true" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          expected_branch="dev"
+          if [[ "$APP_TARGET" == "production" ]]; then
+            expected_branch="main"
           fi
 
-      - uses: subosito/flutter-action@v2
-        if: steps.token.outputs.hay == 'true'
+          if [[ "$GITHUB_REF" != "refs/heads/$expected_branch" ]]; then
+            echo "::error::El ambiente $APP_TARGET solo acepta la rama $expected_branch."
+            exit 1
+          fi
+
+          if [[ ! "$SUPABASE_URL" =~ ^https://[^/]+\.supabase\.co/?$ ]]; then
+            echo "::error::SUPABASE_URL no está definida o no es una URL HTTPS de Supabase."
+            exit 1
+          fi
+
+          if [[ -z "$SUPABASE_PUBLISHABLE_KEY" ]]; then
+            echo "::error::Falta SUPABASE_PUBLISHABLE_KEY en el ambiente $APP_TARGET."
+            exit 1
+          fi
+
+          if [[ "$SUPABASE_PUBLISHABLE_KEY" == sb_secret_* ]]; then
+            echo "::error::Se recibió una secret key; el frontend solo admite la publishable key."
+            exit 1
+          fi
+
+          if [[ -z "$AZURE_STATIC_WEB_APPS_API_TOKEN" ]]; then
+            echo "::error::Falta AZURE_STATIC_WEB_APPS_API_TOKEN en el ambiente $APP_TARGET."
+            exit 1
+          fi
+
+      - name: Preparar Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
-      - name: Construir
-        if: steps.token.outputs.hay == 'true'
-        run: |
-          flutter pub get
-          flutter build web --release
-          # La config de rutas, cabeceras y MIME viaja junto al build.
-          cp staticwebapp.config.json build/web/
+      - name: Resolver dependencias
+        run: flutter pub get
 
-      - name: Desplegar
-        if: steps.token.outputs.hay == 'true'
+      - name: Análisis estático
+        shell: bash
+        run: |
+          # `lib/` conserva warnings heredados, pero no errores. Se usa el
+          # mismo trinquete que CI hasta saldar esa deuda por separado.
+          flutter analyze lib | tee analisis.txt
+          if grep -q "error •" analisis.txt; then
+            echo "::error::Hay errores de análisis en lib/"
+            grep "error •" analisis.txt
+            exit 1
+          fi
+
+          # Los archivos propios de SD-133 sí deben quedar completamente
+          # limpios, sin ampliar la línea base heredada.
+          flutter analyze \
+            lib/main.dart \
+            lib/core/config/app_config.dart \
+            test/core/app_config_test.dart
+
+      - name: Suite de pruebas
+        run: dart run tool/ci/verificar_pruebas.dart
+
+      - name: Construir Flutter Web
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build web \
+            --release \
+            --pwa-strategy=none \
+            --dart-define="APP_ENVIRONMENT=$APP_TARGET" \
+            --dart-define="SUPABASE_URL=$SUPABASE_URL" \
+            --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
+          # `flutter build` no borra el worker de un build anterior si el
+          # workspace se reutiliza. Nunca debe entrar por accidente al paquete.
+          rm -f build/web/flutter_service_worker.js
+          cp staticwebapp.config.json build/web/staticwebapp.config.json
+
+      - name: Conservar artefacto auditable
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ env.APP_TARGET }}-${{ github.sha }}
+          path: build/web
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Desplegar en Azure Static Web Apps
+        id: azure
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          azure_static_web_apps_api_token: ${{ env.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: upload
-          # El build ya está hecho arriba: Oryx no sabe compilar Flutter.
           app_location: build/web
           skip_app_build: true
           skip_api_build: true
-
-  cerrar_entorno_de_pr:
-    name: Retirar el entorno del PR
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      # El mismo guardia que arriba: sin token no hay nada que cerrar, y la
-      # acción de Azure fallaría con un token vacío.
-      - name: Comprobar que hay token
-        id: token
-        run: |
-          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
-            echo "hay=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "hay=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Cerrar
-        if: steps.token.outputs.hay == 'true'
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          action: close

@@ -110,6 +110,10 @@ Añadir `--obfuscate --split-debug-info=<dir>` a los builds de release y
 **archivar los símbolos junto a la versión publicada**: sin ellos, un fallo en
 producción llega como direcciones sin nombre y no hay forma de leerlo.
 
+Todos los comandos de release requieren además los tres `--dart-define`
+documentados en `DEPLOYMENT.md`. El workflow de Azure genera exclusivamente
+`build/web`: no publica APK, app bundle ni binarios de escritorio.
+
 ---
 
 ## 3. Pendiente

@@ -48,6 +48,8 @@ class WorkspaceConsulta extends StatefulWidget {
 
 class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   final _notasController = TextEditingController();
+  String? _consultaNotasHidratada;
+  bool _hidratandoNotas = false;
 
   List<Tratamiento> _catalogo = const [];
   Map<String, String> _nombrePorId = const {};
@@ -84,17 +86,31 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     _cargarDoctores();
     _cargarHistorialPiezas();
 
-    final state = context.read<ConsultaCubit>().state;
-    if (state is ConsultaIniciada && state.consulta.notas != null) {
-      _notasController.text = state.consulta.notas!;
-    } else if (state is ConsultaGuardando && state.consulta?.notas != null) {
-      _notasController.text = state.consulta!.notas!;
-    }
-
     _notasController.addListener(() {
+      if (_hidratandoNotas) return;
       context.read<ConsultaCubit>().actualizarObservaciones(
         _notasController.text,
       );
+    });
+  }
+
+  void _hidratarNotasDeConsulta(Consulta consulta) {
+    final consultaId = consulta.id;
+    if (consultaId == null || _consultaNotasHidratada == consultaId) return;
+    _consultaNotasHidratada = consultaId;
+    final notas = consulta.notas ?? '';
+
+    // Al reanudar, el workspace se crea mientras el cubit todavía está
+    // cargando. La nota llega después: se hidrata una sola vez para no pisar
+    // lo que el doctor escriba durante emisiones posteriores del autoguardado.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _notasController.text == notas) return;
+      _hidratandoNotas = true;
+      _notasController.value = TextEditingValue(
+        text: notas,
+        selection: TextSelection.collapsed(offset: notas.length),
+      );
+      _hidratandoNotas = false;
     });
   }
 
@@ -498,6 +514,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             child: CircularProgressIndicator(color: ac.primaryBlue),
           );
         }
+
+        _hidratarNotasDeConsulta(consulta);
 
         if (consulta.odontograma == null) {
           // La consulta se crea con sus 52 piezas, así que llegar aquí

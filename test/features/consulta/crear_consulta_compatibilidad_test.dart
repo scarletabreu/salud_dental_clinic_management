@@ -135,5 +135,60 @@ void main() {
       expect(payload, isNot(contains('justificacion_no_planificada')));
       expect(payload, isNot(contains('notas')));
     });
+
+    test('al actualizar conserva la auditoría que la UI no cargó', () {
+      final payload =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaActualizacion({
+            'tratamiento_id': 'trat-1',
+            'item_plan_id': null,
+            'justificacion_no_planificada': null,
+            'doctor_ejecuta_id': null,
+            'fecha_ejecucion': null,
+            'notas': null,
+          });
+
+      expect(payload['tratamiento_id'], 'trat-1');
+      expect(payload, isNot(contains('item_plan_id')));
+      expect(payload, isNot(contains('justificacion_no_planificada')));
+      expect(payload, isNot(contains('doctor_ejecuta_id')));
+      expect(payload, isNot(contains('fecha_ejecucion')));
+      expect(payload, containsPair('notas', null));
+    });
+
+    test('tolera la restricción antigua sin pedir texto al doctor', () {
+      final payload =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaEsquemaConJustificacionRequerida(
+            {
+              'tratamiento_id': 'trat-1',
+              'item_plan_id': null,
+              'justificacion_no_planificada': null,
+            },
+          );
+
+      expect(
+        payload['justificacion_no_planificada'],
+        'Tratamiento agregado durante la consulta clínica.',
+      );
+    });
+
+    test('no reemplaza la procedencia explícita ni la actividad del plan', () {
+      final justificado =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaEsquemaConJustificacionRequerida(
+            {
+              'item_plan_id': null,
+              'justificacion_no_planificada': 'Urgencia resuelta en sesión.',
+            },
+          );
+      final planificado =
+          ConsultaRemoteDatasourceImpl.payloadTratamientoParaEsquemaConJustificacionRequerida(
+            {'item_plan_id': 'item-1', 'justificacion_no_planificada': null},
+          );
+
+      expect(
+        justificado['justificacion_no_planificada'],
+        'Urgencia resuelta en sesión.',
+      );
+      expect(planificado['justificacion_no_planificada'], isNull);
+    });
   });
 }

@@ -11,6 +11,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   final CrearConsultaRpc _crearConsultaRpc;
   bool? _soportaFlujoClinicoSeparado;
   bool? _soportaJustificacionNoPlanificada;
+  bool? _requiereJustificacionNoPlanificada;
 
   ConsultaRemoteDatasourceImpl({
     required this.supabaseClient,
@@ -336,7 +337,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     String id,
     Map<String, dynamic> campos,
   ) async {
-    final payload = _payloadTratamientoCompatible(campos);
+    final payload = _payloadTratamientoCompatible(
+      payloadTratamientoParaActualizacion(campos),
+    );
     try {
       await supabaseClient
           .from('tratamientos_aplicados')
@@ -344,11 +347,25 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
           .eq('id', id);
       _soportaJustificacionNoPlanificada ??= true;
     } on PostgrestException catch (error) {
-      if (!_esColumnaJustificacionAusente(error)) rethrow;
-      _soportaJustificacionNoPlanificada = false;
+      if (_esColumnaJustificacionAusente(error)) {
+        _soportaJustificacionNoPlanificada = false;
+        await supabaseClient
+            .from('tratamientos_aplicados')
+            .update(
+              _payloadTratamientoCompatible(
+                payloadTratamientoParaActualizacion(campos),
+              ),
+            )
+            .eq('id', id);
+        return;
+      }
+      if (!_esRestriccionJustificacionRequerida(error)) rethrow;
+      _requiereJustificacionNoPlanificada = true;
       await supabaseClient
           .from('tratamientos_aplicados')
-          .update(_payloadTratamientoCompatible(campos))
+          .update(
+            payloadTratamientoParaEsquemaConJustificacionRequerida(payload),
+          )
           .eq('id', id);
     }
   }
@@ -367,11 +384,24 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       _soportaJustificacionNoPlanificada ??= true;
       return insertados;
     } on PostgrestException catch (error) {
-      if (!_esColumnaJustificacionAusente(error)) rethrow;
-      _soportaJustificacionNoPlanificada = false;
+      if (_esColumnaJustificacionAusente(error)) {
+        _soportaJustificacionNoPlanificada = false;
+        return await supabaseClient
+                .from('tratamientos_aplicados')
+                .insert(filas.map(_payloadTratamientoCompatible).toList())
+                .select('id')
+            as List;
+      }
+      if (!_esRestriccionJustificacionRequerida(error)) rethrow;
+      _requiereJustificacionNoPlanificada = true;
       return await supabaseClient
               .from('tratamientos_aplicados')
-              .insert(filas.map(_payloadTratamientoCompatible).toList())
+              .insert(
+                filas
+                    .map(_payloadTratamientoCompatible)
+                    .map(payloadTratamientoParaEsquemaConJustificacionRequerida)
+                    .toList(),
+              )
               .select('id')
           as List;
     }
@@ -380,10 +410,49 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   Map<String, dynamic> _payloadTratamientoCompatible(
     Map<String, dynamic> original,
   ) {
-    if (_soportaJustificacionNoPlanificada != false) {
-      return Map<String, dynamic>.from(original);
+    final payload = _soportaJustificacionNoPlanificada == false
+        ? payloadTratamientoParaEsquemaAnterior(original)
+        : Map<String, dynamic>.from(original);
+    return _requiereJustificacionNoPlanificada == true
+        ? payloadTratamientoParaEsquemaConJustificacionRequerida(payload)
+        : payload;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> payloadTratamientoParaActualizacion(
+    Map<String, dynamic> original,
+  ) {
+    final payload = Map<String, dynamic>.from(original);
+
+    // Estos campos describen la procedencia y autoría originales de la
+    // ejecución. Un null en el estado de la UI significa "no se cargó", no
+    // "borrar la auditoría que ya existe en la base".
+    for (final campo in const [
+      'item_plan_id',
+      'justificacion_no_planificada',
+      'doctor_ejecuta_id',
+      'fecha_ejecucion',
+    ]) {
+      if (payload[campo] == null) payload.remove(campo);
     }
-    return payloadTratamientoParaEsquemaAnterior(original);
+    return payload;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic>
+  payloadTratamientoParaEsquemaConJustificacionRequerida(
+    Map<String, dynamic> original,
+  ) {
+    final payload = Map<String, dynamic>.from(original);
+    final itemPlanId = payload['item_plan_id'] as String?;
+    final justificacion = (payload['justificacion_no_planificada'] as String?)
+        ?.trim();
+    if (itemPlanId == null &&
+        (justificacion == null || justificacion.isEmpty)) {
+      payload['justificacion_no_planificada'] =
+          'Tratamiento agregado durante la consulta clínica.';
+    }
+    return payload;
   }
 
   @visibleForTesting
@@ -408,6 +477,10 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   bool _esColumnaJustificacionAusente(PostgrestException error) =>
       error.message.contains('justificacion_no_planificada') &&
       error.message.contains('schema cache');
+
+  bool _esRestriccionJustificacionRequerida(PostgrestException error) =>
+      error.code == '23514' &&
+      error.message.contains('tratamientos_origen_ejecucion_requerido');
 
   @override
   Future<List<Map<String, dynamic>>> fetchConsultas() async {

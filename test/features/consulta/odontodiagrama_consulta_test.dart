@@ -49,11 +49,13 @@ const _pacienteId = '11111111-1111-1111-1111-111111111111';
 Consulta _consultaConOdontograma({
   EvaluacionOdontologica evaluacion = EvaluacionOdontologica.vacia,
   EvaluacionOdontologica historico = EvaluacionOdontologica.vacia,
+  String? notas,
 }) => Consulta(
   id: _consultaId,
   pacienteId: _pacienteId,
   doctorId: '22222222-2222-2222-2222-222222222222',
   fecha: DateTime(2026, 7, 24),
+  notas: notas,
   odontograma: Odontograma(
     id: 'odo-1',
     consultaId: _consultaId,
@@ -296,12 +298,17 @@ void main() {
       }
     });
 
-    Future<void> montar(WidgetTester tester) async {
+    Future<void> montar(
+      WidgetTester tester, {
+      bool cargarAntesDeMontar = true,
+    }) async {
       tester.view.physicalSize = const Size(1400, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await cubit.reanudarConsulta(consultaId: _consultaId);
+      if (cargarAntesDeMontar) {
+        await cubit.reanudarConsulta(consultaId: _consultaId);
+      }
 
       await tester.pumpWidget(
         MaterialApp(
@@ -322,7 +329,29 @@ void main() {
         ),
       );
       await tester.pump();
+
+      if (!cargarAntesDeMontar) {
+        await cubit.reanudarConsulta(consultaId: _consultaId);
+        await tester.pump();
+        await tester.pump();
+      }
     }
+
+    testWidgets('hidrata las notas cuando la reanudación termina después', (
+      tester,
+    ) async {
+      repo = _ConsultaRepositorioEspia(
+        _consultaConOdontograma(notas: 'Nota clínica ya guardada'),
+      );
+      await cubit.close();
+      cubit = _cubit(repo);
+
+      await montar(tester, cargarAntesDeMontar: false);
+
+      final campo = tester.widget<TextField>(find.byType(TextField).last);
+      expect(campo.controller!.text, 'Nota clínica ya guardada');
+      expect((cubit.state as ConsultaIniciada).guardado, EstadoGuardado.alDia);
+    });
 
     testWidgets('ofrece las dos vistas y solo dibuja la elegida', (
       tester,

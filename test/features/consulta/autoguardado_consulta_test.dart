@@ -33,6 +33,7 @@ class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
   final Consulta consulta;
 
   int guardados = 0;
+  int cierresFinancieros = 0;
   Odontograma? ultimoOdontograma;
   ResultadoGuardadoOdontograma idsADevolver =
       const ResultadoGuardadoOdontograma();
@@ -55,6 +56,15 @@ class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
     ultimoOdontograma = odontograma;
     if (falla) throw Exception('sin red');
     return idsADevolver;
+  }
+
+  @override
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String? nota,
+  }) async {
+    cierresFinancieros++;
+    return 'cuenta-1';
   }
 }
 
@@ -90,22 +100,32 @@ final _resina = Tratamiento(
 
 void main() {
   group('autoguardado de la consulta', () {
-    test('una ejecución no planificada exige justificación', () async {
-      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
-      final cubit = _cubitCon(repo);
-      addTearDown(cubit.close);
-      await cubit.reanudarConsulta(consultaId: 'c-1');
-      final diente = (cubit.state as ConsultaIniciada)
-          .consulta
-          .odontograma!
-          .dientes
-          .single;
+    test(
+      'una ejecución agregada durante la consulta no exige justificación',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
 
-      expect(
-        () => cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina),
-        throwsArgumentError,
-      );
-    });
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+        final aplicado = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single
+            .tratamientos
+            .single;
+        expect(aplicado.itemPlanId, isNull);
+        expect(aplicado.justificacionNoPlanificada, isNull);
+      },
+    );
 
     test(
       'una ejecución planificada conserva el vínculo con su actividad',
@@ -138,6 +158,36 @@ void main() {
         expect(aplicado.justificacionNoPlanificada, isNull);
       },
     );
+
+    test('terminar sin tratamientos cierra sin generar cuenta', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+
+      await cubit.terminarAtencion();
+
+      expect(repo.cierresFinancieros, 0);
+      expect(cubit.state, const ConsultaTerminada());
+    });
+
+    test('terminar con tratamientos realiza el cierre financiero', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+      await cubit.terminarAtencion();
+
+      expect(repo.cierresFinancieros, 1);
+      expect(cubit.state, const ConsultaTerminada(cuentaId: 'cuenta-1'));
+    });
 
     test('un cambio queda pendiente y se guarda solo', () async {
       final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());

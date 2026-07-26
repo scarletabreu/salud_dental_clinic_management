@@ -13,7 +13,6 @@ import '../cubit/cita_cubit_state.dart';
 import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 const _kMonths = [
@@ -1232,30 +1231,13 @@ class _CitaCard extends StatelessWidget {
           alignment: WrapAlignment.end,
           children: [
             Tooltip(
-              message: TipoAtencionClinica.evaluacion.descripcion,
-              child: OutlinedButton.icon(
-                onPressed: () => _abrirAtencion(
-                  context,
-                  pacienteId,
-                  doctorId,
-                  TipoAtencionClinica.evaluacion,
-                ),
-                icon: const Icon(Icons.assignment_outlined, size: 16),
-                label: Text(TipoAtencionClinica.evaluacion.accion),
-              ),
-            ),
-            Tooltip(
-              message: TipoAtencionClinica.consulta.descripcion,
+              message:
+                  'Diagnostica, planifica y registra tratamientos sin salir.',
               child: FilledButton.icon(
-                onPressed: () => _abrirAtencion(
-                  context,
-                  pacienteId,
-                  doctorId,
-                  TipoAtencionClinica.consulta,
-                ),
+                onPressed: () => _abrirAtencion(context, pacienteId, doctorId),
                 style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
                 icon: const Icon(Icons.medical_services_outlined, size: 16),
-                label: Text(TipoAtencionClinica.consulta.accion),
+                label: const Text('Iniciar consulta'),
               ),
             ),
           ],
@@ -1268,7 +1250,6 @@ class _CitaCard extends StatelessWidget {
     BuildContext context,
     String pacienteId,
     String doctorId,
-    TipoAtencionClinica tipo,
   ) async {
     final cubit = context.read<CitaCubit>();
     await Navigator.of(context).push(
@@ -1277,7 +1258,6 @@ class _CitaCard extends StatelessWidget {
           citaId: cita.id!,
           pacienteId: pacienteId,
           doctorId: doctorId,
-          tipoAtencion: tipo,
         ),
       ),
     );

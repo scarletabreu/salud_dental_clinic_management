@@ -2339,7 +2339,6 @@ CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
     "doctor_ejecuta_id" "uuid",
     "fecha_ejecucion" timestamp with time zone,
     "justificacion_no_planificada" "text",
-    CONSTRAINT "tratamientos_origen_ejecucion_requerido" CHECK ((("item_plan_id" IS NOT NULL) OR (NULLIF("btrim"("justificacion_no_planificada"), ''::"text") IS NOT NULL))),
     CONSTRAINT "tratamientos_aplicados_solo_ejecucion" CHECK ((("deleted_at" IS NOT NULL) OR ("estado" = ANY (ARRAY['aplicado'::"text", 'en_proceso'::"text", 'completado'::"text"]))))
 );
 
@@ -2347,7 +2346,7 @@ CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
 ALTER TABLE "public"."tratamientos_aplicados" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico obligatorio cuando item_plan_id es NULL (SD-138).';
+COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico opcional para una ejecución sin item_plan_id.';
 
 
 CREATE TABLE IF NOT EXISTS "public"."usuarios" (
@@ -4699,7 +4698,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
 
 
 

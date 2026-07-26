@@ -1,21 +1,14 @@
-/// El acto clínico que el doctor abrió.
+/// Clasificación histórica del acto clínico persistido.
 ///
-/// Una evaluación documenta lo encontrado y puede proponer un plan. Una
-/// consulta ejecuta actividades del plan o deja justificada una excepción.
+/// La interfaz ya no obliga al doctor a elegirla al entrar: toda atención abre
+/// el mismo workspace. Se conserva para leer registros creados con el flujo
+/// anterior; las atenciones nuevas se registran como consulta.
 enum TipoAtencionClinica {
   evaluacion,
   consulta;
 
   String get etiqueta =>
       this == TipoAtencionClinica.evaluacion ? 'Evaluación' : 'Consulta';
-
-  String get accion => this == TipoAtencionClinica.evaluacion
-      ? 'Evaluar y planificar'
-      : 'Realizar tratamiento';
-
-  String get descripcion => this == TipoAtencionClinica.evaluacion
-      ? 'Registra hallazgos y prepara el plan, sin realizar tratamientos.'
-      : 'Registra los tratamientos realizados durante esta cita.';
 
   static TipoAtencionClinica fromDb(String? value) =>
       value == 'evaluacion' ? evaluacion : consulta;

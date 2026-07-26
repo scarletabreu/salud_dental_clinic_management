@@ -332,15 +332,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     String? itemPlanId,
     String? justificacionNoPlanificada,
   }) {
-    if (itemPlanId == null &&
-        (justificacionNoPlanificada == null ||
-            justificacionNoPlanificada.trim().isEmpty)) {
-      throw ArgumentError.value(
-        justificacionNoPlanificada,
-        'justificacionNoPlanificada',
-        'Una actividad no planificada requiere justificación clínica.',
-      );
-    }
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
       final odonto = actual.odontograma;
@@ -813,6 +804,28 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  /// Cierra el flujo clínico unificado según lo que realmente se hizo.
+  ///
+  /// Diagnosticar y planificar no crea cargos. En cuanto existe al menos un
+  /// tratamiento ejecutado se usa el cierre de consulta, que hace el handoff
+  /// financiero y descuenta los insumos registrados.
+  Future<void> terminarAtencion() async {
+    if (state is! ConsultaIniciada) return;
+    final consulta = (state as ConsultaIniciada).consulta;
+    final tieneTratamientos =
+        consulta.odontograma?.dientes.any(
+          (diente) => diente.tratamientos.isNotEmpty,
+        ) ??
+        false;
+    final requiereCierreFinanciero =
+        tieneTratamientos || consulta.insumosUtilizados.isNotEmpty;
+    if (requiereCierreFinanciero) {
+      await terminarConsulta();
+    } else {
+      await terminarEvaluacion();
+    }
+  }
+
   /// Cierra una evaluación sin producir cuenta ni descontar inventario. Los
   /// hallazgos y el plan quedan en el expediente; facturar corresponde a una
   /// consulta que haya ejecutado actividades.
@@ -837,7 +850,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         consultaId: consultaId,
         pacienteId: consulta.pacienteId,
         odontograma: odontograma,
-        recetas: const [],
+        recetas: consulta.recetas,
         notas: consulta.notas,
         signosVitales: consulta.signosVitales?.toJson(),
         finalizada: true,

@@ -37,8 +37,8 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/reposit
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
@@ -167,6 +167,8 @@ class _CondicionesDoble extends _Vacio implements GetCondicionesPaciente {
 
 /// La consulta de estos casos no tiene plan: la sección se dibuja vacía y no
 /// interfiere con lo que se está probando (odontodiagrama y tratamientos).
+List<ItemPlanTratamiento> _itemsEjecutablesDoble = const [];
+
 class _PlanRepositorioDoble extends _Vacio
     implements PlanTratamientoRepository {
   @override
@@ -175,7 +177,7 @@ class _PlanRepositorioDoble extends _Vacio
   @override
   Future<List<ItemPlanTratamiento>> getItemsEjecutables(
     String pacienteId,
-  ) async => const [];
+  ) async => _itemsEjecutablesDoble;
 }
 
 class _ConsumibleRepositorioDoble extends _Vacio
@@ -258,6 +260,7 @@ void main() {
       // La vista elegida se recuerda durante la sesión, así que cada test debe
       // partir del mismo estado.
       vistaOdontogramaPreferida.value = VistaOdontograma.formulario;
+      _itemsEjecutablesDoble = const [];
       if (sl.isRegistered<TratamientoRepository>()) {
         sl.unregister<TratamientoRepository>();
       }
@@ -293,10 +296,7 @@ void main() {
       }
     });
 
-    Future<void> montar(
-      WidgetTester tester, {
-      TipoAtencionClinica tipo = TipoAtencionClinica.evaluacion,
-    }) async {
+    Future<void> montar(WidgetTester tester) async {
       tester.view.physicalSize = const Size(1400, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -317,9 +317,7 @@ void main() {
                     PlanTratamientoCubit(repository: _PlanRepositorioDoble()),
               ),
             ],
-            child: Scaffold(
-              body: WorkspaceConsulta(citaId: 'cita-1', tipoAtencion: tipo),
-            ),
+            child: Scaffold(body: const WorkspaceConsulta(citaId: 'cita-1')),
           ),
         ),
       );
@@ -414,40 +412,34 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> registrarNoPlanificada(
+    Future<void> registrarTratamiento(
       WidgetTester tester,
       String tratamiento,
     ) async {
       await tester.tap(find.text('Tratamiento'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar actividad no planificada'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(tratamiento));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Justificación clínica'),
-        'Dolor agudo durante la sesión',
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(tratamiento),
+        ),
       );
-      await tester.tap(find.text('Continuar'));
       await tester.pumpAndSettle();
     }
 
     testWidgets('asignar un tratamiento desde el formulario llega al estado '
         'de la consulta', (tester) async {
-      await montar(tester, tipo: TipoAtencionClinica.consulta);
+      await montar(tester);
       await abrirPieza(tester, 16);
 
-      await registrarNoPlanificada(tester, 'Resina compuesta');
+      await registrarTratamiento(tester, 'Resina compuesta');
 
       final aplicado = pieza(16).tratamientos.single;
       expect(aplicado.tratamientoId, 'trat-resina');
       expect(aplicado.precioAplicado, 2500);
       // El centro de un posterior es la cara oclusal.
       expect(aplicado.superficie, TipoSuperficie.oclusal);
-      expect(
-        aplicado.justificacionNoPlanificada,
-        'Dolor agudo durante la sesión',
-      );
+      expect(aplicado.justificacionNoPlanificada, isNull);
 
       // Lo asignado en el formulario se proyecta al dibujo sin recargar, que es
       // lo mismo que ve la arcada.
@@ -471,16 +463,41 @@ void main() {
     testWidgets('un tratamiento de pieza completa ignora la cara marcada', (
       tester,
     ) async {
-      await montar(tester, tipo: TipoAtencionClinica.consulta);
+      await montar(tester);
       await abrirPieza(tester, 16);
 
-      await registrarNoPlanificada(tester, 'Corona');
+      await registrarTratamiento(tester, 'Corona');
 
       // La cara estaba marcada, pero el catálogo dice que la corona es de la
       // pieza entera: guardarla en oclusal la haría parecer una cara tratada.
       expect(pieza(16).tratamientos.single.superficie, isNull);
       await drenarAutoguardado(tester);
     });
+
+    testWidgets(
+      'vincula automáticamente un tratamiento que coincide con el plan',
+      (tester) async {
+        _itemsEjecutablesDoble = [
+          ItemPlanTratamiento(
+            id: 'item-plan-resina',
+            planId: 'plan-1',
+            tratamientoId: 'trat-resina',
+            fdiDiente: 16,
+            superficie: TipoSuperficie.oclusal,
+            estado: EstadoItemPlan.aceptado,
+            fechaPropuesta: DateTime(2026, 7, 24),
+            nombreTratamiento: 'Resina compuesta',
+          ),
+        ];
+        await montar(tester);
+        await abrirPieza(tester, 16);
+
+        await registrarTratamiento(tester, 'Resina compuesta');
+
+        expect(pieza(16).tratamientos.single.itemPlanId, 'item-plan-resina');
+        await drenarAutoguardado(tester);
+      },
+    );
 
     testWidgets('asignar un diagnóstico desde el formulario llega al estado '
         'de la consulta', (tester) async {

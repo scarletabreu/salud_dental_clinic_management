@@ -45,15 +45,22 @@ class NuevaCitaDialog extends StatefulWidget {
   final PersonaRepository personaRepository;
   final DoctorRepository doctorRepository;
 
+  /// Momento con el que abre el diálogo cuando se llega desde una casilla de la
+  /// agenda. Sin esto, tocar las 9:00 del miércoles abría un formulario vacío y
+  /// obligaba a volver a elegir el día y la hora que ya se habían señalado.
+  final DateTime? fechaInicial;
+
   const NuevaCitaDialog._({
     required this.personaRepository,
     required this.doctorRepository,
+    this.fechaInicial,
   });
 
   static Future<void> show(
     BuildContext context, {
     required PersonaRepository personaRepository,
     required DoctorRepository doctorRepository,
+    DateTime? fechaInicial,
   }) {
     return showDialog<void>(
       context: context,
@@ -63,6 +70,7 @@ class NuevaCitaDialog extends StatefulWidget {
         child: NuevaCitaDialog._(
           personaRepository: personaRepository,
           doctorRepository: doctorRepository,
+          fechaInicial: fechaInicial,
         ),
       ),
     );
@@ -122,6 +130,11 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     );
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+
+    if (widget.fechaInicial case final inicial?) {
+      _fecha = DateTime(inicial.year, inicial.month, inicial.day);
+      _hora = TimeOfDay(hour: inicial.hour, minute: inicial.minute);
+    }
   }
 
   @override
@@ -1027,12 +1040,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           ),
           const SizedBox(height: 10),
 
-          Container(
-            decoration: BoxDecoration(
-              color: _esEmergencia ? ac.red.withValues(alpha: 0.08) : ac.bgPage,
+          Material(
+            color: _esEmergencia ? ac.red.withValues(alpha: 0.08) : ac.bgPage,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: _esEmergencia ? ac.red : ac.divider),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _esEmergencia ? ac.red : ac.divider),
             ),
+            clipBehavior: Clip.antiAlias,
             child: SwitchListTile(
               title: Text(
                 'Cita de emergencia',
@@ -1327,12 +1341,16 @@ class _PersonaTile extends StatelessWidget {
         '${persona.nombre.isNotEmpty ? persona.nombre[0] : ''}${persona.apellido.isNotEmpty ? persona.apellido[0] : ''}'
             .toUpperCase();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: ac.cardBg,
-        border: Border.all(color: ac.divider),
+    // El color de fondo lo pone el Material y no el Container: pintarlo por
+    // encima tapa el destello del toque —Flutter lo afirma en depuración— y
+    // deja la fila sin decir que se pulsó.
+    return Material(
+      color: ac.cardBg,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: ac.divider),
         borderRadius: BorderRadius.circular(10),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         dense: true,
         onTap: onTap,

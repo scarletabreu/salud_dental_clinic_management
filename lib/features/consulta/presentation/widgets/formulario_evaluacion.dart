@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 
@@ -11,12 +12,14 @@ class FormularioEvaluacion extends StatefulWidget {
   final String pacienteId;
   final String doctorId;
   final String? citaId;
+  final TipoAtencionClinica tipoAtencion;
 
   const FormularioEvaluacion({
     super.key,
     required this.pacienteId,
     required this.doctorId,
     this.citaId,
+    required this.tipoAtencion,
   });
 
   @override
@@ -103,12 +106,14 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
       tempCondiciones: _condiciones,
       adjuntos: _adjuntos,
       signosVitales: _buildSignosVitales(),
+      tipoAtencion: widget.tipoAtencion,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final esEvaluacion = widget.tipoAtencion == TipoAtencionClinica.evaluacion;
 
     return Form(
       key: _formKey,
@@ -116,8 +121,10 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
         padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
         children: [
           _PageHeader(
-            title: 'Evaluación Clínica',
-            subtitle: 'Completa los datos antes de iniciar la consulta',
+            title: esEvaluacion ? 'Registrar evaluación' : 'Preparar consulta',
+            subtitle: esEvaluacion
+                ? 'Documenta el motivo y el contexto clínico inicial'
+                : 'Confirma el motivo antes de registrar lo realizado',
             step: '01',
             ac: ac,
           ),
@@ -127,7 +134,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
             ac: ac,
             icon: Icons.notes_rounded,
             iconColor: ac.primaryBlue,
-            title: 'Motivo de consulta',
+            title: esEvaluacion ? 'Motivo de evaluación' : 'Motivo de consulta',
             subtitle: 'Describe el motivo principal',
             child: TextFormField(
               controller: _motivoController,
@@ -272,6 +279,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
                 cargando: cargando,
                 onTap: cargando ? null : _guardar,
                 ac: ac,
+                tipoAtencion: widget.tipoAtencion,
               );
             },
           ),
@@ -648,10 +656,12 @@ class _IniciarButton extends StatelessWidget {
     required this.cargando,
     required this.onTap,
     required this.ac,
+    required this.tipoAtencion,
   });
   final bool cargando;
   final VoidCallback? onTap;
   final AppColors ac;
+  final TipoAtencionClinica tipoAtencion;
 
   @override
   Widget build(BuildContext context) {
@@ -681,7 +691,13 @@ class _IniciarButton extends StatelessWidget {
                 ),
               )
             : const Icon(Icons.play_circle_outline_rounded, size: 20),
-        label: Text(cargando ? 'Iniciando consulta…' : 'Iniciar consulta'),
+        label: Text(
+          cargando
+              ? 'Abriendo ${tipoAtencion.etiqueta.toLowerCase()}…'
+              : tipoAtencion == TipoAtencionClinica.evaluacion
+              ? 'Continuar con la evaluación'
+              : 'Continuar con la consulta',
+        ),
       ),
     );
   }

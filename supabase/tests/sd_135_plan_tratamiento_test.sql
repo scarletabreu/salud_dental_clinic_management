@@ -34,6 +34,7 @@ declare
   v_conteo        integer;
   v_total         numeric;
   v_fallo         boolean;
+  v_estado_item   text;
 begin
   -- ---------------------------------------------------------------- montaje
   -- `usuarios` cuelga de `personas`, y `doctores` de `usuarios`.
@@ -153,10 +154,11 @@ begin
   begin
     insert into tratamientos_aplicados (
       tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
-      precio_aplicado, estado, created_at, updated_at
+      precio_aplicado, estado, justificacion_no_planificada,
+      created_at, updated_at
     ) values (
       v_tratamiento_id, v_consulta_id, v_diente_id, false, false,
-      2500.00, 'indicado', now(), now()
+      2500.00, 'indicado', 'Prueba del eje de ejecución', now(), now()
     );
     v_fallo := true;
   exception when check_violation then
@@ -180,9 +182,49 @@ begin
     false, true, 2500.00, 'aplicado', v_doctor_id, now(), now(), now()
   );
 
-  update items_plan_tratamiento
-  set estado = 'completado', fecha_completado = now(), updated_at = now()
-  where id = v_item_id;
+  select estado::text into v_estado_item
+  from items_plan_tratamiento where id = v_item_id;
+  if v_estado_item <> 'completado' then
+    raise exception
+      'La ejecución planificada dejó el item en %, se esperaba completado.',
+      v_estado_item;
+  end if;
+
+  update tratamientos_aplicados
+  set deleted_at = now(), updated_at = now()
+  where item_plan_id = v_item_id;
+  select estado::text into v_estado_item
+  from items_plan_tratamiento where id = v_item_id;
+  if v_estado_item <> 'pendiente' then
+    raise exception
+      'Al anular la ejecución el item quedó en %, se esperaba pendiente.',
+      v_estado_item;
+  end if;
+
+  -- Restaurar la fila simula el reintento/reconciliación y deja listo el
+  -- escenario financiero que sigue.
+  update tratamientos_aplicados
+  set deleted_at = null, updated_at = now()
+  where item_plan_id = v_item_id;
+
+  -- REGLA SD-138: una ejecución fuera del plan solo es válida si explica por
+  -- qué fue necesaria. El estado sí es ejecutable para aislar esta regla.
+  v_fallo := false;
+  begin
+    insert into tratamientos_aplicados (
+      tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
+      precio_aplicado, estado, created_at, updated_at
+    ) values (
+      v_tratamiento_id, v_consulta_id, v_diente_id, false, true,
+      2500.00, 'aplicado', now(), now()
+    );
+    v_fallo := true;
+  exception when check_violation then
+    null;
+  end;
+  if v_fallo then
+    raise exception 'Se aceptó una ejecución no planificada sin justificación.';
+  end if;
 
   -- Un segundo item queda propuesto y nunca se ejecuta: no debe facturar.
   insert into items_plan_tratamiento (

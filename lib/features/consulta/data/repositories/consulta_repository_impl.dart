@@ -81,6 +81,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         'p_temp_condiciones': consulta.tempCondiciones,
         'p_dientes': dientes,
         'p_documentos': documentos,
+        'p_tipo_atencion': consulta.tipoAtencion.name,
       };
 
       final id = await remoteDataSource.crearConsultaCompleta(params);
@@ -139,6 +140,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   // viaja cuando la ejecución cumple una actividad ya decidida
                   // del plan; la base rechaza vincularla a una propuesta.
                   'item_plan_id': t.itemPlanId,
+                  'justificacion_no_planificada': t.justificacionNoPlanificada,
                   'doctor_ejecuta_id': t.doctorEjecutaId,
                   'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
                       ?.toUtc()

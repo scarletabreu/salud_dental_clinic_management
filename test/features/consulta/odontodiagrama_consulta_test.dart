@@ -36,7 +36,11 @@ import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/s
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 
 const _consultaId = '33333333-3333-3333-3333-333333333333';
@@ -167,7 +171,15 @@ class _PlanRepositorioDoble extends _Vacio
     implements PlanTratamientoRepository {
   @override
   Future<PlanTratamiento?> getPlanDeConsulta(String consultaId) async => null;
+
+  @override
+  Future<List<ItemPlanTratamiento>> getItemsEjecutables(
+    String pacienteId,
+  ) async => const [];
 }
+
+class _ConsumibleRepositorioDoble extends _Vacio
+    implements ConsumibleRepository {}
 
 class _PacienteCubitDoble extends Cubit<PacienteState>
     implements PacienteCubit {
@@ -183,6 +195,7 @@ ConsultaCubit _cubit(_ConsultaRepositorioEspia repo) => ConsultaCubit(
   _StorageDoble(),
   _CitaRepositorioDoble(),
   repo,
+  DescontarStockPorConsumo(_ConsumibleRepositorioDoble()),
 );
 
 void main() {
@@ -251,11 +264,15 @@ void main() {
       if (sl.isRegistered<GetCondicionesPaciente>()) {
         sl.unregister<GetCondicionesPaciente>();
       }
+      if (sl.isRegistered<PlanTratamientoRepository>()) {
+        sl.unregister<PlanTratamientoRepository>();
+      }
       sl.registerFactory<TratamientoRepository>(
         _TratamientoRepositorioDoble.new,
       );
       sl.registerFactory<GetCondicionesPaciente>(_CondicionesDoble.new);
       sl.registerFactory<DiagnosisRepository>(_DiagnosticoRepositorioDoble.new);
+      sl.registerFactory<PlanTratamientoRepository>(_PlanRepositorioDoble.new);
       repo = _ConsultaRepositorioEspia(_consultaConOdontograma());
       cubit = _cubit(repo);
     });
@@ -271,9 +288,15 @@ void main() {
       if (sl.isRegistered<DiagnosisRepository>()) {
         sl.unregister<DiagnosisRepository>();
       }
+      if (sl.isRegistered<PlanTratamientoRepository>()) {
+        sl.unregister<PlanTratamientoRepository>();
+      }
     });
 
-    Future<void> montar(WidgetTester tester) async {
+    Future<void> montar(
+      WidgetTester tester, {
+      TipoAtencionClinica tipo = TipoAtencionClinica.evaluacion,
+    }) async {
       tester.view.physicalSize = const Size(1400, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -294,7 +317,9 @@ void main() {
                     PlanTratamientoCubit(repository: _PlanRepositorioDoble()),
               ),
             ],
-            child: const Scaffold(body: WorkspaceConsulta(citaId: 'cita-1')),
+            child: Scaffold(
+              body: WorkspaceConsulta(citaId: 'cita-1', tipoAtencion: tipo),
+            ),
           ),
         ),
       );
@@ -389,21 +414,40 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('asignar un tratamiento desde el formulario llega al estado '
-        'de la consulta', (tester) async {
-      await montar(tester);
-      await abrirPieza(tester, 16);
-
+    Future<void> registrarNoPlanificada(
+      WidgetTester tester,
+      String tratamiento,
+    ) async {
       await tester.tap(find.text('Tratamiento'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Resina compuesta'));
+      await tester.tap(find.text('Registrar actividad no planificada'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text(tratamiento));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Justificación clínica'),
+        'Dolor agudo durante la sesión',
+      );
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('asignar un tratamiento desde el formulario llega al estado '
+        'de la consulta', (tester) async {
+      await montar(tester, tipo: TipoAtencionClinica.consulta);
+      await abrirPieza(tester, 16);
+
+      await registrarNoPlanificada(tester, 'Resina compuesta');
 
       final aplicado = pieza(16).tratamientos.single;
       expect(aplicado.tratamientoId, 'trat-resina');
       expect(aplicado.precioAplicado, 2500);
       // El centro de un posterior es la cara oclusal.
       expect(aplicado.superficie, TipoSuperficie.oclusal);
+      expect(
+        aplicado.justificacionNoPlanificada,
+        'Dolor agudo durante la sesión',
+      );
 
       // Lo asignado en el formulario se proyecta al dibujo sin recargar, que es
       // lo mismo que ve la arcada.
@@ -427,13 +471,10 @@ void main() {
     testWidgets('un tratamiento de pieza completa ignora la cara marcada', (
       tester,
     ) async {
-      await montar(tester);
+      await montar(tester, tipo: TipoAtencionClinica.consulta);
       await abrirPieza(tester, 16);
 
-      await tester.tap(find.text('Tratamiento'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Corona'));
-      await tester.pumpAndSettle();
+      await registrarNoPlanificada(tester, 'Corona');
 
       // La cara estaba marcada, pero el catálogo dice que la corona es de la
       // pieza entera: guardarla en oclusal la haría parecer una cara tratada.

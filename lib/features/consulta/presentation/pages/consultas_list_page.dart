@@ -946,6 +946,7 @@ class _ConsultaCard extends StatelessWidget {
                                     pacienteId: consulta.pacienteId,
                                     doctorId: consulta.doctorId,
                                     consultaId: consulta.id,
+                                    tipoAtencion: consulta.tipoAtencion,
                                   ),
                                 ),
                               ),

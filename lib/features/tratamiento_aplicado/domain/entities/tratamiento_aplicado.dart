@@ -61,6 +61,11 @@ class TratamientoAplicado {
   /// planificada (una urgencia resuelta en el momento), que es legítima.
   final String? itemPlanId;
 
+  /// Motivo obligatorio cuando la ejecución no corresponde a una actividad
+  /// planificada. No se reutiliza [notas]: las notas pueden documentar una
+  /// contraindicación y no explican por qué se alteró el plan del día.
+  final String? justificacionNoPlanificada;
+
   /// Auditoría de la ejecución: quién la hizo y cuándo (SD-135).
   final String? doctorEjecutaId;
   final DateTime? fechaEjecucion;
@@ -81,6 +86,7 @@ class TratamientoAplicado {
     this.claveOdontograma,
     this.fechaAplicacion,
     this.itemPlanId,
+    this.justificacionNoPlanificada,
     this.doctorEjecutaId,
     this.fechaEjecucion,
   });
@@ -103,6 +109,7 @@ class TratamientoAplicado {
     String? claveOdontograma,
     DateTime? fechaAplicacion,
     String? itemPlanId,
+    String? justificacionNoPlanificada,
     String? doctorEjecutaId,
     DateTime? fechaEjecucion,
   }) {
@@ -122,6 +129,8 @@ class TratamientoAplicado {
       claveOdontograma: claveOdontograma ?? this.claveOdontograma,
       fechaAplicacion: fechaAplicacion ?? this.fechaAplicacion,
       itemPlanId: itemPlanId ?? this.itemPlanId,
+      justificacionNoPlanificada:
+          justificacionNoPlanificada ?? this.justificacionNoPlanificada,
       doctorEjecutaId: doctorEjecutaId ?? this.doctorEjecutaId,
       fechaEjecucion: fechaEjecucion ?? this.fechaEjecucion,
     );

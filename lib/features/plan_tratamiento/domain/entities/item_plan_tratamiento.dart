@@ -17,6 +17,7 @@ class ItemPlanTratamiento {
   final String? diagnosticoAplicadoId;
 
   final String? dienteId;
+  final int? fdiDiente;
   final TipoSuperficie? superficie;
   final EstadoItemPlan estado;
   final double precioEstimado;
@@ -42,6 +43,7 @@ class ItemPlanTratamiento {
     required this.tratamientoId,
     this.diagnosticoAplicadoId,
     this.dienteId,
+    this.fdiDiente,
     this.superficie,
     this.estado = EstadoItemPlan.propuesto,
     this.precioEstimado = 0,
@@ -90,6 +92,7 @@ class ItemPlanTratamiento {
     String? tratamientoId,
     String? diagnosticoAplicadoId,
     String? dienteId,
+    int? fdiDiente,
     TipoSuperficie? superficie,
     EstadoItemPlan? estado,
     double? precioEstimado,
@@ -111,6 +114,7 @@ class ItemPlanTratamiento {
       diagnosticoAplicadoId:
           diagnosticoAplicadoId ?? this.diagnosticoAplicadoId,
       dienteId: dienteId ?? this.dienteId,
+      fdiDiente: fdiDiente ?? this.fdiDiente,
       superficie: superficie ?? this.superficie,
       estado: estado ?? this.estado,
       precioEstimado: precioEstimado ?? this.precioEstimado,

@@ -13,6 +13,7 @@ import '../cubit/cita_cubit_state.dart';
 import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 const _kMonths = [
@@ -1219,33 +1220,56 @@ class _CitaCard extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: Padding(
         padding: const EdgeInsets.only(top: 10),
-        child: FilledButton.icon(
-          onPressed: () async {
-            final cubit = context.read<CitaCubit>();
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => EfectuarConsultaPage(
-                  citaId: cita.id!,
-                  pacienteId: pacienteId,
-                  doctorId: doctorId,
-                ),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _abrirAtencion(
+                context,
+                pacienteId,
+                doctorId,
+                TipoAtencionClinica.evaluacion,
               ),
-            );
-            cubit.load();
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: ac.primaryBlue,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            textStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+              icon: const Icon(Icons.assignment_outlined, size: 16),
+              label: const Text('Registrar evaluación'),
             ),
-          ),
-          icon: const Icon(Icons.medical_services_outlined, size: 16),
-          label: const Text('Efectuar Consulta'),
+            FilledButton.icon(
+              onPressed: () => _abrirAtencion(
+                context,
+                pacienteId,
+                doctorId,
+                TipoAtencionClinica.consulta,
+              ),
+              style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+              icon: const Icon(Icons.medical_services_outlined, size: 16),
+              label: const Text('Efectuar consulta'),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _abrirAtencion(
+    BuildContext context,
+    String pacienteId,
+    String doctorId,
+    TipoAtencionClinica tipo,
+  ) async {
+    final cubit = context.read<CitaCubit>();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EfectuarConsultaPage(
+          citaId: cita.id!,
+          pacienteId: pacienteId,
+          doctorId: doctorId,
+          tipoAtencion: tipo,
+        ),
+      ),
+    );
+    cubit.load();
   }
 }
 

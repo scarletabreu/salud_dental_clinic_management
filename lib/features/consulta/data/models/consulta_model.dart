@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/data/models/documento_clinico_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/models/odontograma_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
@@ -19,6 +20,7 @@ class ConsultaModel extends Consulta {
     super.notas,
     super.signosVitales,
     super.finalizada,
+    super.tipoAtencion,
     super.tienePreFactura,
   });
 
@@ -32,6 +34,9 @@ class ConsultaModel extends Consulta {
       motivoConsulta: json['motivo_consulta'] ?? json['motivoConsulta'],
       notas: json['notas'] as String?,
       finalizada: (json['finalizada'] ?? false) as bool,
+      tipoAtencion: TipoAtencionClinica.fromDb(
+        json['tipo_atencion'] as String?,
+      ),
       signosVitales: json['signos_vitales'] != null
           ? SignosVitales.fromJson(
               json['signos_vitales'] as Map<String, dynamic>,
@@ -75,6 +80,7 @@ class ConsultaModel extends Consulta {
       'temp_condiciones': tempCondiciones,
       'signos_vitales': signosVitales?.toJson(),
       'finalizada': finalizada,
+      'tipo_atencion': tipoAtencion.name,
       'tiene_pre_factura': tienePreFactura,
     };
 

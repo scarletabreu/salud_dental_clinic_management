@@ -130,7 +130,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
                   'superficie': t.superficie?.name.toLowerCase(),
-                  'aprecio_aplicado': t.precioAplicado,
+                  'precio_aplicado': t.precioAplicado,
                   // La justificación clínica de una contraindicación viaja
                   // aquí. Sin ella el expediente diría que el tratamiento se
                   // aplicó a ciegas.

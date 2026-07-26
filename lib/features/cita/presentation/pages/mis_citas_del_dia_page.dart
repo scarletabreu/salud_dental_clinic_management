@@ -770,7 +770,14 @@ class _DetailPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    // Envuelve en vez de desbordar: «Miércoles» y la fecha
+                    // completa no caben en una línea del panel estrecho, y
+                    // recortar cualquiera de las dos deja la cabecera sin
+                    // decir de qué día se está viendo la agenda.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           dayLabel,
@@ -781,7 +788,6 @@ class _DetailPanel extends StatelessWidget {
                             letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         if (isToday)
                           Container(
                             padding: const EdgeInsets.symmetric(

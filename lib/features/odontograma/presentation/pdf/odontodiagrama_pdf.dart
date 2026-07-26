@@ -5,9 +5,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 
-/// Arma la hoja imprimible del odontodiagrama a partir de la captura del
-/// widget. No vuelve a dibujar el diagrama: incrusta la misma imagen que el
-/// doctor tiene en pantalla, así la hoja y el expediente no pueden divergir.
 Future<Uint8List> generarOdontodiagramaPdf({
   required Uint8List diagramaPng,
   required String nombrePaciente,
@@ -15,9 +12,6 @@ Future<Uint8List> generarOdontodiagramaPdf({
   PdfPageFormat formato = PdfPageFormat.a4,
   pw.ThemeData? tema,
 }) async {
-  // Las fuentes por defecto del PDF no llevan acentos; sin Open Sans un
-  // apellido como «Rodríguez» sale roto. Los tests inyectan su propio tema
-  // para no depender de la red.
   final theme =
       tema ??
       pw.ThemeData.withFont(
@@ -64,7 +58,6 @@ Future<Uint8List> generarOdontodiagramaPdf({
   return documento.save();
 }
 
-/// Nombre sugerido del archivo, con la fecha de la consulta.
 String nombreArchivoOdontodiagrama(DateTime fecha) {
   final dia = fecha.day.toString().padLeft(2, '0');
   final mes = fecha.month.toString().padLeft(2, '0');

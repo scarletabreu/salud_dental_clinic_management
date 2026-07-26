@@ -9,18 +9,11 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/pdf/odontodiagrama_pdf.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 
-/// El odontodiagrama tal como se archiva en el expediente: solo lectura, sobre
-/// papel y listo para imprimir.
-///
-/// La hoja impresa es una captura de esta misma vista, así que lo que el doctor
-/// ve en pantalla y lo que sale por la impresora no pueden divergir.
 class OdontodiagramaExpediente extends StatefulWidget {
   final EvaluacionOdontologica evaluacion;
   final String nombrePaciente;
   final DateTime fecha;
 
-  /// Oculta el botón de imprimir, para donde el odontodiagrama es solo una
-  /// referencia dentro de otra vista.
   final bool permiteImprimir;
 
   const OdontodiagramaExpediente({
@@ -31,7 +24,6 @@ class OdontodiagramaExpediente extends StatefulWidget {
     this.permiteImprimir = true,
   });
 
-  /// Identifica el lienzo capturable, para que los tests puedan localizarlo.
   static const lienzoKey = ValueKey('odontodiagrama-lienzo');
 
   @override
@@ -104,7 +96,6 @@ class _OdontodiagramaExpedienteState extends State<OdontodiagramaExpediente> {
   }
 }
 
-/// Rasteriza el subárbol de un [RepaintBoundary] a PNG.
 Future<Uint8List> capturarLienzo(GlobalKey lienzo, {double escala = 3}) async {
   final objeto = lienzo.currentContext?.findRenderObject();
   if (objeto is! RenderRepaintBoundary) {

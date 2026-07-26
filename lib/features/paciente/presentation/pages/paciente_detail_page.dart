@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -15,6 +16,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/wi
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
+import 'package:salud_dental_clinic_management/features/record/presentation/widgets/generar_expediente_modal.dart';
 
 enum _VistaConsultas { cronologica, lista }
 
@@ -29,7 +31,7 @@ class PacienteDetailPage extends StatefulWidget {
 
 class _PacienteDetailPageState extends State<PacienteDetailPage> {
   _VistaConsultas _modoVista = _VistaConsultas.cronologica;
-  bool _ordenDescendente = true; // true: más reciente primero
+  bool _ordenDescendente = true;
 
   @override
   void initState() {
@@ -96,50 +98,90 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    return Scaffold(
-      backgroundColor: ac.bgPage,
-      appBar: AppBar(
-        backgroundColor: ac.cardBg,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: ac.textPrimary,
-        title: Text(
-          'Expediente Clínico',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: ac.textPrimary,
-          ),
-        ),
-        centerTitle: false,
-      ),
-      body: BlocBuilder<PacienteCubit, PacienteState>(
-        builder: (context, state) {
-          if (state is PacienteDetailLoading) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: ac.primaryBlue,
-                strokeWidth: 2,
+    return BlocBuilder<PacienteCubit, PacienteState>(
+      builder: (context, state) {
+        final paciente = (state is PacienteDetailLoaded)
+            ? state.paciente
+            : null;
+
+        final historialPiezas = (state is PacienteDetailLoaded)
+            ? state.historialPiezas
+            : null;
+
+        return Scaffold(
+          backgroundColor: ac.bgPage,
+          appBar: AppBar(
+            backgroundColor: ac.cardBg,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            foregroundColor: ac.textPrimary,
+            title: Text(
+              'Expediente Clínico',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: ac.textPrimary,
               ),
-            );
-          }
+            ),
+            centerTitle: false,
+            actions: [
+              if (paciente != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: IconButton(
+                    tooltip: 'Exportar / Imprimir Expediente',
+                    icon: Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: ac.primaryBlue,
+                    ),
+                    onPressed: () {
+                      final consultasConOdontograma = paciente.record.consultas
+                          .where((c) => c.odontograma != null)
+                          .toList();
 
-          if (state is PacienteError) {
-            return _ErrorView(message: state.message);
-          }
+                      final odontogramaActual =
+                          consultasConOdontograma.isNotEmpty
+                          ? consultasConOdontograma.first.odontograma
+                          : null;
 
-          if (state is PacienteDetailLoaded) {
-            return _buildContent(
-              state.paciente,
-              historialNoDisponible: state.historialNoDisponible,
-              historialPiezas: state.historialPiezas,
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
-      ),
+                      GenerarExpedienteModal.mostrar(
+                        context,
+                        paciente: paciente,
+                        odontogramaActual: odontogramaActual,
+                        consultasConOdontograma: consultasConOdontograma,
+                        historialPiezas: historialPiezas,
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+          body: _buildBody(state, ac),
+        );
+      },
     );
+  }
+
+  Widget _buildBody(PacienteState state, AppColors ac) {
+    if (state is PacienteDetailLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: ac.primaryBlue, strokeWidth: 2),
+      );
+    }
+
+    if (state is PacienteError) {
+      return _ErrorView(message: state.message);
+    }
+
+    if (state is PacienteDetailLoaded) {
+      return _buildContent(
+        state.paciente,
+        historialNoDisponible: state.historialNoDisponible,
+        historialPiezas: state.historialPiezas,
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   Widget _buildContent(
@@ -198,8 +240,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             },
           ),
           const SizedBox(height: 16),
-          // SD-135: lo que se decidió tratar, separado de lo ya ejecutado que
-          // cuenta el odontograma de abajo.
           PlanesTratamientoCard(pacienteId: p.id ?? widget.pacienteId),
           OdontogramArchWidget(
             consultas: sortedConsultas,
@@ -729,8 +769,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  // ── Historial de Consultas & Actividades Longitudinales ────────────────────
-
   Widget _buildTimelineCard(List<Consulta> sorted) {
     final ac = context.appColors;
 
@@ -826,8 +864,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       ),
     );
   }
-
-  // ── Elemento Vista Cronológica ───────────────────────────────────────────
 
   Widget _buildTimelineItem(Consulta c, bool isLast) {
     final ac = context.appColors;
@@ -1008,8 +1044,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  // ── Elemento Vista de Lista Detallada ────────────────────────────────────
-
   Widget _buildListItem(Consulta c) {
     final ac = context.appColors;
     final fechaStr =
@@ -1065,8 +1099,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       ),
     );
   }
-
-  // ── Modal de Detalle de Consulta ──────────────────────────────────────────
 
   void _abrirDetalleConsulta(Consulta c) {
     final ac = context.appColors;
@@ -1144,7 +1176,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               Divider(color: ac.divider),
               const SizedBox(height: 16),
 
-              // Profesional Responsable
               if (docNombre != null) ...[
                 Text(
                   'PROFESIONAL RESPONSABLE',
@@ -1167,7 +1198,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 const SizedBox(height: 16),
               ],
 
-              // Notas Clínicas
               Text(
                 'NOTAS CLÍNICAS Y OBSERVACIONES',
                 style: TextStyle(
@@ -1199,7 +1229,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               ),
               const SizedBox(height: 20),
 
-              // Recetas
               if (c.recetas.isNotEmpty) ...[
                 Text(
                   'RECETAS Y FÁRMACOS PRESCRITOS (${c.recetas.length})',
@@ -1244,8 +1273,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   ),
                 const SizedBox(height: 16),
               ],
-
-              // Documentos Adjuntos
               if (c.documentosClinicos.isNotEmpty) ...[
                 Text(
                   'DOCUMENTOS Y ADJUNTOS CLINICOS (${c.documentosClinicos.length})',
@@ -1274,8 +1301,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 }
-
-// ── Componentes Auxiliares ───────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final Widget child;

@@ -11,15 +11,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/presentation
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
-/// Las dos maneras de mirar la misma boca.
-enum VistaOdontograma {
-  /// El odontodiagrama del formulario en papel: cuatro filas de piezas con sus
-  /// claves. Es la vista por defecto porque es la que el doctor conoce.
-  formulario,
-
-  /// La arcada dibujada, donde se asignan tratamientos y superficies.
-  arcada,
-}
+enum VistaOdontograma { formulario, arcada }
 
 extension VistaOdontogramaX on VistaOdontograma {
   String get label => switch (this) {
@@ -33,15 +25,10 @@ extension VistaOdontogramaX on VistaOdontograma {
   };
 }
 
-/// La vista elegida se recuerda durante la sesión: un doctor que prefiere la
-/// arcada no quiere volver a cambiarla en cada paciente. No se persiste en
-/// disco a propósito —es una preferencia de momento, no un ajuste de la app.
 final ValueNotifier<VistaOdontograma> vistaOdontogramaPreferida = ValueNotifier(
   VistaOdontograma.formulario,
 );
 
-/// Conmutador entre las dos vistas. Botones anchos y con etiqueta: en tablet
-/// hay que poder cambiar de vista con el dedo y sin adivinar el icono.
 class SelectorVistaOdontograma extends StatelessWidget {
   final VistaOdontograma vista;
   final ValueChanged<VistaOdontograma> onChanged;
@@ -75,7 +62,6 @@ class SelectorVistaOdontograma extends StatelessWidget {
       onSelectionChanged: (seleccion) => onChanged(seleccion.first),
       style: SegmentedButton.styleFrom(
         textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        // 44 px de alto: la barra se toca con el dedo, no con el ratón.
         minimumSize: const Size(0, 44),
         visualDensity: VisualDensity.standard,
         selectedBackgroundColor: ac.teal.withValues(alpha: 0.14),
@@ -87,17 +73,9 @@ class SelectorVistaOdontograma extends StatelessWidget {
   }
 }
 
-/// Las dos vistas del odontograma bajo un mismo selector.
-///
-/// Antes se apilaban una debajo de otra en tres pantallas distintas, lo que
-/// obligaba a desplazarse por dos diagramas para leer una sola boca. Aquí solo
-/// se dibuja la elegida, y ambas leen del mismo [Odontograma]: la arcada
-/// muestra tratamientos y la capa histórica de tratamientos, el formulario
-/// muestra hallazgos y la capa histórica del odontodiagrama.
 class VistasOdontograma extends StatefulWidget {
   final Odontograma odontograma;
 
-  /// Habilita anotar en el formulario y editar en la arcada.
   final bool editable;
 
   final ValueChanged<EvaluacionOdontologica>? onEvaluacionChanged;
@@ -110,29 +88,16 @@ class VistasOdontograma extends StatefulWidget {
   final String Function(String tratamientoId)? nombreTratamiento;
   final String Function(String doctorId)? nombreDoctor;
 
-  /// Actividades del plan de tratamiento que caen sobre cada pieza, indexadas
-  /// por código FDI. Es lo que permite que la ficha distinga lo que se piensa
-  /// hacer de lo que ya se hizo.
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
 
-  /// La historia de cada pieza del paciente (SD-144). Las dos vistas la reciben
-  /// igual: el ticket pide poder abrir la línea de tiempo desde *cualquier*
-  /// odontograma del expediente, y son el mismo panel.
   final HistorialPiezas? historialPiezas;
 
-  /// Anota una observación clínica sobre una pieza concreta.
   final void Function(Diente, String)? onNotasPiezaChanged;
 
-  /// Contenido opcional a la derecha del selector (un indicador de carga, un
-  /// contador de tratamientos…).
   final Widget? accion;
 
-  /// Sustituye la vista de formulario. El expediente la envuelve en la hoja
-  /// capturable para imprimir, sin duplicar el conmutador.
   final Widget? formularioPersonalizado;
 
-  /// Contenido bajo cualquiera de las dos vistas (el desglose de tratamientos
-  /// de la consulta, por ejemplo).
   final Widget? pie;
 
   const VistasOdontograma({
@@ -167,9 +132,6 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
       builder: (context, vista, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // El selector y la acción comparten fila mientras quepan; en un
-          // viewport estrecho la acción baja entera en vez de comprimir los
-          // botones por debajo del objetivo táctil.
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -192,8 +154,6 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                     historico: widget.odontograma.evaluacionHistorica,
                     editable: widget.editable,
                     onChanged: widget.onEvaluacionChanged,
-                    // Las mismas piezas y los mismos callbacks que la arcada:
-                    // el panel de detalle es el mismo widget en las dos vistas.
                     dientes: {
                       for (final diente in widget.odontograma.dientes)
                         diente.fdiCode: diente,
@@ -210,10 +170,6 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                     nombreTratamiento: widget.nombreTratamiento,
                     nombreDoctor: widget.nombreDoctor,
                   ),
-            // La arcada no lleva las claves incrustadas —no es una hoja que se
-            // imprima—, así que la leyenda compartida va debajo. Es la misma
-            // que dibuja el formulario, de modo que las dos vistas explican la
-            // boca con las mismas palabras.
             VistaOdontograma.arcada => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

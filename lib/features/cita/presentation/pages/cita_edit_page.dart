@@ -161,11 +161,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
           return true;
         },
         listener: (listenerContext, state) {
-          print("DEBUG: Llegó un estado de tipo: ${state.runtimeType}");
           if (state is CitaCubitLoaded) {
-            print(
-              "DEBUG: isSubmitting = ${state.isSubmitting}, _intentandoGuardar = $_intentandoGuardar",
-            );
             if (state.errorMessage != null) {
               _snackError(state.errorMessage!);
               setState(() => _intentandoGuardar = false);
@@ -751,7 +747,6 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("BUILD CUBIT: ${context.read<CitaCubit>().hashCode}");
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(

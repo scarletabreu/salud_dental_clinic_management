@@ -61,49 +61,55 @@ class DashboardCitasChart extends StatelessWidget {
                 flex: 4,
                 child: SizedBox(
                   height: 140,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 4,
-                      centerSpaceRadius: 45,
-                      startDegreeOffset: -90,
-                      sections: [
-                        if (enEspera > 0)
-                          PieChartSectionData(
-                            color: ac.amber,
-                            value: enEspera.toDouble(),
-                            title: '$enEspera',
-                            radius: 18,
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                  // El gráfico se redibuja en cada frame de su animación de
+                  // entrada. Sin esta frontera, esos repintados arrastran a
+                  // toda la capa del inicio —tarjetas, sombras y listas— que
+                  // no ha cambiado en nada.
+                  child: RepaintBoundary(
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 4,
+                        centerSpaceRadius: 45,
+                        startDegreeOffset: -90,
+                        sections: [
+                          if (enEspera > 0)
+                            PieChartSectionData(
+                              color: ac.amber,
+                              value: enEspera.toDouble(),
+                              title: '$enEspera',
+                              radius: 18,
+                              titleStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                        if (completadas > 0)
-                          PieChartSectionData(
-                            color: ac.green,
-                            value: completadas.toDouble(),
-                            title: '$completadas',
-                            radius: 18,
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          if (completadas > 0)
+                            PieChartSectionData(
+                              color: ac.green,
+                              value: completadas.toDouble(),
+                              title: '$completadas',
+                              radius: 18,
+                              titleStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                        if (pendientes > 0)
-                          PieChartSectionData(
-                            color: ac.indigo,
-                            value: pendientes.toDouble(),
-                            title: '$pendientes',
-                            radius: 18,
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          if (pendientes > 0)
+                            PieChartSectionData(
+                              color: ac.indigo,
+                              value: pendientes.toDouble(),
+                              title: '$pendientes',
+                              radius: 18,
+                              titleStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

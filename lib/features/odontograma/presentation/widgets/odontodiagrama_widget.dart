@@ -761,14 +761,23 @@ class _PiezaDentalState extends State<_PiezaDental> {
 
   @override
   Widget build(BuildContext context) {
-    Widget pieza = CustomPaint(
-      size: Size.square(widget.lado),
-      painter: GlifoPiezaPainter(
-        glifo: widget.glifo,
-        hallazgos: widget.hallazgos,
-        superficies: widget.superficies,
-        paleta: widget.paleta,
-        resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
+    // Cada pieza es su propia capa de dibujo.
+    //
+    // El diagrama tiene entre 32 y 52 piezas y todas comparten padre. Sin esta
+    // frontera, pasar el ratón por un molar invalida la capa entera y obliga a
+    // repintar la boca completa —52 `CustomPaint` con sus contornos, tinciones
+    // y símbolos— para cambiar el resalte de un solo diente. Con la frontera,
+    // el repintado se queda en la pieza que cambió.
+    Widget pieza = RepaintBoundary(
+      child: CustomPaint(
+        size: Size.square(widget.lado),
+        painter: GlifoPiezaPainter(
+          glifo: widget.glifo,
+          hallazgos: widget.hallazgos,
+          superficies: widget.superficies,
+          paleta: widget.paleta,
+          resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
+        ),
       ),
     );
 

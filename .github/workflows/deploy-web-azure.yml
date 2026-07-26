@@ -1,0 +1,94 @@
+name: Desplegar web (Azure Static Web Apps)
+
+# SD-132. Despliega `build/web` en Azure Static Web Apps, que sirve los
+# ficheros ya comprimidos con brotli desde su CDN. Es la pieza que convierte
+# los 5115 KiB de `main.dart.js` en ~1095 KiB reales de descarga; ver
+# PERFORMANCE.md §4.
+#
+# REQUISITO ANTES DE QUE ESTO FUNCIONE:
+#   El secreto `AZURE_STATIC_WEB_APPS_API_TOKEN` tiene que existir en
+#   Settings → Secrets and variables → Actions. Se obtiene del recurso de
+#   Azure Static Web Apps (portal → Manage deployment token). Crear secretos
+#   requiere permiso de admin en el repositorio.
+#
+# Mientras el secreto no exista, el workflow se salta solo en vez de fallar:
+# un despliegue roto no debe teñir de rojo el CI de todos.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: 3.44.1
+
+jobs:
+  desplegar:
+    name: Construir y desplegar
+    # `closed` se maneja en el job de abajo; aquí solo lo que hay que publicar.
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que hay token
+        id: token
+        run: |
+          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
+            echo "::warning::Falta AZURE_STATIC_WEB_APPS_API_TOKEN; no se despliega."
+            echo "hay=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: subosito/flutter-action@v2
+        if: steps.token.outputs.hay == 'true'
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Construir
+        if: steps.token.outputs.hay == 'true'
+        run: |
+          flutter pub get
+          flutter build web --release
+          # La config de rutas, cabeceras y MIME viaja junto al build.
+          cp staticwebapp.config.json build/web/
+
+      - name: Desplegar
+        if: steps.token.outputs.hay == 'true'
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          # El build ya está hecho arriba: Oryx no sabe compilar Flutter.
+          app_location: build/web
+          skip_app_build: true
+          skip_api_build: true
+
+  cerrar_entorno_de_pr:
+    name: Retirar el entorno del PR
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      # El mismo guardia que arriba: sin token no hay nada que cerrar, y la
+      # acción de Azure fallaría con un token vacío.
+      - name: Comprobar que hay token
+        id: token
+        run: |
+          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
+            echo "hay=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cerrar
+        if: steps.token.outputs.hay == 'true'
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close

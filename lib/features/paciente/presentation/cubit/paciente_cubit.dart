@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -55,17 +55,14 @@ class PacienteCubit extends Cubit<PacienteState> {
 
     return result.fold(
       (failure) {
-        print("connection error");
         emit(PacienteError(failure.message));
         return false;
       },
       (success) {
         if (!success) {
-          print("Si es paciente");
           emit(PacienteOperationSuccess());
           return true;
         } else {
-          print("no es paciente");
           emit(PacienteError('El paciente es nuevo, requiere registro.'));
           return false;
         }
@@ -83,9 +80,7 @@ class PacienteCubit extends Cubit<PacienteState> {
         await _consultaRepository.getHistorialPaciente(pacienteId),
       );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('No se pudo cargar el historial de $pacienteId: $e');
-      }
+      AppLog.error('historial de $pacienteId', e);
       return const _Historial(const [], fallo: true);
     }
   }

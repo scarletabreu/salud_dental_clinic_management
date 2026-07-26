@@ -236,12 +236,15 @@ class _ResumenJornadaCard extends StatelessWidget {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Estado Operativo de Hoy',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: ac.textPrimary,
+              Expanded(
+                child: Text(
+                  'Estado Operativo de Hoy',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: ac.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -270,33 +273,41 @@ class _ResumenJornadaCard extends StatelessWidget {
                 ),
               ),
               if (loaded.citasEnEspera > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ac.amber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.hourglass_empty_rounded,
-                        size: 14,
-                        color: ac.amber,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${loaded.citasEnEspera} en espera',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                // La insignia era rígida: con el texto ampliado empujaba a la
+                // columna de progreso fuera de la tarjeta. `Flexible` deja que
+                // se recorte ella en vez de romper la fila.
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ac.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.hourglass_empty_rounded,
+                          size: 14,
                           color: ac.amber,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${loaded.citasEnEspera} en espera',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: ac.amber,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -697,12 +708,18 @@ class _PieCardState extends State<_PieCard> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                Text(
-                                  '${s.value} ($pct%)',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: ac.textPrimary,
+                                // La cifra era el único hijo rígido de la fila:
+                                // con el texto ampliado se salía 61 px de la
+                                // leyenda del gráfico.
+                                Flexible(
+                                  child: Text(
+                                    '${s.value} ($pct%)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: ac.textPrimary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],

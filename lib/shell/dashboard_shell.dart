@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -21,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/pa
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
+import 'package:salud_dental_clinic_management/shell/lazy_destination_stack.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
@@ -58,7 +60,14 @@ class _DashboardShellView extends StatefulWidget {
 }
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
-  int _selectedIndex = 0;
+  /// La selección se guarda por etiqueta, no por índice.
+  ///
+  /// La lista visible depende de los roles y puede encogerse en caliente. Con
+  /// un índice, perder un permiso movía al usuario a *otra* pantalla —o lo
+  /// tiraba a «Inicio»— porque el número seguía siendo válido pero ya no
+  /// apuntaba a lo mismo. Con la etiqueta, si el destino sigue permitido el
+  /// usuario se queda donde estaba.
+  String _selectedLabel = 'Inicio';
 
   final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
 
@@ -222,12 +231,35 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     ),
   ];
 
-  List<ShellDestination> _visibleDestinations = [];
+  List<ShellDestination> _visibleDestinations = const [];
+
+  /// Roles con los que se calculó [_visibleDestinations].
+  List<RolUsuario>? _rolesResueltos;
+
+  /// Filtrar por permisos es barato, pero devolver una lista *nueva* en cada
+  /// build no lo es: obliga al rail y a la barra inferior a reconstruir todos
+  /// sus items en cada frame aunque nada haya cambiado. Memorizar la lista
+  /// mantiene la identidad estable y los deja quietos.
+  List<ShellDestination> _destinosPara(List<RolUsuario> roles) {
+    if (_rolesResueltos != null && listEquals(_rolesResueltos, roles)) {
+      return _visibleDestinations;
+    }
+    _rolesResueltos = List<RolUsuario>.unmodifiable(roles);
+    _visibleDestinations = List<ShellDestination>.unmodifiable(
+      _allDestinations.where(
+        (destination) => ShellDestinationAccess.allows(destination.label, roles),
+      ),
+    );
+    return _visibleDestinations;
+  }
 
   void _onDestinationSelected(int index) {
-    if (_selectedIndex == index) return;
-    setState(() => _selectedIndex = index);
-    if (_visibleDestinations[index].label == 'Consultas') {
+    final destinos = _visibleDestinations;
+    if (index < 0 || index >= destinos.length) return;
+    final label = destinos[index].label;
+    if (_selectedLabel == label) return;
+    setState(() => _selectedLabel = label);
+    if (label == 'Consultas') {
       _consultasListCubit.recargar();
     }
   }
@@ -241,40 +273,33 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
 
-    _visibleDestinations = _allDestinations
-        .where(
-          (destination) =>
-              ShellDestinationAccess.allows(destination.label, roles),
-        )
-        .toList();
+    final destinos = _destinosPara(roles);
 
-    if (_selectedIndex >= _visibleDestinations.length) {
-      _selectedIndex = 0;
-    }
+    // Derivado, nunca asignado durante el build: si la pantalla actual dejó de
+    // estar permitida se cae a la primera disponible sin tocar estado.
+    var selectedIndex = destinos.indexWhere((d) => d.label == _selectedLabel);
+    if (selectedIndex == -1) selectedIndex = 0;
 
     final mediaQuery = MediaQuery.of(context);
     final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (_visibleDestinations.isEmpty) {
+    if (destinos.isEmpty) {
       return Scaffold(
         backgroundColor: colorScheme.surfaceContainerLowest,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    final selectedDestination = _visibleDestinations[_selectedIndex];
-    final content = KeyedSubtree(
-      key: ValueKey(selectedDestination.label),
-      child: Builder(builder: selectedDestination.builder),
+    final content = LazyDestinationStack(
+      destinations: destinos,
+      selectedIndex: selectedIndex,
     );
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: ShellAppBar(
-        sectionTitle: _visibleDestinations.isNotEmpty
-            ? _visibleDestinations[_selectedIndex].label
-            : '',
+        sectionTitle: destinos[selectedIndex].label,
         compact:
             layout.usesBottomNavigation || mediaQuery.viewInsets.bottom > 0,
       ),
@@ -295,8 +320,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
                         children: [
                           _SideRail(
                             extended: layout.usesExtendedRail,
-                            destinations: _visibleDestinations,
-                            selectedIndex: _selectedIndex,
+                            destinations: destinos,
+                            selectedIndex: selectedIndex,
                             onDestinationSelected: _onDestinationSelected,
                           ),
                           const SizedBox(width: 10),
@@ -315,8 +340,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
       bottomNavigationBar: layout.usesBottomNavigation
           ? ShellMobileNavigation(
-              destinations: _visibleDestinations,
-              selectedIndex: _selectedIndex,
+              destinations: destinos,
+              selectedIndex: selectedIndex,
               onDestinationSelected: _onDestinationSelected,
             )
           : null,

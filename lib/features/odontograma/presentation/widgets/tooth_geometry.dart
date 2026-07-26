@@ -299,6 +299,30 @@ final Map<String, Path> _baseCache = {};
 Path _parseCached(String svg) =>
     _baseCache.putIfAbsent(svg, () => parseSvgPathData(svg));
 
+/// Trazos ya ajustados a un tamaño concreto, indexados por trazo y tamaño.
+///
+/// El parseo del SVG ya estaba memorizado, pero el ajuste no: `_fit` corre
+/// dentro del bucle de `paint` de la arcada, una vez por pieza y por trazo.
+/// Con 32 piezas eso son ~64 `Path` nuevos en cada repintado, y la arcada
+/// repinta entera con solo mover el ratón por encima. Como la geometría
+/// depende únicamente de la forma y del tamaño, el resultado se puede guardar.
+///
+/// La caché se mantiene acotada porque los tamaños distintos son pocos —los
+/// que produzcan los breakpoints—, pero un `LayoutBuilder` con tamaños
+/// continuos podría generar muchos: al pasarse del tope se vacía entera en vez
+/// de crecer sin límite.
+final Map<(String, Size), Path> _fittedCache = {};
+const int _maxFitted = 128;
+
+Path _fitCached(String svg, Size size) {
+  final clave = (svg, size);
+  final memorizado = _fittedCache[clave];
+  if (memorizado != null) return memorizado;
+
+  if (_fittedCache.length >= _maxFitted) _fittedCache.clear();
+  return _fittedCache[clave] = _fit(_parseCached(svg), size);
+}
+
 /// Transform a 0–100 viewBox path to a [size]-sized path centered at origin.
 Path _fit(Path base, Size size) {
   final m = Matrix4.identity()
@@ -309,7 +333,7 @@ Path _fit(Path base, Size size) {
 
 /// Tooth outline path, centered at (0,0), sized to [size].
 Path buildToothPath(ToothType type, Size size) {
-  return _fit(_parseCached(_shapeSvgFor(type)), size);
+  return _fitCached(_shapeSvgFor(type), size);
 }
 
 /// Occlusal groove path for [type], or null if the tooth has no groove
@@ -322,7 +346,7 @@ Path? buildGroovePath(ToothType type, Size size, {required bool upper}) {
     ToothType.incisor || ToothType.canine => null,
   };
   if (svg == null) return null;
-  return _fit(_parseCached(svg), size);
+  return _fitCached(svg, size);
 }
 
 // ─────────────────────────────────────────────

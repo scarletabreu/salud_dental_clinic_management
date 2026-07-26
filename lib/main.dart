@@ -39,18 +39,34 @@ class MyApp extends StatelessWidget {
         ),
       ],
 
-      child: BlocBuilder<SettingsCubit, SettingsState>(
-        builder: (context, state) {
-          return MaterialApp(
-            title: 'Salud Dental',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: state.themeMode,
-            home: const _AppRouter(),
-          );
-        },
-      ),
+      child: const _RaizConTema(),
+    );
+  }
+}
+
+/// Raíz de la interfaz. Solo se reconstruye cuando cambia el modo de tema.
+///
+/// Antes era un `BlocBuilder` sobre `SettingsState` completo, de modo que
+/// cualquier ajuste —el idioma, por ejemplo— reconstruía el `MaterialApp` y
+/// con él todo el árbol de la app. Seleccionar únicamente `themeMode` deja
+/// fuera al resto del estado: es el rebuild más caro que existe aquí y ahora
+/// solo ocurre cuando de verdad cambia lo que el `MaterialApp` usa.
+class _RaizConTema extends StatelessWidget {
+  const _RaizConTema();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeMode = context.select(
+      (SettingsCubit cubit) => cubit.state.themeMode,
+    );
+
+    return MaterialApp(
+      title: 'Salud Dental',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
+      home: const _AppRouter(),
     );
   }
 }

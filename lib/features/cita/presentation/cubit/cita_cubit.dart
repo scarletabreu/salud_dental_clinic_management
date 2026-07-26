@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
@@ -63,11 +64,10 @@ class CitaCubit extends Cubit<CitaCubitState> {
         return;
       }
 
-      print('Datos enviados a Supabase: $cita');
       await _repository.createCita(cita);
       await load();
     } catch (e) {
-      print('Error capturado en Cubit: $e');
+      AppLog.error('crearCita', e);
       if (!isClosed) {
         emit(
           current.copyWith(
@@ -169,7 +169,6 @@ class CitaCubit extends Cubit<CitaCubitState> {
   }
 
   Future<void> actualizarCita(Cita citaActualizada) async {
-    print("ACTUALIZAR CUBIT: $hashCode");
     final current = state;
     if (current is! CitaCubitLoaded) return;
 
@@ -207,7 +206,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
         ),
       );
     } catch (e) {
-      print('Error capturado en actualizarCita: $e');
+      AppLog.error('actualizarCita', e);
       emit(
         current.copyWith(
           isSubmitting: false,

@@ -1,12 +1,20 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class SettingsState {
+/// Ajustes de la app.
+///
+/// Es [Equatable] por una razón de rendimiento, no de estilo: este estado lo
+/// escucha el `MaterialApp` de `main.dart`, que es la raíz de todo el árbol.
+/// Sin igualdad por valor, cada `emit` produce un objeto distinto y bloc
+/// reconstruye la aplicación entera —shell, pantalla activa y listas— aunque
+/// el tema no haya cambiado. Cambiar el idioma repintaba todo por nada.
+class SettingsState extends Equatable {
   final ThemeMode themeMode;
   final String languageCode;
 
-  SettingsState({required this.themeMode, required this.languageCode});
+  const SettingsState({required this.themeMode, required this.languageCode});
 
   SettingsState copyWith({ThemeMode? themeMode, String? languageCode}) {
     return SettingsState(
@@ -14,11 +22,16 @@ class SettingsState {
       languageCode: languageCode ?? this.languageCode,
     );
   }
+
+  @override
+  List<Object?> get props => [themeMode, languageCode];
 }
 
 class SettingsCubit extends Cubit<SettingsState> {
   SettingsCubit()
-    : super(SettingsState(themeMode: ThemeMode.system, languageCode: 'es')) {
+    : super(
+        const SettingsState(themeMode: ThemeMode.system, languageCode: 'es'),
+      ) {
     _loadSettings();
   }
 

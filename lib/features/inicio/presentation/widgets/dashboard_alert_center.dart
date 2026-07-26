@@ -39,12 +39,29 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
   @override
   void initState() {
     super.initState();
-    // AÑADIDO: pulso sutil en el indicador cuando hay alertas críticas,
-    // para que el panel se note de un vistazo sin depender solo del color.
+    // Pulso sutil en el indicador cuando hay alertas críticas, para que el
+    // panel se note de un vistazo sin depender solo del color.
     _pulso = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+  }
+
+  /// Arranca o detiene el pulso según haga falta.
+  ///
+  /// SD-132: antes el controlador hacía `repeat()` en `initState` y no paraba
+  /// nunca. El punto solo se dibuja si hay alertas críticas, pero el
+  /// controlador seguía pidiendo un frame cada 16 ms toda la sesión —con el
+  /// inicio abierto o retenido en segundo plano—, gastando batería por un
+  /// dibujo que nadie estaba viendo. Y como no cesaba, `pumpAndSettle` nunca
+  /// terminaba: las pruebas del inicio no podían pasar de ahí.
+  void _sincronizarPulso(bool hayCriticas) {
+    if (hayCriticas) {
+      if (!_pulso.isAnimating) _pulso.repeat(reverse: true);
+    } else if (_pulso.isAnimating) {
+      _pulso.stop();
+      _pulso.value = 0;
+    }
   }
 
   @override
@@ -67,6 +84,7 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
     final hayCriticas = visibles.any(
       (a) => a.severidad == SeveridadAlerta.critica,
     );
+    _sincronizarPulso(hayCriticas);
     final colorPrincipal = visibles.isEmpty
         ? ac.textSecondary
         : _colorSeveridadMasAlta(visibles, ac);
@@ -99,24 +117,31 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
             child: Row(
               children: [
                 if (hayCriticas)
-                  AnimatedBuilder(
-                    animation: _pulso,
-                    builder: (context, _) => Container(
-                      width: 10,
-                      height: 10,
-                      margin: const EdgeInsets.only(right: 9),
-                      decoration: BoxDecoration(
-                        color: ac.red.withValues(
-                          alpha: 0.45 + (_pulso.value * 0.55),
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: ac.red.withValues(alpha: 0.5 * _pulso.value),
-                            blurRadius: 8,
-                            spreadRadius: 1.5,
+                  // El punto se redibuja 60 veces por segundo. Sin frontera,
+                  // arrastra en cada frame a la cabecera entera: título,
+                  // contador y el borde con sombra de la tarjeta.
+                  RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: _pulso,
+                      builder: (context, _) => Container(
+                        width: 10,
+                        height: 10,
+                        margin: const EdgeInsets.only(right: 9),
+                        decoration: BoxDecoration(
+                          color: ac.red.withValues(
+                            alpha: 0.45 + (_pulso.value * 0.55),
                           ),
-                        ],
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: ac.red.withValues(
+                                alpha: 0.5 * _pulso.value,
+                              ),
+                              blurRadius: 8,
+                              spreadRadius: 1.5,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   )
@@ -127,15 +152,22 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
                     color: visibles.isEmpty ? ac.textPrimary : colorPrincipal,
                   ),
                 const SizedBox(width: 8),
-                Text(
-                  'Centro de Alertas',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: ac.textPrimary,
+                // `Expanded` hace el trabajo del `Spacer` que había aquí y
+                // además cede espacio: con el título fijo, a 320 px o con el
+                // texto ampliado la fila se salía 45 px y el contador quedaba
+                // fuera de pantalla.
+                Expanded(
+                  child: Text(
+                    'Centro de Alertas',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: ac.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 if (visibles.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(

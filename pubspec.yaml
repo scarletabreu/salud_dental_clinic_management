@@ -31,9 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  # SD-132: `cupertino_icons` venía de la plantilla de Flutter y no se usaba en
+  # ninguna pantalla —la app es Material de principio a fin—, pero su fuente
+  # (257 KiB) se empaquetaba en cada APK y en cada build web. Si algún día se
+  # usan iconos de iOS, hay que volver a añadirlo.
   dartz: ^0.10.1
   equatable: ^2.0.8
   supabase_flutter: ^2.12.2

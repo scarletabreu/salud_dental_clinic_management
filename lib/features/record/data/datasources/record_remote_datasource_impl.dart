@@ -58,13 +58,10 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
 
   @override
   Future<String> getOrCreateRecordId(String pacienteId) async {
-    print('DEBUG getOrCreateRecordId START pacienteId=$pacienteId');
     final existente = await fetchRecordId(pacienteId);
-    print('DEBUG fetchRecordId existente=$existente');
     if (existente != null) return existente;
 
     final now = DateTime.now().toIso8601String();
-    print('DEBUG creando nueva fila records');
     final creado = await supabaseClient
         .from('records')
         .insert({
@@ -75,7 +72,6 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
         })
         .select('id')
         .single();
-    print('DEBUG creado id=${creado['id']}');
     return creado['id'] as String;
   }
 

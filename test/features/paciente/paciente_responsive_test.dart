@@ -5,6 +5,8 @@ import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_state.dart';
@@ -18,6 +20,8 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/admin.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
@@ -34,6 +38,13 @@ class _PacienteCubitDoble extends Cubit<PacienteState>
 
   @override
   Future<void> loadById(String id) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+class _AuthCubitDoble extends Cubit<AuthState> implements AuthCubit {
+  _AuthCubitDoble(super.initialState);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -160,20 +171,59 @@ void _registrarCondiciones() {
   );
 }
 
-Widget _app(Widget pagina, PacienteState estado, {double textScale = 1}) =>
-    MaterialApp(
-      theme: AppTheme.light,
-      builder: (context, inner) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(textScale)),
-        child: inner!,
+AuthState _authState({bool asistente = false}) => AuthState(
+  isAuthenticated: true,
+  usuario: asistente
+      ? Asistente(
+          id: 'asistente-1',
+          nombre: 'Ana',
+          apellido: 'Asistente',
+          birthDate: DateTime(1990),
+          govID: '001',
+          contactos: const [],
+          estatus: EstatusPersona.activo,
+          username: 'asistente',
+          passwordHash: '',
+          shift: 'matutino',
+        )
+      : Admin(
+          id: 'admin-1',
+          nombre: 'Ada',
+          apellido: 'Admin',
+          birthDate: DateTime(1990),
+          govID: '002',
+          contactos: const [],
+          estatus: EstatusPersona.activo,
+          username: 'admin',
+          passwordHash: '',
+          departamento: 'Clinica',
+        ),
+);
+
+Widget _app(
+  Widget pagina,
+  PacienteState estado, {
+  double textScale = 1,
+  AuthState? authState,
+}) => MaterialApp(
+  key: ValueKey(authState?.rol),
+  theme: AppTheme.light,
+  builder: (context, inner) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    child: inner!,
+  ),
+  home: MultiBlocProvider(
+    providers: [
+      BlocProvider<PacienteCubit>(create: (_) => _PacienteCubitDoble(estado)),
+      BlocProvider<AuthCubit>(
+        create: (_) => _AuthCubitDoble(authState ?? _authState()),
       ),
-      home: BlocProvider<PacienteCubit>(
-        create: (_) => _PacienteCubitDoble(estado),
-        child: pagina,
-      ),
-    );
+    ],
+    child: pagina,
+  ),
+);
 
 void _viewport(WidgetTester tester, Size tamano) {
   tester.view.physicalSize = tamano;
@@ -281,6 +331,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('solo roles clínicos pueden exportar el expediente', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(900, 900));
+    final estado = PacienteDetailLoaded(_paciente());
+
+    await tester.pumpWidget(
+      _app(
+        const PacienteDetailPage(pacienteId: _pacienteId),
+        estado,
+        authState: _authState(asistente: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('exportar_expediente_button')), findsNothing);
+
+    await tester.pumpWidget(
+      _app(
+        const PacienteDetailPage(pacienteId: _pacienteId),
+        estado,
+        authState: _authState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('exportar_expediente_button')), findsOneWidget);
+  });
+
+  testWidgets('no genera un expediente incompleto si falla el historial', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(900, 900));
+    await tester.pumpWidget(
+      _app(
+        const PacienteDetailPage(pacienteId: _pacienteId),
+        PacienteDetailLoaded(_paciente(), historialNoDisponible: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('exportar_expediente_button')));
+    await tester.pump();
+
+    expect(
+      find.textContaining('el historial clínico no está disponible'),
+      findsOneWidget,
+    );
+    expect(find.text('Generar Expediente Clínico'), findsNothing);
   });
 
   _viewports.forEach((nombre, tamano) {

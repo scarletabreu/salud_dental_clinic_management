@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
@@ -47,24 +46,11 @@ class GenerarExpedienteModal extends StatefulWidget {
   State<GenerarExpedienteModal> createState() => _GenerarExpedienteModalState();
 }
 
-enum TipoOdontogramaImpresion {
-  consolidadoHistorico,
-  consultaEspecifica,
-  sinOdontograma,
-}
+enum TipoExpedienteImpresion { conOdontograma, sinOdontograma }
 
 class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
-  TipoOdontogramaImpresion _opcionSeleccionada =
-      TipoOdontogramaImpresion.consolidadoHistorico;
-  Consulta? _consultaSeleccionada;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.consultasConOdontograma.isNotEmpty) {
-      _consultaSeleccionada = widget.consultasConOdontograma.first;
-    }
-  }
+  TipoExpedienteImpresion _opcionSeleccionada =
+      TipoExpedienteImpresion.conOdontograma;
 
   @override
   Widget build(BuildContext context) {
@@ -154,79 +140,33 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
               child: Column(
                 children: [
                   _OptionTile(
-                    titulo: 'Odontograma Histórico Consolidado',
+                    key: const Key('expediente_con_odontograma'),
+                    titulo: 'Expediente con odontograma',
                     subtitulo:
-                        'Acumula todos los hallazgos y tratamientos hechos al paciente',
+                        'Incluye el odontograma clínico consolidado del paciente',
                     icono: Icons.layers_rounded,
                     selected:
                         _opcionSeleccionada ==
-                        TipoOdontogramaImpresion.consolidadoHistorico,
+                        TipoExpedienteImpresion.conOdontograma,
                     onTap: () => setState(
                       () => _opcionSeleccionada =
-                          TipoOdontogramaImpresion.consolidadoHistorico,
+                          TipoExpedienteImpresion.conOdontograma,
                     ),
                     ac: ac,
                   ),
                   const SizedBox(height: 10),
                   _OptionTile(
-                    titulo: 'Odontograma de una Consulta Específica',
+                    key: const Key('expediente_sin_odontograma'),
+                    titulo: 'Expediente sin odontograma',
                     subtitulo:
-                        'Imprime únicamente el estado registrado en una fecha concreta',
-                    icono: Icons.event_note_rounded,
-                    selected:
-                        _opcionSeleccionada ==
-                        TipoOdontogramaImpresion.consultaEspecifica,
-                    onTap: () => setState(
-                      () => _opcionSeleccionada =
-                          TipoOdontogramaImpresion.consultaEspecifica,
-                    ),
-                    ac: ac,
-                  ),
-                  if (_opcionSeleccionada ==
-                          TipoOdontogramaImpresion.consultaEspecifica &&
-                      widget.consultasConOdontograma.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ac.cardBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: ac.primaryBlue),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<Consulta>(
-                          value: _consultaSeleccionada,
-                          isExpanded: true,
-                          items: widget.consultasConOdontograma.map((c) {
-                            return DropdownMenuItem<Consulta>(
-                              value: c,
-                              child: Text(
-                                'Consulta del ${fechaLargaEs(c.fecha)}',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) =>
-                              setState(() => _consultaSeleccionada = val),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  _OptionTile(
-                    titulo: 'Sin Odontograma',
-                    subtitulo:
-                        'Imprime solo datos del paciente, antecedentes e historial',
+                        'Incluye todos los datos clínicos, sin el diagrama dental',
                     icono: Icons.description_rounded,
                     selected:
                         _opcionSeleccionada ==
-                        TipoOdontogramaImpresion.sinOdontograma,
+                        TipoExpedienteImpresion.sinOdontograma,
                     onTap: () => setState(
                       () => _opcionSeleccionada =
-                          TipoOdontogramaImpresion.sinOdontograma,
+                          TipoExpedienteImpresion.sinOdontograma,
                     ),
                     ac: ac,
                   ),
@@ -266,6 +206,7 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                         navigator.pop();
                         _abrirPrevisualizacion(navigator);
                       },
+                      key: const Key('generar_expediente_pdf'),
                       icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
                       label: const Text('Generar PDF'),
                     ),
@@ -281,25 +222,16 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
 
   void _abrirPrevisualizacion(NavigatorState navigator) {
     final incluirOdontograma =
-        _opcionSeleccionada != TipoOdontogramaImpresion.sinOdontograma;
+        _opcionSeleccionada == TipoExpedienteImpresion.conOdontograma;
 
-    final odontogramaIndividual =
-        _opcionSeleccionada == TipoOdontogramaImpresion.consultaEspecifica
-        ? _consultaSeleccionada?.odontograma
-        : widget.odontogramaActual;
-
-    final historialOdontogramas =
-        _opcionSeleccionada == TipoOdontogramaImpresion.consolidadoHistorico
+    final historialOdontogramas = incluirOdontograma
         ? widget.consultasConOdontograma
               .map((c) => c.odontograma)
               .whereType<Odontograma>()
               .toList()
         : const <Odontograma>[];
 
-    final hp =
-        _opcionSeleccionada == TipoOdontogramaImpresion.consolidadoHistorico
-        ? widget.historialPiezas
-        : null;
+    final hp = incluirOdontograma ? widget.historialPiezas : null;
 
     final options = ExpedientePrintOptions(
       incluirOdontograma: incluirOdontograma,
@@ -319,7 +251,7 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
             build: (format) => ExpedientePdfBuilder.buildPdf(
               paciente: widget.paciente,
               options: options,
-              odontograma: odontogramaIndividual,
+              odontograma: incluirOdontograma ? widget.odontogramaActual : null,
               historialOdontogramas: historialOdontogramas,
               historialPiezas: hp,
             ),
@@ -342,6 +274,7 @@ class _OptionTile extends StatelessWidget {
   final AppColors ac;
 
   const _OptionTile({
+    super.key,
     required this.titulo,
     required this.subtitulo,
     required this.icono,

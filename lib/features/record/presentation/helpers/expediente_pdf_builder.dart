@@ -1,12 +1,17 @@
 import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/record_condicion.dart';
+import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/expediente_print_options.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 class _Brand {
   static const primary = PdfColor.fromInt(0xFF2563EB);
@@ -25,24 +30,41 @@ class ExpedientePdfBuilder {
     required ExpedientePrintOptions options,
     Odontograma? odontograma,
     List<Odontograma> historialOdontogramas = const [],
-    List<dynamic> evaluaciones = const [],
-    List<dynamic> tratamientos = const [],
-    List<dynamic> recetas = const [],
     HistorialPiezas? historialPiezas,
+    DateTime? generadoEn,
+    pw.ThemeData? theme,
+    bool compress = true,
   }) async {
-    final theme = pw.ThemeData.withFont(
-      base: await PdfGoogleFonts.openSansRegular(),
-      bold: await PdfGoogleFonts.openSansBold(),
-    );
+    final documentTheme =
+        theme ??
+        pw.ThemeData.withFont(
+          base: pw.Font.helvetica(),
+          bold: pw.Font.helveticaBold(),
+        );
 
-    final pdf = pw.Document(theme: theme);
-    final now = DateTime.now();
+    final pdf = pw.Document(
+      theme: documentTheme,
+      compress: compress,
+      title: 'Expediente clínico de ${paciente.nombre} ${paciente.apellido}',
+      author: 'Salud Dental',
+      subject: 'Expediente médico',
+    );
+    final now = generadoEn ?? DateTime.now();
     final fechaGeneracion = fechaLargaEs(now);
     final record = paciente.record;
+    final consultas = [...record.consultas]
+      ..sort((a, b) => b.fecha.compareTo(a.fecha));
+    final evaluaciones = consultas
+        .where((c) => c.tipoAtencion == TipoAtencionClinica.evaluacion)
+        .toList();
+    final consultasClinicas = consultas
+        .where((c) => c.tipoAtencion == TipoAtencionClinica.consulta)
+        .toList();
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.letter,
+        maxPages: 1000,
         margin: const pw.EdgeInsets.fromLTRB(32, 0, 32, 28),
         header: (context) => _buildHeader(
           paciente,
@@ -59,7 +81,7 @@ class ExpedientePdfBuilder {
           _buildSeccionRecordClinico(paciente),
           pw.SizedBox(height: 10),
 
-          _buildSeccionCondiciones(paciente),
+          ..._buildSeccionCondiciones(paciente),
           pw.SizedBox(height: 10),
 
           if (options.incluirOdontograma) ...[
@@ -71,21 +93,31 @@ class ExpedientePdfBuilder {
             pw.SizedBox(height: 10),
           ],
 
-          if (options.incluirConsultas && record.consultas.isNotEmpty) ...[
-            _buildSeccionConsultas(paciente),
+          if (options.incluirEvaluaciones && evaluaciones.isNotEmpty) ...[
+            ..._buildSeccionEvaluaciones(evaluaciones),
             pw.SizedBox(height: 10),
           ],
 
-          if (options.incluirEvaluaciones && evaluaciones.isNotEmpty) ...[
-            _buildSeccionEvaluaciones(evaluaciones),
+          if (options.incluirConsultas && consultasClinicas.isNotEmpty) ...[
+            ..._buildSeccionConsultas(consultasClinicas),
             pw.SizedBox(height: 10),
           ],
-          if (options.incluirTratamientos && tratamientos.isNotEmpty) ...[
-            _buildSeccionTratamientos(tratamientos),
+
+          if (options.incluirTratamientos &&
+              _tratamientosDe(consultas).isNotEmpty) ...[
+            ..._buildSeccionTratamientos(consultas),
             pw.SizedBox(height: 10),
           ],
-          if (options.incluirRecetas && recetas.isNotEmpty) ...[
-            _buildSeccionRecetas(recetas),
+
+          if (options.incluirRecetas &&
+              consultas.any((c) => c.recetas.isNotEmpty)) ...[
+            ..._buildSeccionRecetas(consultas),
+            pw.SizedBox(height: 10),
+          ],
+
+          if (options.incluirDocumentosReferenciados &&
+              consultas.any((c) => c.documentosClinicos.isNotEmpty)) ...[
+            ..._buildSeccionDocumentos(consultas),
           ],
         ],
       ),
@@ -479,53 +511,90 @@ class ExpedientePdfBuilder {
     );
   }
 
-  static pw.Widget _buildSeccionCondiciones(Paciente p) {
+  static List<pw.Widget> _buildSeccionCondiciones(Paciente p) {
     final condiciones = p.record.conditions;
+    final detalles = p.record.detallesCondiciones;
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(10),
-      decoration: _cardDecoration(),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          _sectionTitle('3', 'CONDICIONES MÉDICAS Y ALERGIAS'),
-          pw.SizedBox(height: 8),
-          if (condiciones.isEmpty)
-            pw.Text(
-              'Sin condiciones médicas registradas.',
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
-            )
-          else
-            pw.Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: condiciones
-                  .map(
-                    (c) => pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: pw.BoxDecoration(
-                        color: _Brand.accentSoft,
-                        borderRadius: pw.BorderRadius.circular(8),
-                        border: pw.Border.all(color: _Brand.accent, width: 0.6),
-                      ),
-                      child: pw.Text(
-                        c.nombre,
-                        style: pw.TextStyle(
-                          fontSize: 7.5,
-                          color: _Brand.primaryDark,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-        ],
+    return [
+      pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: _cardDecoration(),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('3', 'CONDICIONES MÉDICAS Y ALERGIAS'),
+            if (condiciones.isEmpty) ...[
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'Sin condiciones médicas registradas.',
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey700,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-    );
+      if (condiciones.isNotEmpty) pw.SizedBox(height: 4),
+      for (final condicion in condiciones)
+        ..._clinicalCards(
+          condicion.nombre,
+          _textoDetalleDe(condicion.id, detalles),
+        ),
+    ];
+  }
+
+  static String _textoDetalleDe(
+    String? condicionId,
+    List<RecordCondicion> detalles,
+  ) {
+    final detalle = _detalleDe(condicionId, detalles);
+    return detalle == null
+        ? 'Sin indicaciones adicionales registradas.'
+        : _textoDetalleCondicion(detalle);
+  }
+
+  static RecordCondicion? _detalleDe(
+    String? condicionId,
+    List<RecordCondicion> detalles,
+  ) {
+    if (condicionId == null) return null;
+    for (final detalle in detalles) {
+      if (detalle.condicionId == condicionId) return detalle;
+    }
+    return null;
+  }
+
+  static String _textoDetalleCondicion(RecordCondicion detalle) {
+    final partes = <String>[];
+    if (detalle.activo == false) partes.add('Estado: inactiva');
+    final fechaDeteccion = detalle.fechaDeteccion;
+    if (fechaDeteccion != null) {
+      partes.add('Detectada: ${fechaLargaEs(fechaDeteccion)}');
+    }
+    final medicamento = (detalle.medicamento ?? '').trim();
+    final dosis = (detalle.dosis ?? '').trim();
+    final frecuencia = (detalle.frecuencia ?? '').trim();
+    if (medicamento.isNotEmpty) {
+      final pauta = [dosis, frecuencia].where((e) => e.isNotEmpty).join(' · ');
+      partes.add(
+        'Medicamento/indicación: $medicamento${pauta.isEmpty ? '' : ' ($pauta)'}',
+      );
+    }
+    final medico = (detalle.medicoTratante ?? '').trim();
+    final contacto = (detalle.contactoMedico ?? '').trim();
+    if (medico.isNotEmpty || contacto.isNotEmpty) {
+      partes.add(
+        'Médico tratante: ${medico.isEmpty ? 'No indicado' : medico}'
+        '${contacto.isEmpty ? '' : ' · $contacto'}',
+      );
+    }
+    final notas = (detalle.notas ?? '').trim();
+    if (notas.isNotEmpty) partes.add('Indicaciones/notas: $notas');
+    return partes.isEmpty
+        ? 'Sin indicaciones adicionales registradas.'
+        : partes.join('\n');
   }
 
   static pw.Widget _buildSeccionOdontodiagramaOficial(
@@ -726,7 +795,6 @@ class ExpedientePdfBuilder {
     }
 
     for (final o in lista) {
-      if (o == null) continue;
       final oMap = _objToMap(o);
       if (oMap == null) continue;
 
@@ -764,8 +832,9 @@ class ExpedientePdfBuilder {
     if (diagnosticos is Iterable) {
       for (final d in diagnosticos) {
         final dMap = _objToMap(d);
-        if (dMap != null)
+        if (dMap != null) {
           _procesarHallazgoRelacional(dMap, res, esDiagnostico: true);
+        }
       }
     }
 
@@ -773,8 +842,9 @@ class ExpedientePdfBuilder {
     if (tratamientos is Iterable) {
       for (final t in tratamientos) {
         final tMap = _objToMap(t);
-        if (tMap != null)
+        if (tMap != null) {
           _procesarHallazgoRelacional(tMap, res, esDiagnostico: false);
+        }
       }
     }
   }
@@ -845,24 +915,25 @@ class ExpedientePdfBuilder {
     }
 
     if (col != PdfColors.white) {
-      if (k.contains('vest') || k == 'v' || k == 'top')
+      if (k.contains('vest') || k == 'v' || k == 'top') {
         res.superficies['vestibular'] = col;
-      else if (k.contains('ling') ||
+      } else if (k.contains('ling') ||
           k.contains('palat') ||
           k == 'l' ||
           k == 'p' ||
-          k == 'bottom')
+          k == 'bottom') {
         res.superficies['lingual'] = col;
-      else if (k.contains('mes') || k == 'm' || k == 'left')
+      } else if (k.contains('mes') || k == 'm' || k == 'left') {
         res.superficies['mesial'] = col;
-      else if (k.contains('dist') || k == 'd' || k == 'right')
+      } else if (k.contains('dist') || k == 'd' || k == 'right') {
         res.superficies['distal'] = col;
-      else if (k.contains('ocl') ||
+      } else if (k.contains('ocl') ||
           k.contains('inc') ||
           k == 'o' ||
           k == 'i' ||
-          k == 'center')
+          k == 'center') {
         res.superficies['oclusal'] = col;
+      }
     }
   }
 
@@ -1209,7 +1280,7 @@ class ExpedientePdfBuilder {
               final textoValor =
                   (valorEncontrado != null && valorEncontrado.trim().isNotEmpty)
                   ? valorEncontrado
-                  : '—';
+                  : '-';
               final esUltimo = idx == listaTejidos.length - 1;
 
               return pw.TableRow(
@@ -1248,10 +1319,10 @@ class ExpedientePdfBuilder {
                       textoValor,
                       style: pw.TextStyle(
                         fontSize: 8,
-                        fontStyle: textoValor == '—'
+                        fontStyle: textoValor == '-'
                             ? pw.FontStyle.italic
                             : pw.FontStyle.normal,
-                        color: textoValor == '—'
+                        color: textoValor == '-'
                             ? PdfColors.grey600
                             : _Brand.ink,
                       ),
@@ -1266,282 +1337,311 @@ class ExpedientePdfBuilder {
     );
   }
 
-  static pw.Widget _buildSeccionConsultas(Paciente p) {
-    final consultas = p.record.consultas;
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 10),
-          decoration: const pw.BoxDecoration(
-            borderRadius: pw.BorderRadius.vertical(top: pw.Radius.circular(8)),
-            color: _Brand.primary,
-          ),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Row(
-                children: [
-                  _toothBadge(
-                    size: 16,
-                    bg: PdfColors.white,
-                    tooth: _Brand.primary,
-                  ),
-                  pw.SizedBox(width: 6),
-                  pw.Text(
-                    'HISTORIAL DE CONSULTAS Y CITAS',
-                    style: pw.TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
+  static List<pw.Widget> _buildSeccionConsultas(List<Consulta> consultas) => [
+    _clinicalSectionHeader('CONSULTAS CLÍNICAS', consultas.length),
+    pw.SizedBox(height: 4),
+    for (final consulta in consultas)
+      ..._clinicalCards(
+        '${fechaLargaEs(consulta.fecha)} · ${_referenciaConsulta(consulta)} · '
+        '${consulta.finalizada ? 'Finalizada' : 'En proceso'}',
+        [
+          if (_textoNoVacio(consulta.motivoConsulta) case final motivo?)
+            'Motivo: $motivo',
+          if (_textoNoVacio(consulta.notas) case final notas?) 'Notas: $notas',
+          if (consulta.tempCondiciones.isNotEmpty)
+            'Indicaciones/condiciones del día: ${consulta.tempCondiciones.join(', ')}',
+          if (_signosVitales(consulta) case final signos?)
+            'Signos vitales: $signos',
+          if (_textoNoVacio(consulta.motivoConsulta) == null &&
+              _textoNoVacio(consulta.notas) == null &&
+              consulta.tempCondiciones.isEmpty &&
+              _signosVitales(consulta) == null)
+            'Sin notas clínicas.',
+        ].join('\n'),
+      ),
+  ];
+
+  static pw.Widget _clinicalSectionHeader(String titulo, int cantidad) =>
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 10),
+        decoration: const pw.BoxDecoration(
+          borderRadius: pw.BorderRadius.vertical(top: pw.Radius.circular(8)),
+          color: _Brand.primary,
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Row(
+              children: [
+                _toothBadge(
+                  size: 16,
+                  bg: PdfColors.white,
+                  tooth: _Brand.primary,
                 ),
-                decoration: pw.BoxDecoration(
-                  color: _Brand.primaryDark,
-                  borderRadius: pw.BorderRadius.circular(7),
-                ),
-                child: pw.Text(
-                  '${consultas.length} registro(s)',
+                pw.SizedBox(width: 6),
+                pw.Text(
+                  titulo,
                   style: pw.TextStyle(
-                    fontSize: 6.8,
+                    fontSize: 8.5,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColors.white,
+                    letterSpacing: 0.4,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-
-        pw.Table(
-          border: const pw.TableBorder(
-            left: pw.BorderSide(color: _Brand.border, width: 0.7),
-            right: pw.BorderSide(color: _Brand.border, width: 0.7),
-            bottom: pw.BorderSide(color: _Brand.border, width: 0.7),
-          ),
-          columnWidths: const {
-            0: pw.FlexColumnWidth(2.0),
-            1: pw.FlexColumnWidth(1.6),
-            2: pw.FlexColumnWidth(1.3),
-            3: pw.FlexColumnWidth(3.0),
-          },
-          children: [
-            pw.TableRow(
-              decoration: const pw.BoxDecoration(
-                color: _Brand.accentSoft,
-                border: pw.Border(
-                  bottom: pw.BorderSide(color: _Brand.border, width: 0.7),
-                ),
-              ),
-              children: [
-                _thConsulta('FECHA'),
-                _thConsulta('CÓDIGO REF.'),
-                _thConsulta('ESTADO'),
-                _thConsulta('NOTAS DE LA CONSULTA'),
               ],
             ),
-
-            ...consultas.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final c = entry.value;
-
-              final rawId = c.id ?? '';
-              final shortId = rawId.length >= 8
-                  ? '#${rawId.substring(0, 8).toUpperCase()}'
-                  : (rawId.isNotEmpty ? '#$rawId' : 'S/N');
-
-              final esUltimo = idx == consultas.length - 1;
-              final estadoStr = c.finalizada
-                  ? 'Finalizada'
-                  : (c.finalizada == false ? 'Pendiente' : 'En Proceso');
-
-              final textoNotas = (c.notas != null && c.notas!.trim().isNotEmpty)
-                  ? c.notas!.trim()
-                  : '—';
-
-              return pw.TableRow(
-                decoration: pw.BoxDecoration(
-                  color: idx % 2 == 1 ? _Brand.surface : PdfColors.white,
-                  border: esUltimo
-                      ? null
-                      : const pw.Border(
-                          bottom: pw.BorderSide(
-                            color: PdfColors.grey300,
-                            width: 0.5,
-                          ),
-                        ),
-                ),
-                children: [
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    child: pw.Text(
-                      fechaLargaEs(c.fecha),
-                      style: const pw.TextStyle(fontSize: 7.5),
-                    ),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    child: pw.Text(
-                      shortId,
-                      style: pw.TextStyle(
-                        fontSize: 7.5,
-                        fontWeight: pw.FontWeight.bold,
-                        color: _Brand.primary,
-                      ),
-                    ),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    child: _estadoBadge(estadoStr, c.finalizada),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    child: pw.Text(
-                      textoNotas,
-                      style: pw.TextStyle(
-                        fontSize: 7.5,
-                        fontStyle: textoNotas == '—'
-                            ? pw.FontStyle.italic
-                            : pw.FontStyle.normal,
-                        color: textoNotas == '—'
-                            ? PdfColors.grey600
-                            : PdfColors.black,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }),
+            pw.Text(
+              '$cantidad registro(s)',
+              style: pw.TextStyle(
+                fontSize: 6.8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+            ),
           ],
         ),
-        pw.SizedBox(height: 4),
-      ],
-    );
-  }
+      );
 
-  static pw.Widget _thConsulta(String texto) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      child: pw.Text(
-        texto,
-        style: pw.TextStyle(
-          fontSize: 7,
-          fontWeight: pw.FontWeight.bold,
-          color: _Brand.primaryDark,
-          letterSpacing: 0.3,
+  static List<pw.Widget> _buildSeccionEvaluaciones(
+    List<Consulta> evaluaciones,
+  ) {
+    final widgets = <pw.Widget>[
+      _clinicalSectionHeader('EVALUACIONES CLÍNICAS', evaluaciones.length),
+      pw.SizedBox(height: 4),
+    ];
+    for (final evaluacion in evaluaciones) {
+      final hallazgos = <String>[];
+      for (final diente
+          in evaluacion.odontograma?.dientes ?? const <Diente>[]) {
+        for (final diagnostico in diente.diagnosis) {
+          final nombre =
+              _textoNoVacio(diagnostico.nombreDiagnostico) ?? 'Diagnóstico';
+          final superficie = diagnostico.superficie == null
+              ? ''
+              : ' · ${_labelEnum(diagnostico.superficie!.name)}';
+          final notas = diagnostico.notas.trim().isEmpty
+              ? ''
+              : ' · ${diagnostico.notas.trim()}';
+          hallazgos.add(
+            'Pieza ${diente.fdiCode}: $nombre$superficie$notas'
+            '${diagnostico.estaAnulado ? ' · ANULADO' : ''}',
+          );
+        }
+      }
+      final partes = <String>[
+        if (_textoNoVacio(evaluacion.motivoConsulta) case final motivo?)
+          'Motivo: $motivo',
+        if (_textoNoVacio(evaluacion.notas) case final notas?)
+          'Resumen: $notas',
+        if (_signosVitales(evaluacion) case final signos?)
+          'Signos vitales: $signos',
+        if (hallazgos.isEmpty)
+          'Sin hallazgos odontológicos registrados.'
+        else
+          'Hallazgos:\n${hallazgos.join('\n')}',
+      ];
+      widgets.addAll(
+        _clinicalCards(
+          '${fechaLargaEs(evaluacion.fecha)} · ${_referenciaConsulta(evaluacion)}',
+          partes.join('\n'),
         ),
-      ),
-    );
+      );
+    }
+    return widgets;
   }
 
-  static pw.Widget _estadoBadge(String estado, bool? finalizada) {
-    final color = finalizada == true
-        ? PdfColors.green700
-        : (finalizada == false ? PdfColors.orange800 : _Brand.muted);
-    final bg = finalizada == true
-        ? const PdfColor.fromInt(0xFFE6F6EC)
-        : (finalizada == false
-              ? const PdfColor.fromInt(0xFFFCEFDD)
-              : _Brand.accentSoft);
+  static List<_TratamientoExpediente> _tratamientosDe(
+    List<Consulta> consultas,
+  ) {
+    final resultados = <_TratamientoExpediente>[];
+    final vistos = <String>{};
+    for (final consulta in consultas) {
+      for (final diente in consulta.odontograma?.dientes ?? const <Diente>[]) {
+        for (final tratamiento in diente.tratamientos) {
+          final clave =
+              tratamiento.id ??
+              '${consulta.id}|${diente.fdiCode}|${tratamiento.tratamientoId}|'
+                  '${tratamiento.fechaEjecucion ?? tratamiento.fechaAplicacion}';
+          if (vistos.add(clave)) {
+            resultados.add(
+              _TratamientoExpediente(consulta, diente, tratamiento),
+            );
+          }
+        }
+      }
+    }
+    return resultados;
+  }
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: pw.BoxDecoration(
-        color: bg,
-        borderRadius: pw.BorderRadius.circular(6),
-      ),
-      child: pw.Text(
-        estado,
-        style: pw.TextStyle(
-          fontSize: 6.8,
-          fontWeight: pw.FontWeight.bold,
-          color: color,
+  static List<pw.Widget> _buildSeccionTratamientos(List<Consulta> consultas) {
+    final tratamientos = _tratamientosDe(consultas);
+    return [
+      _clinicalSectionHeader('TRATAMIENTOS REALIZADOS', tratamientos.length),
+      pw.SizedBox(height: 4),
+      for (final item in tratamientos)
+        ..._clinicalCards(
+          '${fechaLargaEs(item.fecha)} · Pieza ${item.diente.fdiCode}',
+          [
+            item.tratamiento.nombreTratamiento ?? 'Tratamiento',
+            'Estado: ${item.tratamiento.estaAnulado ? 'Anulado' : _labelEnum(item.tratamiento.estado.dbValue)}',
+            if (item.tratamiento.superficie != null)
+              'Superficie: ${_labelEnum(item.tratamiento.superficie!.name)}',
+            if (_textoNoVacio(item.tratamiento.notas) case final notas?)
+              'Notas: $notas',
+            if (_textoNoVacio(item.tratamiento.justificacionNoPlanificada)
+                case final justificacion?)
+              'Justificación no planificada: $justificacion',
+            'Consulta: ${_referenciaConsulta(item.consulta)}',
+          ].join('\n'),
         ),
-      ),
-    );
+    ];
   }
 
-  static pw.Widget _buildListaSeccion(String titulo, List<dynamic> items) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(10),
-      decoration: _cardDecoration(),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
+  static List<pw.Widget> _buildSeccionRecetas(List<Consulta> consultas) {
+    final recetas = <({Consulta consulta, Receta receta})>[
+      for (final consulta in consultas)
+        for (final receta in consulta.recetas)
+          (consulta: consulta, receta: receta),
+    ];
+    return [
+      _clinicalSectionHeader('RECETAS E INDICACIONES', recetas.length),
+      pw.SizedBox(height: 4),
+      for (final item in recetas)
+        ..._clinicalCards(
+          '${fechaLargaEs(item.receta.createdAt)} · ${item.receta.title}',
+          [
+            'Dosis: ${item.receta.dosis}',
+            'Frecuencia: ${item.receta.frecuencia}',
+            'Duración: ${item.receta.duracion}',
+            'Indicaciones: ${item.receta.indicaciones}',
+            if (_textoNoVacio(item.receta.notas) case final notas?)
+              'Notas: $notas',
+            'Consulta: ${_referenciaConsulta(item.consulta)}',
+          ].join('\n'),
+        ),
+    ];
+  }
+
+  static List<pw.Widget> _buildSeccionDocumentos(List<Consulta> consultas) {
+    final documentos = [
+      for (final consulta in consultas)
+        for (final documento in consulta.documentosClinicos)
+          (consulta: consulta, documento: documento),
+    ];
+    return [
+      _clinicalSectionHeader(
+        'DOCUMENTOS CLÍNICOS REFERENCIADOS',
+        documentos.length,
+      ),
+      pw.SizedBox(height: 4),
+      for (final item in documentos)
+        ..._clinicalCards(
+          '${fechaLargaEs(item.documento.fechaCreacion)} · '
+          '${_labelEnum(item.documento.tipoDocumento.name)}',
+          [
+            item.documento.descripcion.trim().isEmpty
+                ? 'Sin descripción.'
+                : item.documento.descripcion.trim(),
+            'Consulta: ${_referenciaConsulta(item.consulta)}',
+            'Referencia interna: ${_referenciaDocumento(item.documento.id)}',
+          ].join('\n'),
+        ),
+    ];
+  }
+
+  static List<pw.Widget> _clinicalCards(String titulo, String cuerpo) {
+    final partes = _partirTexto(cuerpo, 1200);
+    return [
+      for (var i = 0; i < partes.length; i++)
+        pw.Container(
+          width: double.infinity,
+          margin: const pw.EdgeInsets.only(bottom: 4),
+          padding: const pw.EdgeInsets.all(8),
+          decoration: _cardDecoration(),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              _toothBadge(size: 15),
-              pw.SizedBox(width: 6),
               pw.Text(
-                titulo,
+                i == 0 ? titulo : '$titulo (continuación)',
                 style: pw.TextStyle(
-                  fontSize: 9,
+                  fontSize: 8,
                   fontWeight: pw.FontWeight.bold,
                   color: _Brand.primaryDark,
                 ),
               ),
+              pw.SizedBox(height: 3),
+              pw.Text(
+                partes[i],
+                style: const pw.TextStyle(fontSize: 7.5, height: 1.3),
+              ),
             ],
           ),
-          pw.SizedBox(height: 6),
-          ...items.map(
-            (e) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 3),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Container(
-                    width: 4,
-                    height: 4,
-                    margin: const pw.EdgeInsets.only(top: 3, right: 5),
-                    decoration: const pw.BoxDecoration(
-                      color: _Brand.accent,
-                      shape: pw.BoxShape.circle,
-                    ),
-                  ),
-                  pw.Expanded(
-                    child: pw.Text(
-                      e.toString(),
-                      style: const pw.TextStyle(fontSize: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+        ),
+    ];
   }
 
-  static pw.Widget _buildSeccionEvaluaciones(List<dynamic> evaluaciones) =>
-      _buildListaSeccion('EVALUACIONES CLÍNICAS', evaluaciones);
+  static List<String> _partirTexto(String texto, int maximo) {
+    if (texto.length <= maximo) return [texto];
+    final partes = <String>[];
+    var restante = texto;
+    while (restante.length > maximo) {
+      var corte = restante.lastIndexOf(RegExp(r'\s'), maximo);
+      if (corte < maximo ~/ 2) corte = maximo;
+      partes.add(restante.substring(0, corte).trimRight());
+      restante = restante.substring(corte).trimLeft();
+    }
+    if (restante.isNotEmpty) partes.add(restante);
+    return partes;
+  }
 
-  static pw.Widget _buildSeccionTratamientos(List<dynamic> tratamientos) =>
-      _buildListaSeccion('TRATAMIENTOS APLICADOS', tratamientos);
+  static String? _textoNoVacio(String? valor) {
+    final limpio = valor?.trim() ?? '';
+    return limpio.isEmpty ? null : limpio;
+  }
 
-  static pw.Widget _buildSeccionRecetas(List<dynamic> recetas) =>
-      _buildListaSeccion('RECETAS PRESCRITAS', recetas);
+  static String _referenciaConsulta(Consulta consulta) {
+    final id = consulta.id?.trim() ?? '';
+    if (id.isEmpty) return 'S/N';
+    return '#${id.substring(0, id.length.clamp(0, 8)).toUpperCase()}';
+  }
+
+  static String _referenciaDocumento(String? id) {
+    final limpio = id?.trim() ?? '';
+    if (limpio.isEmpty) return 'S/N';
+    return '#${limpio.substring(0, limpio.length.clamp(0, 8)).toUpperCase()}';
+  }
+
+  static String _labelEnum(String valor) {
+    final normalizado = valor.replaceAll('_', ' ').trim();
+    if (normalizado.isEmpty) return '';
+    return '${normalizado[0].toUpperCase()}${normalizado.substring(1)}';
+  }
+
+  static String? _signosVitales(Consulta consulta) {
+    final signos = consulta.signosVitales;
+    if (signos == null || signos.estaVacia) return null;
+    return [
+      if (signos.presionSistolica != null || signos.presionDiastolica != null)
+        'PA ${signos.presionSistolica ?? '-'}/${signos.presionDiastolica ?? '-'} mmHg',
+      if (signos.pulso != null) 'Pulso ${signos.pulso} lpm',
+      if (signos.temperatura != null) 'Temp. ${signos.temperatura} °C',
+      if (signos.saturacionO2 != null) 'SpO2 ${signos.saturacionO2}%',
+    ].join(' · ');
+  }
+}
+
+class _TratamientoExpediente {
+  final Consulta consulta;
+  final Diente diente;
+  final TratamientoAplicado tratamiento;
+
+  const _TratamientoExpediente(this.consulta, this.diente, this.tratamiento);
+
+  DateTime get fecha =>
+      tratamiento.fechaEjecucion ??
+      tratamiento.fechaAplicacion ??
+      consulta.fecha;
 }
 
 class _EstadoPiezaResultado {

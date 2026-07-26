@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -98,6 +99,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final puedeExportar = context.select(
+      (AuthCubit cubit) => cubit.state.roles.puedeVerExpedientes,
+    );
     return BlocBuilder<PacienteCubit, PacienteState>(
       builder: (context, state) {
         final paciente = (state is PacienteDetailLoaded)
@@ -125,16 +129,29 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ),
             centerTitle: false,
             actions: [
-              if (paciente != null)
+              if (paciente != null && puedeExportar)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: IconButton(
+                    key: const Key('exportar_expediente_button'),
                     tooltip: 'Exportar / Imprimir Expediente',
                     icon: Icon(
                       Icons.picture_as_pdf_rounded,
                       color: ac.primaryBlue,
                     ),
                     onPressed: () {
+                      if (state is PacienteDetailLoaded &&
+                          state.historialNoDisponible) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No se puede generar un expediente completo '
+                              'porque el historial clínico no está disponible.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
                       final consultasConOdontograma = paciente.record.consultas
                           .where((c) => c.odontograma != null)
                           .toList();

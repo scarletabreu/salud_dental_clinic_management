@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'paciente_state.dart';
@@ -36,13 +37,19 @@ class PacienteCubit extends Cubit<PacienteState> {
     await result.fold(
       (failure) async => emit(PacienteError(failure.message)),
       (paciente) async {
-        final historial = await _historialDe(paciente.id);
+        // Las consultas y la historia por pieza se piden a la vez: son dos
+        // lecturas independientes de la misma apertura del expediente.
+        final (historial, piezas) = await (
+          _historialDe(paciente.id),
+          _historialDePiezas(paciente.id),
+        ).wait;
         emit(
           PacienteDetailLoaded(
             paciente.copyWith(
               record: paciente.record.copyWith(consultas: historial.consultas),
             ),
             historialNoDisponible: historial.fallo,
+            historialPiezas: piezas,
           ),
         );
       },
@@ -82,6 +89,19 @@ class PacienteCubit extends Cubit<PacienteState> {
     } catch (e) {
       AppLog.error('historial de $pacienteId', e);
       return const _Historial(const [], fallo: true);
+    }
+  }
+
+  /// La historia de cada pieza (SD-144). Es contexto del expediente, no un
+  /// requisito: si falla, las fichas de pieza se quedan con lo que dibuja el
+  /// odontograma en vez de impedir abrir el paciente.
+  Future<HistorialPiezas> _historialDePiezas(String? pacienteId) async {
+    if (pacienteId == null) return HistorialPiezas.vacio;
+    try {
+      return await _consultaRepository.getHistorialPiezas(pacienteId);
+    } catch (e) {
+      AppLog.error('historial de piezas de $pacienteId', e);
+      return HistorialPiezas.vacio;
     }
   }
 

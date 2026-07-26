@@ -30,6 +30,13 @@ class DiagnosticoAplicado {
   final String? nombreDiagnostico;
   final String? claveOdontograma;
 
+  /// Cuándo se anuló el hallazgo (`deleted_at`). Se conserva porque retirar un
+  /// hallazgo no borra que se anotó: la línea de tiempo de la pieza lo sigue
+  /// contando, tachado (SD-144).
+  final DateTime? anuladoEn;
+
+  bool get estaAnulado => anuladoEn != null;
+
   DiagnosticoAplicado({
     this.id,
     required this.diagnosisId,
@@ -44,6 +51,7 @@ class DiagnosticoAplicado {
     this.doctorId,
     this.nombreDiagnostico,
     this.claveOdontograma,
+    this.anuladoEn,
   });
 
   DiagnosticoAplicado copyWith({
@@ -60,6 +68,7 @@ class DiagnosticoAplicado {
     String? doctorId,
     String? nombreDiagnostico,
     String? claveOdontograma,
+    DateTime? anuladoEn,
   }) {
     return DiagnosticoAplicado(
       id: id ?? this.id,
@@ -75,6 +84,7 @@ class DiagnosticoAplicado {
       doctorId: doctorId ?? this.doctorId,
       nombreDiagnostico: nombreDiagnostico ?? this.nombreDiagnostico,
       claveOdontograma: claveOdontograma ?? this.claveOdontograma,
+      anuladoEn: anuladoEn ?? this.anuladoEn,
     );
   }
 }

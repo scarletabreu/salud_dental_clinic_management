@@ -23,6 +23,8 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
     super.fechaInicio,
     super.fechaCompletado,
     super.nombreTratamiento,
+    super.anuladoEn,
+    super.consultaOrigenId,
   });
 
   factory ItemPlanTratamientoModel.fromEntity(ItemPlanTratamiento item) {
@@ -46,6 +48,8 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       fechaInicio: item.fechaInicio,
       fechaCompletado: item.fechaCompletado,
       nombreTratamiento: item.nombreTratamiento,
+      anuladoEn: item.anuladoEn,
+      consultaOrigenId: item.consultaOrigenId,
     );
   }
 
@@ -75,6 +79,10 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       fechaCompletado: _parseFecha(json['fecha_completado']),
       nombreTratamiento: tratamiento is Map
           ? tratamiento['nombre'] as String?
+          : null,
+      anuladoEn: _parseFecha(json['deleted_at']),
+      consultaOrigenId: json['plan'] is Map
+          ? (json['plan'] as Map)['consulta_origen_id'] as String?
           : null,
     );
   }

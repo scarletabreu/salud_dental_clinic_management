@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
@@ -114,6 +115,11 @@ class VistasOdontograma extends StatefulWidget {
   /// hacer de lo que ya se hizo.
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
 
+  /// La historia de cada pieza del paciente (SD-144). Las dos vistas la reciben
+  /// igual: el ticket pide poder abrir la línea de tiempo desde *cualquier*
+  /// odontograma del expediente, y son el mismo panel.
+  final HistorialPiezas? historialPiezas;
+
   /// Anota una observación clínica sobre una pieza concreta.
   final void Function(Diente, String)? onNotasPiezaChanged;
 
@@ -142,6 +148,7 @@ class VistasOdontograma extends StatefulWidget {
     this.nombreTratamiento,
     this.nombreDoctor,
     this.itemsPlan = const {},
+    this.historialPiezas,
     this.onNotasPiezaChanged,
     this.accion,
     this.formularioPersonalizado,
@@ -192,6 +199,7 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                         diente.fdiCode: diente,
                     },
                     itemsPlan: widget.itemsPlan,
+                    historialPiezas: widget.historialPiezas,
                     onNotasPiezaChanged: widget.onNotasPiezaChanged,
                     onAddDiagnosis: widget.onAddDiagnosis,
                     onAddTratamiento: widget.onAddTratamiento,
@@ -200,6 +208,7 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                     onToggleTratamientoTerminado:
                         widget.onToggleTratamientoTerminado,
                     nombreTratamiento: widget.nombreTratamiento,
+                    nombreDoctor: widget.nombreDoctor,
                   ),
             // La arcada no lleva las claves incrustadas —no es una hoja que se
             // imprima—, así que la leyenda compartida va debajo. Es la misma
@@ -212,6 +221,7 @@ class _VistasOdontogramaState extends State<VistasOdontograma> {
                   odontograma: widget.odontograma,
                   editMode: widget.editable,
                   itemsPlan: widget.itemsPlan,
+                  historialPiezas: widget.historialPiezas,
                   onNotasPiezaChanged: widget.onNotasPiezaChanged,
                   onAddDiagnosis: widget.onAddDiagnosis,
                   onAddTratamiento: widget.onAddTratamiento,

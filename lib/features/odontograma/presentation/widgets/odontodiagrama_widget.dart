@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/glifo_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
@@ -55,6 +56,11 @@ class OdontodiagramaWidget extends StatefulWidget {
   /// permite que la ficha distinga lo planificado de lo ya ejecutado.
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
 
+  /// La historia de cada pieza del paciente (SD-144). Es lo que permite abrir
+  /// una pieza desde el formulario del expediente y leer todo lo que le pasó,
+  /// no solo lo que este odontograma dibuja.
+  final HistorialPiezas? historialPiezas;
+
   /// Anota una observación clínica sobre la pieza. `null` deja el campo en solo
   /// lectura, que es como lo ve el expediente.
   final void Function(Diente, String)? onNotasPiezaChanged;
@@ -67,6 +73,10 @@ class OdontodiagramaWidget extends StatefulWidget {
   onToggleTratamientoTerminado;
   final String Function(String tratamientoId)? nombreTratamiento;
 
+  /// Resuelve el nombre del doctor de cada anotación de la ficha. Sin él la
+  /// ficha omite la autoría en vez de mostrar un uuid.
+  final String Function(String doctorId)? nombreDoctor;
+
   const OdontodiagramaWidget({
     super.key,
     required this.evaluacion,
@@ -77,6 +87,7 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.onChanged,
     this.dientes = const {},
     this.itemsPlan = const {},
+    this.historialPiezas,
     this.onNotasPiezaChanged,
     this.onAddDiagnosis,
     this.onAddTratamiento,
@@ -84,6 +95,7 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.onQuitarTratamiento,
     this.onToggleTratamientoTerminado,
     this.nombreTratamiento,
+    this.nombreDoctor,
   });
 
   @override
@@ -145,7 +157,8 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
 
   bool get _hayHistorico =>
       !widget.historico.estaVacia ||
-      widget.dientes.values.any((d) => d.tratamientosHistoricos.isNotEmpty);
+      widget.dientes.values.any((d) => d.tratamientosHistoricos.isNotEmpty) ||
+      !(widget.historialPiezas?.estaVacio ?? true);
 
   @override
   void initState() {
@@ -333,6 +346,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     diente: widget.dientes[fdi],
     hallazgosHistoricos: _historicoDe(fdi),
     itemsPlan: widget.itemsPlan[fdi] ?? const [],
+    historial: widget.historialPiezas?[fdi],
     editMode: _editando,
     onClose: () => setState(() => _fdiSeleccionado = null),
     onNotasChanged: widget.onNotasPiezaChanged,
@@ -342,6 +356,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     onQuitarTratamiento: widget.onQuitarTratamiento,
     onToggleTerminado: widget.onToggleTratamientoTerminado,
     nombreTratamiento: widget.nombreTratamiento,
+    nombreDoctor: widget.nombreDoctor ?? widget.historialPiezas?.nombreDoctor,
   );
 
   Widget _panelPapel(double disponible, PaletaOdontodiagrama paleta) {

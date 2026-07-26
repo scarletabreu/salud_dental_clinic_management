@@ -70,6 +70,13 @@ class TratamientoAplicado {
   final String? doctorEjecutaId;
   final DateTime? fechaEjecucion;
 
+  /// Cuándo se anuló la ejecución (`deleted_at`). El borrado es lógico a
+  /// propósito: una ejecución retirada sigue siendo un hecho del expediente y
+  /// la línea de tiempo de la pieza tiene que poder contarlo (SD-144).
+  final DateTime? anuladoEn;
+
+  bool get estaAnulado => anuladoEn != null;
+
   TratamientoAplicado({
     this.id,
     required this.tratamientoId,
@@ -89,6 +96,7 @@ class TratamientoAplicado {
     this.justificacionNoPlanificada,
     this.doctorEjecutaId,
     this.fechaEjecucion,
+    this.anuladoEn,
   });
 
   TratamientoAplicado copyWith({
@@ -112,6 +120,7 @@ class TratamientoAplicado {
     String? justificacionNoPlanificada,
     String? doctorEjecutaId,
     DateTime? fechaEjecucion,
+    DateTime? anuladoEn,
   }) {
     return TratamientoAplicado(
       id: id ?? this.id,
@@ -133,6 +142,7 @@ class TratamientoAplicado {
           justificacionNoPlanificada ?? this.justificacionNoPlanificada,
       doctorEjecutaId: doctorEjecutaId ?? this.doctorEjecutaId,
       fechaEjecucion: fechaEjecucion ?? this.fechaEjecucion,
+      anuladoEn: anuladoEn ?? this.anuladoEn,
     );
   }
 }

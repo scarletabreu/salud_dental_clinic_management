@@ -4,7 +4,8 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/entities
 
 abstract class IPacienteRepository {
   Future<Either<Failure, List<Paciente>>> getPacientes();
-  Future<Either<Failure, void>> addPaciente(Paciente paciente);
+  /// Devuelve el id del paciente creado.
+  Future<Either<Failure, String>> addPaciente(Paciente paciente);
   Future<Either<Failure, void>> updatePaciente(Paciente paciente);
   Future<Either<Failure, void>> deletePaciente(String id);
   Future<Either<Failure, bool>> faltaRegistro(String id);

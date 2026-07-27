@@ -28,7 +28,7 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addPaciente(Paciente paciente) {
+  Future<Either<Failure, String>> addPaciente(Paciente paciente) {
     return guard(
       () => remoteDataSource.addPaciente(PacienteModel.fromEntity(paciente)),
       context: 'agregar el paciente',

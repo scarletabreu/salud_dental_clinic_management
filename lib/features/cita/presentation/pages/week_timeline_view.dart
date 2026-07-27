@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/widget
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 class WeekTimelineView extends StatelessWidget {
   final List<Cita> citas;
@@ -274,6 +275,7 @@ class WeekTimelineView extends StatelessWidget {
       context,
       personaRepository: sl<PersonaRepository>(),
       doctorRepository: sl<DoctorRepository>(),
+      pacienteRepository: sl<IPacienteRepository>(),
       fechaInicial: fechaPrellenada,
     );
 

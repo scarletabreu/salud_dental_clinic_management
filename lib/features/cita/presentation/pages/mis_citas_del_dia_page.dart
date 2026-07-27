@@ -14,6 +14,7 @@ import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 const _kMonths = [
   'Enero',
@@ -109,6 +110,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
               context,
               personaRepository: sl<PersonaRepository>(),
               doctorRepository: sl<DoctorRepository>(),
+              pacienteRepository: sl<IPacienteRepository>(),
             );
             if (context.mounted) context.read<CitaCubit>().load();
           }

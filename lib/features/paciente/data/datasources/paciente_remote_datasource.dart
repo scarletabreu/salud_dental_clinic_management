@@ -237,7 +237,10 @@ class PacienteRemoteDatasource {
   String _generoDb(Genero g) =>
       g == Genero.noPrefiereDecir ? Genero.otro.name : g.name;
 
-  Future<void> addPaciente(PacienteModel paciente) async {
+  /// Devuelve el id del paciente creado (el mismo de su persona) para que
+  /// quien lo registra pueda seguir trabajando sobre él sin releer la lista:
+  /// agendarle la cita del mismo flujo o subirle la foto de perfil.
+  Future<String> addPaciente(PacienteModel paciente) async {
     if (paciente.contactos.isEmpty) {
       throw Exception('El paciente debe tener al menos un contacto.');
     }
@@ -282,6 +285,7 @@ class PacienteRemoteDatasource {
         ..['created_at'] = DateTime.now().toIso8601String()
         ..['updated_at'] = DateTime.now().toIso8601String();
       await client.from('pacientes').insert(data);
+      return personaId;
     } on PostgrestException {
       if (personaId != null) {
         await client

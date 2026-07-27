@@ -326,10 +326,10 @@ class PacienteRemoteDatasource {
           'referencia': paciente.referencia,
           'peso': paciente.peso,
           'altura': paciente.altura,
-          'foto_ruta': paciente.fotoRuta,
-          'foto_mime_type': paciente.fotoMimeType,
-          'foto_tamano_bytes': paciente.fotoTamanoBytes,
-          'foto_actualizada_en': paciente.fotoActualizadaEn?.toIso8601String(),
+          // Las columnas `foto_*` se omiten a propósito: su única ruta de
+          // escritura es `PacienteFotoStorage`, que las mantiene en sincronía
+          // con el objeto de Storage. Incluirlas aquí borraba la foto cada vez
+          // que se editaba cualquier otro dato de la ficha.
           'updated_at': now,
         })
         .eq('id', pacienteId);

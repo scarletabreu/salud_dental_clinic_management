@@ -1,7 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -17,6 +17,7 @@ import 'package:salud_dental_clinic_management/features/paciente/data/services/p
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/recorte_foto_dialog.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
 
 enum PacienteFormModo { editar, completarRegistro }
@@ -387,6 +388,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ruta: widget.paciente.fotoRuta!,
         );
       }
+      // El cubit ya recargó el listado al confirmar el resto de la ficha, antes
+      // de que existiera esta foto: hay que releer para que el avatar cambie.
+      if (mounted) await context.read<PacienteCubit>().load();
     } catch (error) {
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -404,30 +408,41 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return true;
   }
 
+  /// La cámara solo existe en móvil y en navegador; en escritorio el plugin
+  /// resuelve la galería con un selector de archivos y `camera` no está.
+  bool get _soportaCamara =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
   Future<void> _elegirFoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de galería'),
-              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tomar fotografía'),
-              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
-            ),
-          ],
+    ImageSource? source = ImageSource.gallery;
+    if (_soportaCamara) {
+      source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Tomar fotografía'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
     if (source == null || !mounted) return;
 
     setState(() => _procesandoFoto = true);
     try {
+      final storage = sl<PacienteFotoStorage>();
       final selected = await ImagePicker().pickImage(
         source: source,
         maxWidth: 2048,
@@ -435,15 +450,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         imageQuality: 95,
       );
       if (selected == null) return;
-      final cropped = await ImageCropper().cropImage(
-        sourcePath: selected.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 92,
+      final decodificada = storage.decodificar(await selected.readAsBytes());
+      if (!mounted) return;
+      final optimizada = await RecorteFotoDialog.mostrar(
+        context,
+        imagen: decodificada,
+        storage: storage,
       );
-      if (cropped == null) return;
-      final optimizada = await sl<PacienteFotoStorage>().preparar(
-        await cropped.readAsBytes(),
-      );
+      if (optimizada == null) return;
       if (mounted) {
         setState(() {
           _fotoPendiente = optimizada;
@@ -459,12 +473,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: context.appColors.red,
-            content: const Text('No se pudo preparar la fotografía.'),
+            content: Text('No se pudo preparar la fotografía: $error'),
           ),
         );
       }
@@ -563,10 +577,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 fit: BoxFit.cover,
               ),
             )
-          else if (hasCurrent)
-            PacienteAvatar(paciente: widget.paciente, size: 88)
           else
-            PacienteAvatar(paciente: widget.paciente, size: 88),
+            // Con la eliminación pendiente se muestran las iniciales aunque el
+            // paciente todavía tenga foto guardada.
+            PacienteAvatar(
+              paciente: widget.paciente,
+              size: 88,
+              forzarIniciales: !hasCurrent,
+            ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

@@ -10,11 +10,16 @@ class PacienteAvatar extends StatefulWidget {
     required this.paciente,
     this.size = 48,
     this.backgroundColor,
+    this.forzarIniciales = false,
   });
 
   final Paciente paciente;
   final double size;
   final Color? backgroundColor;
+
+  /// Ignora la foto guardada y muestra las iniciales; lo usa el formulario
+  /// cuando hay una eliminación pendiente de confirmar.
+  final bool forzarIniciales;
 
   @override
   State<PacienteAvatar> createState() => _PacienteAvatarState();
@@ -33,6 +38,7 @@ class _PacienteAvatarState extends State<PacienteAvatar> {
   void didUpdateWidget(covariant PacienteAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.paciente.fotoRuta != widget.paciente.fotoRuta ||
+        oldWidget.forzarIniciales != widget.forzarIniciales ||
         oldWidget.paciente.fotoActualizadaEn !=
             widget.paciente.fotoActualizadaEn) {
       _url = _crearUrl();
@@ -40,6 +46,7 @@ class _PacienteAvatarState extends State<PacienteAvatar> {
   }
 
   Future<String>? _crearUrl() {
+    if (widget.forzarIniciales) return null;
     final ruta = widget.paciente.fotoRuta;
     if (ruta == null || ruta.isEmpty) return null;
     return sl<PacienteFotoStorage>().urlFirmada(ruta);

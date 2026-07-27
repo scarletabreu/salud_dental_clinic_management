@@ -121,10 +121,7 @@ class PacienteModel extends Paciente {
       'referencia': referencia,
       'peso': peso,
       'altura': altura,
-      'foto_ruta': fotoRuta,
-      'foto_mime_type': fotoMimeType,
-      'foto_tamano_bytes': fotoTamanoBytes,
-      'foto_actualizada_en': fotoActualizadaEn?.toIso8601String(),
+      // Sin campos `foto_*`: solo `PacienteFotoStorage` escribe esas columnas.
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

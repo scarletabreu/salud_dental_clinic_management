@@ -44,7 +44,6 @@ dependencies:
   path_drawing: ^1.0.1
   file_picker: ^8.1.4
   image_picker: ^1.1.2
-  image_cropper: ^8.0.2
   image: ^4.3.0
   fl_chart: ^1.2.0
   connectivity_plus: ^6.1.0

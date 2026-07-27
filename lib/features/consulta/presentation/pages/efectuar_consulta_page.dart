@@ -445,16 +445,18 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    final textoVisible =
+        !layout.isCompact && MediaQuery.textScalerOf(context).scale(1) <= 1.3;
     return Row(
       children: [
-        Flexible(
-          child: _StepPill(
-            number: '01',
-            label: 'Datos iniciales',
-            active: !enWorkspace,
-            done: enWorkspace,
-            ac: ac,
-          ),
+        _StepPill(
+          number: '01',
+          label: 'Datos iniciales',
+          active: !enWorkspace,
+          done: enWorkspace,
+          textoVisible: textoVisible,
+          ac: ac,
         ),
         // El conector es lo primero que cede: nunca baja de 16 px.
         Expanded(
@@ -463,14 +465,13 @@ class _StepRow extends StatelessWidget {
             child: _StepConnector(done: enWorkspace, ac: ac),
           ),
         ),
-        Flexible(
-          child: _StepPill(
-            number: '02',
-            label: 'Consulta clínica',
-            active: enWorkspace,
-            done: false,
-            ac: ac,
-          ),
+        _StepPill(
+          number: '02',
+          label: 'Consulta clínica',
+          active: enWorkspace,
+          done: false,
+          textoVisible: textoVisible,
+          ac: ac,
         ),
       ],
     );
@@ -483,6 +484,7 @@ class _StepPill extends StatelessWidget {
     required this.label,
     required this.active,
     required this.done,
+    required this.textoVisible,
     required this.ac,
   });
 
@@ -490,6 +492,7 @@ class _StepPill extends StatelessWidget {
   final String label;
   final bool active;
   final bool done;
+  final bool textoVisible;
   final AppColors ac;
 
   @override
@@ -536,9 +539,9 @@ class _StepPill extends StatelessWidget {
                   ),
                 ),
         ),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
+        if (textoVisible) ...[
+          const SizedBox(width: 6),
+          Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -548,7 +551,7 @@ class _StepPill extends StatelessWidget {
               color: textColor,
             ),
           ),
-        ),
+        ],
       ],
     );
   }

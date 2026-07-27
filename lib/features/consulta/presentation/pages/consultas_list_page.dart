@@ -248,32 +248,35 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  'Consultas',
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.6,
+          SizedBox(
+            width: double.infinity,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    'Consultas',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      letterSpacing: -0.6,
+                    ),
                   ),
                 ),
-              ),
-              if (state is ConsultasLoaded) ...[
-                const SizedBox(width: 14),
-                _CountBadge(count: total),
-                const Spacer(),
-                IconButton(
-                  tooltip: 'Actualizar listado',
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
-                  onPressed: () =>
-                      context.read<ConsultasListCubit>().recargar(),
-                ),
+                if (state is ConsultasLoaded) ...[
+                  const SizedBox(width: 14),
+                  _CountBadge(count: total),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Actualizar listado',
+                    icon: const Icon(Icons.refresh_rounded, size: 20),
+                    onPressed: () =>
+                        context.read<ConsultasListCubit>().recargar(),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -999,7 +1002,10 @@ class _AccionesConsulta extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final colorScheme = Theme.of(context).colorScheme;
-    final textoVisible = layout.isDesktop;
+    // La leyenda encima de la lista explica ambos iconos; en la fila las dos
+    // ranuras se mantienen compactas para que una ausencia no parezca un
+    // segundo bloque vacío ni separe artificialmente las acciones.
+    const textoVisible = false;
     final razonEliminar = razonNoEliminable(consulta);
 
     return Row(
@@ -1028,8 +1034,8 @@ class _AccionesConsulta extends StatelessWidget {
           textoVisible: textoVisible,
         ),
         SizedBox(
-          width: textoVisible ? 48 : 32,
-          height: textoVisible ? 48 : 32,
+          width: 32,
+          height: 32,
           child: PopupMenuButton<_AccionMenuConsulta>(
             tooltip: 'Más acciones',
             icon: const Icon(Icons.more_vert_rounded, size: 20),

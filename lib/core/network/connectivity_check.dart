@@ -1,4 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 /// Comprobación de conectividad de red. Reporta si hay alguna interfaz activa
 /// (wifi, datos, ethernet), no si el backend responde de verdad: la fuente de
@@ -13,10 +14,14 @@ class ConnectivityCheckImpl implements ConnectivityCheck {
   final Connectivity _connectivity;
 
   ConnectivityCheckImpl([Connectivity? connectivity])
-      : _connectivity = connectivity ?? Connectivity();
+    : _connectivity = connectivity ?? Connectivity();
 
   @override
   Future<bool> get hasConnection async {
+    // En Flutter Web, connectivity_plus no reporta de forma confiable la interfaz del navegador.
+    // Asumimos true y dejamos que la petición HTTP a Supabase sea la fuente de verdad.
+    if (kIsWeb) return true;
+
     try {
       return _isOnline(await _connectivity.checkConnectivity());
     } catch (_) {
@@ -29,8 +34,14 @@ class ConnectivityCheckImpl implements ConnectivityCheck {
   }
 
   @override
-  Stream<bool> get onStatusChange =>
-      _connectivity.onConnectivityChanged.map(_isOnline).handleError((_) {});
+  Stream<bool> get onStatusChange {
+    if (kIsWeb) {
+      return Stream.value(true);
+    }
+    return _connectivity.onConnectivityChanged
+        .map(_isOnline)
+        .handleError((_) {});
+  }
 
   /// connectivity_plus v6 devuelve una lista de interfaces; hay conexión si
   /// alguna es distinta de `none`.

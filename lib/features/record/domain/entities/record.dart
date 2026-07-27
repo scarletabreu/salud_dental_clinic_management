@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/record_condicion.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 
@@ -8,6 +9,7 @@ class Record {
   final TipoSangre tipoSangre;
   final List<Consulta> consultas;
   final List<Condicion> condiciones;
+  final List<RecordCondicion> detallesCondiciones;
   final int cantHijos;
   final List<String> cirugiasPrevias;
   final String historialFamiliar;
@@ -18,6 +20,7 @@ class Record {
     required this.tipoSangre,
     this.consultas = const [],
     required this.condiciones,
+    this.detallesCondiciones = const [],
     this.cantHijos = 0,
     required this.cirugiasPrevias,
     required this.historialFamiliar,
@@ -35,6 +38,7 @@ class Record {
     TipoSangre? tipoSangre,
     List<Consulta>? consultas,
     List<Condicion>? condiciones,
+    List<RecordCondicion>? detallesCondiciones,
     int? cantHijos,
     List<String>? cirugiasPrevias,
     String? historialFamiliar,
@@ -45,6 +49,7 @@ class Record {
       tipoSangre: tipoSangre ?? this.tipoSangre,
       consultas: consultas ?? this.consultas,
       condiciones: condiciones ?? this.condiciones,
+      detallesCondiciones: detallesCondiciones ?? this.detallesCondiciones,
       cantHijos: cantHijos ?? this.cantHijos,
       cirugiasPrevias: cirugiasPrevias ?? this.cirugiasPrevias,
       historialFamiliar: historialFamiliar ?? this.historialFamiliar,

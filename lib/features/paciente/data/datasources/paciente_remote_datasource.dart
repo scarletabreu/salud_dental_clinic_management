@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
+import 'package:salud_dental_clinic_management/features/condicion/data/models/record_condicion_model.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/models/paciente_model.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
@@ -466,6 +467,7 @@ class PacienteRemoteDatasource {
               .eq('record_id', record.id!);
 
           final condiciones = <CondicionModel>[];
+          final detallesCondiciones = <RecordCondicionModel>[];
           for (final item in condicionesRes) {
             Map<String, dynamic>? condicionJson;
             if (item['condiciones'] is Map<String, dynamic>) {
@@ -478,11 +480,17 @@ class PacienteRemoteDatasource {
 
             if (condicionJson != null) {
               condiciones.add(CondicionModel.fromJson(condicionJson));
+              detallesCondiciones.add(
+                RecordCondicionModel.fromJson(Map<String, dynamic>.from(item)),
+              );
             }
           }
 
           return RecordModel.fromEntity(
-            record.copyWith(condiciones: condiciones),
+            record.copyWith(
+              condiciones: condiciones,
+              detallesCondiciones: detallesCondiciones,
+            ),
           );
         }
 

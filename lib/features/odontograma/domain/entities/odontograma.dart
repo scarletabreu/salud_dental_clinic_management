@@ -10,16 +10,7 @@ class Odontograma {
   final List<Diente> dientes;
   final List<Tratamiento> tratamientos;
   final List<Diagnosis> diagnosis;
-
-  /// Odontodiagrama del formulario: hallazgos por pieza y tejidos blandos.
-  /// Vive en `odontogramas.evaluacion_clinica` (jsonb), aparte de `dientes`,
-  /// que sigue normalizado porque de él cuelgan tratamientos y facturación.
   final EvaluacionOdontologica evaluacion;
-
-  /// Lo anotado en el odontodiagrama de consultas anteriores del mismo
-  /// paciente. Es un campo derivado —igual que `Diente.tratamientosHistoricos`—
-  /// que se calcula al cargar y no se persiste: la fuente sigue siendo la
-  /// `evaluacion` de cada consulta.
   final EvaluacionOdontologica evaluacionHistorica;
 
   Odontograma({
@@ -51,19 +42,13 @@ class Odontograma {
     );
   }
 
-  /// Persistencia residual de SD-141. Los hallazgos dentales se guardan en
-  /// `diagnosticos_aplicados` / `tratamientos_aplicados`, no en este JSON.
   Map<String, dynamic> evaluacionToJson() => EvaluacionOdontologica(
     tejidosBlandos: evaluacion.tejidosBlandos,
   ).toJson();
 
-  /// Datos visuales de las claves dentales más tejidos blandos. Nunca se
-  /// persiste como JSON: la fuente de las claves son las filas normalizadas.
   EvaluacionOdontologica get evaluacionProyectada =>
       proyectarEvaluacionOdontologica(this);
 
-  /// Lo mismo, pero como se ve *debajo* de otra consulta: solo diagnósticos,
-  /// para que un tratamiento previo no se estampe en tenue sobre la pieza.
   EvaluacionOdontologica get evaluacionComoAntecedente =>
       proyectarEvaluacionOdontologica(this, soloDiagnosticos: true);
 }

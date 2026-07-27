@@ -1,64 +1,109 @@
+import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 class RecetaModel extends Receta {
-  RecetaModel({
+  const RecetaModel({
     super.id,
-    required super.title,
-    required super.createdAt,
-    required super.medicinaId,
-    required super.dosis,
-    required super.frecuencia,
-    required super.indicaciones,
-    required super.duracion,
-    super.notas,
+    required super.codigoReceta,
+    required super.consultaId,
+    required super.pacienteId,
+    super.doctorId,
+    super.doctorNombre,
+    required super.fechaEmision,
+    required super.items,
+    super.indicacionesGenerales,
+    super.justificacionContraindicaciones,
+    super.estado,
+    super.motivoAnulacion,
+    super.recetaReemplazadaId,
   });
 
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
+    // Manejo de retrocompatibilidad si viene una fila antigua con 1 solo medicamento
+    final itemsRaw = json['items_receta'] as List?;
+    final List<ItemReceta> itemsList;
+
+    if (itemsRaw != null && itemsRaw.isNotEmpty) {
+      itemsList = itemsRaw
+          .map((i) => ItemRecetaModel.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } else if (json['titulo'] != null) {
+      // Fila heredada de la versión vieja
+      itemsList = [ItemRecetaModel.fromJson(json)];
+    } else {
+      itemsList = const [];
+    }
+
+    String? doctorNombreCalc;
+    try {
+      final docObj = json['doctor'];
+      if (docObj != null && docObj['usuarios'] != null) {
+        final p = docObj['usuarios']['personas'];
+        if (p != null) {
+          doctorNombreCalc = 'Dr. ${p['nombre']} ${p['apellido']}'.trim();
+        }
+      }
+    } catch (_) {}
+
     return RecetaModel(
       id: json['id'] as String?,
-      title: (json['titulo'] ?? json['title']) as String,
-      createdAt: DateTime.parse(
-        json['created_at'] ?? json['createdAt'],
+      codigoReceta: (json['codigo_receta'] ?? 'RX-LEGACY') as String,
+      consultaId: (json['consulta_id'] ?? '') as String,
+      pacienteId: (json['paciente_id'] ?? '') as String,
+      doctorId: json['doctor_id'] as String?,
+      doctorNombre: doctorNombreCalc,
+      fechaEmision: DateTime.parse(
+        json['fecha_emision'] ??
+            json['created_at'] ??
+            DateTime.now().toIso8601String(),
       ).toLocal(),
-      medicinaId: (json['medicina_id'] ?? json['medicinaId']) as String,
-      dosis: json['dosis'] as String,
-      frecuencia: json['frecuencia'] as String,
-      indicaciones: json['indicaciones'] as String,
-      duracion: json['duracion'] as String,
-      notas: json['notas'] as String?,
+      items: itemsList,
+      indicacionesGenerales: json['indicaciones_generales'] as String?,
+      justificacionContraindicaciones:
+          json['justificacion_contraindicaciones'] as String?,
+      estado: _parseEstado(json['estado']),
+      motivoAnulacion: json['motivo_anulacion'] as String?,
+      recetaReemplazadaId: json['receta_reemplazada_id'] as String?,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = {
-      'titulo': title,
-      'created_at': createdAt.toIso8601String(),
-      'medicina_id': medicinaId,
-      'dosis': dosis,
-      'frecuencia': frecuencia,
-      'indicaciones': indicaciones,
-      'notas': notas,
-      'duracion': duracion,
+  static EstadoReceta _parseEstado(dynamic estado) {
+    if (estado == 'anulada') return EstadoReceta.anulada;
+    if (estado == 'reemplazada') return EstadoReceta.reemplazada;
+    return EstadoReceta.activa;
+  }
+
+  Map<String, dynamic> toCabeceraJson() {
+    return {
+      if (id != null && id!.length == 36) 'id': id,
+      'consulta_id': consultaId,
+      'paciente_id': pacienteId,
+      'doctor_id': doctorId,
+      'fecha_emision': fechaEmision.toIso8601String(),
+      'indicaciones_generales': indicacionesGenerales,
+      'justificacion_contraindicaciones': justificacionContraindicaciones,
+      'estado': estado.name,
+      'motivo_anulacion': motivoAnulacion,
+      'receta_reemplazada_id': recetaReemplazadaId,
     };
-
-    if (id != null && id!.contains('-') && id!.length == 36) {
-      data['id'] = id;
-    }
-
-    return data;
   }
 
   factory RecetaModel.fromEntity(Receta receta) {
     return RecetaModel(
       id: receta.id,
-      title: receta.title,
-      createdAt: receta.createdAt,
-      medicinaId: receta.medicinaId,
-      dosis: receta.dosis,
-      frecuencia: receta.frecuencia,
-      indicaciones: receta.indicaciones,
-      duracion: receta.duracion,
-      notas: receta.notas,
+      codigoReceta: receta.codigoReceta,
+      consultaId: receta.consultaId,
+      pacienteId: receta.pacienteId,
+      doctorId: receta.doctorId,
+      doctorNombre: receta.doctorNombre,
+      fechaEmision: receta.fechaEmision,
+      items: receta.items,
+      indicacionesGenerales: receta.indicacionesGenerales,
+      justificacionContraindicaciones: receta.justificacionContraindicaciones,
+      estado: receta.estado,
+      motivoAnulacion: receta.motivoAnulacion,
+      recetaReemplazadaId: receta.recetaReemplazadaId,
     );
   }
 }

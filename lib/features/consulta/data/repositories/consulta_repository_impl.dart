@@ -1,12 +1,12 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
@@ -15,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/data/models/item_plan_tratamiento_model.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
@@ -46,8 +47,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
 
   @override
   Future<String> crearConsultaCompleta(Consulta consulta) {
-    // Validación de dominio fuera del guard: el cubit detecta este mensaje
-    // ('paciente de prueba') como caso especial.
     if (!_isValidUuid(consulta.pacienteId)) {
       throw Exception(
         'No se puede crear una consulta para un paciente de prueba. '
@@ -136,14 +135,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'esta_terminado': t.estaTerminado,
                   'superficie': t.superficie?.name.toLowerCase(),
                   'precio_aplicado': t.precioAplicado,
-                  // La justificación clínica de una contraindicación viaja
-                  // aquí. Sin ella el expediente diría que el tratamiento se
-                  // aplicó a ciegas.
                   'notas': t.notas,
                   'estado': t.estado.dbValue,
-                  // Auditoría de la ejecución (SD-135). `item_plan_id` solo
-                  // viaja cuando la ejecución cumple una actividad ya decidida
-                  // del plan; la base rechaza vincularla a una propuesta.
                   'item_plan_id': t.itemPlanId,
                   'justificacion_no_planificada': t.justificacionNoPlanificada,
                   'doctor_ejecuta_id': t.doctorEjecutaId,
@@ -169,8 +162,16 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
           },
       };
 
+      // Transformación de la cabecera y renglones de las recetas
       final recetasJson = [
-        for (final r in recetas) RecetaModel.fromEntity(r).toJson(),
+        for (final r in recetas)
+          {
+            ...RecetaModel.fromEntity(r).toCabeceraJson(),
+            'items_receta': [
+              for (final item in r.items)
+                ItemRecetaModel.fromEntity(item).toJson(recetaId: r.id ?? ''),
+            ],
+          },
       ];
 
       return remoteDataSource.guardarResultadoConsulta(
@@ -264,8 +265,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   @override
   Future<HistorialPiezas> getHistorialPiezas(String pacienteId) {
     return runGuarded(() async {
-      // Los tres ejes y el índice de consultas se piden a la vez: es una sola
-      // apertura de expediente y encadenarlos multiplicaría su latencia.
       final (filasDiagnosticos, filasTratamientos, filasConsultas) = await (
         remoteDataSource.fetchDiagnosticosHistoricosPaciente(
           pacienteId,
@@ -278,8 +277,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         remoteDataSource.fetchReferenciasConsultasPaciente(pacienteId),
       ).wait;
 
-      // El plan es contexto: si su lectura falla, el historial sale sin la
-      // columna de lo planificado en vez de dejar la pieza sin historia.
       var filasItemsPlan = const <Map<String, dynamic>>[];
       try {
         filasItemsPlan = await remoteDataSource.fetchItemsPlanPorPaciente(
@@ -347,10 +344,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     }, context: 'obtener el historial de las piezas');
   }
 
-  /// Resuelve el nombre de cada doctor que aparece en el historial.
-  ///
-  /// Sin autoría la línea de tiempo no sirve para auditar, pero tampoco vale la
-  /// pena tumbarla por ella: si la consulta falla, la ficha omite el nombre.
   Future<Map<String, String>> _nombresDeDoctoresDe(
     Map<int, List<DiagnosticoAplicado>> diagnosticos,
     Map<int, List<TratamientoAplicado>> tratamientos,
@@ -382,7 +375,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     }
   }
 
-  /// «Dr. Ana Pérez» a partir del embed `doctores → usuarios → personas`.
   static String _nombreDeDoctor(Map<String, dynamic> fila) {
     final usuario = fila['usuarios'];
     final persona = usuario is Map ? usuario['personas'] : null;
@@ -399,17 +391,12 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     String? excluyendoConsultaId,
   }) {
     return runGuarded(() async {
-      // Las piezas salen de `diagnosticos_aplicados`: desde SD-150 el jsonb de
-      // `odontogramas` solo guarda tejidos blandos. Los tratamientos previos no
-      // se dibujan en tenue, se leen en la ficha de la pieza.
       final diagnosticos = await remoteDataSource
           .fetchDiagnosticosHistoricosPaciente(
             pacienteId,
             excluyendoConsultaId: excluyendoConsultaId,
           );
 
-      // Las filas llegan de la consulta más reciente a la más antigua: sobre
-      // cada pieza manda la última que la anotó, con todo lo que dijo de ella.
       final consultaQueMandaPorFdi = <int, String?>{};
       final porFdi = <int, Map<EstadoClinicoDental, Set<TipoSuperficie>>>{};
 

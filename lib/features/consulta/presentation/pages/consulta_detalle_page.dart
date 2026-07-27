@@ -10,6 +10,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 class ConsultaDetallePage extends StatelessWidget {
@@ -88,25 +89,18 @@ class ConsultaDetallePage extends StatelessWidget {
                   const SizedBox(height: 16),
                   _seccion(
                     context,
-                    'Receta',
+                    'Recetas Médicas Emitidas',
                     Icons.receipt_long_rounded,
                     ac.primaryBlue,
-                    BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
-                      builder: (context, state) => Column(
-                        children: [
-                          for (var i = 0; i < consulta.recetas.length; i++)
-                            _tarjetaReceta(
-                              context,
-                              consulta.recetas[i],
-                              state is ConsultaDetalleListo
-                                  ? state.nombreMedicina(
-                                      consulta.recetas[i].medicinaId,
-                                    )
-                                  : 'Medicamento',
-                              esUltima: i == consulta.recetas.length - 1,
-                            ),
-                        ],
-                      ),
+                    Column(
+                      children: [
+                        for (var i = 0; i < consulta.recetas.length; i++)
+                          _tarjetaRecetaCompleta(
+                            context,
+                            consulta.recetas[i],
+                            esUltima: i == consulta.recetas.length - 1,
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -363,70 +357,167 @@ class ConsultaDetallePage extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // Receta
+  // Recetas
   // ---------------------------------------------------------------------------
 
-  Widget _tarjetaReceta(
+  Widget _tarjetaRecetaCompleta(
     BuildContext context,
-    Receta receta,
-    String nombreMedicina, {
+    Receta receta, {
     required bool esUltima,
   }) {
     final ac = context.appColors;
+    final esAnulada = receta.estado == EstadoReceta.anulada;
+    final esReemplazada = receta.estado == EstadoReceta.reemplazada;
+
     return Container(
-      margin: EdgeInsets.only(bottom: esUltima ? 0 : 10),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: esUltima ? 0 : 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: ac.chipBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: esAnulada || esReemplazada
+              ? ac.red.withValues(alpha: 0.4)
+              : ac.divider,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.medication_rounded, size: 18, color: ac.primaryBlue),
+              Icon(Icons.description_outlined, size: 20, color: ac.primaryBlue),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  nombreMedicina,
-                  style: TextStyle(
-                    color: ac.textPrimary,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                receta.codigoReceta.isNotEmpty
+                    ? receta.codigoReceta
+                    : 'Receta Médica',
+                style: TextStyle(
+                  color: ac.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
+              if (esAnulada)
+                _pillStatus('ANULADA', ac.red)
+              else if (esReemplazada)
+                _pillStatus('REEMPLAZADA', ac.amber)
+              else
+                _pillStatus('ACTIVA', ac.green),
             ],
           ),
-          if (receta.title.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Emitida el ${fechaCortaEs(receta.fechaEmision)}',
+            style: TextStyle(color: ac.textMuted, fontSize: 11.5),
+          ),
+          const SizedBox(height: 12),
+
+          // Renglones de medicamentos
+          for (var i = 0; i < receta.items.length; i++)
+            _itemRenglonMedicamento(context, receta.items[i], index: i + 1),
+
+          // Indicaciones generales
+          if ((receta.indicacionesGenerales ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Indicaciones generales:',
+              style: TextStyle(
+                color: ac.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.only(left: 26),
-              child: Text(
-                receta.title.trim(),
-                style: TextStyle(color: ac.textMuted, fontSize: 12.5),
+            Text(
+              receta.indicacionesGenerales!.trim(),
+              style: TextStyle(
+                color: ac.textSecondary,
+                fontSize: 12.5,
+                height: 1.35,
               ),
             ),
           ],
-          const SizedBox(height: 10),
+
+          // Justificación médica ante contraindicaciones
+          if ((receta.justificacionContraindicaciones ?? '')
+              .trim()
+              .isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: ac.amber),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Justificación: ${receta.justificacionContraindicaciones!.trim()}',
+                    style: TextStyle(
+                      color: ac.amber,
+                      fontSize: 11.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _itemRenglonMedicamento(
+    BuildContext context,
+    ItemReceta item, {
+    required int index,
+  }) {
+    final ac = context.appColors;
+    final titulo = item.presentacionConcentracion.isNotEmpty
+        ? '$index. ${item.nombreMedicamento} (${item.presentacionConcentracion})'
+        : '$index. ${item.nombreMedicamento}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: ac.divider.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            titulo,
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              _pildoraReceta(context, 'Dosis', receta.dosis),
-              _pildoraReceta(context, 'Frecuencia', receta.frecuencia),
-              _pildoraReceta(context, 'Duración', receta.duracion),
+              _pildoraReceta(context, 'Dosis', item.dosis),
+              _pildoraReceta(context, 'Vía', item.viaAdministracion),
+              _pildoraReceta(context, 'Frecuencia', item.frecuencia),
+              _pildoraReceta(context, 'Duración', item.duracion),
+              if (item.cantidadIndicada.isNotEmpty)
+                _pildoraReceta(context, 'Cantidad', item.cantidadIndicada),
             ],
           ),
-          if (receta.indicaciones.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
+          if ((item.indicacionesEspecificas ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
             Text(
-              receta.indicaciones.trim(),
+              item.indicacionesEspecificas!.trim(),
               style: TextStyle(
                 color: ac.textSecondary,
-                fontSize: 13,
-                height: 1.4,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -435,15 +526,33 @@ class ConsultaDetallePage extends StatelessWidget {
     );
   }
 
+  Widget _pillStatus(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   Widget _pildoraReceta(BuildContext context, String label, String valor) {
     final ac = context.appColors;
     if (valor.trim().isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ac.cardBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ac.divider),
+        color: ac.chipBg,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: RichText(
         text: TextSpan(
@@ -452,7 +561,7 @@ class ConsultaDetallePage extends StatelessWidget {
               text: '$label: ',
               style: TextStyle(
                 color: ac.textMuted,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -460,7 +569,7 @@ class ConsultaDetallePage extends StatelessWidget {
               text: valor.trim(),
               style: TextStyle(
                 color: ac.textPrimary,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -584,7 +693,7 @@ class ConsultaDetallePage extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Column(
@@ -659,7 +768,7 @@ class ConsultaDetallePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Total calculado sobre los precios congelados de los '
+                'Total calculated sobre los precios congelados de los '
                 'tratamientos aplicados en esta consulta.',
                 style: TextStyle(
                   color: ac.textMuted,

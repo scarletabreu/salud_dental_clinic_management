@@ -10,11 +10,9 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/wi
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
-/// Sección "Receta" del workspace de consulta: buscador de medicinas,
-/// verificación de contraindicaciones (mismo diálogo de HOTFIX-5) y lista
-/// editable de ítems en memoria vía ConsultaCubit.
 class SeccionReceta extends StatefulWidget {
   final List<Condicion> condicionesPaciente;
   final List<Receta> recetas;
@@ -32,6 +30,9 @@ class SeccionReceta extends StatefulWidget {
 class _SeccionRecetaState extends State<SeccionReceta> {
   List<Medicina> _catalogo = const [];
   bool _cargando = true;
+
+  List<ItemReceta> get _itemsReceta =>
+      widget.recetas.expand((r) => r.items).toList();
 
   @override
   void initState() {
@@ -75,14 +76,13 @@ class _SeccionRecetaState extends State<SeccionReceta> {
     }
 
     if (!mounted) return;
-    final receta = await mostrarRecetaItemFormDialog(
-      context,
-      medicina,
-      justificacionClinica: justificacion,
-    );
-    if (receta == null || !mounted) return;
+    final itemReceta = await mostrarRecetaItemFormDialog(context, medicina);
+    if (itemReceta == null || !mounted) return;
 
-    consultaCubit.agregarItemReceta(receta);
+    consultaCubit.agregarItemReceta(
+      itemReceta: itemReceta,
+      justificacion: justificacion,
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -97,13 +97,17 @@ class _SeccionRecetaState extends State<SeccionReceta> {
 
   Future<void> _onQuitar(int index) async {
     final ac = context.appColors;
+    final items = _itemsReceta;
+    if (index < 0 || index >= items.length) return;
+
+    final item = items[index];
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Quitar de la receta'),
         content: Text(
-          '¿Quitar "${widget.recetas[index].title}" de la receta?',
+          '¿Quitar "${item.nombreMedicamento}" de la receta?',
           style: TextStyle(color: ac.textSecondary, fontSize: 13, height: 1.3),
         ),
         actions: [
@@ -126,6 +130,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final items = _itemsReceta;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -159,7 +164,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Receta',
+                      'Receta Médica',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -169,7 +174,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Medicinas recetadas en esta consulta',
+                      'Medicinas y prescripciones de esta consulta',
                       style: TextStyle(fontSize: 11, color: ac.textMuted),
                     ),
                   ],
@@ -195,7 +200,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
           const SizedBox(height: 16),
           Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          if (widget.recetas.isEmpty)
+          if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
@@ -206,8 +211,8 @@ class _SeccionRecetaState extends State<SeccionReceta> {
           else
             Column(
               children: [
-                for (var i = 0; i < widget.recetas.length; i++)
-                  _tarjetaItem(context, widget.recetas[i], i),
+                for (var i = 0; i < items.length; i++)
+                  _tarjetaItem(context, items[i], i, total: items.length),
               ],
             ),
         ],
@@ -215,12 +220,19 @@ class _SeccionRecetaState extends State<SeccionReceta> {
     );
   }
 
-  Widget _tarjetaItem(BuildContext context, Receta receta, int index) {
+  Widget _tarjetaItem(
+    BuildContext context,
+    ItemReceta item,
+    int index, {
+    required int total,
+  }) {
     final ac = context.appColors;
+    final titulo = item.presentacionConcentracion.isNotEmpty
+        ? '${item.nombreMedicamento} (${item.presentacionConcentracion})'
+        : item.nombreMedicamento;
+
     return Container(
-      margin: EdgeInsets.only(
-        bottom: index == widget.recetas.length - 1 ? 0 : 10,
-      ),
+      margin: EdgeInsets.only(bottom: index == total - 1 ? 0 : 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ac.chipBg,
@@ -235,7 +247,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  receta.title,
+                  titulo,
                   style: TextStyle(
                     color: ac.textPrimary,
                     fontSize: 14.5,
@@ -255,40 +267,23 @@ class _SeccionRecetaState extends State<SeccionReceta> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _pildora(ac, 'Dosis', receta.dosis),
-              _pildora(ac, 'Frecuencia', receta.frecuencia),
-              _pildora(ac, 'Duración', receta.duracion),
+              _pildora(ac, 'Dosis', item.dosis),
+              _pildora(ac, 'Vía', item.viaAdministracion),
+              _pildora(ac, 'Frecuencia', item.frecuencia),
+              _pildora(ac, 'Duración', item.duracion),
+              if (item.cantidadIndicada.isNotEmpty)
+                _pildora(ac, 'Cantidad', item.cantidadIndicada),
             ],
           ),
-          if (receta.indicaciones.trim().isNotEmpty) ...[
+          if ((item.indicacionesEspecificas ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              receta.indicaciones.trim(),
+              item.indicacionesEspecificas!.trim(),
               style: TextStyle(
                 color: ac.textSecondary,
                 fontSize: 12.5,
                 height: 1.4,
               ),
-            ),
-          ],
-          if ((receta.notas ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.warning_amber_rounded, size: 14, color: ac.amber),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    receta.notas!.trim(),
-                    style: TextStyle(
-                      color: ac.amber,
-                      fontSize: 11.5,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ],

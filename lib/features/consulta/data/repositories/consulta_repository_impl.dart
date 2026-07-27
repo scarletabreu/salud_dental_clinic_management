@@ -29,7 +29,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<List<Consulta>> getConsultas() {
     return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultas();
-      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+      return _parsearConsultas(data);
     }, context: 'obtener las consultas');
   }
 
@@ -37,8 +37,25 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<List<Consulta>> getConsultasByDoctor(String doctorId) {
     return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultasByDoctor(doctorId);
-      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+      return _parsearConsultas(data);
     }, context: 'obtener las consultas');
+  }
+
+  /// Una fila que no se puede leer se registra y se omite, en vez de abortar
+  /// todo el listado. Un `.map()` directo convertía cualquier fila con una
+  /// forma inesperada en una pantalla de error sin detalle para el usuario y
+  /// sin rastro para nosotros: se perdían las 37 consultas legibles por culpa
+  /// de la 38.ª. El fallo sigue siendo visible en el log, no se silencia.
+  List<Consulta> _parsearConsultas(List<Map<String, dynamic>> filas) {
+    final consultas = <Consulta>[];
+    for (final fila in filas) {
+      try {
+        consultas.add(ConsultaModel.fromJson(fila));
+      } catch (e, stack) {
+        AppLog.error('parsear la consulta ${fila['id']}', e, stack);
+      }
+    }
+    return consultas;
   }
 
   bool _isValidUuid(String? id) =>

@@ -6,32 +6,21 @@ import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 
-const _labels = [
-  'Inicio',
-  'Mis Citas del Día',
-  'Consultas',
-  'Pacientes',
-  'Cuentas por Cobrar',
-  'Perfiles',
-  'Caja',
-  'Equipos',
-  'Medicinas',
-  'Tratamientos',
-  'Configuración',
-];
+const _ids = ShellDestinationId.values;
 
-List<ShellDestination> _destinations(List<String> labels) => [
-  for (final label in labels)
+List<ShellDestination> _destinations(List<ShellDestinationId> ids) => [
+  for (final id in ids)
     ShellDestination(
+      id: id,
       icon: Icons.circle_outlined,
       selectedIcon: Icons.circle,
-      label: label,
-      builder: (_) => Text(label),
+      label: id.name,
+      builder: (_) => Text(id.name),
     ),
 ];
 
 Widget _mobileShell(
-  List<String> labels,
+  List<ShellDestinationId> ids,
   ValueChanged<int> onSelect, {
   double textScale = 1,
 }) {
@@ -46,7 +35,8 @@ Widget _mobileShell(
     home: Scaffold(
       body: const SizedBox.expand(),
       bottomNavigationBar: ShellMobileNavigation(
-        destinations: _destinations(labels),
+        destinations: _destinations(ids),
+        primaryDestinations: _destinations(ids.take(4).toList()),
         selectedIndex: 0,
         onDestinationSelected: onSelect,
       ),
@@ -72,7 +62,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(_mobileShell(_labels, (_) {}));
+      await tester.pumpWidget(_mobileShell(_ids, (_) {}));
 
       expect(
         ShellLayoutResolution.of(
@@ -96,28 +86,28 @@ void main() {
     addTearDown(tester.view.reset);
     var selected = -1;
 
-    await tester.pumpWidget(_mobileShell(_labels, (index) => selected = index));
+    await tester.pumpWidget(_mobileShell(_ids, (index) => selected = index));
     expect(
-      find.byKey(const ValueKey('mobile-navigation-Inicio')),
+      find.byKey(const ValueKey('mobile-navigation-inicio')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('mobile-navigation-Más')), findsOneWidget);
-    expect(find.text('Perfiles'), findsNothing);
+    expect(find.text('perfiles'), findsNothing);
 
     await tester.tap(find.text('Más'));
     await tester.pumpAndSettle();
-    for (final label in _labels.skip(3)) {
+    for (final id in _ids.skip(4)) {
       await tester.scrollUntilVisible(
-        find.text(label),
+        find.text(id.name),
         120,
         scrollable: find.byType(Scrollable).last,
       );
-      expect(find.text(label), findsOneWidget);
+      expect(find.text(id.name), findsOneWidget);
     }
 
-    await tester.tap(find.text('Configuración'));
+    await tester.tap(find.text('configuracion'));
     await tester.pumpAndSettle();
-    expect(selected, _labels.indexOf('Configuración'));
+    expect(selected, _ids.indexOf(ShellDestinationId.configuracion));
     expect(tester.takeException(), isNull);
   });
 
@@ -128,7 +118,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(_mobileShell(_labels, (_) {}, textScale: 2));
+    await tester.pumpWidget(_mobileShell(_ids, (_) {}, textScale: 2));
     expect(find.text('Más'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -136,7 +126,7 @@ void main() {
   testWidgets('mobile navigation uses the sidebar visual language', (
     tester,
   ) async {
-    await tester.pumpWidget(_mobileShell(_labels, (_) {}));
+    await tester.pumpWidget(_mobileShell(_ids, (_) {}));
 
     final itemDecorations = tester
         .widgetList<Container>(find.byType(Container))
@@ -153,42 +143,142 @@ void main() {
   });
 
   test('permissions expose exactly the modules permitted by each role', () {
-    final admin = _labels
-        .where(
-          (label) => ShellDestinationAccess.allows(label, [RolUsuario.admin]),
-        )
+    final admin = _ids
+        .where((id) => ShellDestinationAccess.allows(id, [RolUsuario.admin]))
         .toList();
-    final doctor = _labels
-        .where(
-          (label) => ShellDestinationAccess.allows(label, [RolUsuario.doctor]),
-        )
+    final doctor = _ids
+        .where((id) => ShellDestinationAccess.allows(id, [RolUsuario.doctor]))
         .toList();
-    final assistant = _labels
+    final assistant = _ids
         .where(
-          (label) =>
-              ShellDestinationAccess.allows(label, [RolUsuario.asistente]),
+          (id) => ShellDestinationAccess.allows(id, [RolUsuario.asistente]),
         )
         .toList();
 
-    expect(admin, _labels);
+    expect(admin, _ids);
     expect(doctor, [
-      'Inicio',
-      'Mis Citas del Día',
-      'Consultas',
-      'Pacientes',
-      'Cuentas por Cobrar',
-      'Medicinas',
-      'Tratamientos',
-      'Configuración',
+      ShellDestinationId.inicio,
+      ShellDestinationId.citasDelDia,
+      ShellDestinationId.consultas,
+      ShellDestinationId.pacientes,
+      ShellDestinationId.cuentasPorCobrar,
+      ShellDestinationId.tratamientos,
+      ShellDestinationId.medicinas,
+      ShellDestinationId.configuracion,
     ]);
     expect(assistant, [
-      'Inicio',
-      'Mis Citas del Día',
-      'Pacientes',
-      'Cuentas por Cobrar',
-      'Caja',
-      'Configuración',
+      ShellDestinationId.inicio,
+      ShellDestinationId.citasDelDia,
+      ShellDestinationId.pacientes,
+      ShellDestinationId.cuentasPorCobrar,
+      ShellDestinationId.caja,
+      ShellDestinationId.configuracion,
     ]);
+  });
+
+  test('renaming a destination label does not change its permissions', () {
+    final renamed = ShellDestination(
+      id: ShellDestinationId.consultas,
+      icon: Icons.circle_outlined,
+      selectedIcon: Icons.circle,
+      label: 'Clinical workspace',
+      builder: (_) => const SizedBox.shrink(),
+    );
+
+    expect(
+      ShellDestinationAccess.allows(renamed.id, [RolUsuario.doctor]),
+      isTrue,
+    );
+    expect(
+      ShellDestinationAccess.allows(renamed.id, [RolUsuario.asistente]),
+      isFalse,
+    );
+  });
+
+  test('each role sees only non-empty work sections in role order', () {
+    final sections = [
+      ShellSection(
+        title: 'Atención',
+        destinations: _destinations(const [
+          ShellDestinationId.inicio,
+          ShellDestinationId.citasDelDia,
+          ShellDestinationId.consultas,
+          ShellDestinationId.pacientes,
+        ]),
+      ),
+      ShellSection(
+        title: 'Facturación',
+        destinations: _destinations(const [
+          ShellDestinationId.cuentasPorCobrar,
+          ShellDestinationId.caja,
+        ]),
+      ),
+      ShellSection(
+        title: 'Catálogos',
+        destinations: _destinations(const [
+          ShellDestinationId.tratamientos,
+          ShellDestinationId.medicinas,
+          ShellDestinationId.inventario,
+        ]),
+      ),
+      ShellSection(
+        title: 'Administración',
+        destinations: _destinations(const [
+          ShellDestinationId.perfiles,
+          ShellDestinationId.equipos,
+        ]),
+      ),
+    ];
+
+    List<List<ShellDestinationId>> visibleFor(RolUsuario role) =>
+        ShellDestinationAccess.visibleSections(sections, [role])
+            .map(
+              (section) => section.destinations.map((item) => item.id).toList(),
+            )
+            .toList();
+
+    expect(visibleFor(RolUsuario.admin), [
+      [
+        ShellDestinationId.inicio,
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.consultas,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar, ShellDestinationId.caja],
+      [
+        ShellDestinationId.tratamientos,
+        ShellDestinationId.medicinas,
+        ShellDestinationId.inventario,
+      ],
+      [ShellDestinationId.perfiles, ShellDestinationId.equipos],
+    ]);
+    expect(visibleFor(RolUsuario.doctor), [
+      [
+        ShellDestinationId.inicio,
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.consultas,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar],
+      [ShellDestinationId.tratamientos, ShellDestinationId.medicinas],
+    ]);
+    expect(visibleFor(RolUsuario.asistente), [
+      [
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.inicio,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar, ShellDestinationId.caja],
+    ]);
+
+    for (final role in RolUsuario.values) {
+      expect(
+        ShellDestinationAccess.visibleSections(sections, [role]),
+        everyElement(
+          predicate<ShellSection>((section) => section.destinations.isNotEmpty),
+        ),
+      );
+    }
   });
 
   test('landscape and keyboard remain compact', () {

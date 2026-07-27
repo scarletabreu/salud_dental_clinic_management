@@ -1,33 +1,24 @@
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
 class CitaRemoteDataSource {
   final SupabaseClient supabase;
 
   CitaRemoteDataSource(this.supabase);
 
+  /// Citas reales de la base. Un fallo de red, de RLS o de esquema se propaga
+  /// para que el guard del repositorio lo convierta en un `Failure` tipado y la
+  /// agenda pinte su estado de error: nunca se sustituye por datos inventados.
   Future<List<CitaModel>> fetchCitas() async {
-    try {
-      final citasRes = await supabase
-          .from('citas')
-          .select('*')
-          .filter('deleted_at', 'is', null);
+    final citasRes = await supabase
+        .from('citas')
+        .select('*')
+        .filter('deleted_at', 'is', null);
 
-      final raw = citasRes as List;
-      if (raw.isEmpty) return _citasPrueba;
-
-      final real = await _assembleCitas(raw);
-      return real.isEmpty ? _citasPrueba : real;
-    } catch (e, stack) {
-      AppLog.error('fetchCitas', e, stack);
-      return _citasPrueba;
-    }
+    return _assembleCitas(citasRes as List);
   }
 
   Future<List<CitaModel>> fetchCitasByPaciente(String pacienteId) async {
@@ -189,20 +180,22 @@ class CitaRemoteDataSource {
         .eq('id', id);
   }
 
-  /// Devuelve el estado actual de la cita en la BD, o `null` si no existe
-  /// (p. ej. datos de prueba con ids que no son UUID).
-  Future<EstadoCita?> fetchEstadoCita(String id) async {
-    try {
-      final res = await supabase
-          .from('citas')
-          .select('estado')
-          .eq('id', id)
-          .maybeSingle();
-      if (res == null) return null;
-      return EstadoCita.fromDb(res['estado'] as String?);
-    } on PostgrestException {
-      return null;
+  /// Estado actual de la cita en la BD.
+  ///
+  /// Falla si el id no corresponde a ninguna fila. Antes devolvía `null` para
+  /// tolerar los ids sintéticos de la agenda de prueba; eliminada esa fuente
+  /// (SD-161), un id desconocido o mal formado es un defecto real y debe verse
+  /// como error en vez de saltarse la validación de transiciones.
+  Future<EstadoCita> fetchEstadoCita(String id) async {
+    final res = await supabase
+        .from('citas')
+        .select('estado')
+        .eq('id', id)
+        .maybeSingle();
+    if (res == null) {
+      throw ServerFailure('La cita $id ya no existe o fue eliminada.');
     }
+    return EstadoCita.fromDb(res['estado'] as String?);
   }
 
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
@@ -217,292 +210,4 @@ class CitaRemoteDataSource {
 
   bool _isValidUuid(dynamic id) =>
       id != null && id is String && id.length == 36 && id.contains('-');
-
-  static final _empty = [ContactoModel.empty()];
-
-  static Doctor _doc(
-    String id,
-    String nombre,
-    String apellido,
-    String especialidad,
-  ) => Doctor(
-    id: id,
-    nombre: nombre,
-    apellido: apellido,
-    birthDate: DateTime(1980, 1, 1),
-    govID: '001-0000000-0',
-    contactos: _empty,
-    estatus: EstatusPersona.activo,
-    username: '',
-    passwordHash: '',
-    specialty: especialidad,
-    assistants: const [],
-  );
-
-  static Persona _pac(String id, String nombre, String apellido) => Persona(
-    id: id,
-    nombre: nombre,
-    apellido: apellido,
-    birthDate: DateTime(1990, 1, 1),
-    govID: '001-0000000-0',
-    contactos: _empty,
-    estatus: EstatusPersona.activo,
-  );
-
-  static final _docFernandez = _doc('d1', 'Carlos', 'Fernández', 'Ortodoncia');
-  static final _docRodriguez = _doc('d2', 'Ana', 'Rodríguez', 'Endodoncia');
-  static final _docLopez = _doc('d3', 'Luis', 'López', 'Periodoncia');
-
-  static final _pacAlonso = _pac('p1', 'Pedro', 'Alonso');
-  static final _pacSantos = _pac('p2', 'María', 'Santos');
-  static final _pacMendez = _pac('p3', 'Juan', 'Méndez');
-  static final _pacCastillo = _pac('p4', 'Laura', 'Castillo');
-  static final _pacGarcia = _pac('p5', 'Roberto', 'García');
-  static final _pacHerrera = _pac('p6', 'Sofía', 'Herrera');
-
-  static CitaModel _cita(
-    String id,
-    Doctor doc,
-    Persona pac,
-    int month,
-    int day,
-    int hour,
-    int min,
-    EstadoCita estado, {
-    bool urgente = false,
-    int duracion = 30,
-  }) => CitaModel(
-    id: id,
-    doctor: doc,
-    persona: pac,
-    date: DateTime(2026, month, day, hour, min),
-    duracionMinutos: duracion,
-    esEmergencia: urgente,
-    estado: estado,
-  );
-
-  static final List<CitaModel> _citasPrueba = [
-    _cita(
-      't01',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      5,
-      9,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't02',
-      _docRodriguez,
-      _pacSantos,
-      5,
-      12,
-      10,
-      30,
-      EstadoCita.completada,
-      duracion: 90,
-    ),
-    _cita(
-      't03',
-      _docLopez,
-      _pacMendez,
-      5,
-      12,
-      14,
-      0,
-      EstadoCita.completada,
-      duracion: 45,
-    ),
-    _cita(
-      't04',
-      _docFernandez,
-      _pacCastillo,
-      5,
-      13,
-      11,
-      0,
-      EstadoCita.cancelada,
-      duracion: 60,
-    ),
-    _cita(
-      't05',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      18,
-      8,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't06',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      18,
-      10,
-      0,
-      EstadoCita.programada,
-      urgente: true,
-      duracion: 30,
-    ),
-    _cita(
-      't07',
-      _docLopez,
-      _pacHerrera,
-      5,
-      18,
-      15,
-      30,
-      EstadoCita.programada,
-      duracion: 90,
-    ),
-    _cita(
-      't08',
-      _docFernandez,
-      _pacSantos,
-      5,
-      19,
-      9,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't09',
-      _docRodriguez,
-      _pacMendez,
-      5,
-      19,
-      14,
-      0,
-      EstadoCita.completada,
-      duracion: 120,
-    ),
-    _cita(
-      't10',
-      _docLopez,
-      _pacCastillo,
-      5,
-      20,
-      10,
-      30,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't11',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      21,
-      9,
-      0,
-      EstadoCita.completada,
-      urgente: true,
-      duracion: 45,
-    ),
-    _cita(
-      't12',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      21,
-      16,
-      0,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't13',
-      _docLopez,
-      _pacHerrera,
-      5,
-      22,
-      11,
-      0,
-      EstadoCita.cancelada,
-      duracion: 30,
-    ),
-    _cita(
-      't14',
-      _docFernandez,
-      _pacSantos,
-      5,
-      25,
-      8,
-      30,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't15',
-      _docRodriguez,
-      _pacMendez,
-      5,
-      25,
-      11,
-      0,
-      EstadoCita.programada,
-      duracion: 90,
-    ),
-    _cita(
-      't16',
-      _docLopez,
-      _pacCastillo,
-      5,
-      25,
-      14,
-      30,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't17',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      25,
-      17,
-      0,
-      EstadoCita.programada,
-      duracion: 30,
-    ),
-    _cita(
-      't18',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      27,
-      9,
-      0,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't19',
-      _docLopez,
-      _pacHerrera,
-      5,
-      27,
-      13,
-      0,
-      EstadoCita.completada,
-      duracion: 45,
-    ),
-    _cita(
-      't20',
-      _docFernandez,
-      _pacSantos,
-      5,
-      28,
-      10,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-  ];
 }

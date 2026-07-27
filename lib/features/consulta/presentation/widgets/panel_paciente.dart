@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 
 class PanelPaciente extends StatelessWidget {
   final Paciente paciente;
@@ -150,31 +151,14 @@ class _IdentityHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iniciales =
-        '${paciente.nombre.isNotEmpty ? paciente.nombre[0] : ''}'
-        '${paciente.apellido.isNotEmpty ? paciente.apellido[0] : ''}';
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: ac.primaryBlue,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              iniciales.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                letterSpacing: 0.5,
-              ),
-            ),
+          PacienteAvatar(
+            paciente: paciente,
+            size: 48,
+            backgroundColor: ac.primaryBlue,
           ),
           const SizedBox(width: 12),
           Expanded(

@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
@@ -367,14 +368,26 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           const SizedBox(height: 14),
-          Text(
-            p.fullName,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1.1,
-            ),
+          Row(
+            children: [
+              PacienteAvatar(
+                paciente: p,
+                size: 58,
+                backgroundColor: ac.primaryBlue,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  p.fullName,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: ac.textPrimary,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Wrap(

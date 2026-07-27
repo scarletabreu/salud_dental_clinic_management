@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
@@ -11,8 +13,10 @@ import 'package:salud_dental_clinic_management/features/condicion/domain/reposit
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
 
 enum PacienteFormModo { editar, completarRegistro }
@@ -127,6 +131,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   bool _cargandoCondiciones = true;
   bool _guardandoCondiciones = false;
   bool _isProcessingSave = false;
+  Uint8List? _fotoPendiente;
+  bool _eliminarFotoPendiente = false;
+  bool _procesandoFoto = false;
 
   bool get _isCompletarRegistro =>
       widget.modo == PacienteFormModo.completarRegistro;
@@ -337,6 +344,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _isProcessingSave = true;
 
     try {
+      if (!await _guardarFotoPendiente() || !mounted) return;
       await _guardarDiffCondiciones();
       if (!mounted) return;
 
@@ -358,6 +366,110 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       }
     } finally {
       _isProcessingSave = false;
+    }
+  }
+
+  Future<bool> _guardarFotoPendiente() async {
+    final pacienteId = widget.paciente.id;
+    if (pacienteId == null ||
+        (_fotoPendiente == null && !_eliminarFotoPendiente)) {
+      return true;
+    }
+
+    setState(() => _procesandoFoto = true);
+    try {
+      final storage = sl<PacienteFotoStorage>();
+      if (_fotoPendiente != null) {
+        await storage.guardar(pacienteId: pacienteId, bytes: _fotoPendiente!);
+      } else if (_eliminarFotoPendiente && widget.paciente.fotoRuta != null) {
+        await storage.eliminar(
+          pacienteId: pacienteId,
+          ruta: widget.paciente.fotoRuta!,
+        );
+      }
+    } catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.red,
+          content: Text('No se pudo guardar la fotografía: $error'),
+        ),
+      );
+      // El resto de la ficha ya se guardó; dejamos la pantalla abierta para
+      // que el usuario pueda reintentar la foto sin perder su selección.
+      return false;
+    } finally {
+      if (mounted) setState(() => _procesandoFoto = false);
+    }
+    return true;
+  }
+
+  Future<void> _elegirFoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de galería'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar fotografía'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    setState(() => _procesandoFoto = true);
+    try {
+      final selected = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 95,
+      );
+      if (selected == null) return;
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: selected.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 92,
+      );
+      if (cropped == null) return;
+      final optimizada = await sl<PacienteFotoStorage>().preparar(
+        await cropped.readAsBytes(),
+      );
+      if (mounted) {
+        setState(() {
+          _fotoPendiente = optimizada;
+          _eliminarFotoPendiente = false;
+        });
+      }
+    } on FormatoFotoInvalido catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: Text(error.message),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: const Text('No se pudo preparar la fotografía.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _procesandoFoto = false);
     }
   }
 
@@ -410,6 +522,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     _buildAvisoCompletarRegistro(ac),
                     const SizedBox(height: 16),
                   ],
+                  _buildFotoCard(ac),
+                  const SizedBox(height: 16),
                   _buildDatosPersonalesCard(ac),
                   const SizedBox(height: 16),
                   _buildContactosCard(ac),
@@ -426,6 +540,84 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFotoCard(AppColors ac) {
+    final hasCurrent =
+        widget.paciente.fotoRuta != null && !_eliminarFotoPendiente;
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.primaryBlue,
+      iconBg: ac.primaryBlue.withOpacity(0.10),
+      icon: Icons.account_circle_outlined,
+      title: 'Fotografía de identificación',
+      child: Row(
+        children: [
+          if (_fotoPendiente != null)
+            ClipOval(
+              child: Image.memory(
+                _fotoPendiente!,
+                width: 88,
+                height: 88,
+                fit: BoxFit.cover,
+              ),
+            )
+          else if (hasCurrent)
+            PacienteAvatar(paciente: widget.paciente, size: 88)
+          else
+            PacienteAvatar(paciente: widget.paciente, size: 88),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _procesandoFoto
+                      ? 'Preparando imagen…'
+                      : 'JPG, PNG o WebP · máximo 10 MB',
+                  style: TextStyle(fontSize: 12, color: ac.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _procesandoFoto ? null : _elegirFoto,
+                      icon: const Icon(
+                        Icons.photo_camera_back_outlined,
+                        size: 16,
+                      ),
+                      label: Text(
+                        hasCurrent || _fotoPendiente != null
+                            ? 'Reemplazar'
+                            : 'Agregar foto',
+                      ),
+                    ),
+                    if (hasCurrent || _fotoPendiente != null)
+                      TextButton.icon(
+                        onPressed: _procesandoFoto
+                            ? null
+                            : () => setState(() {
+                                _fotoPendiente = null;
+                                _eliminarFotoPendiente =
+                                    widget.paciente.fotoRuta != null;
+                              }),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 16,
+                        ),
+                        label: const Text('Quitar'),
+                        style: TextButton.styleFrom(foregroundColor: ac.red),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

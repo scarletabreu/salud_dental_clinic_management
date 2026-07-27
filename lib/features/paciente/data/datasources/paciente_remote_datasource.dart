@@ -326,6 +326,10 @@ class PacienteRemoteDatasource {
           'referencia': paciente.referencia,
           'peso': paciente.peso,
           'altura': paciente.altura,
+          'foto_ruta': paciente.fotoRuta,
+          'foto_mime_type': paciente.fotoMimeType,
+          'foto_tamano_bytes': paciente.fotoTamanoBytes,
+          'foto_actualizada_en': paciente.fotoActualizadaEn?.toIso8601String(),
           'updated_at': now,
         })
         .eq('id', pacienteId);

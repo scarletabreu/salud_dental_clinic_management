@@ -23,6 +23,10 @@ class PacienteModel extends Paciente {
     required super.tipoPaciente,
     super.peso,
     super.altura,
+    super.fotoRuta,
+    super.fotoMimeType,
+    super.fotoTamanoBytes,
+    super.fotoActualizadaEn,
   });
 
   PacienteModel copyWithModel({
@@ -41,6 +45,10 @@ class PacienteModel extends Paciente {
     TipoPaciente? tipoPaciente,
     double? peso,
     double? altura,
+    String? fotoRuta,
+    String? fotoMimeType,
+    int? fotoTamanoBytes,
+    DateTime? fotoActualizadaEn,
   }) {
     return PacienteModel(
       id: id ?? this.id,
@@ -58,6 +66,10 @@ class PacienteModel extends Paciente {
       tipoPaciente: tipoPaciente ?? this.tipoPaciente,
       peso: peso ?? this.peso,
       altura: altura ?? this.altura,
+      fotoRuta: fotoRuta ?? this.fotoRuta,
+      fotoMimeType: fotoMimeType ?? this.fotoMimeType,
+      fotoTamanoBytes: fotoTamanoBytes ?? this.fotoTamanoBytes,
+      fotoActualizadaEn: fotoActualizadaEn ?? this.fotoActualizadaEn,
     );
   }
 
@@ -88,6 +100,12 @@ class PacienteModel extends Paciente {
       referencia: json['referencia'] as String? ?? '',
       peso: parseDouble(json['peso']),
       altura: parseDouble(json['altura']),
+      fotoRuta: json['foto_ruta'] as String?,
+      fotoMimeType: json['foto_mime_type'] as String?,
+      fotoTamanoBytes: (json['foto_tamano_bytes'] as num?)?.toInt(),
+      fotoActualizadaEn: json['foto_actualizada_en'] == null
+          ? null
+          : DateTime.tryParse(json['foto_actualizada_en'] as String),
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),
@@ -103,6 +121,10 @@ class PacienteModel extends Paciente {
       'referencia': referencia,
       'peso': peso,
       'altura': altura,
+      'foto_ruta': fotoRuta,
+      'foto_mime_type': fotoMimeType,
+      'foto_tamano_bytes': fotoTamanoBytes,
+      'foto_actualizada_en': fotoActualizadaEn?.toIso8601String(),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {
@@ -158,6 +180,10 @@ class PacienteModel extends Paciente {
       tipoPaciente: paciente.tipoPaciente,
       peso: paciente.peso,
       altura: paciente.altura,
+      fotoRuta: paciente.fotoRuta,
+      fotoMimeType: paciente.fotoMimeType,
+      fotoTamanoBytes: paciente.fotoTamanoBytes,
+      fotoActualizadaEn: paciente.fotoActualizadaEn,
     );
   }
 }

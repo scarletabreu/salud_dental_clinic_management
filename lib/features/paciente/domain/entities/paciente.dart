@@ -15,6 +15,12 @@ class Paciente extends Persona {
   final double? peso;
   final double? altura;
 
+  /// Solo se persiste la ruta privada de Storage y datos técnicos, nunca una URL.
+  final String? fotoRuta;
+  final String? fotoMimeType;
+  final int? fotoTamanoBytes;
+  final DateTime? fotoActualizadaEn;
+
   Paciente({
     super.id,
     required super.nombre,
@@ -31,6 +37,10 @@ class Paciente extends Persona {
     required this.tipoPaciente,
     this.peso,
     this.altura,
+    this.fotoRuta,
+    this.fotoMimeType,
+    this.fotoTamanoBytes,
+    this.fotoActualizadaEn,
   });
 
   Paciente copyWith({
@@ -44,6 +54,10 @@ class Paciente extends Persona {
     TipoPaciente? tipoPaciente,
     double? peso,
     double? altura,
+    String? fotoRuta,
+    String? fotoMimeType,
+    int? fotoTamanoBytes,
+    DateTime? fotoActualizadaEn,
   }) {
     return Paciente(
       id: id,
@@ -61,6 +75,10 @@ class Paciente extends Persona {
       tipoPaciente: tipoPaciente ?? this.tipoPaciente,
       peso: peso ?? this.peso,
       altura: altura ?? this.altura,
+      fotoRuta: fotoRuta ?? this.fotoRuta,
+      fotoMimeType: fotoMimeType ?? this.fotoMimeType,
+      fotoTamanoBytes: fotoTamanoBytes ?? this.fotoTamanoBytes,
+      fotoActualizadaEn: fotoActualizadaEn ?? this.fotoActualizadaEn,
     );
   }
 }

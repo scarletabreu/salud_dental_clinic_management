@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 
 // ── features ──────────────────────────────────────────────────────────────────
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
@@ -468,21 +469,10 @@ class _PacienteRowState extends State<_PacienteRow> {
                           flex: 3,
                           child: Row(
                             children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.onSurface.withOpacity(
-                                    0.04,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 18,
-                                  color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.6),
-                                ),
+                              PacienteAvatar(
+                                paciente: p,
+                                size: 36,
+                                backgroundColor: ac.primaryBlue,
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -588,18 +578,10 @@ class _PacienteRowState extends State<_PacienteRow> {
       children: [
         Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colorScheme.onSurface.withValues(alpha: 0.04),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person_outline_rounded,
-                size: 18,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
+            PacienteAvatar(
+              paciente: p,
+              size: 36,
+              backgroundColor: ac.primaryBlue,
             ),
             const SizedBox(width: 12),
             Expanded(

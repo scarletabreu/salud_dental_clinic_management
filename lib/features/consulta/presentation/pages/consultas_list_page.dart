@@ -131,7 +131,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: finalizada == true,
-                activeColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryBlue,
                 onChanged: (v) =>
                     setModalState(() => finalizada = v ? true : null),
               ),
@@ -141,7 +141,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneNotas == true,
-                activeColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryBlue,
                 onChanged: (v) =>
                     setModalState(() => tieneNotas = v ? true : null),
               ),
@@ -151,7 +151,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneOdontograma == true,
-                activeColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryBlue,
                 onChanged: (v) =>
                     setModalState(() => tieneOdontograma = v ? true : null),
               ),
@@ -161,7 +161,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneRecetas == true,
-                activeColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryBlue,
                 onChanged: (v) =>
                     setModalState(() => tieneRecetas = v ? true : null),
               ),
@@ -171,7 +171,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneTratamientos == true,
-                activeColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryBlue,
                 onChanged: (v) =>
                     setModalState(() => tieneTratamientos = v ? true : null),
               ),
@@ -181,7 +181,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: soloEmergencias == true,
-                activeColor: ac.red,
+                activeThumbColor: ac.red,
                 onChanged: (v) =>
                     setModalState(() => soloEmergencias = v ? true : null),
               ),
@@ -481,6 +481,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       }
       return Column(
         children: [
+          const _IndicadoresConsultasLeyenda(),
           Expanded(
             child: ListView.separated(
               padding: context.pageInsets(top: 4, bottom: 24),
@@ -488,7 +489,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
                 final consulta = state.filtradas[i];
-                return _ConsultaCard(
+                return ConsultaListCard(
                   consulta: consulta,
                   nombrePaciente: state.nombrePaciente(consulta.pacienteId),
                   nombreDoctor: state.nombreDoctor(consulta.doctorId),
@@ -683,14 +684,17 @@ class _DoctorChip extends StatelessWidget {
   }
 }
 
-class _ConsultaCard extends StatelessWidget {
+/// La fila de una consulta conserva el orden de sus controles para que la
+/// acción final forme una columna visual estable en toda la lista.
+class ConsultaListCard extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;
   final String nombreDoctor;
   final bool tieneTratamientos;
   final VoidCallback onTap;
 
-  const _ConsultaCard({
+  const ConsultaListCard({
+    super.key,
     required this.consulta,
     required this.nombrePaciente,
     required this.nombreDoctor,
@@ -784,6 +788,7 @@ class _ConsultaCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
     final esEliminable = esConsultaEliminable(consulta);
+    final layout = context.appLayout;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -829,14 +834,16 @@ class _ConsultaCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(
-                            Icons.medical_services_outlined,
-                            size: 13,
-                            color: colorScheme.onSurfaceVariant.withValues(
-                              alpha: 0.7,
+                          if (!context.isCompactLayout) ...[
+                            Icon(
+                              Icons.medical_services_outlined,
+                              size: 13,
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.7,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
+                            const SizedBox(width: 6),
+                          ],
                           Flexible(
                             child: Text(
                               nombreDoctor,
@@ -852,134 +859,419 @@ class _ConsultaCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 2,
-                    runSpacing: 2,
-                    children: [
-                      if (!consulta.finalizada)
-                        Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ac.amber.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.play_circle_outline_rounded,
-                                size: 13,
-                                color: ac.amber,
-                              ),
-                              if (MediaQuery.textScalerOf(context).scale(1) <=
-                                  1.3) ...[
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    'En curso',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: ac.amber,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      if (tieneTratamientos)
-                        _IndicadorIcono(
-                          icon: Icons.healing_rounded,
-                          color: ac.teal,
-                          tooltip: 'Tratamientos aplicados',
-                        ),
-                      if (consulta.tieneRecetas)
-                        _IndicadorIcono(
-                          icon: Icons.receipt_long_rounded,
-                          color: ac.primaryBlue,
-                          tooltip: 'Tiene receta',
-                        ),
-                      if (esEliminable)
-                        Tooltip(
-                          message: 'Eliminar consulta',
-                          child: InkWell(
-                            onTap: () => _mostrarDialogoEliminar(context),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.delete_outline_rounded,
-                                size: 18,
-                                color: colorScheme.error.withValues(alpha: 0.7),
-                              ),
+                const SizedBox(width: 8),
+                // No es Flexible: el bloque de datos cede primero y esta
+                // gramática conserva su ancho, anclando su acción final.
+                _AccionesConsulta(
+                  consulta: consulta,
+                  tieneTratamientos: tieneTratamientos,
+                  esEliminable: esEliminable,
+                  layout: layout,
+                  onEliminar: () => _mostrarDialogoEliminar(context),
+                  onContinuar: () async {
+                    final resultado = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MultiBlocProvider(
+                          providers: [
+                            BlocProvider(
+                              create: (_) =>
+                                  sl<PacienteCubit>()
+                                    ..loadParaConsulta(consulta.pacienteId),
                             ),
+                            BlocProvider(create: (_) => sl<ConsultaCubit>()),
+                          ],
+                          child: EfectuarConsultaPage(
+                            citaId: consulta.citaId ?? '',
+                            pacienteId: consulta.pacienteId,
+                            doctorId: consulta.doctorId,
+                            consultaId: consulta.id,
                           ),
                         ),
-                      if (!consulta.finalizada)
-                        TextButton.icon(
-                          onPressed: () async {
-                            final resultado = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => MultiBlocProvider(
-                                  providers: [
-                                    BlocProvider(
-                                      create: (_) => sl<PacienteCubit>()
-                                        ..loadParaConsulta(consulta.pacienteId),
-                                    ),
-                                    BlocProvider(
-                                      create: (_) => sl<ConsultaCubit>(),
-                                    ),
-                                  ],
-                                  child: EfectuarConsultaPage(
-                                    citaId: consulta.citaId ?? '',
-                                    pacienteId: consulta.pacienteId,
-                                    doctorId: consulta.doctorId,
-                                    consultaId: consulta.id,
-                                  ),
-                                ),
-                              ),
-                            );
-                            if (resultado == true && context.mounted) {
-                              context.read<ConsultasListCubit>().recargar();
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.navigate_next_rounded,
-                            size: 16,
-                          ),
-                          label: const Text('Continuar'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: ac.primaryBlue,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 0,
-                            ),
-                          ),
-                        )
-                      else
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.5,
-                          ),
-                        ),
-                    ],
-                  ),
+                      ),
+                    );
+                    if (resultado == true && context.mounted) {
+                      context.read<ConsultasListCubit>().recargar();
+                    }
+                  },
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IndicadoresConsultasLeyenda extends StatelessWidget {
+  const _IndicadoresConsultasLeyenda();
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final textoVisible = MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+    return Padding(
+      padding: context.pageInsets(top: 0, bottom: 8),
+      child: Semantics(
+        container: true,
+        label: 'Leyenda de indicadores de consultas',
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            _LeyendaIndicador(
+              icon: Icons.healing_rounded,
+              color: ac.teal,
+              label: 'Tratamientos aplicados',
+              textoVisible: textoVisible,
+            ),
+            _LeyendaIndicador(
+              icon: Icons.receipt_long_rounded,
+              color: ac.primaryBlue,
+              label: 'Tiene receta',
+              textoVisible: textoVisible,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LeyendaIndicador extends StatelessWidget {
+  const _LeyendaIndicador({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.textoVisible,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final bool textoVisible;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    child: ExcludeSemantics(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          if (textoVisible) ...[
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+enum _AccionMenuConsulta { eliminar }
+
+class _AccionesConsulta extends StatelessWidget {
+  const _AccionesConsulta({
+    required this.consulta,
+    required this.tieneTratamientos,
+    required this.esEliminable,
+    required this.layout,
+    required this.onEliminar,
+    required this.onContinuar,
+  });
+
+  final Consulta consulta;
+  final bool tieneTratamientos;
+  final bool esEliminable;
+  final AppLayout layout;
+  final VoidCallback onEliminar;
+  final Future<void> Function() onContinuar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textoVisible = layout.isDesktop;
+    final razonEliminar = razonNoEliminable(consulta);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _EstadoConsulta(
+          finalizada: consulta.finalizada,
+          textoVisible: textoVisible,
+        ),
+        const SizedBox(width: 4),
+        // Dos ranuras fijas: la ausencia de un indicador no mueve el menú ni
+        // la acción principal.
+        _IndicadorConsulta(
+          presente: tieneTratamientos,
+          icon: Icons.healing_rounded,
+          color: ac.teal,
+          label: 'Tratamientos aplicados',
+          textoVisible: textoVisible,
+        ),
+        const SizedBox(width: 2),
+        _IndicadorConsulta(
+          presente: consulta.tieneRecetas,
+          icon: Icons.receipt_long_rounded,
+          color: ac.primaryBlue,
+          label: 'Tiene receta',
+          textoVisible: textoVisible,
+        ),
+        SizedBox(
+          width: textoVisible ? 48 : 32,
+          height: textoVisible ? 48 : 32,
+          child: PopupMenuButton<_AccionMenuConsulta>(
+            tooltip: 'Más acciones',
+            icon: const Icon(Icons.more_vert_rounded, size: 20),
+            padding: EdgeInsets.zero,
+            onSelected: (accion) {
+              if (accion == _AccionMenuConsulta.eliminar) onEliminar();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _AccionMenuConsulta.eliminar,
+                enabled: esEliminable,
+                child: Semantics(
+                  label: esEliminable
+                      ? 'Eliminar consulta'
+                      : 'Eliminar consulta no disponible. $razonEliminar',
+                  child: ExcludeSemantics(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            color: esEliminable
+                                ? colorScheme.error
+                                : colorScheme.onSurface.withValues(alpha: 0.38),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Eliminar consulta'),
+                                if (razonEliminar != null) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    razonEliminar,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _AccionPrincipalConsulta(
+          consulta: consulta,
+          textoVisible: textoVisible,
+          onContinuar: onContinuar,
+        ),
+      ],
+    );
+  }
+}
+
+class _EstadoConsulta extends StatelessWidget {
+  const _EstadoConsulta({required this.finalizada, required this.textoVisible});
+
+  final bool finalizada;
+  final bool textoVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final color = finalizada
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : ac.amber;
+    final label = finalizada ? 'Finalizada' : 'En curso';
+    return Semantics(
+      label: 'Estado: $label',
+      child: ExcludeSemantics(
+        child: Container(
+          constraints: BoxConstraints(minWidth: textoVisible ? 82 : 28),
+          padding: EdgeInsets.symmetric(
+            horizontal: textoVisible ? 8 : 6,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                finalizada
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.play_circle_outline_rounded,
+                size: 14,
+                color: color,
+              ),
+              if (textoVisible) ...[
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IndicadorConsulta extends StatelessWidget {
+  const _IndicadorConsulta({
+    required this.presente,
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.textoVisible,
+  });
+
+  final bool presente;
+  final IconData icon;
+  final Color color;
+  final String label;
+  final bool textoVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = textoVisible ? 126.0 : 28.0;
+    return SizedBox(
+      width: width,
+      child: presente
+          ? Semantics(
+              label: label,
+              child: ExcludeSemantics(
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: textoVisible ? 7 : 6,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 16, color: color),
+                      if (textoVisible) ...[
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            label == 'Tratamientos aplicados'
+                                ? 'Tratamientos'
+                                : 'Receta',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
+class _AccionPrincipalConsulta extends StatelessWidget {
+  const _AccionPrincipalConsulta({
+    required this.consulta,
+    required this.textoVisible,
+    required this.onContinuar,
+  });
+
+  final Consulta consulta;
+  final bool textoVisible;
+  final Future<void> Function() onContinuar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final clave = ValueKey('consulta-accion-principal-${consulta.id}');
+    if (consulta.finalizada) {
+      return Semantics(
+        key: clave,
+        label: 'Ver detalle de consulta finalizada',
+        child: SizedBox(
+          width: textoVisible ? 36 : 32,
+          height: textoVisible ? 36 : 32,
+          child: Center(
+            child: Icon(
+              Icons.chevron_right_rounded,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      );
+    }
+    if (!textoVisible) {
+      return Semantics(
+        key: clave,
+        button: true,
+        label: 'Continuar consulta',
+        child: IconButton(
+          onPressed: onContinuar,
+          icon: const Icon(Icons.navigate_next_rounded, size: 18),
+          color: ac.primaryBlue,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        ),
+      );
+    }
+    return Semantics(
+      key: clave,
+      button: true,
+      label: 'Continuar consulta',
+      child: TextButton.icon(
+        onPressed: onContinuar,
+        icon: const Icon(Icons.navigate_next_rounded, size: 16),
+        label: const Text('Continuar'),
+        style: TextButton.styleFrom(
+          foregroundColor: ac.primaryBlue,
+          minimumSize: const Size(36, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
         ),
       ),
     );
@@ -1023,36 +1315,17 @@ class _DateBadge extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            const SizedBox(height: 1),
+            Text(
+              '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: ac.primaryBlue.withValues(alpha: 0.8),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _IndicadorIcono extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-
-  const _IndicadorIcono({
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        margin: const EdgeInsets.only(left: 6),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 16, color: color),
       ),
     );
   }

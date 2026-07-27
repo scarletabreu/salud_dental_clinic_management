@@ -2,13 +2,14 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/record_condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
-import 'package:salud_dental_clinic_management/features/condicion/domain/entities/record_condicion.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/expediente_print_options.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
@@ -854,8 +855,6 @@ class ExpedientePdfBuilder {
     _EstadoPiezaResultado res, {
     required bool esDiagnostico,
   }) {
-    // Extraer el nombre del tratamiento o diagnóstico de la relación anidada.
-    // Ejemplo de supabase: map['tratamiento']['nombre'] o map['diagnosis']['nombre']
     String nombre = '${map['nombre'] ?? ''}';
 
     if (nombre.isEmpty && map['diagnosis'] is Map) {
@@ -1507,19 +1506,31 @@ class ExpedientePdfBuilder {
     return [
       _clinicalSectionHeader('RECETAS E INDICACIONES', recetas.length),
       pw.SizedBox(height: 4),
-      for (final item in recetas)
-        ..._clinicalCards(
-          '${fechaLargaEs(item.receta.createdAt)} · ${item.receta.title}',
-          [
-            'Dosis: ${item.receta.dosis}',
-            'Frecuencia: ${item.receta.frecuencia}',
-            'Duración: ${item.receta.duracion}',
-            'Indicaciones: ${item.receta.indicaciones}',
-            if (_textoNoVacio(item.receta.notas) case final notas?)
-              'Notas: $notas',
-            'Consulta: ${_referenciaConsulta(item.consulta)}',
-          ].join('\n'),
-        ),
+      for (final item in recetas) ...[
+        for (final m in item.receta.items)
+          ..._clinicalCards(
+            '${fechaLargaEs(item.receta.fechaEmision)} · ${m.nombreMedicamento}'
+            '${m.presentacionConcentracion.isNotEmpty ? ' (${m.presentacionConcentracion})' : ''}',
+            [
+              'Dosis: ${m.dosis}',
+              if (m.viaAdministracion.isNotEmpty) 'Vía: ${m.viaAdministracion}',
+              'Frecuencia: ${m.frecuencia}',
+              'Duración: ${m.duracion}',
+              if (m.cantidadIndicada.isNotEmpty)
+                'Cantidad: ${m.cantidadIndicada}',
+              if (_textoNoVacio(m.indicacionesEspecificas) case final ind?)
+                'Indicaciones específicas: $ind',
+              if (_textoNoVacio(item.receta.indicacionesGenerales)
+                  case final gen?)
+                'Indicaciones generales: $gen',
+              if (_textoNoVacio(item.receta.justificacionContraindicaciones)
+                  case final just?)
+                'Justificación médica: $just',
+              'Código de Receta: ${item.receta.codigoReceta.isNotEmpty ? item.receta.codigoReceta : "S/N"}',
+              'Consulta: ${_referenciaConsulta(item.consulta)}',
+            ].join('\n'),
+          ),
+      ],
     ];
   }
 

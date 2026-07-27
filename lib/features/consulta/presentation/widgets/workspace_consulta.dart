@@ -33,6 +33,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
@@ -58,19 +59,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   List<ItemPlanTratamiento> _itemsEjecutables = const [];
   bool _cargandoPlanDelDia = false;
   String? _errorPlanDelDia;
-
-  /// Nombre de cada doctor, para que la ficha de una pieza pueda decir quién
-  /// anotó cada cosa en vez de mostrar un uuid.
   Map<String, String> _nombrePorDoctorId = const {};
-
-  /// La historia de cada pieza del paciente (SD-144).
   HistorialPiezas? _historialPiezas;
-
-  /// Evaluación de esta consulta (SD-135).
   String? _evaluacionId;
   String? _consultaConEvaluacion;
-
-  /// Condiciones estructuradas del paciente cargadas async desde `record_condicion`.
   List<Condicion> _condicionesAsync = const [];
 
   @override
@@ -446,6 +438,39 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     context.read<ConsultaCubit>().quitarTratamiento(diente, index);
   }
 
+  Future<void> _abrirFormularioFormalReceta(Consulta consulta) async {
+    final pacienteState = context.read<PacienteCubit>().state;
+    if (pacienteState is! PacienteDetailLoaded) return;
+
+    final recetaOriginal = consulta.recetas.firstOrNull;
+
+    final recetaFormal = await RecetaFormDialog.mostrar(
+      context,
+      paciente: pacienteState.paciente,
+      consultaId: consulta.id ?? '',
+      recetaParaEditar: recetaOriginal,
+    );
+
+    if (recetaFormal != null && mounted) {
+      final cubit = context.read<ConsultaCubit>();
+      cubit.limpiarRecetas();
+      for (final item in recetaFormal.items) {
+        cubit.agregarItemReceta(itemReceta: item);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Formulario formal de receta cargado a la consulta.',
+          ),
+          backgroundColor: context.appColors.primaryBlue,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
@@ -767,10 +792,20 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
             const SizedBox(height: 16),
 
-            // ✅ CORRECTO
             SeccionReceta(
               condicionesPaciente: _condicionesPaciente(),
               recetas: consulta.recetas,
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _abrirFormularioFormalReceta(consulta),
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text(
+                  'Abrir Formulario Formal / Vista Previa Receta',
+                ),
+              ),
             ),
             const SizedBox(height: 28),
             const SizedBox(height: 16),

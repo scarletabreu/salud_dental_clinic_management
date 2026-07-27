@@ -1,19 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-// ── core ──────────────────────────────────────────────────────────────────────
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-
-// ── features ──────────────────────────────────────────────────────────────────
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
-
-// ── shell ─────────────────────────────────────────────────────────────────────
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class PacientesPage extends StatefulWidget {
   const PacientesPage({super.key});
@@ -55,17 +49,24 @@ class _PacientesPageState extends State<PacientesPage> {
   }
 
   Future<void> _openDetalle(Paciente paciente) async {
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
     final cubit = context.read<PacienteCubit>();
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: cubit,
-          child: PacienteDetailPage(pacienteId: paciente.id!),
+          child: PacienteDetailPage(pacienteId: pacienteId),
         ),
       ),
     );
-    if (mounted) cubit.load();
+
+    if (context.mounted) {
+      cubit.load();
+    }
   }
 
   @override
@@ -92,8 +93,6 @@ class _PacientesPageState extends State<PacientesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // A Row would clip the counter badge once the title and the action
-          // button no longer fit; wrapping drops the button to its own line.
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -156,7 +155,7 @@ class _PacientesPageState extends State<PacientesPage> {
           Text(
             'Listado completo de pacientes registrados en el sistema.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 20),
@@ -166,12 +165,12 @@ class _PacientesPageState extends State<PacientesPage> {
             decoration: InputDecoration(
               hintText: 'Buscar por nombre o cédula...',
               hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.45),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                 fontSize: 14,
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 size: 20,
               ),
               suffixIcon: _searchController.text.isNotEmpty
@@ -196,7 +195,7 @@ class _PacientesPageState extends State<PacientesPage> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: colorScheme.outlineVariant.withOpacity(0.2),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -326,7 +325,9 @@ class _HeaderLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.65),
+        color: Theme.of(
+          context,
+        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,
         fontSize: 10,
@@ -433,7 +434,7 @@ class _PacienteRowState extends State<_PacienteRow> {
         : ac.cardBg;
     final colorBorde = _expanded
         ? ac.primaryBlue.withValues(alpha: 0.25)
-        : colorScheme.outlineVariant.withOpacity(0.4);
+        : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
     return AnimatedContainer(
@@ -445,7 +446,9 @@ class _PacienteRowState extends State<_PacienteRow> {
         border: Border.all(color: colorBorde, width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(_expanded ? 0.03 : 0.01),
+            color: colorScheme.shadow.withValues(
+              alpha: _expanded ? 0.03 : 0.01,
+            ),
             blurRadius: _expanded ? 10 : 4,
             offset: const Offset(0, 4),
           ),
@@ -472,8 +475,8 @@ class _PacienteRowState extends State<_PacienteRow> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: colorScheme.onSurface.withOpacity(
-                                    0.04,
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.04,
                                   ),
                                   shape: BoxShape.circle,
                                 ),
@@ -481,7 +484,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                                   Icons.person_outline_rounded,
                                   size: 18,
                                   color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.6),
+                                      .withValues(alpha: 0.6),
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -506,7 +509,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.8),
+                                      .withValues(alpha: 0.8),
                                   fontFamily: 'monospace',
                                   fontSize: 13,
                                 ),
@@ -521,7 +524,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.8),
+                                      .withValues(alpha: 0.8),
                                   fontSize: 13,
                                 ),
                           ),
@@ -553,8 +556,8 @@ class _PacienteRowState extends State<_PacienteRow> {
                               _ActionIcon(
                                 icon: Icons.edit_outlined,
                                 tooltip: 'Editar',
-                                color: colorScheme.onSurfaceVariant.withOpacity(
-                                  0.5,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.5,
                                 ),
                                 onTap: widget.onEdit,
                               ),
@@ -562,7 +565,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                               _ActionIcon(
                                 icon: Icons.delete_outline_rounded,
                                 tooltip: 'Eliminar',
-                                color: colorScheme.error.withOpacity(0.7),
+                                color: colorScheme.error.withValues(alpha: 0.7),
                                 onTap: () => _showDeleteConfirmation(
                                   context,
                                   widget.paciente,
@@ -685,7 +688,7 @@ class _PacienteRowState extends State<_PacienteRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(
-            color: colorScheme.outlineVariant.withOpacity(0.25),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.25),
             height: 1,
           ),
           const SizedBox(height: 20),
@@ -735,6 +738,9 @@ class _PacienteRowState extends State<_PacienteRow> {
 
   void _showDeleteConfirmation(BuildContext context, Paciente paciente) {
     final colorScheme = Theme.of(context).colorScheme;
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -784,7 +790,7 @@ class _PacienteRowState extends State<_PacienteRow> {
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(dialogContext);
-              context.read<PacienteCubit>().deletePaciente(paciente.id!);
+              context.read<PacienteCubit>().deletePaciente(pacienteId);
             },
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
             label: const Text('Eliminar'),
@@ -811,7 +817,7 @@ class _DetailItem extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             letterSpacing: 0.8,
             fontWeight: FontWeight.bold,
             fontSize: 9,

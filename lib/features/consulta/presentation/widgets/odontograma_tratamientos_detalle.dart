@@ -8,12 +8,6 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_expediente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 
-/// El odontograma archivado de la consulta —en cualquiera de sus dos vistas— y
-/// el desglose de tratamientos por diente (nombre + precio congelado, cargados
-/// por [ConsultaDetalleCubit]).
-///
-/// La vista de formulario se dibuja sobre papel blanco y con botón de imprimir,
-/// porque el expediente es lo que sale por la impresora.
 class OdontogramaTratamientosDetalle extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;
@@ -42,8 +36,6 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             .toList()
           ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
 
-    // El cubit envuelve la vista entera, no solo el pie: de él sale también el
-    // historial por pieza que la ficha de un diente necesita (SD-144).
     return BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
       builder: (context, state) {
         final listo = state is ConsultaDetalleListo ? state : null;

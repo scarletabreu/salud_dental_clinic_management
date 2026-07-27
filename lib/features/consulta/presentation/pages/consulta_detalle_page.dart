@@ -10,8 +10,12 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/repositories/receta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
+import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
 
 class ConsultaDetallePage extends StatelessWidget {
   final Consulta consulta;
@@ -147,10 +151,6 @@ class ConsultaDetallePage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Datos generales
-  // ---------------------------------------------------------------------------
-
   Widget _cardDatosGenerales(BuildContext context) {
     final ac = context.appColors;
     return Container(
@@ -268,10 +268,6 @@ class ConsultaDetallePage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Signos vitales
-  // ---------------------------------------------------------------------------
-
   Widget _widgetSignosVitales(BuildContext context, SignosVitales sv) {
     final tiles = <Widget>[];
 
@@ -356,10 +352,6 @@ class ConsultaDetallePage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Recetas
-  // ---------------------------------------------------------------------------
-
   Widget _tarjetaRecetaCompleta(
     BuildContext context,
     Receta receta, {
@@ -388,17 +380,25 @@ class ConsultaDetallePage extends StatelessWidget {
             children: [
               Icon(Icons.description_outlined, size: 20, color: ac.primaryBlue),
               const SizedBox(width: 8),
-              Text(
-                receta.codigoReceta.isNotEmpty
-                    ? receta.codigoReceta
-                    : 'Receta Médica',
-                style: TextStyle(
-                  color: ac.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  receta.codigoReceta.isNotEmpty
+                      ? receta.codigoReceta
+                      : 'Receta Médica',
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              const Spacer(),
+              if (!esAnulada && !esReemplazada)
+                IconButton(
+                  tooltip: 'Corregir / Formulario Formal',
+                  icon: Icon(Icons.edit_note_rounded, color: ac.primaryBlue),
+                  onPressed: () => _abrirRecetaFormDialog(context, receta),
+                ),
+              const SizedBox(width: 4),
               if (esAnulada)
                 _pillStatus('ANULADA', ac.red)
               else if (esReemplazada)
@@ -414,11 +414,9 @@ class ConsultaDetallePage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Renglones de medicamentos
           for (var i = 0; i < receta.items.length; i++)
             _itemRenglonMedicamento(context, receta.items[i], index: i + 1),
 
-          // Indicaciones generales
           if ((receta.indicacionesGenerales ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
@@ -440,7 +438,6 @@ class ConsultaDetallePage extends StatelessWidget {
             ),
           ],
 
-          // Justificación médica ante contraindicaciones
           if ((receta.justificacionContraindicaciones ?? '')
               .trim()
               .isNotEmpty) ...[
@@ -466,6 +463,50 @@ class ConsultaDetallePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _abrirRecetaFormDialog(
+    BuildContext context,
+    Receta recetaOriginal,
+  ) async {
+    final pacienteState = context.read<PacienteCubit>().state;
+    if (pacienteState is! PacienteDetailLoaded) return;
+
+    final recetaCorregida = await RecetaFormDialog.mostrar(
+      context,
+      paciente: pacienteState.paciente,
+      consultaId: consulta.id ?? '',
+      recetaParaEditar: recetaOriginal,
+    );
+
+    if (recetaCorregida != null && context.mounted) {
+      try {
+        if (recetaOriginal.id != null) {
+          await sl<RecetaRepositoryImpl>().reemitirRecetaModificada(
+            recetaOriginalId: recetaOriginal.id!,
+            motivoReemplazo: 'Corrección / Modificación formal de receta',
+            nuevaReceta: recetaCorregida,
+          );
+        } else {
+          await sl<RecetaRepositoryImpl>().emitirReceta(recetaCorregida);
+        }
+
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Receta actualizada y reemitida correctamente.'),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al reemitir la receta: $e'),
+            backgroundColor: context.appColors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _itemRenglonMedicamento(
@@ -579,10 +620,6 @@ class ConsultaDetallePage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Documentos
-  // ---------------------------------------------------------------------------
-
   Widget _filaDocumento(BuildContext context, DocumentoClinico doc) {
     final ac = context.appColors;
     return Padding(
@@ -655,10 +692,6 @@ class ConsultaDetallePage extends StatelessWidget {
         return tipo;
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Resumen financiero
-  // ---------------------------------------------------------------------------
 
   Widget _resumenFinanciero(BuildContext context) {
     final ac = context.appColors;
@@ -782,10 +815,6 @@ class ConsultaDetallePage extends StatelessWidget {
       },
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers de layout comunes
-  // ---------------------------------------------------------------------------
 
   Widget _seccion(
     BuildContext context,

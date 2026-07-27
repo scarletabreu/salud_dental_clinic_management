@@ -1,5 +1,5 @@
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
 
 abstract class RecetaRemoteDatasource {
   Future<String> emitirRecetaCompleta({

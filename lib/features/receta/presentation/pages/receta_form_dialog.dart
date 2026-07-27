@@ -53,7 +53,6 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
   void initState() {
     super.initState();
 
-    // Detección preventiva de alertas por alergias/condiciones
     if (widget.paciente.record.condiciones.isNotEmpty) {
       _tieneContraindicacionAlerta = true;
     }

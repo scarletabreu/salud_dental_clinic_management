@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/repositories/receta_repository.dart';
 
@@ -31,13 +31,11 @@ class RecetaRepositoryImpl implements RecetaRepository {
     required Receta nuevaReceta,
   }) {
     return runGuarded(() async {
-      // 1. Marcar anterior como reemplazada
       await remoteDataSource.anularReceta(
         recetaId: recetaOriginalId,
         motivo: 'Reemplazada por nueva versión: $motivoReemplazo',
       );
 
-      // 2. Emitir la nueva receta vinculada a la anterior
       final recetaConVinc = nuevaReceta.copyWith(
         recetaReemplazadaId: recetaOriginalId,
       );

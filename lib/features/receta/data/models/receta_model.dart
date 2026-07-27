@@ -20,7 +20,6 @@ class RecetaModel extends Receta {
   });
 
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
-    // Manejo de retrocompatibilidad si viene una fila antigua con 1 solo medicamento
     final itemsRaw = json['items_receta'] as List?;
     final List<ItemReceta> itemsList;
 
@@ -29,7 +28,6 @@ class RecetaModel extends Receta {
           .map((i) => ItemRecetaModel.fromJson(i as Map<String, dynamic>))
           .toList();
     } else if (json['titulo'] != null) {
-      // Fila heredada de la versión vieja
       itemsList = [ItemRecetaModel.fromJson(json)];
     } else {
       itemsList = const [];

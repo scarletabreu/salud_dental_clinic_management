@@ -1,6 +1,6 @@
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
@@ -21,7 +21,6 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
   }) async {
     final payloadCabecera = receta.toCabeceraJson();
 
-    // 1. Insertar la cabecera
     final res = await supabaseClient
         .from('recetas')
         .insert(payloadCabecera)
@@ -30,7 +29,6 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
 
     final recetaId = res['id'] as String;
 
-    // 2. Insertar cada renglón de medicamento
     if (items.isNotEmpty) {
       final itemsPayload = items
           .map((i) => i.toJson(recetaId: recetaId))

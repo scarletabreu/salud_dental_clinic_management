@@ -26,15 +26,12 @@ class RecetaPdfBuilder {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Encabezado
               _buildHeader(receta),
               pw.SizedBox(height: 16),
 
-              // Datos Paciente y Médico
               _buildInfoSection(receta, paciente),
               pw.SizedBox(height: 20),
 
-              // Título Prescripción
               pw.Text(
                 'Rp. / PRECRIPCIÓN MÉDICA',
                 style: pw.TextStyle(
@@ -45,11 +42,9 @@ class RecetaPdfBuilder {
               ),
               pw.SizedBox(height: 8),
 
-              // Tabla Renglones
               _buildItemsTable(receta),
               pw.SizedBox(height: 16),
 
-              // Indicaciones Generales
               if (receta.indicacionesGenerales?.trim().isNotEmpty == true) ...[
                 pw.Text(
                   'INDICACIONES GENERALES:',
@@ -74,7 +69,6 @@ class RecetaPdfBuilder {
                 pw.SizedBox(height: 16),
               ],
 
-              // Justificación
               if (receta.justificacionContraindicaciones?.trim().isNotEmpty ==
                   true) ...[
                 pw.Text(
@@ -97,11 +91,9 @@ class RecetaPdfBuilder {
 
               pw.Spacer(),
 
-              // Firma y Sello
               _buildFirmaSection(receta),
               pw.SizedBox(height: 10),
 
-              // Pie de página
               pw.Divider(color: PdfColors.grey300),
               pw.Center(
                 child: pw.Text(

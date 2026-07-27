@@ -87,7 +87,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     return super.close();
   }
 
-  /// Registra un cambio clínico en memoria y programa su autoguardado.
   void _emitirCambio(Consulta consulta) {
     if (isClosed) return;
     emit(
@@ -532,12 +531,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Manejo Multirrenglón de Recetas Médicas
-  // ---------------------------------------------------------------------------
+  void limpiarRecetas() {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    _emitirCambio(actual.copyWith(recetas: const []));
+  }
 
-  /// Agrega un fármaco prescrito (renglón/ItemReceta) a la receta de la consulta.
-  /// Si aún no existe una receta activa en esta sesión, se genera la cabecera.
   void agregarItemReceta({
     required ItemReceta itemReceta,
     String? justificacion,
@@ -548,7 +547,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     final List<Receta> recetasVigentes = [...actual.recetas];
 
     if (recetasVigentes.isEmpty) {
-      // Crear cabecera inicial con el primer medicamento
       final nuevaReceta = Receta(
         codigoReceta: '',
         consultaId: actual.id ?? '',
@@ -560,7 +558,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       );
       _emitirCambio(actual.copyWith(recetas: [nuevaReceta]));
     } else {
-      // Adjuntar el renglón a la receta en curso
       final recetaExistente = recetasVigentes.first;
       final itemsActualizados = [...recetaExistente.items, itemReceta];
       final recetaActualizada = recetaExistente.copyWith(
@@ -573,7 +570,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
-  /// Remueve un fármaco prescrito por su índice global.
   void quitarItemReceta(int index) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
@@ -587,7 +583,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     items.removeAt(index);
 
     if (items.isEmpty) {
-      // Si no quedan medicamentos, se retira la receta completa
       _emitirCambio(actual.copyWith(recetas: const []));
     } else {
       final recetaActualizada = recetaActual.copyWith(items: items);

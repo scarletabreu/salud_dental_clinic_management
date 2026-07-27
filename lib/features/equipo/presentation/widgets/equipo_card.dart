@@ -2,33 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/entities/equipo.dart';
 
-int _diasParaMantenimiento(Equipo e) {
-  final proximo = e.ultimoMantenimiento.add(
-    Duration(days: e.tiempoParaMantenimiento),
-  );
-  return proximo.difference(DateTime.now()).inDays;
-}
-
 class EquipoCard extends StatelessWidget {
   final Equipo equipo;
   final VoidCallback onTap;
   final VoidCallback onEliminar;
+  final VoidCallback? onRegistrarMantenimiento;
 
   const EquipoCard({
     super.key,
     required this.equipo,
     required this.onTap,
     required this.onEliminar,
+    this.onRegistrarMantenimiento,
   });
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final colorScheme = Theme.of(context).colorScheme;
-    final dias = _diasParaMantenimiento(equipo);
+    final dias = equipo.diasParaMantenimiento(DateTime.now());
 
     final (statusColor, statusLabel, statusIcon) = switch (dias) {
-      < 0 => (ac.red, 'Vencido (${dias.abs()}d)', Icons.warning_amber_rounded),
+      <= 0 => (
+        ac.red,
+        dias == 0 ? 'Vence hoy' : 'Vencido (${dias.abs()}d)',
+        Icons.warning_amber_rounded,
+      ),
       <= 7 => (ac.amber, 'En $dias días', Icons.schedule_rounded),
       _ => (ac.green, 'En $dias días', Icons.check_circle_outline_rounded),
     };
@@ -123,7 +122,18 @@ class EquipoCard extends StatelessWidget {
               ),
             ),
 
-            // Botón eliminar
+            if (onRegistrarMantenimiento != null)
+              IconButton(
+                onPressed: onRegistrarMantenimiento,
+                icon: Icon(
+                  Icons.handyman_outlined,
+                  size: 20,
+                  color: ac.primaryBlue,
+                ),
+                tooltip: 'Registrar mantenimiento',
+                visualDensity: VisualDensity.compact,
+              ),
+
             IconButton(
               onPressed: onEliminar,
               icon: Icon(

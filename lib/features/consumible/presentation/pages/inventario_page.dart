@@ -12,6 +12,8 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/enums/
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_state.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/entities/suplidor.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/presentation/widgets/suplidores_tab_view.dart';
@@ -27,9 +29,10 @@ class InventarioPage extends StatelessWidget {
       providers: [
         BlocProvider<SuplidorCubit>(create: (_) => sl<SuplidorCubit>()),
         BlocProvider<CompraCubit>(create: (_) => sl<CompraCubit>()),
+        BlocProvider<EquipoCubit>(create: (_) => sl<EquipoCubit>()),
       ],
       child: DefaultTabController(
-        length: 3,
+        length: 4,
         child: Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
           appBar: AppBar(
@@ -37,6 +40,8 @@ class InventarioPage extends StatelessWidget {
             elevation: 0,
             toolbarHeight: 0,
             bottom: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               labelColor: ac.primaryBlue,
               unselectedLabelColor: ac.textSecondary,
               indicatorColor: ac.primaryBlue,
@@ -58,6 +63,10 @@ class InventarioPage extends StatelessWidget {
                   icon: Icon(Icons.shopping_bag_outlined, size: 20),
                   text: 'Compras',
                 ),
+                Tab(
+                  icon: Icon(Icons.precision_manufacturing_outlined, size: 20),
+                  text: 'Equipos',
+                ),
               ],
             ),
           ),
@@ -66,6 +75,7 @@ class InventarioPage extends StatelessWidget {
               _ConsumiblesTabBody(),
               SuplidoresTabView(),
               ComprasTabView(),
+              EquipoListPage(),
             ],
           ),
         ),

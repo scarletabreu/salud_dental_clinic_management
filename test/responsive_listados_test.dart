@@ -200,6 +200,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('actualizar listado queda anclado al borde derecho', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(1280, 900));
+    await tester.pumpWidget(
+      _app(
+        BlocProvider<ConsultasListCubit>(
+          create: (_) => _ConsultasListCubitDoble(_consultas()),
+          child: const ConsultasListPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.getRect(
+      find.byKey(ConsultasListPage.refreshButtonKey),
+    );
+    expect(1280 - refresh.right, closeTo(28, 0.01));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('las cuentas por cobrar resisten el texto ampliado en 320 px', (
     tester,
   ) async {

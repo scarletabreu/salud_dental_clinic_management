@@ -19,6 +19,8 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 class ConsultasListPage extends StatefulWidget {
   const ConsultasListPage({super.key});
 
+  static const refreshButtonKey = ValueKey('consultas-refresh-button');
+
   @override
   State<ConsultasListPage> createState() => _ConsultasListPageState();
 }
@@ -250,31 +252,43 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         children: [
           SizedBox(
             width: double.infinity,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.centerRight,
               children: [
-                Flexible(
-                  child: Text(
-                    'Consultas',
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                      letterSpacing: -0.6,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Consultas',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                              letterSpacing: -0.6,
+                            ),
+                      ),
+                    ),
+                    if (state is ConsultasLoaded) ...[
+                      const SizedBox(width: 14),
+                      _CountBadge(count: total),
+                    ],
+                    // Reserva el área táctil del botón anclado en el Stack.
+                    const SizedBox(width: 48),
+                  ],
+                ),
+                if (state is ConsultasLoaded)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      key: ConsultasListPage.refreshButtonKey,
+                      tooltip: 'Actualizar listado',
+                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                      onPressed: () =>
+                          context.read<ConsultasListCubit>().recargar(),
                     ),
                   ),
-                ),
-                if (state is ConsultasLoaded) ...[
-                  const SizedBox(width: 14),
-                  _CountBadge(count: total),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Actualizar listado',
-                    icon: const Icon(Icons.refresh_rounded, size: 20),
-                    onPressed: () =>
-                        context.read<ConsultasListCubit>().recargar(),
-                  ),
-                ],
               ],
             ),
           ),

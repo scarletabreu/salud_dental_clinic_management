@@ -12,7 +12,16 @@ class CitaModel extends Cita {
     super.duracionMinutos = 30,
     required super.esEmergencia,
     required super.estado,
+    super.motivo,
   });
+
+  /// Un motivo en blanco es "sin motivo": así el campo vacío del formulario no
+  /// se guarda como cadena vacía ni se pinta como si el paciente hubiera dicho
+  /// algo.
+  static String? normalizarMotivo(String? valor) {
+    final limpio = valor?.trim() ?? '';
+    return limpio.isEmpty ? null : limpio;
+  }
 
   factory CitaModel.fromJson(Map<String, dynamic> json) {
     final String? fechaRaw = json['fecha'] ?? json['fecha_hora'];
@@ -31,6 +40,7 @@ class CitaModel extends Cita {
       duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
       esEmergencia: json['es_emergencia'] ?? false,
       estado: EstadoCita.fromDb(json['estado'] as String?),
+      motivo: normalizarMotivo(json['motivo'] as String?),
     );
   }
   Map<String, dynamic> toJson() {
@@ -41,6 +51,7 @@ class CitaModel extends Cita {
       'duracion_minutos': duracionMinutos,
       'es_emergencia': esEmergencia,
       'estado': estado.dbValue,
+      'motivo': normalizarMotivo(motivo),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

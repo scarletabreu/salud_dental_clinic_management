@@ -300,12 +300,14 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       return;
     }
 
+    final motivo = _motivoCtrl.text.trim();
     final cita = Cita(
       doctor: _doctorSeleccionado!,
       persona: persona,
       date: fechaHora.toUtc(),
       esEmergencia: _esEmergencia,
       estado: EstadoCita.programada,
+      motivo: motivo.isEmpty ? null : motivo,
     );
 
     if (!mounted) return;

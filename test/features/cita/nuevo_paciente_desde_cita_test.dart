@@ -149,6 +149,15 @@ void main() {
       await tester.tap(find.text('Dr. Carlos Mendoza').last);
       await tester.pumpAndSettle();
 
+      await tester.enterText(
+        find.widgetWithText(
+          TextFormField,
+          'Ej. Evaluación por dolor en molar superior...',
+        ),
+        'Dolor en molar superior',
+      );
+      await tester.pumpAndSettle();
+
       await tester.ensureVisible(find.text('Confirmar Cita'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar Cita'));
@@ -164,11 +173,12 @@ void main() {
       expect(registrado.genero, Genero.masculino);
       expect(registrado.contactos.single.numeroTelefono, '8297630729');
 
-      // Y la cita apunta al id que devolvió ese registro.
+      // Y la cita apunta al id que devolvió ese registro, con su motivo.
       expect(
         cubit.citaCreada?.persona.id,
         '11111111-1111-1111-1111-111111111111',
       );
+      expect(cubit.citaCreada?.motivo, 'Dolor en molar superior');
     },
   );
 }

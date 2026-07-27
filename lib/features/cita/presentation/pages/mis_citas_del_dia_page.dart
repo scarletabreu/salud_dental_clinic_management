@@ -1256,6 +1256,33 @@ class _CitaCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          // Lo que el paciente dijo al agendar: el odontólogo
+                          // llega a la consulta sabiendo a qué viene.
+                          if ((cita.motivo ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.notes_rounded,
+                                  size: 12,
+                                  color: ac.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    cita.motivo!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: ac.textSecondary,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1340,6 +1367,7 @@ class _CitaCard extends StatelessWidget {
           citaId: cita.id!,
           pacienteId: pacienteId,
           doctorId: doctorId,
+          motivoCita: cita.motivo,
         ),
       ),
     );

@@ -30,6 +30,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
   TimeOfDay? _horaSeleccionada;
   bool _esEmergencia = false;
   int _duracionMinutos = 30;
+  final _motivoCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -38,7 +39,14 @@ class _CitaEditPageState extends State<CitaEditPage> {
     _horaSeleccionada = TimeOfDay.fromDateTime(widget.cita.date.toLocal());
     _esEmergencia = widget.cita.esEmergencia;
     _duracionMinutos = widget.cita.duracionMinutos;
+    _motivoCtrl.text = widget.cita.motivo ?? '';
     _cargarDoctores();
+  }
+
+  @override
+  void dispose() {
+    _motivoCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarDoctores() async {
@@ -108,6 +116,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
         date: fechaHoraFinal.toUtc(),
         duracionMinutos: _duracionMinutos,
         esEmergencia: _esEmergencia,
+        motivo: _motivoCtrl.text.trim(),
       ),
     );
   }
@@ -398,6 +407,24 @@ class _CitaEditPageState extends State<CitaEditPage> {
                 fontWeight: FontWeight.w500,
                 color: ac.textPrimary,
               ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FieldGroup(
+            ac: ac,
+            icon: Icons.notes_rounded,
+            label: 'Motivo de consulta',
+            child: TextFormField(
+              controller: _motivoCtrl,
+              enabled: !isSubmitting,
+              maxLines: 2,
+              maxLength: 300,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _dropDecoration(ac).copyWith(
+                hintText: 'Ej. Evaluación por dolor en molar superior...',
+                counterText: '',
+              ),
+              style: TextStyle(fontSize: 13, color: ac.textPrimary),
             ),
           ),
           const SizedBox(height: 14),

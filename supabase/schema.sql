@@ -1675,11 +1675,15 @@ CREATE TABLE IF NOT EXISTS "public"."citas" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "deleted_at" timestamp with time zone,
     "duracion_minutos" bigint,
-    "updated_at" timestamp with time zone
+    "updated_at" timestamp with time zone,
+    "motivo" "text"
 );
 
 
 ALTER TABLE "public"."citas" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."citas"."motivo" IS 'Motivo declarado al agendar la cita. Prellena consultas.motivo_consulta.';
 
 
 CREATE TABLE IF NOT EXISTS "public"."compras" (

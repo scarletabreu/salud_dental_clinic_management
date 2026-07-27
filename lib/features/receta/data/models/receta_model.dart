@@ -1,4 +1,4 @@
-import 'package:salud_dental_clinic_management/features/receta/data/models/tem_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 

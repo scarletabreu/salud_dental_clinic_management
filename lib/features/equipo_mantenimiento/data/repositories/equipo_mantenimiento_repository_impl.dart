@@ -32,6 +32,7 @@ class EquipoMantenimientoRepositoryImpl
         descripcion: mantenimiento.descripcion,
         suplidorId: mantenimiento.suplidorId,
         costo: mantenimiento.costo,
+        fechaMantenimiento: mantenimiento.fechaMantenimiento,
       );
 
       final data = model.toJson();

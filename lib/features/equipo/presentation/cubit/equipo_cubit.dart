@@ -3,20 +3,25 @@ import 'package:salud_dental_clinic_management/features/equipo/domain/entities/e
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/eliminar_equipo_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/get_inventario_usecase.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/usecases/registrar_o_actualizar_equipo_usecase.dart';
+import 'package:salud_dental_clinic_management/features/equipo_mantenimiento/domain/entities/equipo_mantenimiento.dart';
+import 'package:salud_dental_clinic_management/features/equipo_mantenimiento/domain/repositories/equipo_mantenimiento_repository.dart';
 import 'equipo_state.dart';
 
 class EquipoCubit extends Cubit<EquipoState> {
   final GetInventarioEquiposUseCase _getInventario;
   final RegistrarOActualizarEquipoUseCase _registrarOActualizar;
   final EliminarEquipoUseCase _eliminar;
+  final EquipoMantenimientoRepository _mantenimientoRepository;
 
   EquipoCubit({
     required GetInventarioEquiposUseCase getInventario,
     required RegistrarOActualizarEquipoUseCase registrarOActualizar,
     required EliminarEquipoUseCase eliminar,
+    required EquipoMantenimientoRepository mantenimientoRepository,
   }) : _getInventario = getInventario,
        _registrarOActualizar = registrarOActualizar,
        _eliminar = eliminar,
+       _mantenimientoRepository = mantenimientoRepository,
        super(const EquipoInitial());
 
   Future<void> cargarEquipos() async {
@@ -84,6 +89,27 @@ class EquipoCubit extends Cubit<EquipoState> {
       await cargarEquipos();
       return true;
     } catch (e) {
+      emit(current);
+      return false;
+    }
+  }
+
+  Future<bool> registrarMantenimiento(EquipoMantenimiento mantenimiento) async {
+    final current = state;
+    if (current is! EquipoLoaded) return false;
+
+    emit(
+      EquipoOperating(
+        todos: current.todos,
+        filtrados: current.filtrados,
+        searchQuery: current.searchQuery,
+      ),
+    );
+    try {
+      await _mantenimientoRepository.registrarMantenimiento(mantenimiento);
+      await cargarEquipos();
+      return true;
+    } catch (_) {
       emit(current);
       return false;
     }

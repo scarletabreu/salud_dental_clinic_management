@@ -1062,6 +1062,55 @@ $$;
 ALTER FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_mantenimiento_id uuid;
+begin
+  if p_costo < 0 then
+    raise exception 'El costo no puede ser negativo.' using errcode = '22023';
+  end if;
+
+  if p_fecha_mantenimiento::date > current_date then
+    raise exception 'La fecha de mantenimiento no puede estar en el futuro.'
+      using errcode = '22023';
+  end if;
+
+  insert into public.equipos_mantenimientos (
+    equipo_id,
+    suplidor_id,
+    descripcion,
+    costo,
+    fecha_mantenimiento
+  ) values (
+    p_equipo_id,
+    p_suplidor_id,
+    coalesce(nullif(trim(p_descripcion), ''), 'Mantenimiento'),
+    p_costo,
+    p_fecha_mantenimiento
+  )
+  returning id into v_mantenimiento_id;
+
+  update public.equipos
+     set ultimo_mantenimiento = p_fecha_mantenimiento,
+         updated_at = now()
+   where id = p_equipo_id
+     and deleted_at is null;
+
+  if not found then
+    raise exception 'El equipo no existe o fue eliminado.' using errcode = 'P0002';
+  end if;
+
+  return v_mantenimiento_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -3625,7 +3674,7 @@ CREATE POLICY "equipos_mantenimientos_delete" ON "public"."equipos_mantenimiento
 
 
 
-CREATE POLICY "equipos_mantenimientos_insert" ON "public"."equipos_mantenimientos" FOR INSERT TO "authenticated" WITH CHECK ("public"."es_admin"());
+CREATE POLICY "equipos_mantenimientos_insert" ON "public"."equipos_mantenimientos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
 
 
 
@@ -4302,6 +4351,12 @@ GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "service_role";
 
 
 

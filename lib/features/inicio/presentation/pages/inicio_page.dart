@@ -85,6 +85,7 @@ class InicioPage extends StatelessWidget {
                     onAlertaCita: onNavigateToCitas,
                     onAlertaConsumible: onNavigateToInventario,
                     onAlertaCaja: onNavigateToCaja,
+                    onAlertaEquipo: onNavigateToInventario,
                   ),
                   const SizedBox(height: 16),
 

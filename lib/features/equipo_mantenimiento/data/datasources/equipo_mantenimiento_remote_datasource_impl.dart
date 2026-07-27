@@ -26,9 +26,16 @@ class EquipoMantenimientoRemoteDatasourceImpl
   @override
   Future<void> insertMantenimiento(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('equipos_mantenimientos').insert(data);
+    await supabaseClient.rpc(
+      'registrar_mantenimiento_equipo',
+      params: {
+        'p_equipo_id': data['equipo_id'],
+        'p_suplidor_id': data['suplidor_id'],
+        'p_costo': data['costo'],
+        'p_fecha_mantenimiento': data['fecha_mantenimiento'],
+        'p_descripcion': data['descripcion'],
+      },
+    );
   }
 
   @override

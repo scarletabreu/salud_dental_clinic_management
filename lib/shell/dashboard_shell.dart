@@ -30,6 +30,7 @@ import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart'
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -206,8 +207,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       icon: Icons.build_outlined,
       selectedIcon: Icons.build_rounded,
       label: 'Equipos',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<EquipoCubit>(),
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => sl<EquipoCubit>()),
+          BlocProvider(create: (_) => sl<SuplidorCubit>()),
+        ],
         child: const EquipoListPage(),
       ),
     ),
@@ -247,7 +251,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     _rolesResueltos = List<RolUsuario>.unmodifiable(roles);
     _visibleDestinations = List<ShellDestination>.unmodifiable(
       _allDestinations.where(
-        (destination) => ShellDestinationAccess.allows(destination.label, roles),
+        (destination) =>
+            ShellDestinationAccess.allows(destination.label, roles),
       ),
     );
     return _visibleDestinations;

@@ -1000,8 +1000,8 @@ class _Acciones extends StatelessWidget {
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
                   label: const Text('Ver plan de tratamiento completo'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: ac.primaryBlue,
-                    side: BorderSide(color: ac.primaryBlue.withValues(alpha: 0.4)),
+                    foregroundColor: ac.primaryGreen,
+                    side: BorderSide(color: ac.primaryGreen.withValues(alpha: 0.4)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),

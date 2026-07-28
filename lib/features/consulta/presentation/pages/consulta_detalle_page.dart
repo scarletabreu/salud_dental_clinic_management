@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
@@ -21,7 +20,7 @@ import 'package:salud_dental_clinic_management/features/receta/domain/entities/i
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/repositories/receta_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
-import 'package:salud_dental_clinic_management/features/receta/presentation/widgets/receta_pdf_generator.dart';
+import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_page.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
@@ -29,39 +28,27 @@ class ConsultaDetallePage extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;
   final String nombreDoctor;
+  final String? pacienteFotoUrl;
 
   const ConsultaDetallePage({
     super.key,
     required this.consulta,
     required this.nombrePaciente,
     required this.nombreDoctor,
+    this.pacienteFotoUrl,
   });
 
-  void _imprimirRecetaDirecta(BuildContext context, Receta receta) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => Dialog.fullscreen(
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text('Imprimir Receta ${receta.codigoReceta}'),
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-          ),
-          body: PdfPreview(
-            build: (format) => RecetaPdfGenerator.generatePdf(
-              receta: receta,
-              pacienteNombre: nombrePaciente,
-              doctorNombre: nombreDoctor,
-            ),
-            allowPrinting: true,
-            allowSharing: true,
-            canChangeOrientation: false,
-            canChangePageFormat: false,
-          ),
-        ),
-      ),
+  void _imprimirRecetaDirecta(
+    BuildContext context,
+    Receta receta, {
+    String? fotoUrlFinal,
+  }) {
+    RecetaPage.navegar(
+      context,
+      receta: receta,
+      nombrePaciente: nombrePaciente,
+      doctorNombre: nombreDoctor,
+      pacienteFotoUrl: fotoUrlFinal ?? pacienteFotoUrl,
     );
   }
 
@@ -69,8 +56,15 @@ class ConsultaDetallePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
-    return BlocProvider(
-      create: (_) => sl<ConsultaDetalleCubit>()..cargar(consulta),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => sl<ConsultaDetalleCubit>()..cargar(consulta),
+        ),
+        BlocProvider(
+          create: (_) => sl<PacienteCubit>()..loadById(consulta.pacienteId),
+        ),
+      ],
       child: Scaffold(
         backgroundColor: ac.bgPage,
         appBar: AppBar(
@@ -189,6 +183,7 @@ class ConsultaDetallePage extends StatelessWidget {
 
   Widget _cardDatosGenerales(BuildContext context) {
     final ac = context.appColors;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -200,21 +195,56 @@ class ConsultaDetallePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: ac.primaryGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.person_rounded,
-                  color: ac.primaryGreen,
-                  size: 24,
-                ),
+              BlocBuilder<PacienteCubit, PacienteState>(
+                builder: (context, state) {
+                  String? fotoUrl;
+
+                  if (state is PacienteDetailLoaded) {
+                    fotoUrl = state.paciente.fotoUrl ?? state.paciente.fotoRuta;
+                  } else if (state is PacienteLoaded) {
+                    for (final p in state.todos) {
+                      if (p.id == consulta.pacienteId) {
+                        fotoUrl = p.fotoUrl ?? p.fotoRuta;
+                        break;
+                      }
+                    }
+                  }
+
+                  fotoUrl ??= pacienteFotoUrl;
+                  final tieneFoto =
+                      fotoUrl != null && fotoUrl.trim().isNotEmpty;
+
+                  return Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: ac.primaryGreen.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: ac.primaryGreen.withValues(alpha: 0.25),
+                        width: 1.5,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: tieneFoto
+                        ? Image.network(
+                            fotoUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.person_rounded,
+                              color: ac.primaryGreen,
+                              size: 24,
+                            ),
+                          )
+                        : Icon(
+                            Icons.person_rounded,
+                            color: ac.primaryGreen,
+                            size: 24,
+                          ),
+                  );
+                },
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -397,6 +427,14 @@ class ConsultaDetallePage extends StatelessWidget {
     final esAnulada = receta.estado == EstadoReceta.anulada;
     final esReemplazada = receta.estado == EstadoReceta.reemplazada;
 
+    String? fotoCalculada = pacienteFotoUrl;
+    try {
+      final state = context.read<PacienteCubit>().state;
+      if (state is PacienteDetailLoaded) {
+        fotoCalculada = state.paciente.fotoUrl ?? state.paciente.fotoRuta;
+      }
+    } catch (_) {}
+
     return Container(
       margin: EdgeInsets.only(bottom: esUltima ? 0 : 12),
       padding: const EdgeInsets.all(16),
@@ -436,7 +474,11 @@ class ConsultaDetallePage extends StatelessWidget {
                 IconButton(
                   tooltip: 'Imprimir Receta / Exportar PDF',
                   icon: Icon(Icons.print_rounded, color: ac.primaryGreen),
-                  onPressed: () => _imprimirRecetaDirecta(context, receta),
+                  onPressed: () => _imprimirRecetaDirecta(
+                    context,
+                    receta,
+                    fotoUrlFinal: fotoCalculada,
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Corregir / Formulario Formal',
@@ -581,7 +623,11 @@ class ConsultaDetallePage extends StatelessWidget {
           ),
         );
 
-        _imprimirRecetaDirecta(context, recetaCorregida);
+        _imprimirRecetaDirecta(
+          context,
+          recetaCorregida,
+          fotoUrlFinal: paciente.fotoUrl ?? paciente.fotoRuta,
+        );
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -886,7 +932,7 @@ class ConsultaDetallePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Total calculated sobre los precios congelados de los '
+                'Total calculado sobre los precios congelados de los '
                 'tratamientos aplicados en esta consulta.',
                 style: TextStyle(
                   color: ac.textMuted,

@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 
 Future<Uint8List> generarOdontodiagramaPdf({
@@ -17,8 +16,8 @@ Future<Uint8List> generarOdontodiagramaPdf({
   final theme =
       tema ??
       pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.openSansRegular(),
-        bold: await PdfGoogleFonts.openSansBold(),
+        base: pw.Font.helvetica(),
+        bold: pw.Font.helveticaBold(),
       );
 
   final documento = pw.Document(theme: theme);
@@ -53,7 +52,7 @@ Future<Uint8List> generarOdontodiagramaPdf({
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
                   if (logoImage != null) ...[
-                    pw.Container(
+                    pw.SizedBox(
                       width: 44,
                       height: 44,
                       child: pw.Image(logoImage),

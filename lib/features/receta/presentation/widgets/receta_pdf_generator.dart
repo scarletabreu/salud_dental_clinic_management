@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -14,15 +15,23 @@ class RecetaPdfGenerator {
     String? doctorTelefono,
     String? doctorCelular,
     String? doctorEmail,
-    String direccionFija = 'Emilio Prudhomme #27, Bella Vista, Stgo. R.D.',
+    String direccionFija =
+        'Emilio Prudhomme #27, Bella Vista, Santiago de los Caballeros, República Dominicana',
     String logoAssetPath = 'assets/images/logo.png',
+    pw.MemoryImage? logoImage,
+    pw.MemoryImage? pacienteFotoImage,
+    bool compress = false,
   }) async {
-    final pdf = pw.Document();
+    final pdfTheme = pw.ThemeData.withFont(
+      base: pw.Font.helvetica(),
+      bold: pw.Font.helveticaBold(),
+    );
+
+    final pdf = pw.Document(theme: pdfTheme, compress: compress);
 
     final docNombreFinal =
         doctorNombre ?? receta.doctorNombre ?? 'Dr. Odontólogo';
 
-    // 🌟 Colores alineados a la marca Dorado Champagne & Slate
     final doradoPrincipal = PdfColor.fromHex('#C5A059');
     final doradoSuave = PdfColor.fromHex('#F9F5EB');
     final tintaPrincipal = PdfColor.fromHex('#0F172A');
@@ -30,11 +39,15 @@ class RecetaPdfGenerator {
     final grisLinea = PdfColor.fromHex('#E2E8F0');
     final fondoTarjeta = PdfColor.fromHex('#F8FAFC');
 
-    pw.MemoryImage? logoImage;
-    try {
-      final logoData = await rootBundle.load(logoAssetPath);
-      logoImage = pw.MemoryImage(logoData.buffer.asUint8List());
-    } catch (_) {}
+    pw.MemoryImage? finalLogo = logoImage;
+    if (finalLogo == null) {
+      try {
+        final logoData = await rootBundle.load(logoAssetPath);
+        finalLogo = pw.MemoryImage(logoData.buffer.asUint8List());
+      } catch (e) {
+        debugPrint('⚠️ Error cargando logo desde $logoAssetPath: $e');
+      }
+    }
 
     pdf.addPage(
       pw.Page(
@@ -44,9 +57,6 @@ class RecetaPdfGenerator {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // ==========================================
-              // 1. ENCABEZADO CON LOGO Y CÓDIGO DE RECETA
-              // ==========================================
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -54,14 +64,32 @@ class RecetaPdfGenerator {
                   pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      if (logoImage != null) ...[
+                      if (finalLogo != null)
                         pw.Container(
                           width: 48,
                           height: 48,
-                          child: pw.Image(logoImage),
+                          margin: const pw.EdgeInsets.only(right: 12),
+                          child: pw.Image(finalLogo, fit: pw.BoxFit.contain),
+                        )
+                      else
+                        pw.Container(
+                          width: 44,
+                          height: 48,
+                          margin: const pw.EdgeInsets.only(right: 12),
+                          decoration: pw.BoxDecoration(
+                            color: doradoSuave,
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            'SD',
+                            style: pw.TextStyle(
+                              fontSize: 16,
+                              fontWeight: pw.FontWeight.bold,
+                              color: doradoPrincipal,
+                            ),
+                          ),
                         ),
-                        pw.SizedBox(width: 12),
-                      ],
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
@@ -128,9 +156,6 @@ class RecetaPdfGenerator {
               pw.Divider(thickness: 1, color: grisLinea),
               pw.SizedBox(height: 12),
 
-              // ==========================================
-              // 2. DATOS DEL PACIENTE Y DOCTOR
-              // ==========================================
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(
@@ -140,6 +165,24 @@ class RecetaPdfGenerator {
                 ),
                 child: pw.Row(
                   children: [
+                    if (pacienteFotoImage != null) ...[
+                      pw.Container(
+                        width: 36,
+                        height: 36,
+                        decoration: pw.BoxDecoration(
+                          borderRadius: pw.BorderRadius.circular(6),
+                        ),
+                        child: pw.ClipRRect(
+                          horizontalRadius: 6,
+                          verticalRadius: 6,
+                          child: pw.Image(
+                            pacienteFotoImage,
+                            fit: pw.BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(width: 10),
+                    ],
                     pw.Expanded(
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -202,9 +245,6 @@ class RecetaPdfGenerator {
 
               pw.SizedBox(height: 18),
 
-              // ==========================================
-              // 3. PRESCRIPCIÓN MÉDICA
-              // ==========================================
               pw.Text(
                 'PRESCRIPCIÓN MÉDICA',
                 style: pw.TextStyle(
@@ -319,74 +359,70 @@ class RecetaPdfGenerator {
 
               pw.Spacer(),
 
-              // ==========================================
-              // 4. PIE DE PÁGINA (DIRECCIÓN, CONTACTOS Y FIRMA)
-              // ==========================================
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  // Lado Izquierdo: Dirección fija y contactos resueltos
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        direccionFija,
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          color: tintaPrincipal,
-                          fontWeight: pw.FontWeight.bold,
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Column(
+                  children: [
+                    pw.Container(
+                      width: 170,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(
+                          top: pw.BorderSide(color: grisTexto, width: 0.8),
                         ),
                       ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      docNombreFinal,
+                      style: pw.TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: pw.FontWeight.bold,
+                        color: tintaPrincipal,
+                      ),
+                    ),
+                    pw.Text(
+                      'Firma y Sello Odontológico',
+                      style: pw.TextStyle(fontSize: 8, color: grisTexto),
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 16),
+              pw.Divider(thickness: 0.8, color: grisLinea),
+              pw.SizedBox(height: 8),
+
+              pw.Align(
+                alignment: pw.Alignment.center,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Text(
+                      direccionFija,
+                      style: pw.TextStyle(
+                        fontSize: 8.5,
+                        color: tintaPrincipal,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      _construirLineaTelefonos(doctorTelefono, doctorCelular),
+                      style: pw.TextStyle(fontSize: 8.5, color: tintaPrincipal),
+                    ),
+                    if (doctorEmail != null && doctorEmail.isNotEmpty) ...[
                       pw.SizedBox(height: 2),
                       pw.Text(
-                        _construirLineaTelefonos(doctorTelefono, doctorCelular),
+                        doctorEmail,
                         style: pw.TextStyle(
                           fontSize: 8.5,
-                          color: tintaPrincipal,
-                        ),
-                      ),
-                      if (doctorEmail != null && doctorEmail.isNotEmpty) ...[
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          doctorEmail,
-                          style: pw.TextStyle(
-                            fontSize: 8.5,
-                            color: doradoPrincipal,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  // Lado Derecho: Firma y Sello Odontológico
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 160,
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border(
-                            top: pw.BorderSide(color: grisTexto, width: 1),
-                          ),
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        docNombreFinal,
-                        style: pw.TextStyle(
-                          fontSize: 9.5,
+                          color: doradoPrincipal,
                           fontWeight: pw.FontWeight.bold,
-                          color: tintaPrincipal,
                         ),
                       ),
-                      pw.Text(
-                        'Firma y Sello Odontológico',
-                        style: pw.TextStyle(fontSize: 8, color: grisTexto),
-                      ),
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           );

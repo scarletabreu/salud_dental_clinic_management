@@ -72,9 +72,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthCubit>(
-          create: (_) => di.sl<AuthCubit>(),
-        ), // <-- Corregido
+        BlocProvider<AuthCubit>(create: (_) => di.sl<AuthCubit>()),
         BlocProvider<SettingsCubit>(create: (_) => di.sl<SettingsCubit>()),
         BlocProvider<ConnectivityCubit>(
           create: (_) => di.sl<ConnectivityCubit>(),
@@ -95,7 +93,7 @@ class _RaizConTema extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Salud Dental',
+      title: 'Clínica Salud Dental Integral',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

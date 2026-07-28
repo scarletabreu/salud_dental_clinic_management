@@ -276,6 +276,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   Widget _buildIdentityCard(Paciente p) {
     final ac = context.appColors;
+    final fotoUrl = p.fotoUrl;
+    final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -369,29 +372,70 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            p.fullName,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          const SizedBox(height: 18),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _MetaItem(icon: Icons.badge_outlined, text: 'Cédula: ${p.govID}'),
-              _MetaItem(
-                icon: Icons.cake_outlined,
-                text: _ageFormatted(p.birthDate),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ac.bgPage,
+                  border: Border.all(
+                    color: ac.primaryGreen.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                  image: tieneFoto
+                      ? DecorationImage(
+                          image: NetworkImage(fotoUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: !tieneFoto
+                    ? Icon(Icons.person_rounded, size: 40, color: ac.textMuted)
+                    : null,
               ),
-              if (p.trabajo.isNotEmpty)
-                _MetaItem(icon: Icons.work_outline_rounded, text: p.trabajo),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.fullName,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: ac.textPrimary,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MetaItem(
+                          icon: Icons.badge_outlined,
+                          text: 'Cédula: ${p.govID}',
+                        ),
+                        _MetaItem(
+                          icon: Icons.cake_outlined,
+                          text: _ageFormatted(p.birthDate),
+                        ),
+                        if (p.trabajo.isNotEmpty)
+                          _MetaItem(
+                            icon: Icons.work_outline_rounded,
+                            text: p.trabajo,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],

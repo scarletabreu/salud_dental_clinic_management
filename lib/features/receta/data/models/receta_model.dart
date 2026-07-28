@@ -20,6 +20,17 @@ class RecetaModel extends Receta {
   });
 
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
+    final idStr = json['id'] as String?;
+    final codigoBruto = json['codigo_receta'] ?? json['codigo'];
+    final String codigoFinal;
+    if (codigoBruto != null && codigoBruto.toString().trim().isNotEmpty) {
+      codigoFinal = codigoBruto.toString().trim();
+    } else if (idStr != null && idStr.length >= 8) {
+      codigoFinal = 'RX-${idStr.substring(0, 8).toUpperCase()}';
+    } else {
+      codigoFinal = 'RX-PENDIENTE';
+    }
+
     final itemsRaw = json['items_receta'] as List?;
     final List<ItemReceta> itemsList;
 
@@ -27,8 +38,23 @@ class RecetaModel extends Receta {
       itemsList = itemsRaw
           .map((i) => ItemRecetaModel.fromJson(i as Map<String, dynamic>))
           .toList();
-    } else if (json['titulo'] != null) {
-      itemsList = [ItemRecetaModel.fromJson(json)];
+    } else if (json['titulo'] != null || json['nombre_medicamento'] != null) {
+      itemsList = [
+        ItemRecetaModel(
+          nombreMedicamento:
+              (json['titulo'] ?? json['nombre_medicamento'] ?? 'Medicamento')
+                  as String,
+          dosis: (json['dosis'] ?? '') as String,
+          viaAdministracion:
+              (json['via_administracion'] ?? 'vía oral') as String,
+          frecuencia: (json['frecuencia'] ?? '') as String,
+          duracion: (json['duracion'] ?? '') as String,
+          cantidadIndicada: (json['cantidad_indicada'] ?? '') as String,
+          presentacionConcentracion:
+              (json['presentacion_concentracion'] ?? '') as String,
+          indicacionesEspecificas: json['indicaciones'] as String?,
+        ),
+      ];
     } else {
       itemsList = const [];
     }
@@ -45,8 +71,8 @@ class RecetaModel extends Receta {
     } catch (_) {}
 
     return RecetaModel(
-      id: json['id'] as String?,
-      codigoReceta: (json['codigo_receta'] ?? 'RX-LEGACY') as String,
+      id: idStr,
+      codigoReceta: codigoFinal,
       consultaId: (json['consulta_id'] ?? '') as String,
       pacienteId: (json['paciente_id'] ?? '') as String,
       doctorId: json['doctor_id'] as String?,

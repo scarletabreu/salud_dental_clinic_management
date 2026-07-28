@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
@@ -124,13 +125,62 @@ class PacienteCubit extends Cubit<PacienteState> {
     );
   }
 
-  Future<void> updatePaciente(Paciente paciente) async {
+  Future<void> updatePaciente(Paciente paciente, {Uint8List? fotoBytes}) async {
     emit(const PacienteLoading());
-    final result = await _repository.updatePaciente(paciente);
-    result.fold(
-      (failure) => emit(PacienteError(failure.message)),
-      (_) => emit(const PacienteOperationSuccess()),
-    );
+
+    Paciente pacienteAActualizar = paciente;
+
+    if (fotoBytes != null && fotoBytes.isNotEmpty && paciente.id != null) {
+      const int maxFotoBytes = 10 * 1024 * 1024;
+      if (fotoBytes.length > maxFotoBytes) {
+        emit(
+          const PacienteError(
+            'El tamaño de la imagen es superior a 10 MB. Por favor elige una foto de menor peso.',
+          ),
+        );
+        return;
+      }
+
+      final uploadRes = await _repository.uploadFotoPaciente(
+        pacienteId: paciente.id!,
+        bytes: fotoBytes,
+      );
+
+      bool errorSubida = false;
+      uploadRes.fold(
+        (failure) {
+          errorSubida = true;
+          emit(
+            const PacienteError(
+              'No se pudo subir la fotografía. Asegúrate de que pese menos de 10 MB e intente nuevamente.',
+            ),
+          );
+        },
+        (publicUrl) {
+          pacienteAActualizar = paciente.copyWith(
+            fotoRuta: publicUrl,
+            fotoMimeType: 'image/jpeg',
+            fotoTamanoBytes: fotoBytes.length,
+            fotoActualizadaEn: DateTime.now(),
+          );
+        },
+      );
+
+      if (errorSubida) return;
+    }
+
+    final result = await _repository.updatePaciente(pacienteAActualizar);
+    result.fold((failure) {
+      if (failure.message.contains('pacientes_foto_tamano_bytes_check')) {
+        emit(
+          const PacienteError(
+            'El tamaño de la fotografía no es válido o excede el límite permitido. Por favor elige una foto de menor peso.',
+          ),
+        );
+      } else {
+        emit(PacienteError(failure.message));
+      }
+    }, (_) => emit(const PacienteOperationSuccess()));
   }
 
   Future<void> deletePaciente(String id) async {

@@ -11,7 +11,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.textSecondary,
     required this.textMuted,
     required this.textDisabled,
-    required this.primaryGreen, // Mantenemos el nombre por compatibilidad, pero con el tono Gold
+    required this.primaryGreen,
     required this.gold,
     required this.teal,
     required this.tealLight,
@@ -40,7 +40,7 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color textSecondary;
   final Color textMuted;
   final Color textDisabled;
-  final Color primaryGreen; // Mapeado a Oro Cálido
+  final Color primaryGreen;
   final Color gold;
   final Color teal;
   final Color tealLight;
@@ -59,9 +59,6 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color railTextSelected;
   final Color railDivider;
 
-  // -------------------------------------------------------------
-  // ☀️ MODO CLARO (Elegante, Blanco Perla & Acentos Oro / Navy)
-  // -------------------------------------------------------------
   static const light = AppColors(
     bgPage: Color(0xFFF8FAFC),
     cardBg: Color(0xFFFFFFFF),
@@ -72,7 +69,7 @@ class AppColors extends ThemeExtension<AppColors> {
     textSecondary: Color(0xFF334155),
     textMuted: Color(0xFF64748B),
     textDisabled: Color(0xFF94A3B8),
-    primaryGreen: Color(0xFFC5A059), // 🌟 Dorado Bronce Elegante
+    primaryGreen: Color(0xFFC5A059),
     gold: Color(0xFFD4AF37),
     teal: Color(0xFF0D9488),
     tealLight: Color(0xFF14B8A6),
@@ -90,29 +87,24 @@ class AppColors extends ThemeExtension<AppColors> {
       offset: Offset(0, 4),
     ),
     railBg: Color(0xFFFFFFFF),
-    railSelectedBg: Color(0xFFC5A059), // Dorado en el item activo
+    railSelectedBg: Color(0xFFC5A059),
     railText: Color(0xFF64748B),
     railTextSelected: Color(0xFFFFFFFF),
     railDivider: Color(0xFFE2E8F0),
   );
 
-  // -------------------------------------------------------------
-  // 🌙 MODO OSCURO (Lujo Nocturno, Carbón / Obsidiana & Oro Champagne)
-  // -------------------------------------------------------------
   static const dark = AppColors(
-    bgPage: Color(0xFF0B0F17), // Carbón Noche Profundo
-    cardBg: Color(0xFF161B26), // Pizarra Oscuro Mate
+    bgPage: Color(0xFF0B0F17),
+    cardBg: Color(0xFF161B26),
     divider: Color(0xFF232B3B),
     rowDivider: Color(0xFF1C2230),
     chipBg: Color(0xFF212836),
     searchFill: Color(0xFF1C2230),
-    textPrimary: Color(0xFFF8FAFC), // Blanco Perla
+    textPrimary: Color(0xFFF8FAFC),
     textSecondary: Color(0xFFCBD5E1),
     textMuted: Color(0xFF8A99AD),
     textDisabled: Color(0xFF475569),
-    primaryGreen: Color(
-      0xFFD4AF37,
-    ), // 🌟 Oro Champagne Balanceado (sin deslumbrar)
+    primaryGreen: Color(0xFFD4AF37),
     gold: Color(0xFFE5C158),
     teal: Color(0xFF14B8A6),
     tealLight: Color(0xFF2DD4BF),
@@ -129,11 +121,9 @@ class AppColors extends ThemeExtension<AppColors> {
       offset: Offset(0, 4),
     ),
     railBg: Color(0xFF070A10),
-    railSelectedBg: Color(0xFFD4AF37), // Oro en la barra lateral
+    railSelectedBg: Color(0xFFD4AF37),
     railText: Color(0xFF8A99AD),
-    railTextSelected: Color(
-      0xFF0F172A,
-    ), // Texto oscuro sobre botón dorado para contraste perfecto
+    railTextSelected: Color(0xFF0F172A),
     railDivider: Color(0xFF232B3B),
   );
 

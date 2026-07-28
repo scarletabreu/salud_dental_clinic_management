@@ -471,22 +471,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                           flex: 3,
                           child: Row(
                             children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.04,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 18,
-                                  color: colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.6),
-                                ),
-                              ),
+                              _buildAvatarPaciente(p, colorScheme),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
@@ -584,6 +569,38 @@ class _PacienteRowState extends State<_PacienteRow> {
     );
   }
 
+  Widget _buildAvatarPaciente(Paciente p, ColorScheme colorScheme) {
+    final fotoUrl = p.fotoUrl;
+    final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
+
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: colorScheme.onSurface.withValues(alpha: 0.04),
+        shape: BoxShape.circle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: tieneFoto
+          ? Image.network(
+              fotoUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.person_outline_rounded,
+                  size: 20,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                );
+              },
+            )
+          : Icon(
+              Icons.person_outline_rounded,
+              size: 20,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+    );
+  }
+
   Widget _buildCompactRow(BuildContext context, Paciente p, AppColors ac) {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
@@ -591,19 +608,7 @@ class _PacienteRowState extends State<_PacienteRow> {
       children: [
         Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colorScheme.onSurface.withValues(alpha: 0.04),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person_outline_rounded,
-                size: 18,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-            ),
+            _buildAvatarPaciente(p, colorScheme),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

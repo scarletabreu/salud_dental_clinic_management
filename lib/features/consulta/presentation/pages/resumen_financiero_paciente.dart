@@ -61,7 +61,10 @@ class _ResumenFinancieroView extends StatelessWidget {
     return SizedBox(
       height: 80,
       child: Center(
-        child: CircularProgressIndicator(strokeWidth: 2, color: ac.primaryBlue),
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: ac.primaryGreen,
+        ),
       ),
     );
   }
@@ -162,7 +165,7 @@ class _TarjetasResumen extends StatelessWidget {
       (
         label: 'Total facturado',
         value: currFmt.format(state.totalFacturado),
-        color: ac.primaryBlue,
+        color: ac.primaryGreen,
         icon: Icons.receipt_long_rounded,
       ),
       (

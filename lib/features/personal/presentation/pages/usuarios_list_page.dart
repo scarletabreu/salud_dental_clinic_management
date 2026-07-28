@@ -43,7 +43,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     });
   }
 
-  // Método auxiliar para navegar limpiamente a la página de creación
   void _navegarACrearUsuario() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -62,10 +61,9 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      // Botón flotante para acceder rápidamente a la creación
       floatingActionButton: FloatingActionButton(
         onPressed: _navegarACrearUsuario,
-        backgroundColor: ac.primaryBlue,
+        backgroundColor: ac.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -110,8 +108,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Crear usuario se ofrece desde el botón flotante; un segundo "+"
-          // en la cabecera solo lo duplicaba.
           Text(
             'Control de Usuarios',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -333,7 +329,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

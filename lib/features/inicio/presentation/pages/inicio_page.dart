@@ -42,7 +42,7 @@ class InicioPage extends StatelessWidget {
             if (state is DashboardLoading) {
               return Center(
                 child: CircularProgressIndicator(
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                   strokeWidth: 2,
                 ),
               );
@@ -193,7 +193,7 @@ class InicioPage extends StatelessWidget {
                     : null,
               );
             },
-            style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+            style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
             child: const Text('Reintentar'),
           ),
         ],
@@ -232,7 +232,7 @@ class _ResumenJornadaCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.assignment_turned_in_rounded,
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -318,7 +318,7 @@ class _ResumenJornadaCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: porcentaje,
               minHeight: 8,
-              backgroundColor: ac.primaryBlue.withValues(alpha: 0.12),
+              backgroundColor: ac.primaryGreen.withValues(alpha: 0.12),
               valueColor: AlwaysStoppedAnimation<Color>(ac.green),
             ),
           ),

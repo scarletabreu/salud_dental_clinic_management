@@ -518,7 +518,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -539,8 +539,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withOpacity(0.10),
       icon: Icons.person_outline_rounded,
       title: 'Datos personales',
       child: Column(
@@ -644,7 +644,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               options: Genero.values,
               selected: _genero,
               labelOf: (g) => g.label,
-              activeColor: ac.primaryBlue,
+              activeColor: ac.primaryGreen,
               onSelected: (g) => setState(() => _genero = g),
             ),
           ),
@@ -662,10 +662,10 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       title: 'Contactos',
       action: TextButton.icon(
         onPressed: _addContacto,
-        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
         label: Text(
           'Agregar',
-          style: TextStyle(fontSize: 12, color: ac.primaryBlue),
+          style: TextStyle(fontSize: 12, color: ac.primaryGreen),
         ),
       ),
       child: Column(
@@ -705,7 +705,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   Icon(
                     isFirst ? Icons.phone : Icons.contact_emergency,
                     size: 16,
-                    color: isFirst ? ac.primaryBlue : ac.red,
+                    color: isFirst ? ac.primaryGreen : ac.red,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -964,7 +964,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     alignLabelWithHint: alignLabelWithHint,
   );
@@ -1056,7 +1056,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Expanded(
               child: Text(

@@ -81,7 +81,7 @@ class _OdontodiagramaExpedienteState extends State<OdontodiagramaExpediente> {
                     )
                   : const Icon(Icons.print_outlined, size: 16),
               label: Text(_generando ? 'Preparando…' : 'Imprimir'),
-              style: TextButton.styleFrom(foregroundColor: ac.primaryBlue),
+              style: TextButton.styleFrom(foregroundColor: ac.primaryGreen),
             ),
           ),
         RepaintBoundary(

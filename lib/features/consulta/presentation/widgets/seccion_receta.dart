@@ -88,7 +88,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('"${medicina.nombre}" agregada a la receta.'),
-        backgroundColor: context.appColors.primaryBlue,
+        backgroundColor: context.appColors.primaryGreen,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
       ),
@@ -149,13 +149,13 @@ class _SeccionRecetaState extends State<SeccionReceta> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: ac.primaryBlue.withValues(alpha: 0.10),
+                  color: ac.primaryGreen.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Icons.receipt_long_rounded,
                   size: 17,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
               const SizedBox(width: 12),
@@ -186,7 +186,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 )
               else
@@ -243,7 +243,7 @@ class _SeccionRecetaState extends State<SeccionReceta> {
         children: [
           Row(
             children: [
-              Icon(Icons.medication_rounded, size: 18, color: ac.primaryBlue),
+              Icon(Icons.medication_rounded, size: 18, color: ac.primaryGreen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

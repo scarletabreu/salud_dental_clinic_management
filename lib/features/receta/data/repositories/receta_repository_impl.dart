@@ -1,7 +1,7 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/repositories/receta_repository.dart';
 
@@ -25,7 +25,7 @@ class RecetaRepositoryImpl implements RecetaRepository {
   }
 
   @override
-  Future<void> reemitirRecetaModificada({
+  Future<String> reemitirRecetaModificada({
     required String recetaOriginalId,
     required String motivoReemplazo,
     required Receta nuevaReceta,
@@ -33,22 +33,16 @@ class RecetaRepositoryImpl implements RecetaRepository {
     return runGuarded(() async {
       await remoteDataSource.anularReceta(
         recetaId: recetaOriginalId,
-        motivo: 'Reemplazada por nueva versión: $motivoReemplazo',
+        motivo: motivoReemplazo,
       );
 
-      final recetaConVinc = nuevaReceta.copyWith(
+      final recetaLimpia = nuevaReceta.copyWith(
+        id: null,
         recetaReemplazadaId: recetaOriginalId,
       );
-      final model = RecetaModel.fromEntity(recetaConVinc);
-      final itemsModel = nuevaReceta.items
-          .map((i) => ItemRecetaModel.fromEntity(i))
-          .toList();
 
-      await remoteDataSource.emitirRecetaCompleta(
-        receta: model,
-        items: itemsModel,
-      );
-    }, context: 'reemitir versión corregida de la receta');
+      return await emitirReceta(recetaLimpia);
+    }, context: 'reemitir la receta médica modificada');
   }
 
   @override

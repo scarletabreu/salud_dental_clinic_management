@@ -99,7 +99,7 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
       preferredWidth: 460,
       title: Row(
         children: [
-          Icon(Icons.medication_rounded, size: 22, color: ac.primaryBlue),
+          Icon(Icons.medication_rounded, size: 22, color: ac.primaryGreen),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -204,7 +204,7 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
         ),
         FilledButton.icon(
           onPressed: _confirmar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Agregar renglón'),
         ),

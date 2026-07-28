@@ -126,7 +126,7 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
-          Icon(Icons.medication_liquid_rounded, color: ac.primaryBlue),
+          Icon(Icons.medication_liquid_rounded, color: ac.primaryGreen),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -196,7 +196,7 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.8,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -382,7 +382,7 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
         ),
         FilledButton.icon(
           onPressed: _guardar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           icon: const Icon(Icons.check_rounded, size: 18),
           label: const Text('Emitir Receta'),
         ),

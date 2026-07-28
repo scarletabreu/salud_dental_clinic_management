@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
@@ -10,12 +12,18 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/repositories/receta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/repositories/receta_repository.dart';
 import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
+import 'package:salud_dental_clinic_management/features/receta/presentation/widgets/receta_pdf_generator.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
 class ConsultaDetallePage extends StatelessWidget {
   final Consulta consulta;
@@ -28,6 +36,34 @@ class ConsultaDetallePage extends StatelessWidget {
     required this.nombrePaciente,
     required this.nombreDoctor,
   });
+
+  void _imprimirRecetaDirecta(BuildContext context, Receta receta) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text('Imprimir Receta ${receta.codigoReceta}'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ),
+          body: PdfPreview(
+            build: (format) => RecetaPdfGenerator.generatePdf(
+              receta: receta,
+              pacienteNombre: nombrePaciente,
+              doctorNombre: nombreDoctor,
+            ),
+            allowPrinting: true,
+            allowSharing: true,
+            canChangeOrientation: false,
+            canChangePageFormat: false,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +131,7 @@ class ConsultaDetallePage extends StatelessWidget {
                     context,
                     'Recetas Médicas Emitidas',
                     Icons.receipt_long_rounded,
-                    ac.primaryBlue,
+                    ac.primaryGreen,
                     Column(
                       children: [
                         for (var i = 0; i < consulta.recetas.length; i++)
@@ -170,13 +206,13 @@ class ConsultaDetallePage extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: ac.primaryBlue.withValues(alpha: 0.1),
+                  color: ac.primaryGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.person_rounded,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                   size: 24,
                 ),
               ),
@@ -248,7 +284,7 @@ class ConsultaDetallePage extends StatelessWidget {
                     ? '${consulta.recetas.length} '
                           '${consulta.recetas.length == 1 ? 'receta' : 'recetas'}'
                     : 'Sin recetas',
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 activo: consulta.tieneRecetas,
               ),
               _badge(
@@ -378,7 +414,11 @@ class ConsultaDetallePage extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.description_outlined, size: 20, color: ac.primaryBlue),
+              Icon(
+                Icons.description_outlined,
+                size: 20,
+                color: ac.primaryGreen,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -392,12 +432,18 @@ class ConsultaDetallePage extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!esAnulada && !esReemplazada)
+              if (!esAnulada && !esReemplazada) ...[
+                IconButton(
+                  tooltip: 'Imprimir Receta / Exportar PDF',
+                  icon: Icon(Icons.print_rounded, color: ac.primaryGreen),
+                  onPressed: () => _imprimirRecetaDirecta(context, receta),
+                ),
                 IconButton(
                   tooltip: 'Corregir / Formulario Formal',
-                  icon: Icon(Icons.edit_note_rounded, color: ac.primaryBlue),
+                  icon: Icon(Icons.edit_note_rounded, color: ac.primaryGreen),
                   onPressed: () => _abrirRecetaFormDialog(context, receta),
                 ),
+              ],
               const SizedBox(width: 4),
               if (esAnulada)
                 _pillStatus('ANULADA', ac.red)
@@ -469,26 +515,63 @@ class ConsultaDetallePage extends StatelessWidget {
     BuildContext context,
     Receta recetaOriginal,
   ) async {
-    final pacienteState = context.read<PacienteCubit>().state;
-    if (pacienteState is! PacienteDetailLoaded) return;
+    Paciente? paciente;
+    try {
+      final pacienteState = context.read<PacienteCubit>().state;
+      if (pacienteState is PacienteDetailLoaded) {
+        paciente = pacienteState.paciente;
+      }
+    } catch (_) {}
+
+    if (paciente == null) {
+      final partesNombre = nombrePaciente.trim().split(' ');
+      final primerNombre = partesNombre.isNotEmpty ? partesNombre.first : '';
+      final apellidoSeparado = partesNombre.length > 1
+          ? partesNombre.sublist(1).join(' ')
+          : '';
+
+      paciente = Paciente(
+        id: consulta.pacienteId,
+        nombre: primerNombre,
+        apellido: apellidoSeparado,
+        birthDate: DateTime.now(),
+        govID: '',
+        contactos: const [],
+        estatus: EstatusPersona.activo,
+        genero: Genero.noPrefiereDecir,
+        record: Record(
+          pacienteId: consulta.pacienteId,
+          tipoSangre: TipoSangre.aNegativo,
+          condiciones: const [],
+          cirugiasPrevias: const [],
+          historialFamiliar: '',
+        ),
+        trabajo: '',
+        referencia: '',
+        citas: const [],
+        tipoPaciente: TipoPaciente.integrado,
+      );
+    }
 
     final recetaCorregida = await RecetaFormDialog.mostrar(
       context,
-      paciente: pacienteState.paciente,
+      paciente: paciente,
       consultaId: consulta.id ?? '',
       recetaParaEditar: recetaOriginal,
     );
 
     if (recetaCorregida != null && context.mounted) {
       try {
-        if (recetaOriginal.id != null) {
-          await sl<RecetaRepositoryImpl>().reemitirRecetaModificada(
+        if (recetaOriginal.id != null && recetaOriginal.id!.isNotEmpty) {
+          await sl<RecetaRepository>().reemitirRecetaModificada(
             recetaOriginalId: recetaOriginal.id!,
             motivoReemplazo: 'Corrección / Modificación formal de receta',
-            nuevaReceta: recetaCorregida,
+            nuevaReceta: recetaCorregida.copyWith(id: null),
           );
         } else {
-          await sl<RecetaRepositoryImpl>().emitirReceta(recetaCorregida);
+          await sl<RecetaRepository>().emitirReceta(
+            recetaCorregida.copyWith(id: null),
+          );
         }
 
         if (!context.mounted) return;
@@ -497,6 +580,8 @@ class ConsultaDetallePage extends StatelessWidget {
             content: Text('Receta actualizada y reemitida correctamente.'),
           ),
         );
+
+        _imprimirRecetaDirecta(context, recetaCorregida);
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -655,7 +740,7 @@ class ConsultaDetallePage extends StatelessWidget {
         ),
         trailing: IconButton(
           tooltip: 'Copiar enlace del documento',
-          icon: Icon(Icons.link_rounded, size: 18, color: ac.primaryBlue),
+          icon: Icon(Icons.link_rounded, size: 18, color: ac.primaryGreen),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: doc.urlArchivo));
             ScaffoldMessenger.of(

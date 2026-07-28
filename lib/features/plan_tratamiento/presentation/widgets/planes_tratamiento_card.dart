@@ -44,8 +44,7 @@ class _PlanesView extends StatelessWidget {
 
     return BlocBuilder<PlanesPacienteCubit, PlanesPacienteState>(
       builder: (context, state) {
-        if (state is PlanesPacienteCargando ||
-            state is PlanesPacienteInicial) {
+        if (state is PlanesPacienteCargando || state is PlanesPacienteInicial) {
           return _Shell(
             child: Center(
               child: Padding(
@@ -55,7 +54,7 @@ class _PlanesView extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
               ),
@@ -76,8 +75,7 @@ class _PlanesView extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      context.read<PlanesPacienteCubit>().cargar(),
+                  onPressed: () => context.read<PlanesPacienteCubit>().cargar(),
                   child: const Text('Reintentar'),
                 ),
               ],
@@ -110,10 +108,7 @@ class _PlanesView extends StatelessWidget {
               for (var i = 0; i < cargado.planes.length; i++) ...[
                 if (i > 0) ...[
                   const SizedBox(height: 12),
-                  Divider(
-                    height: 1,
-                    color: ac.divider.withValues(alpha: 0.5),
-                  ),
+                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
                   const SizedBox(height: 12),
                 ],
                 _BloquePlan(plan: cargado.planes[i]),
@@ -139,16 +134,20 @@ class _BandejaPendientes extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.06),
+        color: ac.primaryGreen.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ac.primaryBlue.withValues(alpha: 0.20)),
+        border: Border.all(color: ac.primaryGreen.withValues(alpha: 0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.pending_actions_rounded, size: 15, color: ac.primaryBlue),
+              Icon(
+                Icons.pending_actions_rounded,
+                size: 15,
+                color: ac.primaryGreen,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -156,7 +155,7 @@ class _BandejaPendientes extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
               ),
@@ -165,7 +164,7 @@ class _BandejaPendientes extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ],
@@ -304,13 +303,13 @@ class _Shell extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: ac.primaryBlue.withValues(alpha: 0.10),
+                    color: ac.primaryGreen.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     Icons.fact_check_outlined,
                     size: 18,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -336,7 +335,7 @@ class _Shell extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.07),
+                      color: ac.primaryGreen.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -344,7 +343,7 @@ class _Shell extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                   ),

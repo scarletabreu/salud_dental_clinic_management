@@ -463,7 +463,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           content: const Text(
             'Formulario formal de receta cargado a la consulta.',
           ),
-          backgroundColor: context.appColors.primaryBlue,
+          backgroundColor: context.appColors.primaryGreen,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
         ),
@@ -483,7 +483,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       builder: (context, state) {
         if (state is! ConsultaIniciada && state is! ConsultaGuardando) {
           return Center(
-            child: CircularProgressIndicator(color: ac.primaryBlue),
+            child: CircularProgressIndicator(color: ac.primaryGreen),
           );
         }
 
@@ -493,7 +493,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
         if (consulta == null) {
           return Center(
-            child: CircularProgressIndicator(color: ac.primaryBlue),
+            child: CircularProgressIndicator(color: ac.primaryGreen),
           );
         }
 
@@ -673,7 +673,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
             TarjetaConsulta(
               icon: Icons.fact_check_outlined,
-              iconColor: ac.primaryBlue,
+              iconColor: ac.primaryGreen,
               titulo: 'Plan de tratamiento',
               subtitulo:
                   'Planifica desde los diagnósticos sin salir de la consulta',

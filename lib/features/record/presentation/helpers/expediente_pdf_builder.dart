@@ -9,7 +9,6 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
-import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/expediente_print_options.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
@@ -47,7 +46,7 @@ class ExpedientePdfBuilder {
       theme: documentTheme,
       compress: compress,
       title: 'Expediente clínico de ${paciente.nombre} ${paciente.apellido}',
-      author: 'Salud Dental',
+      author: 'Clínica Salud Dental Integral',
       subject: 'Expediente médico',
     );
     final now = generadoEn ?? DateTime.now();

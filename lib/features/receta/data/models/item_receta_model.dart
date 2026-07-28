@@ -32,10 +32,10 @@ class ItemRecetaModel extends ItemReceta {
     );
   }
 
-  Map<String, dynamic> toJson({required String recetaId}) {
+  Map<String, dynamic> toJson({String? recetaId}) {
     return {
       if (id != null) 'id': id,
-      'receta_id': recetaId,
+      if (recetaId != null) 'receta_id': recetaId,
       'medicamento_id': medicamentoId,
       'nombre_medicamento': nombreMedicamento,
       'presentacion_concentracion': presentacionConcentracion,

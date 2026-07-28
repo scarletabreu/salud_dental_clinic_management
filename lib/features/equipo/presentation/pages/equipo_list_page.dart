@@ -127,7 +127,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
       backgroundColor: colorScheme.surfaceContainerLowest,
       floatingActionButton: FloatingActionButton(
         onPressed: _navegarACrear,
-        backgroundColor: ac.primaryBlue,
+        backgroundColor: ac.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -304,8 +304,8 @@ class _EquipoListPageState extends State<EquipoListPage> {
           // Indicador sutil de operación en curso (guardando/eliminando)
           if (state is EquipoOperating)
             LinearProgressIndicator(
-              backgroundColor: ac.primaryBlue.withValues(alpha: 0.1),
-              color: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen.withValues(alpha: 0.1),
+              color: ac.primaryGreen,
               minHeight: 2,
             ),
           Expanded(
@@ -361,7 +361,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

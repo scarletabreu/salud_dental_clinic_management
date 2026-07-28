@@ -1,6 +1,6 @@
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
@@ -8,9 +8,9 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
 
   RecetaRemoteDatasourceImpl({required this.supabaseClient});
 
+  // 1. Ya no hace falta join a items_receta(*) porque la columna JSONB viene automáticamente con el *
   static const _selectRecetaCompleta = '''
     *,
-    items_receta(*),
     doctor:doctores(id, usuarios(personas(nombre, apellido)))
   ''';
 
@@ -21,22 +21,15 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
   }) async {
     final payloadCabecera = receta.toCabeceraJson();
 
+    payloadCabecera['items_receta'] = items.map((i) => i.toJson()).toList();
+
     final res = await supabaseClient
         .from('recetas')
         .insert(payloadCabecera)
         .select('id')
         .single();
 
-    final recetaId = res['id'] as String;
-
-    if (items.isNotEmpty) {
-      final itemsPayload = items
-          .map((i) => i.toJson(recetaId: recetaId))
-          .toList();
-      await supabaseClient.from('items_receta').insert(itemsPayload);
-    }
-
-    return recetaId;
+    return res['id'] as String;
   }
 
   @override

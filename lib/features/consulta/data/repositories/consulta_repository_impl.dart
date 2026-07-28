@@ -154,7 +154,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'fecha_aplicacion': diagnostico.fechaAplicacion
                       .toUtc()
                       .toIso8601String(),
-                  'superficie': diagnostico.superficie?.name.toLowerCase(),
+                  'superficiecle': diagnostico.superficie?.name.toLowerCase(),
                   'origen': diagnostico.origen.name,
                   'notas': diagnostico.notas,
                 },

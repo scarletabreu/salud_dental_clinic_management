@@ -122,7 +122,7 @@ class _PacientesPageState extends State<PacientesPage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.07),
+                            color: ac.primaryGreen.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -133,13 +133,13 @@ class _PacientesPageState extends State<PacientesPage> {
                                 style: Theme.of(context).textTheme.labelMedium
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: ac.primaryBlue,
+                                      color: ac.primaryGreen,
                                     ),
                               ),
                               const SizedBox(width: 4),
                               Icon(
                                 Icons.people_alt_rounded,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                                 size: 13,
                               ),
                             ],
@@ -202,7 +202,7 @@ class _PacientesPageState extends State<PacientesPage> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: context.appColors.primaryBlue,
+                  color: context.appColors.primaryGreen,
                   width: 1.2,
                 ),
               ),
@@ -361,7 +361,7 @@ Widget _buildFooter(BuildContext context, PacienteLoaded state) {
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-              color: shown == total ? ac.primaryBlue : ac.amber,
+              color: shown == total ? ac.primaryGreen : ac.amber,
               shape: BoxShape.circle,
             ),
           ),
@@ -430,10 +430,10 @@ class _PacienteRowState extends State<_PacienteRow> {
     final ac = context.appColors;
 
     final fondoTarjeta = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.04)
+        ? ac.primaryGreen.withValues(alpha: 0.04)
         : ac.cardBg;
     final colorBorde = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.25)
+        ? ac.primaryGreen.withValues(alpha: 0.25)
         : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
@@ -459,7 +459,7 @@ class _PacienteRowState extends State<_PacienteRow> {
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(14),
-            hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
+            hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: compact
@@ -549,7 +549,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                               _ActionIcon(
                                 icon: Icons.visibility_outlined,
                                 tooltip: 'Ver expediente',
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                                 onTap: widget.onVerDetalle,
                               ),
                               const SizedBox(width: 6),
@@ -618,7 +618,7 @@ class _PacienteRowState extends State<_PacienteRow> {
             _ActionIcon(
               icon: Icons.visibility_outlined,
               tooltip: 'Ver expediente',
-              color: ac.primaryBlue,
+              color: ac.primaryGreen,
               onTap: widget.onVerDetalle,
             ),
             _ActionIcon(

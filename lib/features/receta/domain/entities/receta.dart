@@ -49,7 +49,7 @@ class Receta {
     String? recetaReemplazadaId,
   }) {
     return Receta(
-      id: id ?? this.id,
+      id: null,
       codigoReceta: codigoReceta ?? this.codigoReceta,
       consultaId: consultaId ?? this.consultaId,
       pacienteId: pacienteId ?? this.pacienteId,

@@ -137,7 +137,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     tooltip: 'Exportar / Imprimir Expediente',
                     icon: Icon(
                       Icons.picture_as_pdf_rounded,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     onPressed: () {
                       if (state is PacienteDetailLoaded &&
@@ -182,7 +182,10 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   Widget _buildBody(PacienteState state, AppColors ac) {
     if (state is PacienteDetailLoading) {
       return Center(
-        child: CircularProgressIndicator(color: ac.primaryBlue, strokeWidth: 2),
+        child: CircularProgressIndicator(
+          color: ac.primaryGreen,
+          strokeWidth: 2,
+        ),
       );
     }
 
@@ -347,7 +350,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     icon: const Icon(Icons.calendar_today_outlined, size: 16),
                     label: const Text('Nueva Cita'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryBlue,
+                      backgroundColor: ac.primaryGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -750,7 +753,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               Expanded(
                 child: _MetricTile(
                   icon: Icons.height_rounded,
-                  iconColor: ac.primaryBlue,
+                  iconColor: ac.primaryGreen,
                   label: 'ALTURA',
                   value: p.altura != null ? '${p.altura} cm' : '—',
                 ),
@@ -842,7 +845,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       ? Icons.sort_by_alpha_rounded
                       : Icons.history_rounded,
                   size: 20,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
                 onPressed: () =>
                     setState(() => _ordenDescendente = !_ordenDescendente),
@@ -932,7 +935,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ],
@@ -1159,12 +1162,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.10),
+                      color: ac.primaryGreen.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.assignment_outlined,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       size: 22,
                     ),
                   ),

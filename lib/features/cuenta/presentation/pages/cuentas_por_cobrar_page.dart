@@ -73,7 +73,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.tune_rounded, color: ac.primaryBlue),
+                  Icon(Icons.tune_rounded, color: ac.primaryGreen),
                   const SizedBox(width: 8),
                   Text(
                     'Filtros y Ordenamiento de Cuentas',
@@ -167,7 +167,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
                       Navigator.pop(ctx);
                     },
                     style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryBlue,
+                      backgroundColor: ac.primaryGreen,
                     ),
                     child: const Text('Aplicar'),
                   ),
@@ -373,7 +373,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
                   label: const Text('Filtros'),
                   style: FilledButton.styleFrom(
                     backgroundColor: state.hayFiltrosActivos
-                        ? ac.primaryBlue
+                        ? ac.primaryGreen
                         : ac.searchFill,
                     foregroundColor: state.hayFiltrosActivos
                         ? Colors.white
@@ -518,8 +518,8 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
         children: [
           if (state is CuentasPorCobrarOperating)
             LinearProgressIndicator(
-              backgroundColor: ac.primaryBlue.withValues(alpha: 0.1),
-              color: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen.withValues(alpha: 0.1),
+              color: ac.primaryGreen,
               minHeight: 2,
             ),
           Expanded(
@@ -573,7 +573,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

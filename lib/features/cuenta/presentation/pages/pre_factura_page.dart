@@ -16,15 +16,13 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/widg
 import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
-import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
-    as pago_enums;
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/recibo_pago.dart';
+import 'package:salud_dental_clinic_management/features/pago/domain/enums/metodo_pago.dart'
+    as pago_enums;
 import 'package:salud_dental_clinic_management/features/pago/presentation/pages/recibo_pago_page.dart';
 
-/// Detalle de cuenta / pre-factura de una consulta. Punto de llegada al cerrar
-/// una consulta (SD-96) y accesible desde el expediente del paciente.
 class PreFacturaPage extends StatelessWidget {
   final String cuentaId;
 
@@ -39,14 +37,21 @@ class PreFacturaPage extends StatelessWidget {
       child: Scaffold(
         backgroundColor: ac.bgPage,
         appBar: AppBar(
-          title: const Text('Detalle de cuenta'),
+          title: const Text(
+            'Detalle de Cuenta',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
           backgroundColor: ac.cardBg,
           foregroundColor: ac.textPrimary,
           elevation: 0,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: ac.divider),
+          ),
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: 800),
             child: BlocBuilder<PreFacturaCubit, PreFacturaState>(
               builder: (context, state) => switch (state) {
                 PreFacturaCargada(
@@ -79,7 +84,7 @@ class PreFacturaPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Estados no-cargados
+// Estados de Carga y Error
 // ---------------------------------------------------------------------------
 
 class _EstadoCargando extends StatelessWidget {
@@ -89,7 +94,17 @@ class _EstadoCargando extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: CircularProgressIndicator(strokeWidth: 2, color: ac.primaryBlue),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(strokeWidth: 2.5, color: ac.primaryGreen),
+          const SizedBox(height: 16),
+          Text(
+            'Cargando detalles de la cuenta...',
+            style: TextStyle(color: ac.textMuted, fontSize: 13.5),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -109,19 +124,32 @@ class _EstadoError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, color: ac.red, size: 40),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ac.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline_rounded, color: ac.red, size: 36),
+            ),
+            const SizedBox(height: 16),
             Text(
               mensaje,
               textAlign: TextAlign.center,
               style: TextStyle(color: ac.textSecondary, fontSize: 14),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onReintentar,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Reintentar'),
-              style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+              style: FilledButton.styleFrom(
+                backgroundColor: ac.primaryGreen,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
             ),
           ],
         ),
@@ -131,7 +159,7 @@ class _EstadoError extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Contenido (cuenta cargada)
+// Contenido Principal
 // ---------------------------------------------------------------------------
 
 class _Contenido extends StatefulWidget {
@@ -175,9 +203,11 @@ class _ContenidoState extends State<_Contenido> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        _HeaderEstado(cuenta: cuenta),
+        _HeaderEstado(cuenta: cuenta, paciente: widget.paciente),
+        const SizedBox(height: 16),
+        _ResumenKpis(cuenta: cuenta),
         const SizedBox(height: 16),
         _SelectorModalidad(
           seleccionada: _modalidad,
@@ -185,8 +215,6 @@ class _ContenidoState extends State<_Contenido> {
         ),
         const SizedBox(height: 16),
         _Desglose(items: cuenta.itemCuentas),
-        const SizedBox(height: 16),
-        _Totales(cuenta: cuenta),
         const SizedBox(height: 16),
         if (cuenta.pagos.isNotEmpty) ...[
           _HistorialPagos(
@@ -207,87 +235,113 @@ class _ContenidoState extends State<_Contenido> {
           const SizedBox(height: 16),
         ],
         _Acciones(cuenta: cuenta, cuotas: widget.cuotas),
-        const SizedBox(height: 8),
       ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Header de estado
+// Header Hero
 // ---------------------------------------------------------------------------
 
 class _HeaderEstado extends StatelessWidget {
   final Cuenta cuenta;
-  const _HeaderEstado({required this.cuenta});
+  final Paciente? paciente;
+
+  const _HeaderEstado({required this.cuenta, this.paciente});
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final (color, label, icon) = _infoEstado(cuenta.estado, ac);
     final consultaCorta = cuenta.consultaId.length > 8
-        ? cuenta.consultaId.substring(0, 8)
-        : cuenta.consultaId;
+        ? cuenta.consultaId.substring(0, 8).toUpperCase()
+        : cuenta.consultaId.toUpperCase();
 
-    return _Card(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ac.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: 26),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // El estado acompaña al título mientras haya ancho; con
-                // pantallas estrechas o texto ampliado baja de línea en vez de
-                // empujar el título fuera de la tarjeta.
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 10,
-                  runSpacing: 6,
+                Row(
                   children: [
-                    Text(
-                      'Consulta #$consultaCorta',
-                      style: TextStyle(
-                        color: ac.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
+                    Expanded(
+                      child: Text(
+                        paciente != null
+                            ? paciente!.fullName
+                            : 'Consulta #$consultaCorta',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: ac.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
+                        horizontal: 10,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
+                        color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: color,
+                        border: Border.all(
+                          color: color.withValues(alpha: 0.25),
+                          width: 1,
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 13, color: color),
+                          const SizedBox(width: 4),
+                          Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
-                  fechaLargaEs(cuenta.fechaCreacion),
-                  style: TextStyle(color: ac.textMuted, fontSize: 13),
+                  'Consulta #$consultaCorta · ${fechaLargaEs(cuenta.fechaCreacion)}',
+                  style: TextStyle(color: ac.textMuted, fontSize: 12.5),
                 ),
               ],
             ),
@@ -299,8 +353,142 @@ class _HeaderEstado extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Selector de modalidad. Crédito abre la configuración del calendario; al
-// confirmar el plan la modalidad se persiste junto con las cuotas.
+// Tarjetas KPIs Financieras
+// ---------------------------------------------------------------------------
+
+class _ResumenKpis extends StatelessWidget {
+  final Cuenta cuenta;
+  const _ResumenKpis({required this.cuenta});
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final esSaldada = cuenta.estado == EstadoCuenta.saldada;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final estrecho = constraints.maxWidth < 500;
+        final items = [
+          _KpiCard(
+            etiqueta: 'TOTAL CUENTA',
+            monto: formatMoneda(cuenta.montoTotal),
+            color: ac.textPrimary,
+            icono: Icons.receipt_long_rounded,
+          ),
+          _KpiCard(
+            etiqueta: 'PAGADO',
+            monto: formatMoneda(cuenta.montoPagado),
+            color: ac.green,
+            icono: Icons.check_circle_rounded,
+          ),
+          _KpiCard(
+            etiqueta: 'PENDIENTE',
+            monto: formatMoneda(cuenta.balancePendiente),
+            color: esSaldada ? ac.green : ac.red,
+            icono: esSaldada
+                ? Icons.verified_rounded
+                : Icons.pending_actions_rounded,
+            destacado: !esSaldada,
+          ),
+        ];
+
+        if (estrecho) {
+          return Column(
+            children: items
+                .map(
+                  (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: i,
+                  ),
+                )
+                .toList(),
+          );
+        }
+
+        return Row(
+          children: items
+              .map(
+                (i) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: i,
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _KpiCard extends StatelessWidget {
+  final String etiqueta;
+  final String monto;
+  final Color color;
+  final IconData icono;
+  final bool destacado;
+
+  const _KpiCard({
+    required this.etiqueta,
+    required this.monto,
+    required this.color,
+    required this.icono,
+    this.destacado = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: destacado ? color.withValues(alpha: 0.05) : ac.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: destacado ? color.withValues(alpha: 0.3) : ac.divider,
+          width: destacado ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icono, size: 15, color: color),
+              const SizedBox(width: 6),
+              Text(
+                etiqueta,
+                style: TextStyle(
+                  color: ac.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              monto,
+              style: TextStyle(
+                color: color,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Selector de Modalidad
 // ---------------------------------------------------------------------------
 
 class _SelectorModalidad extends StatelessWidget {
@@ -319,7 +507,7 @@ class _SelectorModalidad extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _TituloSeccion(
-            titulo: 'Modalidad de pago',
+            titulo: 'Modalidad de Pago',
             icono: Icons.tune_rounded,
             color: context.appColors.indigo,
           ),
@@ -328,13 +516,15 @@ class _SelectorModalidad extends StatelessWidget {
             children: [
               _OpcionModalidad(
                 metodo: MetodoPago.contado,
+                subtitulo: 'Pago único de contado',
                 icono: Icons.payments_outlined,
                 activa: seleccionada == MetodoPago.contado,
                 onTap: () => onChanged(MetodoPago.contado),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               _OpcionModalidad(
                 metodo: MetodoPago.credito,
+                subtitulo: 'Plan por cuotas',
                 icono: Icons.credit_card_rounded,
                 activa: seleccionada == MetodoPago.credito,
                 onTap: () => onChanged(MetodoPago.credito),
@@ -349,12 +539,14 @@ class _SelectorModalidad extends StatelessWidget {
 
 class _OpcionModalidad extends StatelessWidget {
   final MetodoPago metodo;
+  final String subtitulo;
   final IconData icono;
   final bool activa;
   final VoidCallback onTap;
 
   const _OpcionModalidad({
     required this.metodo,
+    required this.subtitulo,
     required this.icono,
     required this.activa,
     required this.onTap,
@@ -363,7 +555,7 @@ class _OpcionModalidad extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final color = activa ? ac.primaryBlue : ac.textMuted;
+    final color = activa ? ac.primaryGreen : ac.textMuted;
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -372,39 +564,56 @@ class _OpcionModalidad extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: activa
-                  ? ac.primaryBlue.withValues(alpha: 0.08)
+                  ? ac.primaryGreen.withValues(alpha: 0.08)
                   : ac.chipBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: activa
-                    ? ac.primaryBlue.withValues(alpha: 0.4)
+                    ? ac.primaryGreen.withValues(alpha: 0.4)
                     : ac.divider,
-                width: activa ? 1.4 : 1,
+                width: activa ? 1.5 : 1,
               ),
             ),
             child: Row(
               children: [
-                Icon(icono, size: 20, color: color),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: activa
+                        ? ac.primaryGreen.withValues(alpha: 0.12)
+                        : ac.cardBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icono, size: 20, color: color),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    metodo.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: activa ? ac.textPrimary : ac.textSecondary,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        metodo.name,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: activa ? ac.textPrimary : ac.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        subtitulo,
+                        style: TextStyle(fontSize: 11, color: ac.textMuted),
+                      ),
+                    ],
                   ),
                 ),
                 if (activa)
                   Icon(
                     Icons.check_circle_rounded,
                     size: 18,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
               ],
             ),
@@ -416,7 +625,7 @@ class _OpcionModalidad extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Desglose de tratamientos
+// Desglose
 // ---------------------------------------------------------------------------
 
 class _Desglose extends StatelessWidget {
@@ -431,22 +640,37 @@ class _Desglose extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _TituloSeccion(
-            titulo: 'Desglose de tratamientos',
+            titulo: 'Desglose de Tratamientos',
             icono: Icons.receipt_long_rounded,
             color: ac.teal,
           ),
           const SizedBox(height: 14),
           if (items.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Esta cuenta no tiene tratamientos desglosados.',
-                style: TextStyle(color: ac.textMuted, fontSize: 13),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'Esta cuenta no tiene tratamientos desglosados.',
+                  style: TextStyle(color: ac.textMuted, fontSize: 13),
+                ),
               ),
             )
           else
-            for (var i = 0; i < items.length; i++)
-              _FilaItem(item: items[i], esUltima: i == items.length - 1),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: ac.divider),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    _FilaItem(item: items[i]),
+                    if (i < items.length - 1)
+                      Divider(height: 1, color: ac.divider),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -455,100 +679,57 @@ class _Desglose extends StatelessWidget {
 
 class _FilaItem extends StatelessWidget {
   final ItemCuenta item;
-  final bool esUltima;
 
-  const _FilaItem({required this.item, required this.esUltima});
+  const _FilaItem({required this.item});
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final detalle = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          item.descripcion.isEmpty ? 'Tratamiento' : item.descripcion,
-          style: TextStyle(
-            color: ac.textPrimary,
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '${item.cantidad} × ${formatMoneda(item.precioUnitario)}',
-          style: TextStyle(color: ac.textMuted, fontSize: 12.5),
-        ),
-      ],
-    );
-    final total = Text(
-      formatMoneda(item.precioTotal),
-      style: TextStyle(
-        color: ac.textPrimary,
-        fontSize: 14.5,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-
     return Padding(
-      padding: EdgeInsets.only(bottom: esUltima ? 0 : 12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // El importe nunca se recorta: si no cabe junto a la descripción,
-          // pasa a su propia línea.
-          final anchoTotal = _anchoTexto(context, total);
-          if (anchoTotal > constraints.maxWidth * 0.5) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [detalle, const SizedBox(height: 4), total],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: detalle),
-              const SizedBox(width: 12),
-              total,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Totales
-// ---------------------------------------------------------------------------
-
-class _Totales extends StatelessWidget {
-  final Cuenta cuenta;
-  const _Totales({required this.cuenta});
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    return _Card(
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
         children: [
-          _FilaTotal(
-            label: 'Subtotal',
-            valor: formatMoneda(cuenta.montoTotal),
-            color: ac.textPrimary,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ac.teal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.medical_services_outlined,
+              size: 18,
+              color: ac.teal,
+            ),
           ),
-          const SizedBox(height: 10),
-          _FilaTotal(
-            label: 'Pagado',
-            valor: formatMoneda(cuenta.montoPagado),
-            color: ac.green,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.descripcion.isEmpty ? 'Tratamiento' : item.descripcion,
+                  style: TextStyle(
+                    color: ac.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${item.cantidad} × ${formatMoneda(item.precioUnitario)}',
+                  style: TextStyle(color: ac.textMuted, fontSize: 11.5),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: ac.divider),
-          const SizedBox(height: 12),
-          _FilaTotal(
-            label: 'Balance pendiente',
-            valor: formatMoneda(cuenta.balancePendiente),
-            color: cuenta.estado == EstadoCuenta.saldada ? ac.green : ac.red,
-            destacado: true,
+          const SizedBox(width: 12),
+          Text(
+            formatMoneda(item.precioTotal),
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -556,65 +737,8 @@ class _Totales extends StatelessWidget {
   }
 }
 
-class _FilaTotal extends StatelessWidget {
-  final String label;
-  final String valor;
-  final Color color;
-  final bool destacado;
-
-  const _FilaTotal({
-    required this.label,
-    required this.valor,
-    required this.color,
-    this.destacado = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final etiqueta = Text(
-      label,
-      style: TextStyle(
-        color: destacado ? ac.textPrimary : ac.textSecondary,
-        fontSize: destacado ? 15 : 14,
-        fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-      ),
-    );
-    final importe = Text(
-      valor,
-      style: TextStyle(
-        color: color,
-        fontSize: destacado ? 18 : 14.5,
-        fontWeight: destacado ? FontWeight.w800 : FontWeight.w700,
-        letterSpacing: destacado ? -0.4 : 0,
-      ),
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // El importe no se recorta nunca; si compite con la etiqueta, la
-        // etiqueta pasa a su propia línea.
-        if (_anchoTexto(context, importe) > constraints.maxWidth * 0.55) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [etiqueta, const SizedBox(height: 2), importe],
-          );
-        }
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(child: etiqueta),
-            const SizedBox(width: 12),
-            importe,
-          ],
-        );
-      },
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Recibos de pagos ya registrados
+// Historial de Recibos
 // ---------------------------------------------------------------------------
 
 class _HistorialPagos extends StatelessWidget {
@@ -642,11 +766,11 @@ class _HistorialPagos extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _TituloSeccion(
-            titulo: 'Recibos de pago',
-            icono: Icons.receipt_long_rounded,
-            color: ac.teal,
+            titulo: 'Recibos Emitidos',
+            icono: Icons.point_of_sale_rounded,
+            color: ac.green,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           if (errorDatosRecibo != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -655,20 +779,30 @@ class _HistorialPagos extends StatelessWidget {
                 style: TextStyle(color: ac.red, fontSize: 12),
               ),
             ),
-          for (var i = 0; i < pagos.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: ac.divider),
-            _FilaPago(
-              pago: pagos[i],
-              habilitado: consulta != null && paciente != null,
-              onVer: () => _abrirRecibo(
-                context,
-                cuenta: cuenta,
-                pago: pagos[i],
-                consulta: consulta!,
-                paciente: paciente!,
-              ),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: ac.divider),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
+            child: Column(
+              children: [
+                for (var i = 0; i < pagos.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: ac.divider),
+                  _FilaPago(
+                    pago: pagos[i],
+                    habilitado: consulta != null && paciente != null,
+                    onVer: () => _abrirRecibo(
+                      context,
+                      cuenta: cuenta,
+                      pago: pagos[i],
+                      consulta: consulta!,
+                      paciente: paciente!,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -692,19 +826,19 @@ class _FilaPago extends StatelessWidget {
     final pagoId = pago.id;
     final numero = pagoId == null
         ? 'Pago'
-        : 'Pago #${pagoId.substring(0, pagoId.length < 8 ? pagoId.length : 8).toUpperCase()}';
+        : 'Recibo #${pagoId.substring(0, pagoId.length < 8 ? pagoId.length : 8).toUpperCase()}';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: ac.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.check_rounded, color: ac.green, size: 20),
+            child: Icon(Icons.receipt_rounded, color: ac.green, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -737,12 +871,10 @@ class _FilaPago extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           IconButton(
-            tooltip: habilitado
-                ? 'Ver recibo'
-                : 'Datos del recibo no disponibles',
+            tooltip: habilitado ? 'Ver Recibo PDF' : 'Datos no disponibles',
             onPressed: habilitado ? onVer : null,
             icon: const Icon(Icons.open_in_new_rounded, size: 18),
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
         ],
       ),
@@ -751,7 +883,7 @@ class _FilaPago extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Acciones
+// Acciones Inferiores
 // ---------------------------------------------------------------------------
 
 class _Acciones extends StatelessWidget {
@@ -774,6 +906,7 @@ class _Acciones extends StatelessWidget {
       children: [
         SizedBox(
           width: double.infinity,
+          height: 48,
           child: FilledButton.icon(
             onPressed: saldada
                 ? null
@@ -785,16 +918,22 @@ class _Acciones extends StatelessWidget {
             ),
             label: Text(
               saldada
-                  ? 'Cuenta saldada'
+                  ? 'Cuenta Saldada Completamente'
                   : proximaCuota != null
-                  ? 'Pagar próxima cuota'
-                  : 'Registrar pago',
+                  ? 'Pagar Próxima Cuota'
+                  : 'Registrar Cobro / Pago',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5,
+              ),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen,
               disabledBackgroundColor: ac.green.withValues(alpha: 0.15),
               disabledForegroundColor: ac.green,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -802,31 +941,41 @@ class _Acciones extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: cuotas.isEmpty
-                    ? () => _mostrarDialogoPlan(context, cuenta)
-                    : null,
-                icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                label: Text(
-                  cuotas.isEmpty ? 'Plan de cuotas' : 'Plan configurado',
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+              child: SizedBox(
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: cuotas.isEmpty
+                      ? () => _mostrarDialogoPlan(context, cuenta)
+                      : null,
+                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                  label: Text(
+                    cuotas.isEmpty ? 'Plan de cuotas' : 'Plan configurado',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _mostrarDialogoAjuste(context, cuenta),
-                icon: const Icon(Icons.edit_note_rounded, size: 20),
-                label: const Text('Ajustar'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+              child: SizedBox(
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () => _mostrarDialogoAjuste(context, cuenta),
+                  icon: const Icon(Icons.edit_note_rounded, size: 20),
+                  label: const Text('Ajustar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -882,9 +1031,6 @@ Future<void> _mostrarDialogoPlan(BuildContext context, Cuenta cuenta) async {
   }
 }
 
-/// Abre el diálogo de cobro pasándole el cubit de la pantalla (capturado antes
-/// de `showDialog`, ya que el diálogo se monta en otra rama del árbol). Al
-/// confirmar el cobro, el cubit recarga la cuenta y aquí se muestra el aviso.
 Future<void> _mostrarDialogoPago(
   BuildContext context,
   Cuenta cuenta, {
@@ -966,9 +1112,6 @@ MaterialPageRoute<void> _rutaRecibo({
   ),
 );
 
-/// Diálogo de cobro: monto prellenado con el saldo, selector de método y un
-/// resumen en vivo (monto, método y saldo tras el pago). Gestiona su propio
-/// estado de carga y error; delega la operación atómica en [PreFacturaCubit].
 class _DialogoRegistrarPago extends StatefulWidget {
   final Cuenta cuenta;
   final PreFacturaCubit cubit;
@@ -1057,13 +1200,28 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
 
     return AlertDialog(
       backgroundColor: ac.cardBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: Row(
         children: [
-          Icon(Icons.payments_rounded, color: ac.primaryBlue, size: 22),
-          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ac.primaryGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.payments_rounded,
+              color: ac.primaryGreen,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
           Text(
-            widget.cuota == null ? 'Registrar pago' : 'Pagar cuota',
-            style: TextStyle(color: ac.textPrimary),
+            widget.cuota == null ? 'Registrar Pago' : 'Pagar Cuota',
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1074,12 +1232,12 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
           children: [
             Text(
               widget.cuota == null
-                  ? 'Saldo pendiente: ${formatMoneda(_saldo)}'
+                  ? 'Saldo pendiente total: ${formatMoneda(_saldo)}'
                   : 'Vence ${fechaLargaEs(widget.cuota!.fechaVencimiento)} · '
                         'Restan ${formatMoneda(_saldoACobrar)}',
               style: TextStyle(color: ac.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             TextField(
               controller: _montoController,
               autofocus: true,
@@ -1088,55 +1246,48 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
                 decimal: true,
               ),
               onChanged: (_) => setState(() => _error = null),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Monto a cobrar (RD\$)',
                 hintText: '0.00',
               ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Semantics(
-                liveRegion: true,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: ac.red.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: ac.red.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.point_of_sale_rounded,
-                        size: 19,
-                        color: ac.red,
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: ac.red,
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                          ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ac.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ac.red.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: 18, color: ac.red),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: ac.red,
+                          fontSize: 12.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
             const SizedBox(height: 16),
             Text(
-              'Método de pago',
+              'Método de Pago',
               style: TextStyle(
                 color: ac.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
@@ -1172,7 +1323,7 @@ class _DialogoRegistrarPagoState extends State<_DialogoRegistrarPago> {
         ),
         FilledButton(
           onPressed: (_montoValido && !_procesando) ? _registrar : null,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           child: _procesando
               ? const SizedBox(
                   width: 18,
@@ -1212,11 +1363,11 @@ class _ChipMetodoPago extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: activo ? ac.primaryBlue.withValues(alpha: 0.1) : ac.chipBg,
+            color: activo ? ac.primaryGreen.withValues(alpha: 0.1) : ac.chipBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: activo
-                  ? ac.primaryBlue.withValues(alpha: 0.5)
+                  ? ac.primaryGreen.withValues(alpha: 0.5)
                   : ac.divider,
               width: activo ? 1.4 : 1,
             ),
@@ -1227,13 +1378,13 @@ class _ChipMetodoPago extends StatelessWidget {
               Icon(
                 _iconoMetodo(metodo),
                 size: 16,
-                color: activo ? ac.primaryBlue : ac.textMuted,
+                color: activo ? ac.primaryGreen : ac.textMuted,
               ),
               const SizedBox(width: 7),
               Text(
                 metodo.name,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                   color: activo ? ac.textPrimary : ac.textSecondary,
                 ),
@@ -1269,10 +1420,12 @@ class _ResumenPago extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _FilaResumen(label: 'Monto', valor: formatMoneda(monto)),
-          const SizedBox(height: 8),
-          _FilaResumen(label: 'Método', valor: metodo.name),
-          const SizedBox(height: 8),
+          _FilaResumen(label: 'Monto a cobrar', valor: formatMoneda(monto)),
+          const SizedBox(height: 6),
+          _FilaResumen(label: 'Método seleccionado', valor: metodo.name),
+          const SizedBox(height: 6),
+          Divider(height: 1, color: ac.divider),
+          const SizedBox(height: 6),
           _FilaResumen(
             label: 'Saldo tras el pago',
             valor: formatMoneda(saldoRestante),
@@ -1301,12 +1454,12 @@ class _FilaResumen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: ac.textSecondary, fontSize: 13)),
+        Text(label, style: TextStyle(color: ac.textSecondary, fontSize: 12.5)),
         Text(
           valor,
           style: TextStyle(
             color: resaltado ? ac.green : ac.textPrimary,
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1325,9 +1478,6 @@ IconData _iconoMetodo(pago_enums.MetodoPago metodo) {
   };
 }
 
-/// Diálogo de ajuste con gate de autorización por rol. La entrega de este ticket
-/// (SD-101) es el gate funcionando; la persistencia del ajuste queda para un
-/// ticket futuro.
 void _mostrarDialogoAjuste(BuildContext context, Cuenta cuenta) {
   final autorizado = context.read<AuthCubit>().state.hasAnyRole([
     RolUsuario.admin,
@@ -1423,13 +1573,10 @@ class _FormularioAjusteState extends State<_FormularioAjuste> {
         ),
         FilledButton(
           onPressed: () {
-            // TODO(SD-###): persistir el ajuste. El schema aún no tiene un
-            // mecanismo de descuento/ajuste; este flujo queda cableado a un
-            // ticket futuro. Por ahora solo confirma el gate de autorización.
             Navigator.of(context).pop();
             _mostrarProximamente(context, 'Aplicar ajuste');
           },
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           child: const Text('Aplicar'),
         ),
       ],
@@ -1438,7 +1585,7 @@ class _FormularioAjusteState extends State<_FormularioAjuste> {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers compartidos
+// Helpers Compartidos
 // ---------------------------------------------------------------------------
 
 class _Card extends StatelessWidget {
@@ -1477,14 +1624,14 @@ class _TituloSeccion extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 30,
-          height: 30,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(9),
           ),
           alignment: Alignment.center,
-          child: Icon(icono, size: 17, color: color),
+          child: Icon(icono, size: 18, color: color),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1517,14 +1664,4 @@ class _TituloSeccion extends StatelessWidget {
     ),
     EstadoCuenta.abierta => (ac.red, 'Sin pago', Icons.receipt_long_outlined),
   };
-}
-
-/// Mide un [Text] sin renderizarlo, para decidir si cabe junto a otro widget.
-double _anchoTexto(BuildContext context, Text texto) {
-  final painter = TextPainter(
-    text: TextSpan(text: texto.data, style: texto.style),
-    textDirection: Directionality.of(context),
-    textScaler: MediaQuery.textScalerOf(context),
-  )..layout();
-  return painter.width;
 }

@@ -37,9 +37,9 @@ class InventarioPage extends StatelessWidget {
             elevation: 0,
             toolbarHeight: 0,
             bottom: TabBar(
-              labelColor: ac.primaryBlue,
+              labelColor: ac.primaryGreen,
               unselectedLabelColor: ac.textSecondary,
-              indicatorColor: ac.primaryBlue,
+              indicatorColor: ac.primaryGreen,
               indicatorWeight: 3,
               labelStyle: const TextStyle(
                 fontWeight: FontWeight.w700,
@@ -182,7 +182,7 @@ class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Nuevo'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -205,7 +205,7 @@ class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
                   child: _SummaryCard(
                     label: 'Total artículos',
                     value: '${state.totalArticulos}',
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                     icon: Icons.inventory_2_outlined,
                     ac: ac,
                   ),
@@ -453,7 +453,7 @@ class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),
@@ -655,7 +655,7 @@ class _ConsumibleCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: esCritico
                           ? ac.red.withValues(alpha: 0.10)
-                          : ac.primaryBlue.withValues(alpha: 0.08),
+                          : ac.primaryGreen.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -674,7 +674,7 @@ class _ConsumibleCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            color: esCritico ? ac.red : ac.primaryBlue,
+                            color: esCritico ? ac.red : ac.primaryGreen,
                           ),
                         ),
                         Text(
@@ -818,12 +818,12 @@ Future<void> _mostrarDialogoFormulario(
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.12),
+                            color: ac.primaryGreen.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.inventory_2_rounded,
-                            color: ac.primaryBlue,
+                            color: ac.primaryGreen,
                             size: 24,
                           ),
                         ),
@@ -1027,7 +1027,7 @@ Future<void> _mostrarDialogoFormulario(
                           icon: const Icon(Icons.check_rounded, size: 18),
                           label: const Text('Guardar'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: ac.primaryBlue,
+                            backgroundColor: ac.primaryGreen,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 12,
@@ -1169,7 +1169,7 @@ Future<void> _mostrarDialogoAjustarStock(
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: context.appColors.primaryBlue,
+              backgroundColor: context.appColors.primaryGreen,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),

@@ -7,6 +7,22 @@ import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/pago/domain/entities/recibo_pago.dart';
 import 'package:salud_dental_clinic_management/features/pago/presentation/pdf/recibo_pdf.dart';
 
+enum TipoFormatoImpresion {
+  paginaA4('Página (A4)', PdfPageFormat.a4),
+  termico80mm(
+    'Térmico (80mm)',
+    PdfPageFormat(
+      80 * PdfPageFormat.mm,
+      200 * PdfPageFormat.mm,
+      marginAll: 5 * PdfPageFormat.mm,
+    ),
+  );
+
+  final String label;
+  final PdfPageFormat formato;
+  const TipoFormatoImpresion(this.label, this.formato);
+}
+
 class ReciboPagoPage extends StatefulWidget {
   final ReciboPago recibo;
 
@@ -18,6 +34,7 @@ class ReciboPagoPage extends StatefulWidget {
 
 class _ReciboPagoPageState extends State<ReciboPagoPage> {
   bool _procesando = false;
+  TipoFormatoImpresion _formatoSeleccionado = TipoFormatoImpresion.paginaA4;
 
   Future<void> _ejecutar(Future<void> Function() accion) async {
     if (_procesando) return;
@@ -40,17 +57,18 @@ class _ReciboPagoPageState extends State<ReciboPagoPage> {
   Future<void> _imprimir() => _ejecutar(() async {
     await Printing.layoutPdf(
       name: widget.recibo.nombreArchivo,
-      onLayout: (formato) => generarReciboPdf(
+      onLayout: (_) => generarReciboPdf(
         widget.recibo,
-        formato: formato == PdfPageFormat.undefined
-            ? PdfPageFormat.a4
-            : formato,
+        formato: _formatoSeleccionado.formato,
       ),
     );
   });
 
   Future<void> _guardarPdf() => _ejecutar(() async {
-    final bytes = await generarReciboPdf(widget.recibo);
+    final bytes = await generarReciboPdf(
+      widget.recibo,
+      formato: _formatoSeleccionado.formato,
+    );
     await Printing.sharePdf(
       bytes: bytes,
       filename: widget.recibo.nombreArchivo,
@@ -60,6 +78,8 @@ class _ReciboPagoPageState extends State<ReciboPagoPage> {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final esTermico = _formatoSeleccionado == TipoFormatoImpresion.termico80mm;
+
     return Scaffold(
       backgroundColor: ac.bgPage,
       appBar: AppBar(
@@ -72,6 +92,12 @@ class _ReciboPagoPageState extends State<ReciboPagoPage> {
         children: [
           _BarraAcciones(
             procesando: _procesando,
+            formatoActual: _formatoSeleccionado,
+            onFormatoChanged: (nuevoFormato) {
+              if (nuevoFormato != null) {
+                setState(() => _formatoSeleccionado = nuevoFormato);
+              }
+            },
             onImprimir: _imprimir,
             onGuardarPdf: _guardarPdf,
           ),
@@ -80,8 +106,11 @@ class _ReciboPagoPageState extends State<ReciboPagoPage> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 820),
-                  child: _DocumentoRecibo(recibo: widget.recibo),
+                  constraints: BoxConstraints(maxWidth: esTermico ? 380 : 820),
+                  child: _DocumentoRecibo(
+                    recibo: widget.recibo,
+                    esTermico: esTermico,
+                  ),
                 ),
               ),
             ),
@@ -94,11 +123,15 @@ class _ReciboPagoPageState extends State<ReciboPagoPage> {
 
 class _BarraAcciones extends StatelessWidget {
   final bool procesando;
+  final TipoFormatoImpresion formatoActual;
+  final ValueChanged<TipoFormatoImpresion?> onFormatoChanged;
   final VoidCallback onImprimir;
   final VoidCallback onGuardarPdf;
 
   const _BarraAcciones({
     required this.procesando,
+    required this.formatoActual,
+    required this.onFormatoChanged,
     required this.onImprimir,
     required this.onGuardarPdf,
   });
@@ -114,45 +147,81 @@ class _BarraAcciones extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 820),
           child: Wrap(
-            alignment: WrapAlignment.end,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 10,
             runSpacing: 8,
             children: [
-              OutlinedButton.icon(
-                key: const Key('guardar_pdf_button'),
-                onPressed: procesando ? null : onGuardarPdf,
-                icon: const Icon(Icons.picture_as_pdf_outlined, size: 19),
-                label: const Text('Guardar PDF'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ac.textSecondary,
-                  side: BorderSide(color: ac.divider),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 13,
+              // 🖨️ Selector de formato de papel
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ac.divider),
+                  color: ac.chipBg,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<TipoFormatoImpresion>(
+                    value: formatoActual,
+                    icon: Icon(
+                      Icons.print_outlined,
+                      size: 18,
+                      color: ac.primaryGreen,
+                    ),
+                    style: TextStyle(
+                      color: ac.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    onChanged: procesando ? null : onFormatoChanged,
+                    items: TipoFormatoImpresion.values.map((f) {
+                      return DropdownMenuItem(value: f, child: Text(f.label));
+                    }).toList(),
                   ),
                 ),
               ),
-              FilledButton.icon(
-                key: const Key('imprimir_recibo_button'),
-                onPressed: procesando ? null : onImprimir,
-                icon: procesando
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.print_rounded, size: 19),
-                label: Text(procesando ? 'Preparando…' : 'Imprimir'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 13,
+
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    key: const Key('guardar_pdf_button'),
+                    onPressed: procesando ? null : onGuardarPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 19),
+                    label: const Text('Guardar PDF'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ac.textSecondary,
+                      side: BorderSide(color: ac.divider),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 13,
+                      ),
+                    ),
                   ),
-                ),
+                  FilledButton.icon(
+                    key: const Key('imprimir_recibo_button'),
+                    onPressed: procesando ? null : onImprimir,
+                    icon: procesando
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.print_rounded, size: 19),
+                    label: Text(procesando ? 'Preparando…' : 'Imprimir'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.primaryGreen,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 13,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -164,13 +233,15 @@ class _BarraAcciones extends StatelessWidget {
 
 class _DocumentoRecibo extends StatelessWidget {
   final ReciboPago recibo;
+  final bool esTermico;
 
-  const _DocumentoRecibo({required this.recibo});
+  const _DocumentoRecibo({required this.recibo, required this.esTermico});
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final compacto = MediaQuery.sizeOf(context).width < 600;
+    final compacto = esTermico || MediaQuery.sizeOf(context).width < 600;
+
     return Container(
       key: const Key('recibo_documento'),
       padding: EdgeInsets.all(compacto ? 16 : 32),
@@ -181,67 +252,103 @@ class _DocumentoRecibo extends StatelessWidget {
         boxShadow: [ac.cardShadow],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: esTermico
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
-          _Encabezado(recibo: recibo),
-          const SizedBox(height: 24),
+          _Encabezado(recibo: recibo, esTermico: esTermico),
+          const SizedBox(height: 18),
           Divider(height: 1, color: ac.divider),
-          const SizedBox(height: 24),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final paciente = _BloqueInformacion(
-                titulo: 'Paciente',
-                filas: [
-                  ('Nombre', recibo.paciente.fullName),
-                  (
-                    'Cédula',
-                    recibo.paciente.govID.isEmpty ? '—' : recibo.paciente.govID,
-                  ),
-                ],
-              );
-              final pago = _BloqueInformacion(
-                titulo: 'Pago y consulta',
-                filas: [
-                  (
-                    'Fecha',
-                    '${fechaLargaEs(recibo.pago.fecha.toLocal())} · ${_hora(recibo.pago.fecha)}',
-                  ),
-                  ('Consulta', '#${recibo.consultaNumero}'),
-                  ('Método', recibo.pago.metodoPago.name),
-                ],
-              );
-              if (constraints.maxWidth < 560) {
-                return Column(
-                  children: [paciente, const SizedBox(height: 12), pago],
+          const SizedBox(height: 18),
+
+          if (esTermico) ...[
+            _BloqueInformacion(
+              titulo: 'Paciente',
+              filas: [
+                ('Nombre', recibo.paciente.fullName),
+                (
+                  'Cédula',
+                  recibo.paciente.govID.isEmpty ? '—' : recibo.paciente.govID,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _BloqueInformacion(
+              titulo: 'Pago y Consulta',
+              filas: [
+                (
+                  'Fecha',
+                  '${fechaLargaEs(recibo.pago.fecha.toLocal())} · ${_hora(recibo.pago.fecha)}',
+                ),
+                ('Consulta', '#${recibo.consultaNumero}'),
+                ('Método', recibo.pago.metodoPago.name),
+              ],
+            ),
+          ] else ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final paciente = _BloqueInformacion(
+                  titulo: 'Paciente',
+                  filas: [
+                    ('Nombre', recibo.paciente.fullName),
+                    (
+                      'Cédula',
+                      recibo.paciente.govID.isEmpty
+                          ? '—'
+                          : recibo.paciente.govID,
+                    ),
+                  ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: paciente),
-                  const SizedBox(width: 12),
-                  Expanded(child: pago),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 26),
-          Text(
-            'DESGLOSE DE LA CUENTA',
-            style: TextStyle(
-              color: ac.textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
+                final pago = _BloqueInformacion(
+                  titulo: 'Pago y consulta',
+                  filas: [
+                    (
+                      'Fecha',
+                      '${fechaLargaEs(recibo.pago.fecha.toLocal())} · ${_hora(recibo.pago.fecha)}',
+                    ),
+                    ('Consulta', '#${recibo.consultaNumero}'),
+                    ('Método', recibo.pago.metodoPago.name),
+                  ],
+                );
+                if (constraints.maxWidth < 560) {
+                  return Column(
+                    children: [paciente, const SizedBox(height: 12), pago],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: paciente),
+                    const SizedBox(width: 12),
+                    Expanded(child: pago),
+                  ],
+                );
+              },
+            ),
+          ],
+
+          const SizedBox(height: 22),
+          Align(
+            alignment: esTermico ? Alignment.center : Alignment.centerLeft,
+            child: Text(
+              'DESGLOSE DE LA CUENTA',
+              style: TextStyle(
+                color: ac.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+              ),
             ),
           ),
           const SizedBox(height: 10),
           _DesgloseRecibo(recibo: recibo),
           const SizedBox(height: 22),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: esTermico ? Alignment.center : Alignment.centerRight,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 330),
+              constraints: BoxConstraints(
+                maxWidth: esTermico ? double.infinity : 330,
+              ),
               child: _ResumenTotales(recibo: recibo),
             ),
           ),
@@ -271,32 +378,85 @@ class _DocumentoRecibo extends StatelessWidget {
 
 class _Encabezado extends StatelessWidget {
   final ReciboPago recibo;
+  final bool esTermico;
 
-  const _Encabezado({required this.recibo});
+  const _Encabezado({required this.recibo, this.esTermico = false});
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+
+    // 🖼️ LOGO INSTITUCIONAL DE LA CLÍNICA
+    final logoWidget = Container(
+      width: esTermico ? 40 : 48,
+      height: esTermico ? 40 : 48,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: ac.primaryGreen.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          'assets/images/logo.png',
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Icon(
+              Icons.local_hospital_rounded,
+              color: ac.primaryGreen,
+              size: esTermico ? 22 : 26,
+            );
+          },
+        ),
+      ),
+    );
+
+    if (esTermico) {
+      return Column(
+        children: [
+          logoWidget,
+          const SizedBox(height: 10),
+          Text(
+            recibo.clinica.nombre,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: ac.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            recibo.clinica.descripcion,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: ac.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: ac.primaryGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              'RECIBO #${recibo.numero}',
+              style: TextStyle(
+                color: ac.primaryGreen,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     final identidad = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: ac.primaryBlue,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Text(
-            'SD',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-        ),
+        logoWidget,
         const SizedBox(width: 13),
         Flexible(
           child: Column(
@@ -321,13 +481,14 @@ class _Encabezado extends StatelessWidget {
         ),
       ],
     );
+
     final referencia = Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           'RECIBO DE PAGO',
           style: TextStyle(
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
@@ -515,7 +676,7 @@ class _ResumenTotales extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
           decoration: BoxDecoration(
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
             borderRadius: BorderRadius.circular(11),
           ),
           child: Row(

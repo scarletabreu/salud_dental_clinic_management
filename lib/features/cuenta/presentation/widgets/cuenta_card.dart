@@ -135,7 +135,7 @@ class CuentaCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: ac.primaryBlue.withValues(alpha: 0.08),
+                  color: ac.primaryGreen.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -148,7 +148,7 @@ class CuentaCard extends StatelessWidget {
                           ? Icons.credit_card_rounded
                           : Icons.payments_outlined,
                       size: 12,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -156,7 +156,7 @@ class CuentaCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                   ],

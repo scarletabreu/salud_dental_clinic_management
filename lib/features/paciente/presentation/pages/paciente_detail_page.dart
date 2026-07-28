@@ -4,9 +4,10 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
@@ -14,9 +15,8 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/condiciones_medicas_card.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
-import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/record/presentation/widgets/generar_expediente_modal.dart';
 
 enum _VistaConsultas { cronologica, lista }
@@ -137,7 +137,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     tooltip: 'Exportar / Imprimir Expediente',
                     icon: Icon(
                       Icons.picture_as_pdf_rounded,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     onPressed: () {
                       if (state is PacienteDetailLoaded &&
@@ -182,7 +182,10 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   Widget _buildBody(PacienteState state, AppColors ac) {
     if (state is PacienteDetailLoading) {
       return Center(
-        child: CircularProgressIndicator(color: ac.primaryBlue, strokeWidth: 2),
+        child: CircularProgressIndicator(
+          color: ac.primaryGreen,
+          strokeWidth: 2,
+        ),
       );
     }
 
@@ -273,6 +276,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   Widget _buildIdentityCard(Paciente p) {
     final ac = context.appColors;
+    final fotoUrl = p.fotoUrl;
+    final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -347,7 +353,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     icon: const Icon(Icons.calendar_today_outlined, size: 16),
                     label: const Text('Nueva Cita'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryBlue,
+                      backgroundColor: ac.primaryGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -366,29 +372,70 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            p.fullName,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          const SizedBox(height: 18),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _MetaItem(icon: Icons.badge_outlined, text: 'Cédula: ${p.govID}'),
-              _MetaItem(
-                icon: Icons.cake_outlined,
-                text: _ageFormatted(p.birthDate),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ac.bgPage,
+                  border: Border.all(
+                    color: ac.primaryGreen.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                  image: tieneFoto
+                      ? DecorationImage(
+                          image: NetworkImage(fotoUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: !tieneFoto
+                    ? Icon(Icons.person_rounded, size: 40, color: ac.textMuted)
+                    : null,
               ),
-              if (p.trabajo.isNotEmpty)
-                _MetaItem(icon: Icons.work_outline_rounded, text: p.trabajo),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.fullName,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: ac.textPrimary,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MetaItem(
+                          icon: Icons.badge_outlined,
+                          text: 'Cédula: ${p.govID}',
+                        ),
+                        _MetaItem(
+                          icon: Icons.cake_outlined,
+                          text: _ageFormatted(p.birthDate),
+                        ),
+                        if (p.trabajo.isNotEmpty)
+                          _MetaItem(
+                            icon: Icons.work_outline_rounded,
+                            text: p.trabajo,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -750,7 +797,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               Expanded(
                 child: _MetricTile(
                   icon: Icons.height_rounded,
-                  iconColor: ac.primaryBlue,
+                  iconColor: ac.primaryGreen,
                   label: 'ALTURA',
                   value: p.altura != null ? '${p.altura} cm' : '—',
                 ),
@@ -806,9 +853,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
 
-          // Wrap y no Row: el conmutador de vista con sus dos etiquetas y el
-          // botón de orden no caben en una línea de 320 px, y comprimirlos
-          // dejaría los objetivos táctiles por debajo del mínimo (SD-130).
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -845,7 +889,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       ? Icons.sort_by_alpha_rounded
                       : Icons.history_rounded,
                   size: 20,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
                 onPressed: () =>
                     setState(() => _ordenDescendente = !_ordenDescendente),
@@ -935,7 +979,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ],
@@ -1162,12 +1206,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.10),
+                      color: ac.primaryGreen.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.assignment_outlined,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       size: 22,
                     ),
                   ),
@@ -1263,37 +1307,69 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                for (final receta in c.recetas)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: ac.indigo.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: ac.indigo.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.medication_outlined,
-                          size: 18,
-                          color: ac.indigo,
+                for (final receta in c.recetas) ...[
+                  for (final item in receta.items)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: ac.indigo.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ac.indigo.withValues(alpha: 0.2),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            receta.toString(),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: ac.textPrimary,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.medication_outlined,
+                            size: 20,
+                            color: ac.indigo,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.presentacionConcentracion.isNotEmpty
+                                      ? '${item.nombreMedicamento} (${item.presentacionConcentracion})'
+                                      : item.nombreMedicamento,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: ac.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Dosis: ${item.dosis} · Frecuencia: ${item.frecuencia} · Duración: ${item.duracion}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: ac.textSecondary,
+                                  ),
+                                ),
+                                if ((item.indicacionesEspecificas ?? '')
+                                    .trim()
+                                    .isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Indicaciones: ${item.indicacionesEspecificas!.trim()}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontStyle: FontStyle.italic,
+                                      color: ac.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                ],
                 const SizedBox(height: 16),
               ],
               if (c.documentosClinicos.isNotEmpty) ...[

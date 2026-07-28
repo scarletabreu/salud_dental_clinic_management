@@ -24,13 +24,8 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
   @override
   Future<List<PersonaModel>> searchPersonas(String query) async {
     if (query.trim().isEmpty) return [];
-    // Busca por nombre O apellido usando ilike (case-insensitive).
-    // Supabase no soporta OR entre columnas distintas con un solo .ilike(),
-    // así que usamos el filtro `or` explícito.
     final response = await supabase
         .from('personas')
-        // La tabla puente es `persona_contactos` (plural); se usa el alias
-        // `persona_contacto` porque PersonaModel.fromJson lee esa clave.
         .select('*, persona_contacto:persona_contactos(*, contactos(*))')
         .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
         .eq('estatus', 'activo')
@@ -89,11 +84,11 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
 
       return PersonaModel.fromJson({
         ...personaResponse,
-        'contactos':
-            persona.contactos.map((c) => (c as ContactoModel).toJson()).toList(),
+        'contactos': persona.contactos
+            .map((c) => (c as ContactoModel).toJson())
+            .toList(),
       });
     } on PostgrestException {
-      // Rollback best-effort; se re-lanza la excepción tipada para el guard.
       if (contactoId != null) {
         await supabase.from('contactos').delete().eq('id', contactoId);
       }

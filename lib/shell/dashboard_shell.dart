@@ -61,14 +61,7 @@ class _DashboardShellView extends StatefulWidget {
 }
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
-  /// La selección se guarda por identificador, no por índice.
-  ///
-  /// La lista visible depende de los roles y puede encogerse en caliente. Con
-  /// un índice, perder un permiso movía al usuario a *otra* pantalla —o lo
-  /// tiraba a «Inicio»— porque el número seguía siendo válido pero ya no
-  /// apuntaba a lo mismo. Con el identificador, si el destino sigue permitido el
-  /// usuario se queda donde estaba.
-  ShellDestinationId _selectedId = ShellDestinationId.inicio;
+  String _selectedLabel = 'Inicio';
 
   final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
 
@@ -104,7 +97,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           final authState = context.read<AuthCubit>().state;
           final usuario = authState.usuario;
 
-          // Extrae el nombre real del usuario (Doctor o cualquier otro rol)
           String? nombreUsuario;
           if (usuario != null) {
             nombreUsuario = '${usuario.nombre} ${usuario.apellido}'.trim();
@@ -311,9 +303,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       return _visibleDestinations;
     }
     _rolesResueltos = List<RolUsuario>.unmodifiable(roles);
-    _visibleSections = ShellDestinationAccess.visibleSections(
-      _allSections,
-      roles,
+    _visibleDestinations = List<ShellDestination>.unmodifiable(
+      _allDestinations.where(
+        (destination) =>
+            ShellDestinationAccess.allows(destination.label, roles),
+      ),
     );
     _visibleConfiguracion =
         ShellDestinationAccess.allows(_configuracion.id, roles)
@@ -345,12 +339,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   @override
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
-
     final destinos = _destinosPara(roles);
-
-    // Derivado, nunca asignado durante el build: si la pantalla actual dejó de
-    // estar permitida se cae a la primera disponible sin tocar estado.
-    var selectedIndex = destinos.indexWhere((d) => d.id == _selectedId);
+    var selectedIndex = destinos.indexWhere((d) => d.label == _selectedLabel);
     if (selectedIndex == -1) selectedIndex = 0;
 
     final mediaQuery = MediaQuery.of(context);

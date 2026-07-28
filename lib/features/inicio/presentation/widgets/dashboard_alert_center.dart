@@ -233,7 +233,7 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                   ),

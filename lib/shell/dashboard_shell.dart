@@ -437,7 +437,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   }
 }
 
-/// 📱 NAVEGACIÓN MÓVIL CON MENÚ VERTICAL COMPACTO EN EL '+'
 class ShellMobileNavigation extends StatefulWidget {
   const ShellMobileNavigation({
     super.key,
@@ -534,7 +533,6 @@ class _ShellMobileNavigationState extends State<ShellMobileNavigation>
         alignment: Alignment.bottomCenter,
         clipBehavior: Clip.none,
         children: [
-          // 1. 🌑 Telón oscuro suave que cierra al tocar fuera
           if (_menuAbierto)
             GestureDetector(
               onTap: _cerrarMenu,
@@ -554,7 +552,6 @@ class _ShellMobileNavigationState extends State<ShellMobileNavigation>
               ),
             ),
 
-          // 2. 🎴 Tarjeta Flotante Vertical Compacta
           Positioned(
             bottom: 86,
             child: ScaleTransition(
@@ -614,7 +611,6 @@ class _ShellMobileNavigationState extends State<ShellMobileNavigation>
             ),
           ),
 
-          // 3. 📱 Barra Inferior Flotante
           SafeArea(
             top: false,
             child: Padding(
@@ -679,7 +675,6 @@ class _ShellMobileNavigationState extends State<ShellMobileNavigation>
                     ),
                   ),
 
-                  // ⚪ Botón Central '+'
                   Positioned(
                     top: -14,
                     child: Semantics(

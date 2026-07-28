@@ -94,7 +94,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     required String telefono,
   }) async {
     final relacion = await supabase
-        .from('persona_contacto')
+        .from('persona_contactos')
         .select('contacto_id')
         .eq('persona_id', personaId)
         .eq('es_principal', true)
@@ -112,7 +112,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
           .select('id')
           .single();
 
-      await supabase.from('persona_contacto').insert({
+      await supabase.from('persona_contactos').insert({
         'persona_id': personaId,
         'contacto_id': nuevoContacto['id'],
         'tipo_contacto': 'personal',

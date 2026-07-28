@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
@@ -53,6 +54,16 @@ abstract class ConsultaRepository {
     String pacienteId, {
     String? excluyendoConsultaId,
   });
+
+  /// La línea de tiempo de cada pieza del paciente: todo lo evaluado,
+  /// planificado y ejecutado sobre ella en cualquier consulta, anulaciones
+  /// incluidas y agrupado por visita (SD-144).
+  ///
+  /// No se deriva de los odontogramas: cada uno describe la boca de su día y
+  /// consolidarlos —la Vista General del expediente lo hace— se queda con una
+  /// sola anotación por pieza. El historial se arma de los tres ejes clínicos,
+  /// que conservan una fila por cada cosa que ocurrió.
+  Future<HistorialPiezas> getHistorialPiezas(String pacienteId);
 
   /// Consolida los odontodiagramas anteriores del paciente en una sola
   /// evaluación, para dibujarlos como capa histórica bajo la de hoy.

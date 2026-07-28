@@ -4,36 +4,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_diagnostico_sheet.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_insumos.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/tarjeta_consulta.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/entities/evaluacion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/repositories/evaluacion_clinica_repository.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/repositories/tratamiento_repository.dart';
-import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
-import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
-import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
-import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/entities/evaluacion_clinica.dart';
-import 'package:salud_dental_clinic_management/features/evaluacion_clinica/domain/repositories/evaluacion_clinica_repository.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_insumos.dart';
 
 class WorkspaceConsulta extends StatefulWidget {
   final String? citaId;
@@ -45,23 +49,20 @@ class WorkspaceConsulta extends StatefulWidget {
 
 class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   final _notasController = TextEditingController();
+  String? _consultaNotasHidratada;
+  bool _hidratandoNotas = false;
 
   List<Tratamiento> _catalogo = const [];
   Map<String, String> _nombrePorId = const {};
   bool _cargandoCatalogo = true;
   List<Diagnosis> _catalogoDiagnosticos = const [];
-
-  /// Nombre de cada doctor, para que la ficha de una pieza pueda decir quién
-  /// anotó cada cosa en vez de mostrar un uuid.
+  List<ItemPlanTratamiento> _itemsEjecutables = const [];
+  bool _cargandoPlanDelDia = false;
+  String? _errorPlanDelDia;
   Map<String, String> _nombrePorDoctorId = const {};
-
-  /// Evaluación de esta consulta (SD-135). Se asegura una sola vez: es el
-  /// contenedor al que se cuelgan los hallazgos y del que nace el plan.
+  HistorialPiezas? _historialPiezas;
   String? _evaluacionId;
   String? _consultaConEvaluacion;
-
-  /// Condiciones estructuradas del paciente cargadas async desde `record_condicion`.
-  /// Si están vacías se usan las del record embebido como respaldo.
   List<Condicion> _condicionesAsync = const [];
 
   @override
@@ -71,18 +72,30 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     _cargarDiagnosticos();
     _cargarCondicionesPaciente();
     _cargarDoctores();
-
-    final state = context.read<ConsultaCubit>().state;
-    if (state is ConsultaIniciada && state.consulta.notas != null) {
-      _notasController.text = state.consulta.notas!;
-    } else if (state is ConsultaGuardando && state.consulta?.notas != null) {
-      _notasController.text = state.consulta!.notas!;
-    }
+    _cargarHistorialPiezas();
 
     _notasController.addListener(() {
+      if (_hidratandoNotas) return;
       context.read<ConsultaCubit>().actualizarObservaciones(
         _notasController.text,
       );
+    });
+  }
+
+  void _hidratarNotasDeConsulta(Consulta consulta) {
+    final consultaId = consulta.id;
+    if (consultaId == null || _consultaNotasHidratada == consultaId) return;
+    _consultaNotasHidratada = consultaId;
+    final notas = consulta.notas ?? '';
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _notasController.text == notas) return;
+      _hidratandoNotas = true;
+      _notasController.value = TextEditingValue(
+        text: notas,
+        selection: TextSelection.collapsed(offset: notas.length),
+      );
+      _hidratandoNotas = false;
     });
   }
 
@@ -90,10 +103,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     try {
       final catalogo = await sl<DiagnosisRepository>().getCatalogoCompleto();
       if (mounted) setState(() => _catalogoDiagnosticos = catalogo);
-    } catch (_) {
-      // La pantalla queda operable para tratamientos; el botón de diagnóstico
-      // comunica la indisponibilidad en lugar de abrir un selector vacío.
-    }
+    } catch (_) {}
   }
 
   Future<void> _cargarDoctores() async {
@@ -107,15 +117,25 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               doctor.id!: 'Dr. ${doctor.nombre} ${doctor.apellido}'.trim(),
         };
       });
-    } catch (_) {
-      // La ficha de la pieza omite la autoría en vez de mostrar un uuid; todo
-      // lo demás de la consulta sigue funcionando igual.
-    }
+    } catch (_) {}
   }
 
-  /// El nombre del doctor, o cadena vacía si aún no se cargó el personal: la
-  /// ficha prefiere no decir nada a mostrar un identificador.
   String _nombreDoctor(String doctorId) => _nombrePorDoctorId[doctorId] ?? '';
+
+  Future<void> _cargarHistorialPiezas() async {
+    final state = context.read<PacienteCubit>().state;
+    if (state is! PacienteDetailLoaded) return;
+    final pacienteId = state.paciente.id;
+    if (pacienteId == null) return;
+
+    try {
+      final historial = await sl<ConsultaRepository>().getHistorialPiezas(
+        pacienteId,
+      );
+      if (!mounted) return;
+      setState(() => _historialPiezas = historial);
+    } catch (_) {}
+  }
 
   Future<void> _onAddDiagnosis(
     Diente diente,
@@ -141,18 +161,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       severidad: seleccionado.severidad,
       origen: seleccionado.origen,
       notas: seleccionado.notas,
-      // El hallazgo cuelga del acto de evaluación de esta consulta: de ahí sale
-      // el doctor que lo anotó cuando el expediente lo vuelva a leer.
       evaluacionId: _evaluacionId,
     );
   }
 
-  /// Las actividades del plan repartidas por pieza.
-  ///
-  /// El plan referencia el diente por su id y el odontograma se dibuja por
-  /// código FDI, así que hace falta traducir. Una consulta recién creada aún no
-  /// conoce los ids de sus piezas: en ese momento no hay plan que mostrar
-  /// todavía, y el mapa sale vacío sin romper nada.
   Map<int, List<ItemPlanTratamiento>> _itemsPlanPorFdi(
     Odontograma odontograma,
     PlanTratamientoState estado,
@@ -177,14 +189,10 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     return porFdi;
   }
 
-  /// La observación queda pegada al diente, no al párrafo de la visita.
   void _onNotasPieza(Diente diente, String notas) {
     context.read<ConsultaCubit>().actualizarNotasPieza(diente, notas);
   }
 
-  /// El odontodiagrama ya solo emite tejidos blandos: las claves dentales se
-  /// anotan como diagnósticos y tratamientos desde el panel de la pieza, igual
-  /// que en la arcada.
   void _onEvaluacionChanged(EvaluacionOdontologica evaluacion) {
     context.read<ConsultaCubit>().actualizarEvaluacionOdontologica(evaluacion);
   }
@@ -214,8 +222,6 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
   }
 
-  /// Carga las condiciones desde `record_condicion` (tabla puente real).
-  /// Si falla, se usa el fallback del record embebido en `_condicionesPaciente`.
   Future<void> _cargarCondicionesPaciente() async {
     final state = context.read<PacienteCubit>().state;
     if (state is! PacienteDetailLoaded) return;
@@ -226,13 +232,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       final condiciones = await sl<GetCondicionesPaciente>()(pacienteId);
       if (!mounted) return;
       setState(() => _condicionesAsync = condiciones);
-    } catch (_) {
-      // Se mantiene vacío: _condicionesPaciente() cae al record embebido.
-    }
+    } catch (_) {}
   }
 
-  /// Deja registrada la evaluación de la consulta y carga su plan. Idempotente
-  /// en la base, y aquí se llama una sola vez por consulta.
   Future<void> _prepararPlan(Consulta consulta) async {
     final consultaId = consulta.id;
     if (consultaId == null || _consultaConEvaluacion == consultaId) return;
@@ -240,6 +242,27 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
     final planCubit = context.read<PlanTratamientoCubit>();
     unawaited(planCubit.cargarDeConsulta(consultaId));
+    setState(() {
+      _cargandoPlanDelDia = true;
+      _errorPlanDelDia = null;
+    });
+    try {
+      final items = await sl<PlanTratamientoRepository>().getItemsEjecutables(
+        consulta.pacienteId,
+      );
+      if (mounted) setState(() => _itemsEjecutables = items);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _itemsEjecutables = const [];
+          _errorPlanDelDia =
+              'No se pudo cargar el plan del paciente. Puedes continuar con '
+              'el catálogo, pero los tratamientos no se vincularán al plan.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _cargandoPlanDelDia = false);
+    }
 
     try {
       final id = await sl<EvaluacionClinicaRepository>()
@@ -253,10 +276,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
           );
       if (mounted) setState(() => _evaluacionId = id);
-    } catch (_) {
-      // El plan sigue siendo utilizable sin el vínculo a la evaluación; se
-      // recupera en el siguiente guardado en vez de bloquear la consulta.
-    }
+    } catch (_) {}
   }
 
   List<Condicion> _condicionesPaciente() {
@@ -273,10 +293,61 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     TipoSuperficie? superficie,
   ) async {
     if (_cargandoCatalogo) return;
-    final consultaCubit = context.read<ConsultaCubit>();
     final tratamiento = await seleccionarTratamiento(context, _catalogo);
     if (tratamiento == null || !mounted) return;
 
+    final candidatas = _itemsEjecutables
+        .where((item) => item.fdiDiente == diente.fdiCode)
+        .where(
+          (item) =>
+              superficie == null ||
+              item.superficie == null ||
+              item.superficie == superficie,
+        )
+        .where((item) => item.tratamientoId == tratamiento.id)
+        .toList();
+    final itemPlan = candidatas.firstOrNull;
+    await _aplicarTratamiento(
+      diente,
+      superficie,
+      tratamiento,
+      itemPlan: itemPlan,
+    );
+  }
+
+  Future<void> _registrarItemPlan(
+    Diente diente,
+    ItemPlanTratamiento itemPlan,
+  ) async {
+    final tratamiento = _catalogo.cast<Tratamiento?>().firstWhere(
+      (item) => item?.id == itemPlan.tratamientoId,
+      orElse: () => null,
+    );
+    if (tratamiento == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El tratamiento del plan ya no está disponible en el catálogo.',
+          ),
+        ),
+      );
+      return;
+    }
+    await _aplicarTratamiento(
+      diente,
+      itemPlan.superficie,
+      tratamiento,
+      itemPlan: itemPlan,
+    );
+  }
+
+  Future<void> _aplicarTratamiento(
+    Diente diente,
+    TipoSuperficie? superficie,
+    Tratamiento tratamiento, {
+    ItemPlanTratamiento? itemPlan,
+  }) async {
+    final consultaCubit = context.read<ConsultaCubit>();
     final conflictos = VerificarContraindicacionesUseCase().call(
       condicionesPaciente: _condicionesPaciente(),
       tratamiento: tratamiento,
@@ -295,16 +366,27 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
         superficie,
         tratamiento,
         justificacionClinica: justificacion,
+        itemPlanId: itemPlan?.id,
       );
     } else {
-      consultaCubit.aplicarTratamiento(diente, superficie, tratamiento);
+      consultaCubit.aplicarTratamiento(
+        diente,
+        superficie,
+        tratamiento,
+        itemPlanId: itemPlan?.id,
+      );
     }
 
     if (!mounted) return;
+    if (itemPlan != null) {
+      setState(() => _itemsEjecutables.remove(itemPlan));
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '"${tratamiento.nombre}" asignado al diente ${diente.fdiCode}.',
+          itemPlan == null
+              ? '"${tratamiento.nombre}" agregado a la consulta.'
+              : '"${tratamiento.nombre}" vinculado al plan de tratamiento.',
         ),
         backgroundColor: context.appColors.teal,
         behavior: SnackBarBehavior.floating,
@@ -313,8 +395,6 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     );
   }
 
-  /// La ausencia se guarda en la pieza; la proyección la dibuja como «Pérdida»
-  /// en el formulario, así que las dos vistas siguen contando lo mismo.
   void _onToggleAusente(Diente diente, bool ausente) {
     context.read<ConsultaCubit>().toggleDienteAusente(diente, ausente);
   }
@@ -358,6 +438,39 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     context.read<ConsultaCubit>().quitarTratamiento(diente, index);
   }
 
+  Future<void> _abrirFormularioFormalReceta(Consulta consulta) async {
+    final pacienteState = context.read<PacienteCubit>().state;
+    if (pacienteState is! PacienteDetailLoaded) return;
+
+    final recetaOriginal = consulta.recetas.firstOrNull;
+
+    final recetaFormal = await RecetaFormDialog.mostrar(
+      context,
+      paciente: pacienteState.paciente,
+      consultaId: consulta.id ?? '',
+      recetaParaEditar: recetaOriginal,
+    );
+
+    if (recetaFormal != null && mounted) {
+      final cubit = context.read<ConsultaCubit>();
+      cubit.limpiarRecetas();
+      for (final item in recetaFormal.items) {
+        cubit.agregarItemReceta(itemReceta: item);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Formulario formal de receta cargado a la consulta.',
+          ),
+          backgroundColor: context.appColors.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
@@ -370,7 +483,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       builder: (context, state) {
         if (state is! ConsultaIniciada && state is! ConsultaGuardando) {
           return Center(
-            child: CircularProgressIndicator(color: ac.primaryBlue),
+            child: CircularProgressIndicator(color: ac.primaryGreen),
           );
         }
 
@@ -380,14 +493,13 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
         if (consulta == null) {
           return Center(
-            child: CircularProgressIndicator(color: ac.primaryBlue),
+            child: CircularProgressIndicator(color: ac.primaryGreen),
           );
         }
 
+        _hidratarNotasDeConsulta(consulta);
+
         if (consulta.odontograma == null) {
-          // La consulta se crea con sus 52 piezas, así que llegar aquí
-          // significa que la carga falló: hay que decirlo, no dejar una
-          // pantalla en blanco que parezca «este paciente no tiene nada».
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
@@ -422,8 +534,6 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
           );
         }
 
-        // La evaluación y el plan se preparan cuando la consulta ya tiene id;
-        // fuera del build para no tocar el cubit durante la construcción.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _prepararPlan(consulta);
         });
@@ -479,7 +589,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Registra tratamientos en el odontograma y añade tus notas',
+                        'Diagnostica, planifica y registra lo realizado',
                         style: TextStyle(
                           fontSize: 12,
                           color: ac.textMuted,
@@ -530,16 +640,13 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               iconColor: ac.indigo,
               titulo: 'Odontograma',
               subtitulo:
-                  'Anota hallazgos en el formulario o asigna tratamientos en '
-                  'la arcada: es la misma boca en dos vistas',
-              // El plan se escucha aquí porque la ficha de cada pieza tiene que
-              // mostrar lo planificado junto a lo evaluado y lo ejecutado: son
-              // los tres ejes de SD-135 sobre el mismo diente.
+                  'Anota hallazgos, diagnósticos y tratamientos sobre la pieza',
               child: BlocBuilder<PlanTratamientoCubit, PlanTratamientoState>(
                 builder: (context, planState) => VistasOdontograma(
                   odontograma: odontograma,
                   editable: true,
                   itemsPlan: _itemsPlanPorFdi(odontograma, planState),
+                  historialPiezas: _historialPiezas,
                   onEvaluacionChanged: _onEvaluacionChanged,
                   onNotasPiezaChanged: _onNotasPieza,
                   onAddDiagnosis: _onAddDiagnosis,
@@ -564,15 +671,12 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
             const SizedBox(height: 16),
 
-            // SD-135: evaluar y planificar son dos actos distintos. Aquí se
-            // decide cuáles de los hallazgos anotados arriba se van a tratar.
             TarjetaConsulta(
               icon: Icons.fact_check_outlined,
-              iconColor: ac.primaryBlue,
+              iconColor: ac.primaryGreen,
               titulo: 'Plan de tratamiento',
               subtitulo:
-                  'Decide qué hallazgos se tratan y registra la respuesta del '
-                  'paciente; nada se cobra hasta ejecutarse',
+                  'Planifica desde los diagnósticos sin salir de la consulta',
               child: SeccionPlanTratamiento(
                 dientes: odontograma.dientes,
                 pacienteId: consulta.pacienteId,
@@ -583,6 +687,57 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     seleccionarTratamiento(context, _catalogo),
               ),
             ),
+            TarjetaConsulta(
+              icon: Icons.event_available_outlined,
+              iconColor: ac.teal,
+              titulo: 'Tratamientos pendientes del plan',
+              subtitulo:
+                  'Puedes registrarlos aquí o agregar cualquier tratamiento '
+                  'directamente desde una pieza',
+              child: _cargandoPlanDelDia
+                  ? const LinearProgressIndicator()
+                  : _errorPlanDelDia != null
+                  ? Text(
+                      _errorPlanDelDia!,
+                      style: TextStyle(color: ac.red, height: 1.4),
+                    )
+                  : _itemsEjecutables.isEmpty
+                  ? Text(
+                      'No hay tratamientos aceptados pendientes.',
+                      style: TextStyle(color: ac.textSecondary, height: 1.4),
+                    )
+                  : Column(
+                      children: [
+                        for (final item in _itemsEjecutables)
+                          ListTile(
+                            dense: true,
+                            leading: Icon(
+                              Icons.radio_button_unchecked_rounded,
+                              color: ac.teal,
+                            ),
+                            title: Text(
+                              item.nombreTratamiento ?? 'Tratamiento',
+                            ),
+                            subtitle: Text(
+                              '${item.estado.etiqueta}'
+                              '${item.fdiDiente == null ? '' : ' · Pieza ${item.fdiDiente}'}',
+                            ),
+                            trailing: item.fdiDiente == null
+                                ? const Text('Actividad general')
+                                : TextButton(
+                                    onPressed: () {
+                                      final diente = odontograma.dientes
+                                          .firstWhere(
+                                            (d) => d.fdiCode == item.fdiDiente,
+                                          );
+                                      _registrarItemPlan(diente, item);
+                                    },
+                                    child: const Text('Registrar'),
+                                  ),
+                          ),
+                      ],
+                    ),
+            ),
             const SizedBox(height: 16),
 
             TarjetaConsulta(
@@ -590,8 +745,6 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               iconColor: ac.indigo,
               titulo: 'Notas clínicas',
               subtitulo: 'Observaciones para el expediente',
-              // La consulta ya se guarda sola; el botón solo adelanta la
-              // escritura para quien prefiere confirmarlo a mano.
               accion: TextButton.icon(
                 onPressed: cargando || guardado == EstadoGuardado.guardando
                     ? null
@@ -643,16 +796,27 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               condicionesPaciente: _condicionesPaciente(),
               recetas: consulta.recetas,
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _abrirFormularioFormalReceta(consulta),
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text(
+                  'Abrir Formulario Formal / Vista Previa Receta',
+                ),
+              ),
+            ),
             const SizedBox(height: 28),
-
             const SizedBox(height: 16),
             SeccionInsumos(insumos: consulta.insumosUtilizados),
 
             _TerminarButton(
               cargando: cargando,
+              label: 'Terminar consulta',
               onTap: cargando
                   ? null
-                  : () => context.read<ConsultaCubit>().terminarConsulta(),
+                  : () => context.read<ConsultaCubit>().terminarAtencion(),
               ac: ac,
             ),
           ],
@@ -667,10 +831,12 @@ class _TerminarButton extends StatelessWidget {
     required this.cargando,
     required this.onTap,
     required this.ac,
+    required this.label,
   });
   final bool cargando;
   final VoidCallback? onTap;
   final AppColors ac;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -700,16 +866,12 @@ class _TerminarButton extends StatelessWidget {
                 ),
               )
             : const Icon(Icons.check_circle_outline_rounded, size: 20),
-        label: Text(cargando ? 'Finalizando…' : 'Terminar consulta'),
+        label: Text(cargando ? 'Finalizando…' : label),
       ),
     );
   }
 }
 
-/// Estado del autoguardado, siempre visible en la cabecera de la consulta.
-///
-/// El doctor tiene que poder saber de un vistazo si lo que acaba de anotar ya
-/// está a salvo, sin abrir nada ni acordarse de pulsar un botón.
 class _IndicadorGuardado extends StatelessWidget {
   final EstadoGuardado estado;
 
@@ -740,15 +902,12 @@ class _IndicadorGuardado extends StatelessWidget {
     return Tooltip(
       message: switch (estado) {
         EstadoGuardado.alDia =>
-          'Todo el trabajo de esta consulta está en el '
-              'servidor.',
+          'Todo el trabajo de esta consulta está en el servidor.',
         EstadoGuardado.pendiente =>
-          'Hay cambios que se guardarán solos en unos '
-              'segundos.',
+          'Hay cambios que se guardarán solos en unos segundos.',
         EstadoGuardado.guardando => 'Escribiendo los cambios en el servidor.',
         EstadoGuardado.fallido =>
-          'Los cambios siguen aquí y se reintentará '
-              'solo. No cierres la consulta.',
+          'Los cambios siguen aquí y se reintentará solo. No cierres la consulta.',
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

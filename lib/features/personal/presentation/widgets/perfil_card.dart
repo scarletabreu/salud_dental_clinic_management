@@ -166,7 +166,7 @@ class PerfilCard extends StatelessWidget {
       case RolUsuario.admin:
         return ac.indigo;
       case RolUsuario.doctor:
-        return ac.primaryBlue;
+        return ac.primaryGreen;
       case RolUsuario.asistente:
         return ac.teal;
     }

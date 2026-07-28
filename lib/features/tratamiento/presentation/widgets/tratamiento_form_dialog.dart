@@ -92,13 +92,13 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: ac.primaryBlue.withOpacity(0.10),
+                        color: ac.primaryGreen.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         Icons.medical_services_outlined,
                         size: 17,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -195,7 +195,7 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: ac.primaryBlue,
+                          color: ac.primaryGreen,
                           width: 1.0,
                         ),
                       ),
@@ -285,7 +285,7 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
                         _isEditing ? 'Guardar cambios' : 'Crear tratamiento',
                       ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: ac.primaryBlue,
+                        backgroundColor: ac.primaryGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -332,7 +332,7 @@ class _TratamientoFormDialogState extends State<TratamientoFormDialog> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -361,7 +361,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),

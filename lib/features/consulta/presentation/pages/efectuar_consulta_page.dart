@@ -40,7 +40,8 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   bool _hasInitialTriggered = false;
   bool _hasLoadedParaConsulta = false;
   bool? _registroIncompleto;
-  Paciente? _pacienteParaForm; // <-- NUEVO: copia local, inmune a emits del cubit
+  Paciente?
+  _pacienteParaForm; // <-- NUEVO: copia local, inmune a emits del cubit
   late final PacienteCubit _pacienteCubit;
 
   @override
@@ -127,7 +128,9 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
             _hasLoadedParaConsulta = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!innerContext.mounted) return;
-              innerContext.read<PacienteCubit>().loadParaConsulta(widget.pacienteId);
+              innerContext.read<PacienteCubit>().loadParaConsulta(
+                widget.pacienteId,
+              );
             });
           }
 
@@ -227,7 +230,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                     ),
                   )
                 : CircularProgressIndicator(
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                     strokeWidth: 2,
                   ),
           ),
@@ -288,8 +291,8 @@ class _FloatingBar extends StatelessWidget {
     final layout = context.appLayout;
 
     final subtitle = enWorkspace
-        ? 'Registra tratamientos y notas clínicas'
-        : 'Completa la evaluación para iniciar';
+        ? 'Diagnostica, planifica y registra tratamientos sin salir'
+        : 'Completa el contexto clínico para continuar';
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -325,7 +328,7 @@ class _FloatingBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Efectuar Consulta',
+                        'Consulta clínica',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -355,15 +358,15 @@ class _FloatingBar extends StatelessWidget {
                         ? _StatusBadge(
                             key: const ValueKey('ws'),
                             icon: Icons.radio_button_checked_rounded,
-                            label: 'En curso',
+                            label: 'En consulta',
                             color: ac.green,
                             ac: ac,
                           )
                         : _StatusBadge(
                             key: const ValueKey('ev'),
                             icon: Icons.assignment_outlined,
-                            label: 'Evaluación',
-                            color: ac.primaryBlue,
+                            label: 'Consulta',
+                            color: ac.teal,
                             ac: ac,
                           ),
                   ),
@@ -402,7 +405,7 @@ class _PanelPacienteButton extends StatelessWidget {
             color: ac.chipBg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryBlue),
+          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryGreen),
         ),
       ),
     );
@@ -447,7 +450,7 @@ class _StepRow extends StatelessWidget {
         Flexible(
           child: _StepPill(
             number: '01',
-            label: 'Evaluación',
+            label: 'Datos iniciales',
             active: !enWorkspace,
             done: enWorkspace,
             ac: ac,
@@ -463,7 +466,7 @@ class _StepRow extends StatelessWidget {
         Flexible(
           child: _StepPill(
             number: '02',
-            label: 'Consulta',
+            label: 'Consulta clínica',
             active: enWorkspace,
             done: false,
             ac: ac,
@@ -500,7 +503,7 @@ class _StepPill extends StatelessWidget {
       fg = ac.green;
       textColor = ac.green;
     } else if (active) {
-      bg = ac.primaryBlue;
+      bg = ac.primaryGreen;
       fg = Colors.white;
       textColor = ac.textPrimary;
     } else {

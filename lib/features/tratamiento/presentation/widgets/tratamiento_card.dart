@@ -32,7 +32,7 @@ class TratamientoCard extends StatelessWidget {
       child: InkWell(
         onTap: () => _abrirEdicion(context),
         borderRadius: BorderRadius.circular(14),
-        hoverColor: ac.primaryBlue.withOpacity(0.02),
+        hoverColor: ac.primaryGreen.withOpacity(0.02),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           // Badge, price and the two actions need roughly 260 px of fixed
@@ -97,13 +97,13 @@ class TratamientoCard extends StatelessWidget {
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withOpacity(0.08),
+        color: ac.primaryGreen.withOpacity(0.08),
         shape: BoxShape.circle,
       ),
       child: Icon(
         Icons.medical_services_outlined,
         size: 20,
-        color: ac.primaryBlue,
+        color: ac.primaryGreen,
       ),
     );
   }
@@ -310,9 +310,9 @@ class _AlcanceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withOpacity(0.07),
+        color: ac.primaryGreen.withOpacity(0.07),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ac.primaryBlue.withOpacity(0.20)),
+        border: Border.all(color: ac.primaryGreen.withOpacity(0.20)),
       ),
       child: Text(
         alcance.toUpperCase(),
@@ -320,7 +320,7 @@ class _AlcanceBadge extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.6,
-          color: ac.primaryBlue,
+          color: ac.primaryGreen,
         ),
       ),
     );

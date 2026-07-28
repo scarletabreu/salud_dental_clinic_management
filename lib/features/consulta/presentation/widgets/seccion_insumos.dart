@@ -228,7 +228,7 @@ class _DialogoAgregarInsumoState extends State<_DialogoAgregarInsumo> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.pop(

@@ -4,4 +4,5 @@ enum TipoAlerta {
   inventarioBajo,
   inventarioAgotado,
   cajaNoAperturada,
+  mantenimientoVencido,
 }

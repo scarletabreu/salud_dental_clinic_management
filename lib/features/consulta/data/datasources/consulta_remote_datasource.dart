@@ -45,9 +45,13 @@ abstract class ConsultaRemoteDatasource {
     List<String> ids,
   );
 
+  /// [incluyendoAnulados] trae también las ejecuciones con `deleted_at`. La
+  /// capa que se dibuja sobre el diente no las quiere —no describen la boca—,
+  /// pero la línea de tiempo de la pieza sí: anular es un hecho clínico.
   Future<List<Map<String, dynamic>>> fetchTratamientosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
+    bool incluyendoAnulados = false,
   });
 
   /// Diagnósticos de las consultas anteriores del paciente, de la más reciente
@@ -55,7 +59,26 @@ abstract class ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
+    bool incluyendoAnulados = false,
   });
+
+  /// Actividades del plan que caen sobre alguna pieza del paciente, anuladas
+  /// incluidas. Traen el código FDI de su diente y la consulta que originó el
+  /// plan, que es lo que las sitúa en la línea de tiempo.
+  Future<List<Map<String, dynamic>>> fetchItemsPlanPorPaciente(
+    String pacienteId,
+  );
+
+  /// Índice de las consultas del paciente para encabezar su historial: fecha,
+  /// motivo, tipo de atención y doctor. No filtra las anuladas a propósito, de
+  /// modo que ningún evento se quede sin la visita a la que pertenece.
+  Future<List<Map<String, dynamic>>> fetchReferenciasConsultasPaciente(
+    String pacienteId,
+  );
+
+  /// Nombre de los doctores [ids], para que el historial diga quién anotó cada
+  /// cosa en lugar de mostrar un uuid.
+  Future<List<Map<String, dynamic>>> fetchNombresDoctores(List<String> ids);
 
   /// Odontodiagramas de las consultas anteriores del paciente, de la más
   /// reciente a la más antigua. Tras SD-150 el jsonb solo conserva los tejidos

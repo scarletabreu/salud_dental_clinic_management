@@ -103,7 +103,10 @@ class _MedicinaSheetContentState extends State<_MedicinaSheetContent> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: ac.primaryBlue, width: 1.5),
+                      borderSide: BorderSide(
+                        color: ac.primaryGreen,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -128,14 +131,14 @@ class _MedicinaSheetContentState extends State<_MedicinaSheetContent> {
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                color: ac.primaryBlue.withValues(alpha: 0.1),
+                                color: ac.primaryGreen.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               alignment: Alignment.center,
                               child: Icon(
                                 Icons.medication_rounded,
                                 size: 18,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                             ),
                             title: Text(

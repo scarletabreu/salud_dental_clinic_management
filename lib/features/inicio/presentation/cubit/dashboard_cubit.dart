@@ -7,6 +7,8 @@ import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
+import 'package:salud_dental_clinic_management/features/equipo/domain/entities/equipo.dart';
+import 'package:salud_dental_clinic_management/features/equipo/domain/repositories/equipo_repository.dart';
 import 'package:salud_dental_clinic_management/features/inicio/domain/services/alerta_operativa_generator.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
@@ -18,6 +20,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   final IMedicinaRepository _medicinaRepository;
   final ConsumibleRepository _consumibleRepository;
   final CajaDiariaRepository _cajaDiariaRepository;
+  final EquipoRepository _equipoRepository;
   final AlertaOperativaGenerator _alertaGenerator;
 
   List<RolUsuario> _roles = const [];
@@ -29,6 +32,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   // volver a golpear el backend.
   List<Cita> _citasCache = const [];
   List<Consumible> _consumiblesCache = const [];
+  List<Equipo> _equiposCache = const [];
   CajaDiaria? _cajaActualCache;
 
   DashboardCubit({
@@ -37,12 +41,14 @@ class DashboardCubit extends Cubit<DashboardState> {
     required IMedicinaRepository medicinaRepository,
     required ConsumibleRepository consumibleRepository,
     required CajaDiariaRepository cajaDiariaRepository,
+    required EquipoRepository equipoRepository,
     AlertaOperativaGenerator alertaGenerator = const AlertaOperativaGenerator(),
   }) : _citaRepository = citaRepository,
        _pacienteRepository = pacienteRepository,
        _medicinaRepository = medicinaRepository,
        _consumibleRepository = consumibleRepository,
        _cajaDiariaRepository = cajaDiariaRepository,
+       _equipoRepository = equipoRepository,
        _alertaGenerator = alertaGenerator,
        super(const DashboardLoading());
 
@@ -82,10 +88,14 @@ class DashboardCubit extends Cubit<DashboardState> {
       final cajaActual = tieneAccesoOperativo
           ? await _cajaDiariaRepository.getCajaActual()
           : null;
+      final equipos = tieneAccesoOperativo
+          ? await _equipoRepository.getInventarioEquipos()
+          : const <Equipo>[];
 
       _citasCache = citas;
       _consumiblesCache = consumibles;
       _cajaActualCache = cajaActual;
+      _equiposCache = equipos;
 
       emit(
         _construirEstado(
@@ -94,6 +104,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           citas: citas,
           consumibles: consumibles,
           cajaActual: cajaActual,
+          equipos: equipos,
           totalPacientes: totalPacientes,
           totalMedicinas: medicinas.length,
         ),
@@ -120,6 +131,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         citas: _citasCache,
         consumibles: _consumiblesCache,
         cajaActual: _cajaActualCache,
+        equipos: _equiposCache,
         totalPacientes: current.totalPacientes,
         totalMedicinas: current.totalMedicinas,
       ),
@@ -140,6 +152,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     required List<Cita> citas,
     required List<Consumible> consumibles,
     CajaDiaria? cajaActual,
+    List<Equipo> equipos = const [],
     required int totalPacientes,
     required int totalMedicinas,
   }) {
@@ -175,6 +188,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       citasDeHoy: citasDeHoy,
       consumibles: consumibles,
       cajaActual: cajaActual,
+      equipos: equipos,
       ahora: now,
     );
 

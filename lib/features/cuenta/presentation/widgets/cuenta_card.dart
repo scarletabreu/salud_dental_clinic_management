@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
 
 class CuentaCard extends StatelessWidget {
   final Cuenta cuenta;
@@ -134,18 +135,20 @@ class CuentaCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: ac.primaryBlue.withValues(alpha: 0.08),
+                  color: ac.primaryGreen.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      cuenta.metodoPago.name == 'Crédito'
+                      // Por el enum, no por su etiqueta: comparar el texto
+                      // visible ata el icono a cómo se escriba «Crédito».
+                      cuenta.metodoPago == MetodoPago.credito
                           ? Icons.credit_card_rounded
                           : Icons.payments_outlined,
                       size: 12,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -153,7 +156,7 @@ class CuentaCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                   ],

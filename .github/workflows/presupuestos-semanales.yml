@@ -1,0 +1,49 @@
+name: Presupuestos semanales
+
+# SD-132. El APK tarda ~4 min de Gradle en construirse y su tamaño no cambia
+# en un PR normal, así que vigilarlo en cada push sería gastar runner para
+# ver el mismo número. Una vez por semana basta para detectar la deriva —una
+# dependencia nueva, un asset que engorda— antes de que sea difícil de
+# atribuir a algo.
+on:
+  schedule:
+    # Lunes a las 06:00 UTC, antes de que empiece la semana de trabajo.
+    - cron: '0 6 * * 1'
+  workflow_dispatch: # también a mano, desde la pestaña Actions
+
+env:
+  FLUTTER_VERSION: 3.44.1
+
+jobs:
+  artefactos:
+    name: Tamaño de web y APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Web
+        run: tool/perf/medir_artefactos.sh web
+
+      # El release ya no se firma con la clave de depuración, así que sin una
+      # clave el build falla a propósito. Aquí solo se mide tamaño —que no
+      # depende de con qué se firme—, así que sirve una desechable. La de
+      # publicación no vive en CI: se custodia fuera.
+      - name: Clave desechable para poder construir
+        run: tool/android/generar_keystore.sh --efimero
+
+      - name: APK universal
+        run: tool/perf/medir_artefactos.sh apk
+
+      # Lo que de verdad se descarga un teléfono. Ver PERFORMANCE.md §3.bis.
+      - name: APK por arquitectura
+        run: tool/perf/medir_artefactos.sh apk-abi

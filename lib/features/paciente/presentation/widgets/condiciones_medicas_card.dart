@@ -104,7 +104,7 @@ class _CondicionesView extends StatelessWidget {
                     IconButton(
                       onPressed: procesando ? null : () => _onAgregar(context),
                       icon: const Icon(Icons.add_rounded, size: 20),
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       tooltip: 'Agregar condición',
                     )
                   else
@@ -113,7 +113,7 @@ class _CondicionesView extends StatelessWidget {
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Agregar'),
                       style: TextButton.styleFrom(
-                        foregroundColor: ac.primaryBlue,
+                        foregroundColor: ac.primaryGreen,
                         textStyle: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -128,7 +128,7 @@ class _CondicionesView extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: CircularProgressIndicator(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       strokeWidth: 2,
                     ),
                   ),
@@ -296,7 +296,7 @@ Color _colorTipo(AppColors ac, TipoCondicion tipo) {
     case TipoCondicion.quirurgica:
       return ac.indigo;
     case TipoCondicion.genetica:
-      return ac.primaryBlue;
+      return ac.primaryGreen;
   }
 }
 
@@ -455,7 +455,7 @@ class _AgregarCondicionDialogState extends State<_AgregarCondicionDialog> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                         strokeWidth: 2,
                       ),
                     );
@@ -532,7 +532,7 @@ class _AgregarCondicionDialogState extends State<_AgregarCondicionDialog> {
         if (_modoCrear)
           FilledButton(
             onPressed: _busquedaController.text.trim().isEmpty ? null : _crear,
-            style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+            style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
             child: const Text('Crear y agregar'),
           ),
       ],

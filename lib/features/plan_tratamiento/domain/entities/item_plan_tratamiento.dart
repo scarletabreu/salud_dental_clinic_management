@@ -18,6 +18,7 @@ class ItemPlanTratamiento {
   final String? diagnosticoAplicadoId;
 
   final String? dienteId;
+  final int? fdiDiente;
   final TipoSuperficie? superficie;
   final EstadoItemPlan estado;
   final double precioEstimado;
@@ -40,12 +41,25 @@ class ItemPlanTratamiento {
   final TipoEjecucionItemPlan tipoEjecucion;
   final int? sesionesPlanificadas;
 
+  /// Cuándo se retiró la actividad del plan (`deleted_at`). Retirarla no borra
+  /// que se propuso: la línea de tiempo de la pieza la sigue mostrando como
+  /// anulada (SD-144).
+  final DateTime? anuladoEn;
+
+  bool get estaAnulado => anuladoEn != null;
+
+  /// Id de la consulta en la que nació el plan del que cuelga. No es columna de
+  /// la actividad: llega del JOIN con `planes_tratamiento` y sitúa la actividad
+  /// en la línea de tiempo del expediente.
+  final String? consultaOrigenId;
+
   const ItemPlanTratamiento({
     this.id,
     required this.planId,
     required this.tratamientoId,
     this.diagnosticoAplicadoId,
     this.dienteId,
+    this.fdiDiente,
     this.superficie,
     this.estado = EstadoItemPlan.propuesto,
     this.precioEstimado = 0,
@@ -61,6 +75,8 @@ class ItemPlanTratamiento {
     this.nombreTratamiento,
     this.tipoEjecucion = TipoEjecucionItemPlan.unica,
     this.sesionesPlanificadas,
+    this.anuladoEn,
+    this.consultaOrigenId,
   });
 
   /// Aplica una transición y sella su fecha. Devuelve `null` si el paso no es
@@ -96,6 +112,7 @@ class ItemPlanTratamiento {
     String? tratamientoId,
     String? diagnosticoAplicadoId,
     String? dienteId,
+    int? fdiDiente,
     TipoSuperficie? superficie,
     EstadoItemPlan? estado,
     double? precioEstimado,
@@ -111,6 +128,8 @@ class ItemPlanTratamiento {
     String? nombreTratamiento,
     final TipoEjecucionItemPlan? tipoEjecucion,
     final int? sesionesPlanificadas,
+    DateTime? anuladoEn,
+    String? consultaOrigenId,
   }) {
     return ItemPlanTratamiento(
       id: id ?? this.id,
@@ -119,6 +138,7 @@ class ItemPlanTratamiento {
       diagnosticoAplicadoId:
           diagnosticoAplicadoId ?? this.diagnosticoAplicadoId,
       dienteId: dienteId ?? this.dienteId,
+      fdiDiente: fdiDiente ?? this.fdiDiente,
       superficie: superficie ?? this.superficie,
       estado: estado ?? this.estado,
       precioEstimado: precioEstimado ?? this.precioEstimado,
@@ -134,6 +154,8 @@ class ItemPlanTratamiento {
       nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
       tipoEjecucion: tipoEjecucion ?? this.tipoEjecucion,
       sesionesPlanificadas: sesionesPlanificadas ?? this.sesionesPlanificadas,
+      anuladoEn: anuladoEn ?? this.anuladoEn,
+      consultaOrigenId: consultaOrigenId ?? this.consultaOrigenId,
     );
   }
 }

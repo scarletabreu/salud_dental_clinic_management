@@ -90,7 +90,7 @@ Widget _app({double textScale = 1}) {
       ).copyWith(textScaler: TextScaler.linear(textScale)),
       child: inner!,
     ),
-    home: const EfectuarConsultaPage(
+    home: EfectuarConsultaPage(
       citaId: 'cita-1',
       pacienteId: _pacienteId,
       doctorId: _doctorId,
@@ -126,13 +126,25 @@ void main() {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(find.text('Efectuar Consulta'), findsOneWidget);
+      expect(find.text('Consulta clínica'), findsWidgets);
       expect(
         tester.takeException(),
         isNull,
         reason: 'la consulta no debe desbordar en $nombre',
       );
     });
+  });
+
+  testWidgets('la pantalla inicial presenta un único flujo clínico', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(390, 900));
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Consulta clínica'), findsWidgets);
+    expect(find.text('Motivo de consulta'), findsOneWidget);
+    expect(find.text('Evaluar y planificar'), findsNothing);
   });
 
   testWidgets('en escritorio la ficha del paciente va anclada al workspace', (

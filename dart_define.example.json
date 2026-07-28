@@ -1,0 +1,5 @@
+{
+  "APP_ENVIRONMENT": "development",
+  "SUPABASE_URL": "https://PROYECTO.supabase.co",
+  "SUPABASE_PUBLISHABLE_KEY": "CLAVE_PUBLICA"
+}

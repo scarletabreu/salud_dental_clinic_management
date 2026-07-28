@@ -32,10 +32,10 @@ class DashboardQuickActionCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: ac.primaryBlue.withValues(alpha: 0.10),
+                  color: ac.primaryGreen.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 18, color: ac.primaryBlue),
+                child: Icon(icon, size: 18, color: ac.primaryGreen),
               ),
               const SizedBox(width: 12),
               Expanded(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -21,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/pa
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
+import 'package:salud_dental_clinic_management/shell/lazy_destination_stack.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
@@ -28,6 +30,7 @@ import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart'
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -58,7 +61,7 @@ class _DashboardShellView extends StatefulWidget {
 }
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
-  int _selectedIndex = 0;
+  ShellDestinationId _selectedId = ShellDestinationId.inicio;
 
   final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
 
@@ -84,6 +87,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
 
   late final List<ShellDestination> _allDestinations = [
     ShellDestination(
+      id: ShellDestinationId.inicio,
       icon: Icons.dashboard_outlined,
       selectedIcon: Icons.dashboard_rounded,
       label: 'Inicio',
@@ -93,7 +97,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
           final authState = context.read<AuthCubit>().state;
           final usuario = authState.usuario;
 
-          // Extrae el nombre real del usuario (Doctor o cualquier otro rol)
           String? nombreUsuario;
           if (usuario != null) {
             nombreUsuario = '${usuario.nombre} ${usuario.apellido}'.trim();
@@ -123,17 +126,23 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
             );
           },
           child: InicioPage(
-            onNavigateToCitas: () => _navigateToLabel('Mis Citas del Día'),
-            onNavigateToPacientes: () => _navigateToLabel('Pacientes'),
-            onNavigateToMedicinas: () => _navigateToLabel('Medicinas'),
-            onNavigateToConfiguracion: () => _navigateToLabel('Configuración'),
-            onNavigateToInventario: () => _navigateToLabel('Inventario'),
-            onNavigateToCaja: () => _navigateToLabel('Caja'),
+            onNavigateToCitas: () =>
+                _navigateTo(ShellDestinationId.citasDelDia),
+            onNavigateToPacientes: () =>
+                _navigateTo(ShellDestinationId.pacientes),
+            onNavigateToMedicinas: () =>
+                _navigateTo(ShellDestinationId.medicinas),
+            onNavigateToConfiguracion: () =>
+                _navigateTo(ShellDestinationId.configuracion),
+            onNavigateToInventario: () =>
+                _navigateTo(ShellDestinationId.inventario),
+            onNavigateToCaja: () => _navigateTo(ShellDestinationId.caja),
           ),
         ),
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.citasDelDia,
       icon: Icons.today_outlined,
       selectedIcon: Icons.today_rounded,
       label: 'Mis Citas del Día',
@@ -143,6 +152,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.consultas,
       icon: Icons.medical_information_outlined,
       selectedIcon: Icons.medical_information_rounded,
       label: 'Consultas',
@@ -152,12 +162,14 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.pacientes,
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt_rounded,
       label: 'Pacientes',
       builder: (_) => const PacientesPage(),
     ),
     ShellDestination(
+      id: ShellDestinationId.cuentasPorCobrar,
       icon: Icons.account_balance_wallet_outlined,
       selectedIcon: Icons.account_balance_wallet_rounded,
       label: 'Cuentas por Cobrar',
@@ -167,6 +179,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.inventario,
       icon: Icons.inventory_2_outlined,
       selectedIcon: Icons.inventory_2_rounded,
       label: 'Inventario',
@@ -176,6 +189,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.perfiles,
       icon: Icons.admin_panel_settings_outlined,
       selectedIcon: Icons.admin_panel_settings_rounded,
       label: 'Perfiles',
@@ -185,6 +199,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.caja,
       icon: Icons.point_of_sale_outlined,
       selectedIcon: Icons.point_of_sale_rounded,
       label: 'Caja',
@@ -194,27 +209,34 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.equipos,
       icon: Icons.build_outlined,
       selectedIcon: Icons.build_rounded,
       label: 'Equipos',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<EquipoCubit>(),
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => sl<EquipoCubit>()),
+          BlocProvider(create: (_) => sl<SuplidorCubit>()),
+        ],
         child: const EquipoListPage(),
       ),
     ),
     ShellDestination(
+      id: ShellDestinationId.medicinas,
       icon: Icons.medication_outlined,
       selectedIcon: Icons.medication_rounded,
       label: 'Medicinas',
       builder: (_) => MedicinaListPage(repository: sl<IMedicinaRepository>()),
     ),
     ShellDestination(
+      id: ShellDestinationId.tratamientos,
       icon: Icons.medical_services_outlined,
       selectedIcon: Icons.medical_services_rounded,
       label: 'Tratamientos',
       builder: (_) => const TratamientosScreen(),
     ),
     ShellDestination(
+      id: ShellDestinationId.configuracion,
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings_rounded,
       label: 'Configuración',
@@ -222,59 +244,135 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     ),
   ];
 
-  List<ShellDestination> _visibleDestinations = [];
+  late final List<ShellSection> _allSections = [
+    ShellSection(
+      title: 'Atención',
+      destinations: _destinationsFor(const [
+        ShellDestinationId.inicio,
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.consultas,
+        ShellDestinationId.pacientes,
+      ]),
+    ),
+    ShellSection(
+      title: 'Facturación',
+      destinations: _destinationsFor(const [
+        ShellDestinationId.cuentasPorCobrar,
+        ShellDestinationId.caja,
+      ]),
+    ),
+    ShellSection(
+      title: 'Catálogos',
+      destinations: _destinationsFor(const [
+        ShellDestinationId.tratamientos,
+        ShellDestinationId.medicinas,
+        ShellDestinationId.inventario,
+      ]),
+    ),
+    ShellSection(
+      title: 'Administración',
+      destinations: _destinationsFor(const [
+        ShellDestinationId.perfiles,
+        ShellDestinationId.equipos,
+      ]),
+    ),
+  ];
+
+  List<ShellDestination> _destinationsFor(List<ShellDestinationId> ids) => [
+    for (final id in ids)
+      _allDestinations.firstWhere((destination) => destination.id == id),
+  ];
+
+  ShellDestination get _configuracion => _allDestinations.firstWhere(
+    (destination) => destination.id == ShellDestinationId.configuracion,
+  );
+
+  List<ShellDestination> _visibleDestinations = const [];
+  List<ShellSection> _visibleSections = const [];
+  ShellDestination? _visibleConfiguracion;
+
+  List<RolUsuario>? _rolesResueltos;
+  List<ShellDestination> _destinosPara(List<RolUsuario> roles) {
+    if (_rolesResueltos != null && listEquals(_rolesResueltos, roles)) {
+      return _visibleDestinations;
+    }
+    _rolesResueltos = List<RolUsuario>.unmodifiable(roles);
+
+    final validSections = <ShellSection>[];
+    for (final section in _allSections) {
+      final validDestinations = section.destinations
+          .where((d) => ShellDestinationAccess.allows(d.id, roles))
+          .toList();
+
+      if (validDestinations.isNotEmpty) {
+        validSections.add(
+          ShellSection(title: section.title, destinations: validDestinations),
+        );
+      }
+    }
+
+    _visibleSections = List<ShellSection>.unmodifiable(validSections);
+
+    _visibleConfiguracion =
+        ShellDestinationAccess.allows(_configuracion.id, roles)
+        ? _configuracion
+        : null;
+
+    _visibleDestinations = List<ShellDestination>.unmodifiable([
+      for (final section in _visibleSections) ...section.destinations,
+      ...[_visibleConfiguracion].whereType<ShellDestination>(),
+    ]);
+
+    return _visibleDestinations;
+  }
 
   void _onDestinationSelected(int index) {
-    if (_selectedIndex == index) return;
-    setState(() => _selectedIndex = index);
-    if (_visibleDestinations[index].label == 'Consultas') {
+    final destinos = _visibleDestinations;
+    if (index < 0 || index >= destinos.length) return;
+
+    final id = destinos[index].id;
+    if (_selectedId == id) return;
+
+    setState(() => _selectedId = id);
+
+    if (id == ShellDestinationId.consultas) {
       _consultasListCubit.recargar();
     }
   }
 
-  void _navigateToLabel(String label) {
-    final index = _visibleDestinations.indexWhere((d) => d.label == label);
+  void _navigateTo(ShellDestinationId id) {
+    final index = _visibleDestinations.indexWhere((d) => d.id == id);
     if (index != -1) _onDestinationSelected(index);
   }
 
   @override
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
+    final destinos = _destinosPara(roles);
 
-    _visibleDestinations = _allDestinations
-        .where(
-          (destination) =>
-              ShellDestinationAccess.allows(destination.label, roles),
-        )
-        .toList();
-
-    if (_selectedIndex >= _visibleDestinations.length) {
-      _selectedIndex = 0;
-    }
+    var selectedIndex = destinos.indexWhere((d) => d.id == _selectedId);
+    if (selectedIndex == -1) selectedIndex = 0;
 
     final mediaQuery = MediaQuery.of(context);
     final layout = ShellLayoutResolution.of(mediaQuery);
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (_visibleDestinations.isEmpty) {
+    if (destinos.isEmpty) {
       return Scaffold(
         backgroundColor: colorScheme.surfaceContainerLowest,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    final selectedDestination = _visibleDestinations[_selectedIndex];
-    final content = KeyedSubtree(
-      key: ValueKey(selectedDestination.label),
-      child: Builder(builder: selectedDestination.builder),
+    final content = LazyDestinationStack(
+      destinations: destinos,
+      selectedIndex: selectedIndex,
     );
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: ShellAppBar(
-        sectionTitle: _visibleDestinations.isNotEmpty
-            ? _visibleDestinations[_selectedIndex].label
-            : '',
+        sectionTitle: destinos[selectedIndex].label,
         compact:
             layout.usesBottomNavigation || mediaQuery.viewInsets.bottom > 0,
       ),
@@ -295,8 +393,9 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
                         children: [
                           _SideRail(
                             extended: layout.usesExtendedRail,
-                            destinations: _visibleDestinations,
-                            selectedIndex: _selectedIndex,
+                            sections: _visibleSections,
+                            configuration: _visibleConfiguracion,
+                            selectedIndex: selectedIndex,
                             onDestinationSelected: _onDestinationSelected,
                           ),
                           const SizedBox(width: 10),
@@ -315,8 +414,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       ),
       bottomNavigationBar: layout.usesBottomNavigation
           ? ShellMobileNavigation(
-              destinations: _visibleDestinations,
-              selectedIndex: _selectedIndex,
+              destinations: destinos,
+              primaryDestinations: _visibleSections.isEmpty
+                  ? const []
+                  : _visibleSections.first.destinations,
+              selectedIndex: selectedIndex,
               onDestinationSelected: _onDestinationSelected,
             )
           : null,
@@ -328,21 +430,28 @@ class ShellMobileNavigation extends StatelessWidget {
   const ShellMobileNavigation({
     super.key,
     required this.destinations,
+    required this.primaryDestinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
   });
 
-  static const _primaryLimit = 3;
   final List<ShellDestination> destinations;
+  final List<ShellDestination> primaryDestinations;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final primary = destinations.take(_primaryLimit).toList();
-    final secondary = destinations.skip(_primaryLimit).toList();
-    final selectedIsSecondary = selectedIndex >= primary.length;
+    final primary = primaryDestinations;
+    final secondary = destinations
+        .where(
+          (destination) =>
+              !primary.map((item) => item.id).contains(destination.id),
+        )
+        .toList();
+    final selectedId = destinations[selectedIndex].id;
+    final selectedIsSecondary = secondary.any((item) => item.id == selectedId);
     final hasMore = secondary.isNotEmpty;
 
     return SafeArea(
@@ -367,14 +476,19 @@ class ShellMobileNavigation extends StatelessWidget {
                   child: _MobileRailItem(
                     destination: primary[index],
                     label: _shortLabel(primary[index].label),
-                    selected: selectedIndex == index,
-                    onTap: () => onDestinationSelected(index),
+                    selected: selectedId == primary[index].id,
+                    onTap: () => onDestinationSelected(
+                      destinations.indexWhere(
+                        (item) => item.id == primary[index].id,
+                      ),
+                    ),
                   ),
                 ),
               if (hasMore)
                 Expanded(
                   child: _MobileRailItem(
                     destination: const ShellDestination(
+                      id: ShellDestinationId.configuracion,
                       icon: Icons.more_horiz_rounded,
                       selectedIcon: Icons.more_horiz_rounded,
                       label: 'Más',
@@ -382,11 +496,7 @@ class ShellMobileNavigation extends StatelessWidget {
                     ),
                     label: 'Más',
                     selected: selectedIsSecondary,
-                    onTap: () => _showMoreDestinations(
-                      context,
-                      primary.length,
-                      secondary,
-                    ),
+                    onTap: () => _showMoreDestinations(context, secondary),
                   ),
                 ),
             ],
@@ -400,7 +510,6 @@ class ShellMobileNavigation extends StatelessWidget {
 
   void _showMoreDestinations(
     BuildContext context,
-    int offset,
     List<ShellDestination> secondary,
   ) {
     showModalBottomSheet<void>(
@@ -452,10 +561,15 @@ class ShellMobileNavigation extends StatelessWidget {
                 for (var index = 0; index < secondary.length; index++)
                   _MoreRailItem(
                     destination: secondary[index],
-                    selected: selectedIndex == index + offset,
+                    selected:
+                        destinations[selectedIndex].id == secondary[index].id,
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onDestinationSelected(index + offset);
+                      onDestinationSelected(
+                        destinations.indexWhere(
+                          (item) => item.id == secondary[index].id,
+                        ),
+                      );
                     },
                   ),
               ],
@@ -600,13 +714,15 @@ class _MoreRailItem extends StatelessWidget {
 class _SideRail extends StatelessWidget {
   const _SideRail({
     required this.extended,
-    required this.destinations,
+    required this.sections,
+    required this.configuration,
     required this.selectedIndex,
     required this.onDestinationSelected,
   });
 
   final bool extended;
-  final List<ShellDestination> destinations;
+  final List<ShellSection> sections;
+  final ShellDestination? configuration;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
 
@@ -636,21 +752,91 @@ class _SideRail extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Column(
                 children: [
-                  for (int i = 0; i < destinations.length; i++)
-                    _RailItem(
-                      destination: destinations[i],
-                      selected: selectedIndex == i,
-                      extended: extended,
-                      onTap: () => onDestinationSelected(i),
-                    ),
+                  for (
+                    var sectionIndex = 0;
+                    sectionIndex < sections.length;
+                    sectionIndex++
+                  ) ...[
+                    if (sectionIndex > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: ac.railDivider,
+                        ),
+                      ),
+                    if (extended)
+                      _RailSectionTitle(title: sections[sectionIndex].title),
+                    for (final destination
+                        in sections[sectionIndex].destinations)
+                      _RailItem(
+                        destination: destination,
+                        selected: _selected(destination),
+                        extended: extended,
+                        onTap: () =>
+                            onDestinationSelected(_indexOf(destination)),
+                      ),
+                  ],
                 ],
               ),
             ),
           ),
+          if (configuration case final destination?) ...[
+            Divider(height: 1, thickness: 0.5, color: ac.railDivider),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+              child: _RailItem(
+                destination: destination,
+                selected: _selected(destination),
+                extended: extended,
+                onTap: () => onDestinationSelected(_indexOf(destination)),
+              ),
+            ),
+          ],
           Divider(height: 1, thickness: 0.5, color: ac.railDivider),
           const SizedBox(height: 8),
           RailUserCard(extended: extended),
         ],
+      ),
+    );
+  }
+
+  bool _selected(ShellDestination destination) =>
+      _indexOf(destination) == selectedIndex;
+
+  int _indexOf(ShellDestination destination) {
+    var index = 0;
+    for (final section in sections) {
+      for (final item in section.destinations) {
+        if (item.id == destination.id) return index;
+        index++;
+      }
+    }
+    return configuration?.id == destination.id ? index : -1;
+  }
+}
+
+class _RailSectionTitle extends StatelessWidget {
+  const _RailSectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: ac.railText.withValues(alpha: 0.75),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
       ),
     );
   }

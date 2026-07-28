@@ -54,7 +54,10 @@ class PlanTratamientoRemoteDatasourceImpl
   Future<void> updatePlan(String id, Map<String, dynamic> data) async {
     await supabaseClient
         .from('planes_tratamiento')
-        .update({...data, 'updated_at': DateTime.now().toUtc().toIso8601String()})
+        .update({
+          ...data,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('id', id);
   }
 
@@ -81,7 +84,10 @@ class PlanTratamientoRemoteDatasourceImpl
   ) async {
     final fila = await supabaseClient
         .from('items_plan_tratamiento')
-        .update({...data, 'updated_at': DateTime.now().toUtc().toIso8601String()})
+        .update({
+          ...data,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('id', id)
         .select('*, tratamiento:tratamientos(id, nombre, costo, alcance)')
         .single();
@@ -131,6 +137,7 @@ class PlanTratamientoRemoteDatasourceImpl
         .from('items_plan_tratamiento')
         .select(
           '*, tratamiento:tratamientos(id, nombre, costo, alcance), '
+          'diente:dientes(id, fdi_code), '
           'plan:planes_tratamiento!inner(id, paciente_id, deleted_at)',
         )
         .eq('plan.paciente_id', pacienteId)

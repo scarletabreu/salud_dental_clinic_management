@@ -9,6 +9,7 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
     required super.tratamientoId,
     super.diagnosticoAplicadoId,
     super.dienteId,
+    super.fdiDiente,
     super.superficie,
     super.estado,
     super.precioEstimado,
@@ -22,6 +23,8 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
     super.fechaInicio,
     super.fechaCompletado,
     super.nombreTratamiento,
+    super.anuladoEn,
+    super.consultaOrigenId,
   });
 
   factory ItemPlanTratamientoModel.fromEntity(ItemPlanTratamiento item) {
@@ -31,6 +34,7 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       tratamientoId: item.tratamientoId,
       diagnosticoAplicadoId: item.diagnosticoAplicadoId,
       dienteId: item.dienteId,
+      fdiDiente: item.fdiDiente,
       superficie: item.superficie,
       estado: item.estado,
       precioEstimado: item.precioEstimado,
@@ -44,6 +48,8 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       fechaInicio: item.fechaInicio,
       fechaCompletado: item.fechaCompletado,
       nombreTratamiento: item.nombreTratamiento,
+      anuladoEn: item.anuladoEn,
+      consultaOrigenId: item.consultaOrigenId,
     );
   }
 
@@ -55,6 +61,9 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       tratamientoId: json['tratamiento_id'] as String? ?? '',
       diagnosticoAplicadoId: json['diagnostico_aplicado_id'] as String?,
       dienteId: json['diente_id'] as String?,
+      fdiDiente: json['diente'] is Map
+          ? ((json['diente'] as Map)['fdi_code'] as num?)?.toInt()
+          : null,
       superficie: _parseSuperficie(json['superficie']),
       estado: EstadoItemPlan.fromDb(json['estado'] as String?),
       precioEstimado: (json['precio_estimado'] as num?)?.toDouble() ?? 0,
@@ -70,6 +79,10 @@ class ItemPlanTratamientoModel extends ItemPlanTratamiento {
       fechaCompletado: _parseFecha(json['fecha_completado']),
       nombreTratamiento: tratamiento is Map
           ? tratamiento['nombre'] as String?
+          : null,
+      anuladoEn: _parseFecha(json['deleted_at']),
+      consultaOrigenId: json['plan'] is Map
+          ? (json['plan'] as Map)['consulta_origen_id'] as String?
           : null,
     );
   }

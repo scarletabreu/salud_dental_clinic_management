@@ -118,7 +118,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
           if (MediaQuery.sizeOf(context).width < 360) {
             return FloatingActionButton(
               heroTag: 'fab_nueva_cita_unique_tag',
-              backgroundColor: context.appColors.primaryBlue,
+              backgroundColor: context.appColors.primaryGreen,
               foregroundColor: Colors.white,
               elevation: 2,
               tooltip: 'Nueva Cita',
@@ -128,7 +128,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
           }
           return FloatingActionButton.extended(
             heroTag: 'fab_nueva_cita_unique_tag',
-            backgroundColor: context.appColors.primaryBlue,
+            backgroundColor: context.appColors.primaryGreen,
             foregroundColor: Colors.white,
             elevation: 2,
             onPressed: abrirNuevaCita,
@@ -147,7 +147,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
     if (state is CitaCubitLoading) {
       return Center(
         child: CircularProgressIndicator(
-          color: context.appColors.primaryBlue,
+          color: context.appColors.primaryGreen,
           strokeWidth: 2,
         ),
       );
@@ -171,7 +171,83 @@ class _CalendarioView extends StatelessWidget {
         children: [
           _ControlBar(state: state),
           const SizedBox(height: 12),
+          // Sin citas en toda la agenda: se dice explícitamente, porque el
+          // «Sin citas este día» del panel se lee igual estando la base vacía
+          // que estando llena, y antes un fallo de carga se veía como agenda
+          // llena de citas inventadas.
+          if (state.citas.isEmpty) ...[
+            const _AgendaVaciaAviso(),
+            const SizedBox(height: 12),
+          ],
           Expanded(child: _CalendarioBody(state: state)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgendaVaciaAviso extends StatelessWidget {
+  const _AgendaVaciaAviso();
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: ac.divider.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_busy_outlined, size: 20, color: ac.textDisabled),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aún no hay citas registradas',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: ac.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'La agenda está vacía. Crea la primera con «Nueva Cita».',
+                      style: TextStyle(fontSize: 12, color: ac.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          TextButton.icon(
+            onPressed: context.read<CitaCubit>().load,
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Actualizar'),
+            style: TextButton.styleFrom(
+              foregroundColor: ac.primaryGreen,
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -273,7 +349,7 @@ class _ControlBar extends StatelessWidget {
                     _SummaryChip(
                       icon: Icons.calendar_today_rounded,
                       label: '${citasHoy.length} citas',
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     if (urgentes > 0)
                       _SummaryChip(
@@ -359,10 +435,10 @@ class _TodayButton extends StatelessWidget {
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: ac.primaryBlue.withValues(alpha: 0.08),
+          color: ac.primaryGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: ac.primaryBlue.withValues(alpha: 0.2),
+            color: ac.primaryGreen.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -372,7 +448,7 @@ class _TodayButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
         ),
       ),
@@ -571,7 +647,7 @@ class _DowCell extends StatelessWidget {
     final textColor = isWeekend
         ? ac.red
         : isToday
-        ? ac.primaryBlue
+        ? ac.primaryGreen
         : ac.textPrimary;
 
     return Container(
@@ -580,7 +656,9 @@ class _DowCell extends StatelessWidget {
         color: ac.cardBg,
         border: Border(
           bottom: BorderSide(
-            color: isToday ? ac.primaryBlue.withValues(alpha: 0.3) : ac.divider,
+            color: isToday
+                ? ac.primaryGreen.withValues(alpha: 0.3)
+                : ac.divider,
             width: isToday ? 2 : 1,
           ),
         ),
@@ -603,7 +681,7 @@ class _DowCell extends StatelessWidget {
               width: 16,
               height: 2,
               decoration: BoxDecoration(
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -636,12 +714,12 @@ class _DayCell extends StatelessWidget {
     final FontWeight dayWeight;
 
     if (isSelected) {
-      cellBg = ac.primaryBlue;
+      cellBg = ac.primaryGreen;
       dayColor = Colors.white;
       dayWeight = FontWeight.w700;
     } else if (isToday) {
-      cellBg = ac.primaryBlue.withValues(alpha: 0.12);
-      dayColor = ac.primaryBlue;
+      cellBg = ac.primaryGreen.withValues(alpha: 0.12);
+      dayColor = ac.primaryGreen;
       dayWeight = FontWeight.w700;
     } else {
       cellBg = Colors.transparent;
@@ -769,18 +847,24 @@ class _DetailPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    // Envuelve en vez de desbordar: «Miércoles» y la fecha
+                    // completa no caben en una línea del panel estrecho, y
+                    // recortar cualquiera de las dos deja la cabecera sin
+                    // decir de qué día se está viendo la agenda.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           dayLabel,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isToday ? ac.primaryBlue : ac.textPrimary,
+                            color: isToday ? ac.primaryGreen : ac.textPrimary,
                             letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         if (isToday)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -788,7 +872,7 @@ class _DetailPanel extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: ac.primaryBlue.withValues(alpha: 0.1),
+                              color: ac.primaryGreen.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -796,7 +880,7 @@ class _DetailPanel extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                             ),
                           )
@@ -1219,33 +1303,43 @@ class _CitaCard extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: Padding(
         padding: const EdgeInsets.only(top: 10),
-        child: FilledButton.icon(
-          onPressed: () async {
-            final cubit = context.read<CitaCubit>();
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => EfectuarConsultaPage(
-                  citaId: cita.id!,
-                  pacienteId: pacienteId,
-                  doctorId: doctorId,
-                ),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          children: [
+            Tooltip(
+              message:
+                  'Diagnostica, planifica y registra tratamientos sin salir.',
+              child: FilledButton.icon(
+                onPressed: () => _abrirAtencion(context, pacienteId, doctorId),
+                style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
+                icon: const Icon(Icons.medical_services_outlined, size: 16),
+                label: const Text('Iniciar consulta'),
               ),
-            );
-            cubit.load();
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: ac.primaryBlue,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            textStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
             ),
-          ),
-          icon: const Icon(Icons.medical_services_outlined, size: 16),
-          label: const Text('Efectuar Consulta'),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _abrirAtencion(
+    BuildContext context,
+    String pacienteId,
+    String doctorId,
+  ) async {
+    final cubit = context.read<CitaCubit>();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EfectuarConsultaPage(
+          citaId: cita.id!,
+          pacienteId: pacienteId,
+          doctorId: doctorId,
+        ),
+      ),
+    );
+    cubit.load();
   }
 }
 
@@ -1405,7 +1499,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: ac.primaryBlue,
+                backgroundColor: ac.primaryGreen,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),

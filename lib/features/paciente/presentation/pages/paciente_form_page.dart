@@ -1,11 +1,13 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
@@ -121,6 +123,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   DateTime? _fechaNacimiento;
   Genero _genero = Genero.masculino;
   TipoPaciente _tipoPaciente = TipoPaciente.integrado;
+  XFile? _fotoFile;
+  Uint8List? _fotoBytesWeb;
+  bool _fotoEliminada = false;
 
   List<Condicion> _condicionesIniciales = [];
   List<Condicion> _condicionesSeleccionadas = [];
@@ -207,6 +212,141 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     super.dispose();
   }
 
+  Future<void> _mostrarOpcionesFoto() async {
+    final picker = ImagePicker();
+    final ac = context.appColors;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ac.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ac.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Fotografía del paciente',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ac.primaryGreen.withValues(alpha: 0.12),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: ac.primaryGreen,
+                    ),
+                  ),
+                  title: Text(
+                    'Tomar fotografía',
+                    style: TextStyle(color: ac.textPrimary),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.camera,
+                        imageQuality: 85,
+                        maxWidth: 1000,
+                      );
+                      if (picked != null) _procesarFotoSeleccionada(picked);
+                    } catch (e) {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 85,
+                        maxWidth: 1000,
+                      );
+                      if (picked != null) _procesarFotoSeleccionada(picked);
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ac.teal.withValues(alpha: 0.12),
+                    child: Icon(Icons.photo_library_rounded, color: ac.teal),
+                  ),
+                  title: Text(
+                    'Elegir de la galería',
+                    style: TextStyle(color: ac.textPrimary),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 85,
+                      maxWidth: 1000,
+                    );
+                    if (picked != null) _procesarFotoSeleccionada(picked);
+                  },
+                ),
+                if (_fotoFile != null ||
+                    (widget.paciente.fotoRuta != null && !_fotoEliminada))
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: ac.red.withValues(alpha: 0.12),
+                      child: Icon(Icons.delete_outline_rounded, color: ac.red),
+                    ),
+                    title: Text('Quitar foto', style: TextStyle(color: ac.red)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _fotoFile = null;
+                        _fotoBytesWeb = null;
+                        _fotoEliminada = true;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static const int _maxFotoBytes = 10 * 1024 * 1024;
+
+  Future<void> _procesarFotoSeleccionada(XFile picked) async {
+    final bytes = await picked.readAsBytes();
+
+    if (bytes.length > _maxFotoBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.amber,
+          content: const Text(
+            'La imagen seleccionada es muy pesada. Debe pesar menos de 10 MB.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _fotoFile = picked;
+      _fotoBytesWeb = bytes;
+      _fotoEliminada = false;
+    });
+  }
+
   void _addContacto() {
     setState(() {
       for (final c in _contactos) {
@@ -248,7 +388,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     });
   }
 
-  void _save() {
+  void _save() async {
     if (!_formKey.currentState!.validate() || _fechaNacimiento == null) {
       if (_fechaNacimiento == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,13 +409,36 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       return;
     }
 
+    final bytesFoto =
+        _fotoBytesWeb ??
+        (_fotoFile != null ? await _fotoFile!.readAsBytes() : null);
+
+    final pacienteId = widget.paciente.id;
+
+    String? fotoRutaFinal = widget.paciente.fotoRuta;
+    String? fotoMimeTypeFinal = widget.paciente.fotoMimeType;
+    int? fotoTamanoBytesFinal = widget.paciente.fotoTamanoBytes;
+    DateTime? fotoActualizadaEnFinal = widget.paciente.fotoActualizadaEn;
+
+    if (_fotoEliminada) {
+      fotoRutaFinal = null;
+      fotoMimeTypeFinal = null;
+      fotoTamanoBytesFinal = null;
+      fotoActualizadaEnFinal = null;
+    } else if (_fotoFile != null && bytesFoto != null) {
+      fotoRutaFinal = '${pacienteId ?? 'nuevo'}/perfil.jpg';
+      fotoMimeTypeFinal = 'image/jpeg';
+      fotoTamanoBytesFinal = bytesFoto.length;
+      fotoActualizadaEnFinal = DateTime.now();
+    }
+
     final recordActualizado = widget.paciente.record.copyWith(
       historialFamiliar: _historialFamiliarController.text.trim(),
       cantHijos: int.tryParse(_cantHijosController.text.trim()) ?? 0,
     );
 
     final paciente = Paciente(
-      id: widget.paciente.id,
+      id: pacienteId,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
@@ -294,9 +457,16 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       altura: double.tryParse(_alturaController.text.trim()),
       record: recordActualizado,
       citas: widget.paciente.citas,
+      fotoRuta: fotoRutaFinal,
+      fotoMimeType: fotoMimeTypeFinal,
+      fotoTamanoBytes: fotoTamanoBytesFinal,
+      fotoActualizadaEn: fotoActualizadaEnFinal,
     );
 
-    context.read<PacienteCubit>().updatePaciente(paciente);
+    context.read<PacienteCubit>().updatePaciente(
+      paciente,
+      fotoBytes: bytesFoto,
+    );
   }
 
   Future<void> _guardarDiffCondiciones() async {
@@ -435,9 +605,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ac.amber.withOpacity(0.08),
+        color: ac.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ac.amber.withOpacity(0.25)),
+        border: Border.all(color: ac.amber.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -491,6 +661,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       _isCompletarRegistro
                           ? 'Completar ficha clínica'
                           : 'Editar paciente',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -514,7 +686,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -535,12 +707,67 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
       icon: Icons.person_outline_rounded,
       title: 'Datos personales',
       child: Column(
         children: [
+          Center(
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTap: _mostrarOpcionesFoto,
+                  child: Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: ac.bgPage,
+                      border: Border.all(
+                        color: ac.primaryGreen.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                      image: _buildAvatarDecorationImage(),
+                    ),
+                    child:
+                        (_fotoFile == null &&
+                            (_fotoEliminada ||
+                                widget.paciente.fotoRuta == null ||
+                                widget.paciente.fotoRuta!.isEmpty))
+                        ? Icon(
+                            Icons.person_rounded,
+                            size: 50,
+                            color: ac.textMuted,
+                          )
+                        : null,
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _mostrarOpcionesFoto,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: ac.primaryGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: ac.cardBg, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
           AppFormRow(
             children: [
               _FormField(
@@ -583,8 +810,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               decoration: _inputDeco(ac, hint: '000-0000000-0'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Cédula obligatoria';
-                if (v.replaceAll('-', '').length != 11)
+                if (v.replaceAll('-', '').length != 11) {
                   return 'Debe tener 11 dígitos';
+                }
                 return null;
               },
             ),
@@ -640,7 +868,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               options: Genero.values,
               selected: _genero,
               labelOf: (g) => g.label,
-              activeColor: ac.primaryBlue,
+              activeColor: ac.primaryGreen,
               onSelected: (g) => setState(() => _genero = g),
             ),
           ),
@@ -649,19 +877,43 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
+  DecorationImage? _buildAvatarDecorationImage() {
+    if (_fotoBytesWeb != null) {
+      return DecorationImage(
+        image: MemoryImage(_fotoBytesWeb!),
+        fit: BoxFit.cover,
+      );
+    }
+    if (_fotoFile != null && !kIsWeb) {
+      return DecorationImage(
+        image: FileImage(File(_fotoFile!.path)),
+        fit: BoxFit.cover,
+      );
+    }
+    if (!_fotoEliminada &&
+        widget.paciente.fotoRuta != null &&
+        widget.paciente.fotoRuta!.isNotEmpty) {
+      return DecorationImage(
+        image: NetworkImage(widget.paciente.fotoRuta!),
+        fit: BoxFit.cover,
+      );
+    }
+    return null;
+  }
+
   Widget _buildContactosCard(AppColors ac) {
     return _FormCard(
       ac: ac,
       iconColor: ac.teal,
-      iconBg: ac.teal.withOpacity(0.10),
+      iconBg: ac.teal.withValues(alpha: 0.10),
       icon: Icons.phone_outlined,
       title: 'Contactos',
       action: TextButton.icon(
         onPressed: _addContacto,
-        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
         label: Text(
           'Agregar',
-          style: TextStyle(fontSize: 12, color: ac.primaryBlue),
+          style: TextStyle(fontSize: 12, color: ac.primaryGreen),
         ),
       ),
       child: Column(
@@ -701,14 +953,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   Icon(
                     isFirst ? Icons.phone : Icons.contact_emergency,
                     size: 16,
-                    color: isFirst ? ac.primaryBlue : ac.red,
+                    color: isFirst ? ac.primaryGreen : ac.red,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isFirst
                           ? 'Contacto principal *'
-                          : 'Contacto de emergencia #${index}',
+                          : 'Contacto de emergencia #$index',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -868,7 +1120,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.indigo,
-      iconBg: ac.indigo.withOpacity(0.10),
+      iconBg: ac.indigo.withValues(alpha: 0.10),
       icon: Icons.family_restroom_outlined,
       title: 'Antecedentes y contexto familiar',
       child: Column(
@@ -909,7 +1161,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.red,
-      iconBg: ac.red.withOpacity(0.10),
+      iconBg: ac.red.withValues(alpha: 0.10),
       icon: Icons.health_and_safety_outlined,
       title: 'Condiciones médicas generales',
       child: _cargandoCondiciones
@@ -930,7 +1182,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   label: Text(c.nombre),
                   selected: isActive,
                   onSelected: (v) => _toggleCondicion(c, v),
-                  selectedColor: ac.red.withOpacity(0.12),
+                  selectedColor: ac.red.withValues(alpha: 0.12),
                   checkmarkColor: ac.red,
                   backgroundColor: ac.bgPage,
                   labelStyle: TextStyle(
@@ -960,7 +1212,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     alignLabelWithHint: alignLabelWithHint,
   );
@@ -1052,7 +1304,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Expanded(
               child: Text(
@@ -1104,10 +1356,12 @@ class _ChipSelector<T> extends StatelessWidget {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.10) : ac.bgPage,
+              color: isActive ? activeColor.withValues(alpha: 0.10) : ac.bgPage,
               borderRadius: BorderRadius.circular(100),
               border: Border.all(
-                color: isActive ? activeColor.withOpacity(0.50) : ac.divider,
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.50)
+                    : ac.divider,
                 width: isActive ? 1.0 : 0.5,
               ),
             ),

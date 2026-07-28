@@ -150,7 +150,7 @@ class SeccionPlanTratamiento extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ),
@@ -203,7 +203,7 @@ class SeccionPlanTratamiento extends StatelessWidget {
               _Subtitulo(
                 texto: 'Actividades del plan',
                 conteo: items.length,
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
               ),
               const SizedBox(height: 8),
               for (final item in items)
@@ -308,7 +308,7 @@ class _FilaHallazgo extends StatelessWidget {
             icon: const Icon(Icons.arrow_forward_rounded, size: 14),
             label: const Text('Llevar al plan'),
             style: TextButton.styleFrom(
-              foregroundColor: ac.primaryBlue,
+              foregroundColor: ac.primaryGreen,
               textStyle: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -406,8 +406,7 @@ class _FilaActividad extends StatelessWidget {
               ),
               padding: EdgeInsets.zero,
               splashRadius: 16,
-              onSelected: (destino) =>
-                  _cambiar(context, destino),
+              onSelected: (destino) => _cambiar(context, destino),
               itemBuilder: (_) => [
                 for (final destino in siguientes)
                   PopupMenuItem(
@@ -530,7 +529,7 @@ class _ResumenPlan extends StatelessWidget {
                 child: _Total(
                   etiqueta: 'Aceptado',
                   monto: plan.totalAceptado,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ],
@@ -565,10 +564,7 @@ class _Total extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          etiqueta,
-          style: TextStyle(fontSize: 10, color: ac.textMuted),
-        ),
+        Text(etiqueta, style: TextStyle(fontSize: 10, color: ac.textMuted)),
         const SizedBox(height: 2),
         Text(
           formatMoneda(monto),
@@ -588,11 +584,7 @@ class _Aviso extends StatelessWidget {
   final String texto;
   final Color color;
 
-  const _Aviso({
-    required this.icono,
-    required this.texto,
-    required this.color,
-  });
+  const _Aviso({required this.icono, required this.texto, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -607,11 +599,7 @@ class _Aviso extends StatelessWidget {
           Expanded(
             child: Text(
               texto,
-              style: TextStyle(
-                fontSize: 12,
-                color: ac.textMuted,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 12, color: ac.textMuted, height: 1.4),
             ),
           ),
         ],
@@ -694,7 +682,7 @@ class _DialogoRegistrarEjecucionState
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.pop(

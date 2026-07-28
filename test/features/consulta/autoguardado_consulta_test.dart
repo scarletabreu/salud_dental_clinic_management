@@ -13,6 +13,8 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
+import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 
 class _Vacio {
   dynamic noSuchMethod(Invocation invocation) =>
@@ -23,12 +25,15 @@ class _StorageDoble extends _Vacio implements SupabaseStorageHelper {}
 
 class _CitaRepoDoble extends _Vacio implements CitaRepository {}
 
+class _ConsumibleRepoDoble extends _Vacio implements ConsumibleRepository {}
+
 class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
   _ConsultaRepoDoble({required this.consulta});
 
   final Consulta consulta;
 
   int guardados = 0;
+  int cierresFinancieros = 0;
   Odontograma? ultimoOdontograma;
   ResultadoGuardadoOdontograma idsADevolver =
       const ResultadoGuardadoOdontograma();
@@ -52,6 +57,15 @@ class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
     if (falla) throw Exception('sin red');
     return idsADevolver;
   }
+
+  @override
+  Future<String> finalizarConsulta({
+    required String consultaId,
+    String? nota,
+  }) async {
+    cierresFinancieros++;
+    return 'cuenta-1';
+  }
 }
 
 Consulta _consultaEnCurso({bool finalizada = false}) => Consulta(
@@ -72,6 +86,7 @@ ConsultaCubit _cubitCon(_ConsultaRepoDoble repo) => ConsultaCubit(
   _StorageDoble(),
   _CitaRepoDoble(),
   repo,
+  DescontarStockPorConsumo(_ConsumibleRepoDoble()),
 );
 
 final _resina = Tratamiento(
@@ -85,6 +100,95 @@ final _resina = Tratamiento(
 
 void main() {
   group('autoguardado de la consulta', () {
+    test(
+      'una ejecución agregada durante la consulta no exige justificación',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+        final aplicado = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single
+            .tratamientos
+            .single;
+        expect(aplicado.itemPlanId, isNull);
+        expect(aplicado.justificacionNoPlanificada, isNull);
+      },
+    );
+
+    test(
+      'una ejecución planificada conserva el vínculo con su actividad',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+
+        cubit.aplicarTratamiento(
+          diente,
+          TipoSuperficie.oclusal,
+          _resina,
+          itemPlanId: 'item-plan-1',
+        );
+
+        final aplicado = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single
+            .tratamientos
+            .single;
+        expect(aplicado.itemPlanId, 'item-plan-1');
+        expect(aplicado.justificacionNoPlanificada, isNull);
+      },
+    );
+
+    test('terminar sin tratamientos cierra sin generar cuenta', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+
+      await cubit.terminarAtencion();
+
+      expect(repo.cierresFinancieros, 0);
+      expect(cubit.state, const ConsultaTerminada());
+    });
+
+    test('terminar con tratamientos realiza el cierre financiero', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+      await cubit.terminarAtencion();
+
+      expect(repo.cierresFinancieros, 1);
+      expect(cubit.state, const ConsultaTerminada(cuentaId: 'cuenta-1'));
+    });
+
     test('un cambio queda pendiente y se guarda solo', () async {
       final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
       final cubit = _cubitCon(repo);
@@ -96,7 +200,12 @@ void main() {
           .odontograma!
           .dientes
           .single;
-      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+      cubit.aplicarTratamiento(
+        diente,
+        TipoSuperficie.oclusal,
+        _resina,
+        justificacionNoPlanificada: 'Urgencia clínica',
+      );
 
       // Sin tocar nada más: el trabajo aún no está a salvo y se avisa.
       expect(
@@ -130,7 +239,12 @@ void main() {
           .odontograma!
           .dientes
           .single;
-      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+      cubit.aplicarTratamiento(
+        diente,
+        TipoSuperficie.oclusal,
+        _resina,
+        justificacionNoPlanificada: 'Urgencia clínica',
+      );
       await cubit.guardarParcial();
 
       final tratamiento = (cubit.state as ConsultaIniciada)
@@ -159,7 +273,12 @@ void main() {
             .odontograma!
             .dientes
             .single;
-        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+        cubit.aplicarTratamiento(
+          diente,
+          TipoSuperficie.oclusal,
+          _resina,
+          justificacionNoPlanificada: 'Urgencia clínica',
+        );
         await cubit.guardarParcial();
 
         final estado = cubit.state as ConsultaIniciada;
@@ -168,6 +287,15 @@ void main() {
         expect(
           estado.consulta.odontograma!.dientes.single.tratamientos,
           hasLength(1),
+        );
+
+        await Future<void>.delayed(
+          ConsultaCubit.esperaAutoguardado + const Duration(milliseconds: 200),
+        );
+        expect(
+          repo.guardados,
+          1,
+          reason: 'un fallo permanente no debe generar reintentos infinitos',
         );
       },
     );

@@ -8,6 +8,9 @@ import 'package:salud_dental_clinic_management/features/equipo/presentation/cubi
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_state.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/crear_editar_equipo_page.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/widgets/equipo_card.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/widgets/registrar_mantenimiento_dialog.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_state.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class EquipoListPage extends StatefulWidget {
@@ -118,6 +121,34 @@ class _EquipoListPageState extends State<EquipoListPage> {
     );
   }
 
+  Future<void> _registrarMantenimiento(Equipo equipo) async {
+    final suplidorCubit = context.read<SuplidorCubit>();
+    if (suplidorCubit.state is! SuplidorLoaded) await suplidorCubit.cargar();
+    if (!mounted) return;
+    final state = suplidorCubit.state;
+    if (state is! SuplidorLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron cargar los suplidores.')),
+      );
+      return;
+    }
+    final registrado = await showDialog<bool>(
+      context: context,
+      builder: (_) => BlocProvider.value(
+        value: context.read<EquipoCubit>(),
+        child: RegistrarMantenimientoDialog(
+          equipo: equipo,
+          suplidores: state.suplidores,
+        ),
+      ),
+    );
+    if (registrado == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mantenimiento registrado.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -127,7 +158,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
       backgroundColor: colorScheme.surfaceContainerLowest,
       floatingActionButton: FloatingActionButton(
         onPressed: _navegarACrear,
-        backgroundColor: ac.primaryBlue,
+        backgroundColor: ac.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -159,8 +190,6 @@ class _EquipoListPageState extends State<EquipoListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Crear equipo se ofrece desde el botón flotante; un segundo "+" en
-          // la cabecera solo lo duplicaba.
           Text(
             'Equipos',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -205,7 +234,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
                     )
                   : null,
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -304,8 +333,8 @@ class _EquipoListPageState extends State<EquipoListPage> {
           // Indicador sutil de operación en curso (guardando/eliminando)
           if (state is EquipoOperating)
             LinearProgressIndicator(
-              backgroundColor: ac.primaryBlue.withValues(alpha: 0.1),
-              color: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen.withValues(alpha: 0.1),
+              color: ac.primaryGreen,
               minHeight: 2,
             ),
           Expanded(
@@ -321,6 +350,9 @@ class _EquipoListPageState extends State<EquipoListPage> {
                   onEliminar: equipo.id != null
                       ? () => _confirmarEliminacion(equipo)
                       : () {},
+                  onRegistrarMantenimiento: equipo.id != null
+                      ? () => _registrarMantenimiento(equipo)
+                      : null,
                 );
               },
             ),
@@ -361,7 +393,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

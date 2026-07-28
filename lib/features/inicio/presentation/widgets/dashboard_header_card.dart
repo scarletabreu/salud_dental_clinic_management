@@ -64,14 +64,24 @@ class DashboardHeaderCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: ac.teal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.local_hospital_rounded,
-                  color: ac.teal,
-                  size: 22,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.local_hospital_rounded,
+                        color: ac.teal,
+                        size: 22,
+                      );
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -113,7 +123,6 @@ class DashboardHeaderCard extends StatelessWidget {
           Divider(height: 1, color: ac.divider),
           const SizedBox(height: 16),
 
-          // Los indicadores y el enlace comparten fila mientras quepan.
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -145,14 +154,14 @@ class DashboardHeaderCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: ac.primaryBlue,
+                          color: ac.primaryGreen,
                         ),
                       ),
                       const SizedBox(width: 3),
                       Icon(
                         Icons.arrow_forward_rounded,
                         size: 14,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ],
                   ),

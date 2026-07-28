@@ -70,16 +70,13 @@ void main() {
   test('no destination is reachable before the roles arrive', () {
     // The shell renders once with an empty role list right after login, so it
     // must cope with an empty destination list instead of indexing into it.
-    for (final label in const [
-      'Inicio',
-      'Pacientes',
-      'Caja',
-      'Configuración',
+    for (final id in const [
+      ShellDestinationId.inicio,
+      ShellDestinationId.pacientes,
+      ShellDestinationId.caja,
+      ShellDestinationId.configuracion,
     ]) {
-      expect(
-        ShellDestinationAccess.allows(label, const <RolUsuario>[]),
-        isFalse,
-      );
+      expect(ShellDestinationAccess.allows(id, const <RolUsuario>[]), isFalse);
     }
   });
 }

@@ -21,7 +21,11 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
+    # SD-132: los logs de producción se eliminaron y no deben volver.
+    # Todo diagnóstico pasa por `AppLog` (lib/core/util/app_log.dart), que se
+    # compila fuera del binario release. `avoid_print` corta el reingreso por
+    # la puerta de atrás; `debugPrint` directo se revisa en code review.
+    avoid_print: true
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
 # Additional information about this file can be found at

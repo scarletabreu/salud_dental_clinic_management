@@ -86,7 +86,7 @@ class _SuplidoresTabViewState extends State<SuplidoresTabView> {
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Nuevo suplidor'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -110,7 +110,7 @@ class _SuplidoresTabViewState extends State<SuplidoresTabView> {
                 size: 20,
               ),
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -198,8 +198,8 @@ class _SuplidoresTabViewState extends State<SuplidoresTabView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  backgroundColor: ac.primaryBlue.withValues(alpha: 0.1),
-                  child: Icon(Icons.store_rounded, color: ac.primaryBlue),
+                  backgroundColor: ac.primaryGreen.withValues(alpha: 0.1),
+                  child: Icon(Icons.store_rounded, color: ac.primaryGreen),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -267,7 +267,7 @@ class _TipoSuplidorBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (tipo) {
-      TipoSuplidor.consumible => ('Consumibles', ac.primaryBlue),
+      TipoSuplidor.consumible => ('Consumibles', ac.primaryGreen),
       TipoSuplidor.servicio => ('Servicios', ac.teal),
       TipoSuplidor.mixto => ('Mixto', ac.purple),
     };
@@ -324,12 +324,12 @@ Future<void> _mostrarDialogoFormulario(
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.12),
+                            color: ac.primaryGreen.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.store_rounded,
-                            color: ac.primaryBlue,
+                            color: ac.primaryGreen,
                             size: 24,
                           ),
                         ),
@@ -445,7 +445,7 @@ Future<void> _mostrarDialogoFormulario(
                           icon: const Icon(Icons.check_rounded, size: 18),
                           label: const Text('Guardar'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: ac.primaryBlue,
+                            backgroundColor: ac.primaryGreen,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 12,

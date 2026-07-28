@@ -14,6 +14,10 @@ doc/api/
 # dotenv environment variables file
 .env*
 
+# Configuración local de --dart-define-from-file. Cada quien apunta al proyecto
+# de Supabase que le toca; la plantilla versionada es dart_define.example.json.
+dart_define.json
+
 # Avoid committing generated Javascript files:
 *.dart.js
 # Produced by the --dump-info flag.

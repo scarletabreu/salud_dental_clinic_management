@@ -459,6 +459,7 @@ Future<void> init() async {
       medicinaRepository: sl(),
       consumibleRepository: sl(),
       cajaDiariaRepository: sl(),
+      equipoRepository: sl(),
     ),
   );
   sl.registerFactory<PersonalPerfilesCubit>(
@@ -529,6 +530,7 @@ Future<void> init() async {
       getInventario: sl(),
       registrarOActualizar: sl(),
       eliminar: sl(),
+      mantenimientoRepository: sl(),
     ),
   );
 

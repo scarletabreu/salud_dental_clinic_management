@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/documento_clinico/domain
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 
 class Consulta {
   final String? id;
@@ -19,6 +20,7 @@ class Consulta {
   final String? notas;
   final SignosVitales? signosVitales;
   final bool finalizada;
+  final TipoAtencionClinica tipoAtencion;
 
   final bool tienePreFactura;
 
@@ -37,6 +39,7 @@ class Consulta {
     this.notas,
     this.signosVitales,
     this.finalizada = false,
+    this.tipoAtencion = TipoAtencionClinica.consulta,
     this.tienePreFactura = false,
   });
 
@@ -64,6 +67,7 @@ class Consulta {
     String? notas,
     SignosVitales? signosVitales,
     bool? finalizada,
+    TipoAtencionClinica? tipoAtencion,
     bool? tienePreFactura,
   }) {
     return Consulta(
@@ -82,6 +86,7 @@ class Consulta {
       notas: notas ?? this.notas,
       signosVitales: signosVitales ?? this.signosVitales,
       finalizada: finalizada ?? this.finalizada,
+      tipoAtencion: tipoAtencion ?? this.tipoAtencion,
       tienePreFactura: tienePreFactura ?? this.tienePreFactura,
     );
   }

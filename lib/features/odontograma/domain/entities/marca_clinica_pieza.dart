@@ -114,6 +114,16 @@ class MarcaClinicaPieza {
   /// ofreció— pero no pinta la cara: nadie va a tratarla por ella.
   final bool vigente;
 
+  /// Lo que costó, cuando la marca lleva dinero: el precio congelado de una
+  /// ejecución o el estimado de una actividad del plan. `null` en un hallazgo,
+  /// que no cobra nada. Cuál de los dos es lo dice [procedencia], y por eso no
+  /// se guardan en campos distintos: es el mismo hueco de la ficha.
+  final double? precio;
+
+  /// La fila fue anulada (`deleted_at`). No desaparece del expediente: se sigue
+  /// contando, tachada, porque anular es un hecho clínico y no un olvido.
+  final bool anulada;
+
   const MarcaClinicaPieza({
     this.id,
     required this.fdi,
@@ -129,6 +139,8 @@ class MarcaClinicaPieza {
     this.notas,
     this.indiceOrigen,
     this.vigente = true,
+    this.precio,
+    this.anulada = false,
   });
 
   bool get esPiezaCompleta => superficie == null;
@@ -164,7 +176,9 @@ class MarcaClinicaPieza {
       other.doctorId == doctorId &&
       other.notas == notas &&
       other.indiceOrigen == indiceOrigen &&
-      other.vigente == vigente;
+      other.vigente == vigente &&
+      other.precio == precio &&
+      other.anulada == anulada;
 
   @override
   int get hashCode => Object.hash(
@@ -182,6 +196,8 @@ class MarcaClinicaPieza {
     notas,
     indiceOrigen,
     vigente,
+    precio,
+    anulada,
   );
 }
 
@@ -204,7 +220,7 @@ List<MarcaClinicaPieza> marcasDePieza({
   if (diente != null) {
     for (var i = 0; i < diente.diagnosis.length; i++) {
       marcas.add(
-        _deDiagnostico(
+        marcaDeDiagnostico(
           fdi,
           diente.diagnosis[i],
           ProcedenciaMarca.evaluado,
@@ -214,7 +230,7 @@ List<MarcaClinicaPieza> marcasDePieza({
     }
     for (var i = 0; i < diente.tratamientos.length; i++) {
       marcas.add(
-        _deTratamiento(
+        marcaDeTratamiento(
           fdi,
           diente.tratamientos[i],
           ProcedenciaMarca.ejecutado,
@@ -224,11 +240,13 @@ List<MarcaClinicaPieza> marcasDePieza({
       );
     }
     for (final diagnostico in diente.diagnosticosHistoricos) {
-      marcas.add(_deDiagnostico(fdi, diagnostico, ProcedenciaMarca.historico));
+      marcas.add(
+        marcaDeDiagnostico(fdi, diagnostico, ProcedenciaMarca.historico),
+      );
     }
     for (final tratamiento in diente.tratamientosHistoricos) {
       marcas.add(
-        _deTratamiento(
+        marcaDeTratamiento(
           fdi,
           tratamiento,
           ProcedenciaMarca.historico,
@@ -265,25 +283,7 @@ List<MarcaClinicaPieza> marcasDePieza({
   }
 
   for (final item in itemsPlan) {
-    marcas.add(
-      MarcaClinicaPieza(
-        id: item.id,
-        fdi: fdi,
-        clave: null,
-        tipo: TipoMarcaClinica.procedimiento,
-        titulo:
-            item.nombreTratamiento ??
-            nombreTratamiento?.call(item.tratamientoId) ??
-            'Tratamiento',
-        superficie: item.superficie,
-        procedencia: ProcedenciaMarca.planificado,
-        estado: item.estado.etiqueta,
-        fecha: _fechaDelPlan(item),
-        doctorId: item.doctorProponeId,
-        notas: item.notas,
-        vigente: !_planSinVigencia.contains(item.estado),
-      ),
-    );
+    marcas.add(marcaDeItemPlan(fdi, item, nombreTratamiento));
   }
 
   marcas.sort((a, b) {
@@ -333,7 +333,8 @@ MarcaClinicaPieza? marcaDominante(Iterable<MarcaClinicaPieza> marcas) {
   return mejor;
 }
 
-MarcaClinicaPieza _deDiagnostico(
+/// La marca que describe [diagnostico] sobre la pieza [fdi].
+MarcaClinicaPieza marcaDeDiagnostico(
   int fdi,
   DiagnosticoAplicado diagnostico,
   ProcedenciaMarca procedencia, {
@@ -349,15 +350,20 @@ MarcaClinicaPieza _deDiagnostico(
     titulo: diagnostico.nombreDiagnostico ?? clave?.label ?? 'Hallazgo',
     superficie: diagnostico.superficie,
     procedencia: procedencia,
-    estado: diagnostico.severidad.etiqueta,
+    estado: diagnostico.estaAnulado
+        ? _etiquetaAnulado
+        : diagnostico.severidad.etiqueta,
     fecha: diagnostico.fechaAplicacion,
     consultaId: diagnostico.consultaId,
     doctorId: diagnostico.doctorId,
     notas: diagnostico.notas.isEmpty ? null : diagnostico.notas,
+    anulada: diagnostico.estaAnulado,
+    vigente: !diagnostico.estaAnulado,
   );
 }
 
-MarcaClinicaPieza _deTratamiento(
+/// La marca que describe la ejecución [tratamiento] sobre la pieza [fdi].
+MarcaClinicaPieza marcaDeTratamiento(
   int fdi,
   TratamientoAplicado tratamiento,
   ProcedenciaMarca procedencia,
@@ -378,13 +384,54 @@ MarcaClinicaPieza _deTratamiento(
         'Tratamiento',
     superficie: tratamiento.superficie,
     procedencia: procedencia,
-    estado: tratamiento.estaTerminado ? 'Terminado' : 'En proceso',
+    // Activo, finalizado o anulado: los tres estados que el expediente
+    // necesita distinguir sobre una ejecución.
+    estado: tratamiento.estaAnulado
+        ? _etiquetaAnulado
+        : (tratamiento.estaTerminado ? 'Terminado' : 'En proceso'),
     fecha: tratamiento.fechaEjecucion ?? tratamiento.fechaAplicacion,
     consultaId: tratamiento.consultaId,
     doctorId: tratamiento.doctorEjecutaId,
     notas: (tratamiento.notas?.isEmpty ?? true) ? null : tratamiento.notas,
+    precio: tratamiento.precioAplicado,
+    anulada: tratamiento.estaAnulado,
+    vigente: !tratamiento.estaAnulado,
   );
 }
+
+/// La marca que describe la actividad planificada [item] sobre la pieza [fdi].
+MarcaClinicaPieza marcaDeItemPlan(
+  int fdi,
+  ItemPlanTratamiento item,
+  String Function(String tratamientoId)? nombreTratamiento,
+) {
+  return MarcaClinicaPieza(
+    id: item.id,
+    fdi: fdi,
+    clave: null,
+    tipo: TipoMarcaClinica.procedimiento,
+    titulo:
+        item.nombreTratamiento ??
+        nombreTratamiento?.call(item.tratamientoId) ??
+        'Tratamiento',
+    superficie: item.superficie,
+    procedencia: ProcedenciaMarca.planificado,
+    estado: item.estaAnulado ? _etiquetaAnulado : item.estado.etiqueta,
+    fecha: _fechaDelPlan(item),
+    consultaId: item.consultaOrigenId,
+    doctorId: item.doctorProponeId,
+    notas: item.notas,
+    // El estimado del plan nunca es un cargo (SD-135); se muestra rotulado como
+    // tal para que no se confunda con lo que se cobró.
+    precio: item.precioEstimado > 0 ? item.precioEstimado : null,
+    anulada: item.estaAnulado,
+    vigente: !item.estaAnulado && !_planSinVigencia.contains(item.estado),
+  );
+}
+
+/// Lo que se lee en el chip de estado de una fila anulada. Una sola constante
+/// para que los tres ejes digan exactamente lo mismo.
+const _etiquetaAnulado = 'Anulado';
 
 MarcaClinicaPieza _deHallazgo(
   int fdi,

@@ -4,10 +4,13 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/linea_tiempo_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/paleta_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/texto_marca_clinica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/trazo_punteado.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
@@ -221,6 +224,12 @@ class PanelDetallePieza extends StatefulWidget {
   /// ejecutado porque planificar y hacer son actos distintos (SD-135).
   final List<ItemPlanTratamiento> itemsPlan;
 
+  /// La historia completa de la pieza, visita por visita (SD-144). Cuando está
+  /// disponible sustituye al grupo «Histórico» de la ficha: aquella lista dice
+  /// qué se anotó antes, esta dice además cuándo, en qué consulta, quién y
+  /// cuánto costó, y no pierde lo anulado.
+  final HistorialPieza? historial;
+
   final VoidCallback onClose;
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
@@ -246,6 +255,7 @@ class PanelDetallePieza extends StatefulWidget {
     required this.onClose,
     this.hallazgosHistoricos = const [],
     this.itemsPlan = const [],
+    this.historial,
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onToggleAusente,
@@ -416,11 +426,25 @@ class _PanelDetallePiezaState extends State<PanelDetallePieza> {
             editMode: widget.editMode,
             selectedSurface: _selectedSurface,
             nombreDoctor: widget.nombreDoctor,
+            // Con línea de tiempo, el antecedente se lee ahí abajo con su fecha
+            // y su consulta; repetirlo arriba sin ellas solo alarga la ficha.
+            omitirHistorico: widget.historial != null,
             onAddDiagnosis: widget.onAddDiagnosis,
             onAddTratamiento: widget.onAddTratamiento,
             onQuitarTratamiento: widget.onQuitarTratamiento,
             onToggleTerminado: widget.onToggleTerminado,
           ),
+
+          if (widget.historial case final historial?) ...[
+            const SizedBox(height: 14),
+            _SeccionHistorial(
+              historial: historial,
+              nombreDoctor: widget.nombreDoctor,
+              // En solo lectura el historial es a lo que se viene; editando, la
+              // ficha tiene que abrir con los botones a la vista.
+              inicialmenteAbierta: !widget.editMode,
+            ),
+          ],
 
           if (d != null) ...[
             const SizedBox(height: 14),
@@ -623,7 +647,14 @@ class _MapaSuperficies extends StatelessWidget {
       );
     }
 
-    return SizedBox(width: _size, height: _size, child: map);
+    // El mapa de caras convive con el formulario de la ficha. Sin frontera,
+    // escribir una nota obliga a redibujar el mapa en cada pulsación de tecla,
+    // y tocar una cara redibuja el formulario entero.
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: RepaintBoundary(child: map),
+    );
   }
 }
 
@@ -776,6 +807,11 @@ class _MarcasPieza extends StatelessWidget {
   final bool editMode;
   final TipoSuperficie? selectedSurface;
   final String Function(String doctorId)? nombreDoctor;
+
+  /// Deja fuera el grupo de antecedentes porque la línea de tiempo de la pieza
+  /// los cuenta mejor: con fecha, consulta, doctor y sin perder lo anulado.
+  final bool omitirHistorico;
+
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
   final void Function(Diente, TipoSuperficie?)? onAddTratamiento;
   final void Function(Diente, int index)? onQuitarTratamiento;
@@ -787,6 +823,7 @@ class _MarcasPieza extends StatelessWidget {
     required this.editMode,
     required this.selectedSurface,
     this.nombreDoctor,
+    this.omitirHistorico = false,
     this.onAddDiagnosis,
     this.onAddTratamiento,
     this.onQuitarTratamiento,
@@ -807,8 +844,13 @@ class _MarcasPieza extends StatelessWidget {
     final ac = context.appColors;
     final d = diente;
     final puedeEditar = editMode && d != null;
+    final visibles = omitirHistorico
+        ? marcas
+              .where((m) => m.procedencia != ProcedenciaMarca.historico)
+              .toList()
+        : marcas;
 
-    if (marcas.isEmpty && !puedeEditar) {
+    if (visibles.isEmpty && !puedeEditar) {
       return Text(
         'Sin datos registrados',
         style: TextStyle(fontSize: 12, color: ac.textDisabled),
@@ -821,7 +863,7 @@ class _MarcasPieza extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final procedencia in _orden)
-          if (marcas.where((m) => m.procedencia == procedencia).toList()
+          if (visibles.where((m) => m.procedencia == procedencia).toList()
               case final grupo when grupo.isNotEmpty) ...[
             _EncabezadoProcedencia(
               procedencia: procedencia,
@@ -884,6 +926,105 @@ class _MarcasPieza extends StatelessWidget {
       diente != null &&
       marca.procedencia == ProcedenciaMarca.ejecutado &&
       marca.indiceOrigen != null;
+}
+
+/// El historial de la pieza dentro de la ficha, plegable.
+///
+/// Se pliega porque una boca muy tratada acumula decenas de eventos y la ficha
+/// se abre pegada a la pieza: desplegada siempre, taparía el diagrama entero.
+class _SeccionHistorial extends StatefulWidget {
+  final HistorialPieza historial;
+  final String Function(String doctorId)? nombreDoctor;
+  final bool inicialmenteAbierta;
+
+  const _SeccionHistorial({
+    required this.historial,
+    required this.inicialmenteAbierta,
+    this.nombreDoctor,
+  });
+
+  @override
+  State<_SeccionHistorial> createState() => _SeccionHistorialState();
+}
+
+class _SeccionHistorialState extends State<_SeccionHistorial> {
+  late bool _abierta = widget.inicialmenteAbierta;
+
+  /// «4 eventos · 2 visitas», que es lo que decide si vale la pena abrirlo.
+  String get _resumen {
+    final eventos = widget.historial.totalEventos;
+    final visitas = widget.historial.visitas.length;
+    return '$eventos evento${eventos == 1 ? '' : 's'} · '
+        '$visitas visita${visitas == 1 ? '' : 's'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    if (widget.historial.estaVacio) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, color: ac.divider),
+        const SizedBox(height: 10),
+        Semantics(
+          button: true,
+          expanded: _abierta,
+          label: 'Historial de la pieza. $_resumen',
+          excludeSemantics: true,
+          child: GestureDetector(
+            onTap: () => setState(() => _abierta = !_abierta),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Icon(
+                  _abierta
+                      ? Icons.keyboard_arrow_down_rounded
+                      : Icons.keyboard_arrow_right_rounded,
+                  size: 18,
+                  color: ac.textMuted,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  'HISTORIAL DE LA PIEZA',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: ac.textMuted,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _resumen,
+                    style: TextStyle(fontSize: 10, color: ac.textDisabled),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_abierta) ...[
+          const SizedBox(height: 10),
+          // Alto acotado: el historial se recorre dentro de la ficha en vez de
+          // empujar los botones fuera de la pantalla en una boca muy tratada.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260),
+            child: SingleChildScrollView(
+              key: const ValueKey('historial_pieza'),
+              child: LineaTiempoPieza(
+                historial: widget.historial,
+                nombreDoctor: widget.nombreDoctor,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _EncabezadoProcedencia extends StatelessWidget {
@@ -1054,13 +1195,6 @@ class _FilaMarca extends StatelessWidget {
   }
 }
 
-/// Los antecedentes y lo que ya no se hará se leen más apagados: siguen ahí,
-/// pero no describen el estado de hoy.
-Color procedenciaAtenuada(MarcaClinicaPieza marca, AppColors ac) =>
-    !marca.vigente || marca.procedencia == ProcedenciaMarca.historico
-    ? ac.textMuted
-    : ac.textSecondary;
-
 class _ChipEstado extends StatelessWidget {
   final String texto;
   final Color color;
@@ -1116,37 +1250,3 @@ class _BotonAnadir extends StatelessWidget {
   );
 }
 
-/// «Resina compuesta · Oclusal», o solo el nombre si la marca es de la pieza
-/// entera. La cara es dato clínico: sin ella, dos resinas en el mismo diente se
-/// leen como una repetición.
-String conSuperficie(String nombre, TipoSuperficie? superficie) =>
-    superficie == null ? nombre : '$nombre · ${superficie.name}';
-
-/// Los ocho primeros caracteres de un uuid: lo justo para reconocer la consulta
-/// sin llenar la ficha de identificadores.
-String referenciaCorta(String id) => id.length > 8 ? id.substring(0, 8) : id;
-
-String fechaCortaDeMarca(DateTime fecha) =>
-    '${fecha.day}/${fecha.month}/${fecha.year}';
-
-/// La fila entera dicha en voz alta, para quien no ve el color ni el trazo.
-String descripcionAccesible(
-  MarcaClinicaPieza marca, {
-  String Function(String doctorId)? nombreDoctor,
-}) {
-  final cara = marca.superficie == null
-      ? 'pieza completa'
-      : 'cara ${marca.superficie!.name.toLowerCase()}';
-  final partes = <String>[
-    '${marca.titulo}, $cara',
-    marca.procedencia.etiqueta.toLowerCase(),
-    marca.estado.toLowerCase(),
-    if (marca.fecha case final fecha?) fechaCortaDeMarca(fecha),
-    if (marca.doctorId case final doctorId?)
-      if (nombreDoctor?.call(doctorId) case final nombre?
-          when nombre.trim().isNotEmpty)
-        nombre,
-    ?marca.notas,
-  ];
-  return partes.join('. ');
-}

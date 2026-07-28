@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/fdi_odontodiagrama.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/glifo_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/leyenda_odontograma.dart';
@@ -13,50 +14,26 @@ import 'package:salud_dental_clinic_management/features/odontograma/presentation
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
-// La leyenda es la misma para las dos vistas y para la hoja impresa; se
-// reexporta para no obligar a cambiar los imports que ya la usaban desde aquí.
 export 'leyenda_odontograma.dart' show leyendaClinicaPredeterminada;
 
-/// Reproducción del ODONTODIAGRAMA del formulario en papel de la clínica.
-///
-/// Dibuja las dos denticiones a la vez —permanente por fuera, temporal hacia la
-/// línea media— con los cuatro cuadrantes rotulados, la tabla de tejidos
-/// blandos y las claves. Solo recibe [EvaluacionOdontologica] y emite la
-/// evaluación resultante: no conoce cubits, repositorios ni Supabase, de modo
-/// que la misma vista sirve para evaluar, consultar el expediente e imprimir.
 class OdontodiagramaWidget extends StatefulWidget {
   final EvaluacionOdontologica evaluacion;
 
-  /// Lo anotado en consultas anteriores, dibujado en tinta tenue debajo de
-  /// [evaluacion]. Es la misma capa histórica del odontograma de tratamientos:
-  /// el doctor ve de un vistazo qué traía el paciente y qué añade hoy.
   final EvaluacionOdontologica historico;
 
-  /// Permite anotar. Requiere [onChanged].
   final bool editable;
 
-  /// Suprime los controles y fija la tinta sobre papel para captura o PDF.
   final bool modoImpresion;
 
-  /// Claves disponibles, en el orden en que se muestran.
   final List<EntradaLeyendaOdontograma>? leyenda;
 
   final ValueChanged<EvaluacionOdontologica>? onChanged;
 
-  /// Las piezas normalizadas de la consulta, indexadas por su código FDI.
-  ///
-  /// El dibujo se sigue proyectando desde [evaluacion]; esto es lo que el
-  /// panel de detalle necesita para listar diagnósticos y tratamientos reales,
-  /// con sus precios e identificadores. Sin ellas el diagrama funciona igual y
-  /// no abre panel: es lo que hacen la impresión y el expediente.
   final Map<int, Diente> dientes;
 
-  /// Actividades del plan de tratamiento que caen sobre cada pieza. Es lo que
-  /// permite que la ficha distinga lo planificado de lo ya ejecutado.
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
+  final HistorialPiezas? historialPiezas;
 
-  /// Anota una observación clínica sobre la pieza. `null` deja el campo en solo
-  /// lectura, que es como lo ve el expediente.
   final void Function(Diente, String)? onNotasPiezaChanged;
 
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
@@ -66,6 +43,8 @@ class OdontodiagramaWidget extends StatefulWidget {
   final void Function(Diente, int index, bool terminado)?
   onToggleTratamientoTerminado;
   final String Function(String tratamientoId)? nombreTratamiento;
+
+  final String Function(String doctorId)? nombreDoctor;
 
   const OdontodiagramaWidget({
     super.key,
@@ -77,6 +56,7 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.onChanged,
     this.dientes = const {},
     this.itemsPlan = const {},
+    this.historialPiezas,
     this.onNotasPiezaChanged,
     this.onAddDiagnosis,
     this.onAddTratamiento,
@@ -84,6 +64,7 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.onQuitarTratamiento,
     this.onToggleTratamientoTerminado,
     this.nombreTratamiento,
+    this.nombreDoctor,
   });
 
   @override
@@ -91,52 +72,31 @@ class OdontodiagramaWidget extends StatefulWidget {
 }
 
 class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
-  /// Lado mínimo de una pieza cuando se puede tocar. Por debajo de 44 px el
-  /// dedo no acierta la cara del diente, y esta pantalla se usa en tablet.
   static const double _celdaTactil = 44;
-
-  /// En solo lectura la pieza no es un objetivo, así que puede apretarse para
-  /// que el diagrama entero quepa sin desplazamiento.
   static const double _celdaLectura = 30;
 
   static const double _anchoMaximoDiagrama = 940;
   static const double _lineaMedia = 1.4;
-
-  /// Ancho del panel de detalle y su separación del papel, iguales a los de la
-  /// arcada para que el mismo panel se lea igual en las dos vistas.
   static const double _anchoPanel = 360;
   static const double _separacionPanel = 20;
   static const double _paddingPapel = 12;
 
-  /// Ancho por debajo del cual el papel dejaría de ser tocable con el dedo.
   static const double _anchoMinimoPapel =
       _celdaTactil * kColumnasPorHemicampo * 2 +
       _lineaMedia +
       _paddingPapel * 2;
 
-  /// Pieza cuyo panel de detalle está abierto, si hay alguno.
   int? _fdiSeleccionado;
   final Map<TejidoBlando, TextEditingController> _tejidoControllers = {};
 
   List<EntradaLeyendaOdontograma> get _leyenda =>
       widget.leyenda ?? leyendaClinicaPredeterminada;
 
-  /// El diagrama responde al toque: cada pieza abre su panel de detalle.
-  ///
-  /// Depende de [OdontodiagramaWidget.dientes] y no de `onChanged` porque lo
-  /// que se anota hoy son diagnósticos y tratamientos sobre piezas reales; el
-  /// JSON de la evaluación ya solo guarda tejidos blandos.
   bool get _editando =>
       widget.editable && !widget.modoImpresion && widget.dientes.isNotEmpty;
-
-  /// Tocar una pieza abre su ficha también en solo lectura: ahí es donde ahora
-  /// viven los antecedentes, así que el expediente tiene que poder abrirla. Sin
-  /// piezas ni historial no hay ficha que abrir, y la hoja de impresión nunca
-  /// responde al toque.
   bool get _tocable =>
       !widget.modoImpresion && (widget.dientes.isNotEmpty || _hayHistorico);
 
-  /// Los tejidos blandos siguen siendo texto libre sobre la evaluación.
   bool get _anotandoTejidos =>
       widget.editable && !widget.modoImpresion && widget.onChanged != null;
 
@@ -145,7 +105,8 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
 
   bool get _hayHistorico =>
       !widget.historico.estaVacia ||
-      widget.dientes.values.any((d) => d.tratamientosHistoricos.isNotEmpty);
+      widget.dientes.values.any((d) => d.tratamientosHistoricos.isNotEmpty) ||
+      !(widget.historialPiezas?.estaVacio ?? true);
 
   @override
   void initState() {
@@ -160,8 +121,6 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   @override
   void didUpdateWidget(covariant OdontodiagramaWidget old) {
     super.didUpdateWidget(old);
-    // El texto entrante solo pisa al controlador cuando cambió fuera del campo;
-    // así el cursor no salta mientras el doctor escribe.
     for (final tejido in TejidoBlando.values) {
       final entrante = widget.evaluacion.tejidosBlandos[tejido] ?? '';
       final controller = _tejidoControllers[tejido]!;
@@ -180,23 +139,11 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   void _emitir(EvaluacionOdontologica evaluacion) =>
       widget.onChanged?.call(evaluacion);
 
-  /// Tocar una pieza abre su panel, nunca escribe sola.
-  ///
-  /// Antes el toque estampaba la clave activa sobre la cara pulsada. Elegir
-  /// una cara de 44 px con el dedo y sin ver lo que la pieza ya tiene era la
-  /// parte incómoda; ahora la cara se elige en el mapa grande del panel, que
-  /// es el mismo que usa la arcada.
   void _tocarPieza(int fdi) {
     if (!_tocable) return;
     setState(() => _fdiSeleccionado = _fdiSeleccionado == fdi ? null : fdi);
   }
 
-  /// Lo que tiñe cada cara de la pieza [fdi] en el papel.
-  ///
-  /// Solo entra lo de esta consulta, que es lo que la hoja representa y lo que
-  /// promete su leyenda: los antecedentes se leen en la ficha —dejaron de
-  /// estamparse en tinta tenue porque llenaban de marcas una boca muy tratada—
-  /// y lo planificado todavía no está en la boca.
   Map<TipoSuperficie, MarcaClinicaPieza> _superficiesDe(int fdi) {
     final diente = widget.dientes[fdi];
     if (diente == null) return const {};
@@ -217,10 +164,6 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     return porCara;
   }
 
-  /// Solo se muestra en la capa tenue lo que no está ya anotado en firme, para
-  /// que una clave repetida no se dibuje dos veces sobre la misma pieza. La
-  /// resta es por superficie: lo que el histórico anota en otra cara sigue
-  /// viéndose.
   List<HallazgoDental> _historicoDe(int fdi) {
     if (!_hayHistorico) return const [];
     return hallazgosRestantes(
@@ -240,8 +183,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
         final paleta = _paleta;
 
         final fdi = _fdiSeleccionado;
-        // El panel se pone al lado solo si al papel le queda su ancho táctil
-        // íntegro; si no, cae debajo antes que estrujar el diagrama.
+
         final alLado =
             fdi != null &&
             disponible >= _anchoMinimoPapel + _anchoPanel + _separacionPanel;
@@ -312,10 +254,6 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     );
   }
 
-  /// El papel y el panel de la pieza tocada, uno al lado del otro.
-  ///
-  /// El panel se coloca del lado de su propia pieza —como en la arcada— para
-  /// que el doctor no cruce la vista de un extremo al otro del diagrama.
   Widget _papelConPanelAlLado(int fdi, Widget papel) {
     final panel = SizedBox(width: _anchoPanel, child: _panelPieza(fdi));
     const separacion = SizedBox(width: _separacionPanel);
@@ -333,6 +271,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     diente: widget.dientes[fdi],
     hallazgosHistoricos: _historicoDe(fdi),
     itemsPlan: widget.itemsPlan[fdi] ?? const [],
+    historial: widget.historialPiezas?[fdi],
     editMode: _editando,
     onClose: () => setState(() => _fdiSeleccionado = null),
     onNotasChanged: widget.onNotasPiezaChanged,
@@ -342,12 +281,11 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     onQuitarTratamiento: widget.onQuitarTratamiento,
     onToggleTerminado: widget.onToggleTratamientoTerminado,
     nombreTratamiento: widget.nombreTratamiento,
+    nombreDoctor: widget.nombreDoctor ?? widget.historialPiezas?.nombreDoctor,
   );
 
   Widget _panelPapel(double disponible, PaletaOdontodiagrama paleta) {
     const padding = _paddingPapel;
-    // El diagrama nunca se comprime por debajo del objetivo táctil: si no cabe,
-    // se desplaza en horizontal, como haría una hoja más ancha que el escritorio.
     final minimo =
         (_editando ? _celdaTactil : _celdaLectura) * kColumnasPorHemicampo * 2 +
         _lineaMedia;
@@ -507,8 +445,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     paleta: paleta,
     claves: _leyenda,
     compacto: compacto,
-    // El papel solo lleva la tinta de hoy; lo anterior y lo planificado se leen
-    // en la ficha de la pieza, así que la leyenda no promete lo que no dibuja.
+
     procedencias: const [ProcedenciaMarca.evaluado, ProcedenciaMarca.ejecutado],
     pie: _hayHistorico
         ? Row(
@@ -602,8 +539,6 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
                 fontSize: 13,
                 fontStyle: previo == null ? FontStyle.normal : FontStyle.italic,
               ),
-              // 12 px arriba y abajo dejan la fila en el objetivo táctil de
-              // 44 px sin que la tabla parezca un formulario suelto.
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
           )
@@ -655,10 +590,6 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
   }
 }
 
-/// El odontodiagrama sobre papel y sin controles, para el expediente, el
-/// histórico y la captura a PDF. Fija el papel blanco y las tintas impresas
-/// para que la hoja capturada salga igual por la impresora, sin importar el
-/// tema con el que se estuviera viendo la aplicación.
 class OdontodiagramaPapel extends StatelessWidget {
   final EvaluacionOdontologica evaluacion;
   final EvaluacionOdontologica historico;
@@ -683,27 +614,14 @@ class OdontodiagramaPapel extends StatelessWidget {
   );
 }
 
-/// Una pieza del diagrama: dibuja el glifo y abre su panel al tocarla.
 class _PiezaDental extends StatefulWidget {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
-
-  /// Lo que tiñe cada cara. Alimenta el dibujo y la descripción accesible: un
-  /// tratamiento por cara se ve en el papel y se dice en voz alta.
   final Map<TipoSuperficie, MarcaClinicaPieza> superficies;
-
-  /// Antecedentes de la pieza. No se dibujan —el papel solo lleva la tinta de
-  /// hoy—; alimentan la descripción accesible y el tooltip, y el detalle
-  /// completo vive en la ficha que abre el toque.
   final List<HallazgoDental> historicos;
   final double lado;
   final PaletaOdontodiagrama paleta;
-
-  /// Si el toque abre la ficha de la pieza. Falso solo en la hoja de impresión.
   final bool tocable;
-
-  /// La pieza cuyo panel está abierto se mantiene resaltada, para no perderla
-  /// de vista mientras se trabaja en el panel.
   final bool seleccionada;
   final VoidCallback onTap;
 
@@ -735,9 +653,6 @@ class _PiezaDentalState extends State<_PiezaDental> {
         return '${h.estado.label} ($caras)';
       })
       .join('; ');
-
-  /// Lo anotado por cara, en el orden fijo del enum para que la lectura no
-  /// cambie de una pieza a otra.
   String get _resumenSuperficies => [
     for (final cara in TipoSuperficie.values)
       if (widget.superficies[cara] case final marca?)
@@ -749,8 +664,6 @@ class _PiezaDentalState extends State<_PiezaDental> {
     final porCara = _resumenSuperficies;
     final partes = [
       if (porCara.isNotEmpty) porCara,
-      // Las claves de pieza completa no salen del mapa de caras: se dicen
-      // aparte para no perderlas de la descripción.
       if (widget.hallazgos.any((h) => h.esPiezaCompleta))
         _resumen(widget.hallazgos.where((h) => h.esPiezaCompleta)),
       if (widget.historicos.isNotEmpty) 'Antes: ${_resumen(widget.historicos)}',
@@ -761,14 +674,16 @@ class _PiezaDentalState extends State<_PiezaDental> {
 
   @override
   Widget build(BuildContext context) {
-    Widget pieza = CustomPaint(
-      size: Size.square(widget.lado),
-      painter: GlifoPiezaPainter(
-        glifo: widget.glifo,
-        hallazgos: widget.hallazgos,
-        superficies: widget.superficies,
-        paleta: widget.paleta,
-        resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
+    Widget pieza = RepaintBoundary(
+      child: CustomPaint(
+        size: Size.square(widget.lado),
+        painter: GlifoPiezaPainter(
+          glifo: widget.glifo,
+          hallazgos: widget.hallazgos,
+          superficies: widget.superficies,
+          paleta: widget.paleta,
+          resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
+        ),
       ),
     );
 

@@ -40,6 +40,7 @@ class _DatasourceDoble extends _Vacio implements ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchDiagnosticosHistoricosPaciente(
     String pacienteId, {
     String? excluyendoConsultaId,
+    bool incluyendoAnulados = false,
   }) async {
     pacienteRecibido = pacienteId;
     exclusionRecibida = excluyendoConsultaId;

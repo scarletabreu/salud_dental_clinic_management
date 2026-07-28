@@ -33,7 +33,7 @@ class ContraindicacionPicker extends StatelessWidget {
           children: [
             TextButton.icon(
               onPressed: () => _add(context),
-              icon: Icon(Icons.add, color: ac.primaryBlue),
+              icon: Icon(Icons.add, color: ac.primaryGreen),
               label: const Text('Agregar'),
             ),
           ],
@@ -42,10 +42,7 @@ class ContraindicacionPicker extends StatelessWidget {
         const SizedBox(height: 10),
 
         if (items.isEmpty)
-          Text(
-            'Sin contraindicaciones',
-            style: TextStyle(color: ac.textMuted),
-          )
+          Text('Sin contraindicaciones', style: TextStyle(color: ac.textMuted))
         else
           Column(
             children: items.map((c) {
@@ -72,7 +69,7 @@ class ContraindicacionPicker extends StatelessWidget {
                           ..remove(c);
                         onChanged(updated);
                       },
-                    )
+                    ),
                   ],
                 ),
               );

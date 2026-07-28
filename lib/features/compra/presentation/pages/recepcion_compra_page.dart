@@ -161,14 +161,14 @@ class _RecepcionCompraPageState extends State<RecepcionCompraPage> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: ac.primaryBlue.withValues(alpha: 0.1),
+                          color: ac.primaryGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           '+${item.cantidad} unids.',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: ac.primaryBlue,
+                            color: ac.primaryGreen,
                           ),
                         ),
                       ),

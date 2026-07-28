@@ -1,15 +1,21 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/data/models/item_plan_tratamiento_model.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
@@ -24,7 +30,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<List<Consulta>> getConsultas() {
     return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultas();
-      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+      return _parsearConsultas(data);
     }, context: 'obtener las consultas');
   }
 
@@ -32,8 +38,25 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<List<Consulta>> getConsultasByDoctor(String doctorId) {
     return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultasByDoctor(doctorId);
-      return data.map((json) => ConsultaModel.fromJson(json)).toList();
+      return _parsearConsultas(data);
     }, context: 'obtener las consultas');
+  }
+
+  /// Una fila que no se puede leer se registra y se omite, en vez de abortar
+  /// todo el listado. Un `.map()` directo convertía cualquier fila con una
+  /// forma inesperada en una pantalla de error sin detalle para el usuario y
+  /// sin rastro para nosotros: se perdían las 37 consultas legibles por culpa
+  /// de la 38.ª. El fallo sigue siendo visible en el log, no se silencia.
+  List<Consulta> _parsearConsultas(List<Map<String, dynamic>> filas) {
+    final consultas = <Consulta>[];
+    for (final fila in filas) {
+      try {
+        consultas.add(ConsultaModel.fromJson(fila));
+      } catch (e, stack) {
+        AppLog.error('parsear la consulta ${fila['id']}', e, stack);
+      }
+    }
+    return consultas;
   }
 
   bool _isValidUuid(String? id) =>
@@ -41,8 +64,6 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
 
   @override
   Future<String> crearConsultaCompleta(Consulta consulta) {
-    // Validación de dominio fuera del guard: el cubit detecta este mensaje
-    // ('paciente de prueba') como caso especial.
     if (!_isValidUuid(consulta.pacienteId)) {
       throw Exception(
         'No se puede crear una consulta para un paciente de prueba. '
@@ -81,6 +102,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         'p_temp_condiciones': consulta.tempCondiciones,
         'p_dientes': dientes,
         'p_documentos': documentos,
+        'p_tipo_atencion': consulta.tipoAtencion.name,
       };
 
       final id = await remoteDataSource.crearConsultaCompleta(params);
@@ -129,16 +151,11 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'es_continuo': t.esContinuo,
                   'esta_terminado': t.estaTerminado,
                   'superficie': t.superficie?.name.toLowerCase(),
-                  'aprecio_aplicado': t.precioAplicado,
-                  // La justificación clínica de una contraindicación viaja
-                  // aquí. Sin ella el expediente diría que el tratamiento se
-                  // aplicó a ciegas.
+                  'precio_aplicado': t.precioAplicado,
                   'notas': t.notas,
                   'estado': t.estado.dbValue,
-                  // Auditoría de la ejecución (SD-135). `item_plan_id` solo
-                  // viaja cuando la ejecución cumple una actividad ya decidida
-                  // del plan; la base rechaza vincularla a una propuesta.
                   'item_plan_id': t.itemPlanId,
+                  'justificacion_no_planificada': t.justificacionNoPlanificada,
                   'doctor_ejecuta_id': t.doctorEjecutaId,
                   'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
                       ?.toUtc()
@@ -154,7 +171,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                   'fecha_aplicacion': diagnostico.fechaAplicacion
                       .toUtc()
                       .toIso8601String(),
-                  'superficie': diagnostico.superficie?.name.toLowerCase(),
+                  'superficiecle': diagnostico.superficie?.name.toLowerCase(),
                   'origen': diagnostico.origen.name,
                   'notas': diagnostico.notas,
                 },
@@ -163,7 +180,14 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       };
 
       final recetasJson = [
-        for (final r in recetas) RecetaModel.fromEntity(r).toJson(),
+        for (final r in recetas)
+          {
+            ...RecetaModel.fromEntity(r).toCabeceraJson(),
+            'items_receta': [
+              for (final item in r.items)
+                ItemRecetaModel.fromEntity(item).toJson(recetaId: r.id ?? ''),
+            ],
+          },
       ];
 
       return remoteDataSource.guardarResultadoConsulta(
@@ -255,22 +279,140 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
+  Future<HistorialPiezas> getHistorialPiezas(String pacienteId) {
+    return runGuarded(() async {
+      final (filasDiagnosticos, filasTratamientos, filasConsultas) = await (
+        remoteDataSource.fetchDiagnosticosHistoricosPaciente(
+          pacienteId,
+          incluyendoAnulados: true,
+        ),
+        remoteDataSource.fetchTratamientosHistoricosPaciente(
+          pacienteId,
+          incluyendoAnulados: true,
+        ),
+        remoteDataSource.fetchReferenciasConsultasPaciente(pacienteId),
+      ).wait;
+
+      var filasItemsPlan = const <Map<String, dynamic>>[];
+      try {
+        filasItemsPlan = await remoteDataSource.fetchItemsPlanPorPaciente(
+          pacienteId,
+        );
+      } catch (e) {
+        AppLog.error('plan del historial de piezas', e);
+      }
+
+      final diagnosticos = <int, List<DiagnosticoAplicado>>{};
+      for (final fila in filasDiagnosticos) {
+        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+        if (fdi == null) continue;
+        diagnosticos
+            .putIfAbsent(fdi, () => [])
+            .add(DiagnosticoAplicadoModel.fromJson(fila));
+      }
+
+      final tratamientos = <int, List<TratamientoAplicado>>{};
+      for (final fila in filasTratamientos) {
+        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+        if (fdi == null) continue;
+        tratamientos
+            .putIfAbsent(fdi, () => [])
+            .add(TratamientoAplicadoModel.fromJson(fila));
+      }
+
+      final itemsPlan = <int, List<ItemPlanTratamiento>>{};
+      for (final fila in filasItemsPlan) {
+        final item = ItemPlanTratamientoModel.fromJson(fila);
+        final fdi = item.fdiDiente;
+        if (fdi == null) continue;
+        itemsPlan.putIfAbsent(fdi, () => []).add(item);
+      }
+
+      final consultas = {
+        for (final fila in filasConsultas)
+          if (fila['id'] case final String id)
+            id: ReferenciaConsulta(
+              id: id,
+              fecha:
+                  DateTime.tryParse(fila['fecha']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0),
+              motivo: fila['motivo_consulta'] as String?,
+              tipoAtencion: TipoAtencionClinica.fromDb(
+                fila['tipo_atencion'] as String?,
+              ),
+              doctorId: fila['doctor_id'] as String?,
+            ),
+      };
+
+      final historial = HistorialPiezas.consolidar(
+        diagnosticos: diagnosticos,
+        tratamientos: tratamientos,
+        itemsPlan: itemsPlan,
+        consultas: consultas,
+        nombrePorDoctorId: await _nombresDeDoctoresDe(
+          diagnosticos,
+          tratamientos,
+          itemsPlan,
+          consultas,
+        ),
+      );
+      return historial;
+    }, context: 'obtener el historial de las piezas');
+  }
+
+  Future<Map<String, String>> _nombresDeDoctoresDe(
+    Map<int, List<DiagnosticoAplicado>> diagnosticos,
+    Map<int, List<TratamientoAplicado>> tratamientos,
+    Map<int, List<ItemPlanTratamiento>> itemsPlan,
+    Map<String, ReferenciaConsulta> consultas,
+  ) async {
+    final ids = <String>{
+      for (final filas in diagnosticos.values)
+        for (final fila in filas) ?fila.doctorId,
+      for (final filas in tratamientos.values)
+        for (final fila in filas) ?fila.doctorEjecutaId,
+      for (final filas in itemsPlan.values)
+        for (final fila in filas) ?fila.doctorProponeId,
+      for (final consulta in consultas.values) ?consulta.doctorId,
+    };
+    if (ids.isEmpty) return const {};
+
+    try {
+      final filas = await remoteDataSource.fetchNombresDoctores(ids.toList());
+      return {
+        for (final fila in filas)
+          if (fila['id'] case final String id)
+            if (_nombreDeDoctor(fila) case final nombre when nombre.isNotEmpty)
+              id: nombre,
+      };
+    } catch (e) {
+      AppLog.error('nombres de doctores del historial', e);
+      return const {};
+    }
+  }
+
+  static String _nombreDeDoctor(Map<String, dynamic> fila) {
+    final usuario = fila['usuarios'];
+    final persona = usuario is Map ? usuario['personas'] : null;
+    if (persona is! Map) return '';
+    final nombre = (persona['nombre'] as String? ?? '').trim();
+    final apellido = (persona['apellido'] as String? ?? '').trim();
+    final completo = '$nombre $apellido'.trim();
+    return completo.isEmpty ? '' : 'Dr. $completo';
+  }
+
+  @override
   Future<EvaluacionOdontologica> getEvaluacionHistorica(
     String pacienteId, {
     String? excluyendoConsultaId,
   }) {
     return runGuarded(() async {
-      // Las piezas salen de `diagnosticos_aplicados`: desde SD-150 el jsonb de
-      // `odontogramas` solo guarda tejidos blandos. Los tratamientos previos no
-      // se dibujan en tenue, se leen en la ficha de la pieza.
       final diagnosticos = await remoteDataSource
           .fetchDiagnosticosHistoricosPaciente(
             pacienteId,
             excluyendoConsultaId: excluyendoConsultaId,
           );
 
-      // Las filas llegan de la consulta más reciente a la más antigua: sobre
-      // cada pieza manda la última que la anotó, con todo lo que dijo de ella.
       final consultaQueMandaPorFdi = <int, String?>{};
       final porFdi = <int, Map<EstadoClinicoDental, Set<TipoSuperficie>>>{};
 

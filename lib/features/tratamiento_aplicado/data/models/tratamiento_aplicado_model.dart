@@ -17,9 +17,11 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.nombreTratamiento,
     super.claveOdontograma,
     super.itemPlanId,
+    super.justificacionNoPlanificada,
     super.doctorEjecutaId,
     super.fechaEjecucion,
-    super.cantidadRealizada
+    super.cantidadRealizada,
+    super.anuladoEn,
   });
 
   factory TratamientoAplicadoModel.fromJson(Map<String, dynamic> json) {
@@ -47,9 +49,12 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
           catalogo['clave_odontograma'] as String? ??
           catalogo['claveOdontograma'] as String?,
       itemPlanId: json['item_plan_id'] as String?,
+      justificacionNoPlanificada:
+          json['justificacion_no_planificada'] as String?,
       doctorEjecutaId: json['doctor_ejecuta_id'] as String?,
       cantidadRealizada: _toDouble(json['cantidad_realizada']) ?? 1,
       fechaEjecucion: _parseFecha(json['fecha_ejecucion']),
+      anuladoEn: _parseFecha(json['deleted_at']),
     );
   }
 
@@ -86,6 +91,7 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'notas': notas,
       'estado': estado.dbValue,
       'item_plan_id': itemPlanId,
+      'justificacion_no_planificada': justificacionNoPlanificada,
       'doctor_ejecuta_id': doctorEjecutaId,
       'fecha_ejecucion': fechaEjecucion?.toIso8601String(),
       'cantidad_realizada': cantidadRealizada,

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/proyeccion_odontograma.dart';
@@ -259,6 +260,10 @@ class OdontogramWidget extends StatefulWidget {
   /// Actividades del plan que caen sobre cada pieza, indexadas por código FDI.
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
 
+  /// La historia de cada pieza del paciente (SD-144). Al abrir una, su ficha
+  /// muestra la línea de tiempo completa en vez de solo lo de este odontograma.
+  final HistorialPiezas? historialPiezas;
+
   /// Anota una observación clínica sobre la pieza abierta.
   final void Function(Diente, String)? onNotasPiezaChanged;
 
@@ -275,6 +280,7 @@ class OdontogramWidget extends StatefulWidget {
     this.nombreTratamiento,
     this.nombreDoctor,
     this.itemsPlan = const {},
+    this.historialPiezas,
     this.onNotasPiezaChanged,
   });
 
@@ -348,17 +354,23 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
             if (d != null) widget.onToothSelected?.call(d);
           }
         },
-        child: CustomPaint(
-          size: Size(w, h),
-          painter: _OdontogramPainter(
-            dientes: _dienteMap,
-            marcaPorFdi: _marcaPorFdi,
-            selectedFdi: _selectedFdi,
-            hoveredFdi: _hoveredFdi,
-            labelColor: labelColor,
-            paleta: PaletaArcada.de(context),
-            paletaClinica: PaletaOdontodiagrama.de(context),
-            denticion: _denticion,
+        // La arcada se repinta entera con cada hover y cada selección. La
+        // frontera evita que ese repintado —constante mientras se recorre la
+        // boca con el ratón— arrastre al panel de detalle, la leyenda y el
+        // resto de la pantalla de consulta, que no cambian.
+        child: RepaintBoundary(
+          child: CustomPaint(
+            size: Size(w, h),
+            painter: _OdontogramPainter(
+              dientes: _dienteMap,
+              marcaPorFdi: _marcaPorFdi,
+              selectedFdi: _selectedFdi,
+              hoveredFdi: _hoveredFdi,
+              labelColor: labelColor,
+              paleta: PaletaArcada.de(context),
+              paletaClinica: PaletaOdontodiagrama.de(context),
+              denticion: _denticion,
+            ),
           ),
         ),
       ),
@@ -370,6 +382,7 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
     fdi: _selectedFdi!,
     diente: _getDiente(_selectedFdi!),
     itemsPlan: widget.itemsPlan[_selectedFdi!] ?? const [],
+    historial: widget.historialPiezas?[_selectedFdi!],
     editMode: widget.editMode,
     onClose: () => setState(() => _selectedFdi = null),
     onNotasChanged: widget.onNotasPiezaChanged,
@@ -379,7 +392,7 @@ class _OdontogramWidgetState extends State<OdontogramWidget> {
     onQuitarTratamiento: widget.onQuitarTratamiento,
     onToggleTerminado: widget.onToggleTratamientoTerminado,
     nombreTratamiento: widget.nombreTratamiento,
-    nombreDoctor: widget.nombreDoctor,
+    nombreDoctor: widget.nombreDoctor ?? widget.historialPiezas?.nombreDoctor,
   );
 
   Widget _selectorDenticion() => Padding(

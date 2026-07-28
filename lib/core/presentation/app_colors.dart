@@ -11,7 +11,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.textSecondary,
     required this.textMuted,
     required this.textDisabled,
-    required this.primaryBlue,
+    required this.primaryGreen,
+    required this.gold,
     required this.teal,
     required this.tealLight,
     required this.amber,
@@ -39,7 +40,8 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color textSecondary;
   final Color textMuted;
   final Color textDisabled;
-  final Color primaryBlue;
+  final Color primaryGreen;
+  final Color gold;
   final Color teal;
   final Color tealLight;
   final Color amber;
@@ -51,8 +53,6 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color emergencyBg;
   final Color searchFill;
   final BoxShadow cardShadow;
-
-  // Sidebar (rail) — claro en tema light, navy oscuro en tema dark.
   final Color railBg;
   final Color railSelectedBg;
   final Color railText;
@@ -60,69 +60,71 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color railDivider;
 
   static const light = AppColors(
-    bgPage: Color(0xFFEEF2F8),
+    bgPage: Color(0xFFF8FAFC),
     cardBg: Color(0xFFFFFFFF),
-    divider: Color(0xFFE2E8F2),
-    rowDivider: Color(0xFFF4F7FB),
-    chipBg: Color(0xFFEEF2F8),
+    divider: Color(0xFFE2E8F0),
+    rowDivider: Color(0xFFF1F5F9),
+    chipBg: Color(0xFFF1F5F9),
     textPrimary: Color(0xFF0F172A),
     textSecondary: Color(0xFF334155),
     textMuted: Color(0xFF64748B),
     textDisabled: Color(0xFF94A3B8),
-    primaryBlue: Color(0xFF3385FF),
+    primaryGreen: Color(0xFFC5A059),
+    gold: Color(0xFFD4AF37),
     teal: Color(0xFF0D9488),
     tealLight: Color(0xFF14B8A6),
-    amber: Color(0xFFF59E0B),
+    amber: Color(0xFFD97706),
     green: Color(0xFF10B981),
     indigo: Color(0xFF6366F1),
     purple: Color(0xFF8B5CF6),
     red: Color(0xFFEF4444),
     orange: Color(0xFFF97316),
     emergencyBg: Color(0xFFFEE2E2),
-    searchFill: Color(0xFFEEF2F8),
+    searchFill: Color(0xFFF1F5F9),
     cardShadow: BoxShadow(
-      color: Color(0x0A1B3A5C),
+      color: Color(0x0AC5A059),
       blurRadius: 20,
       offset: Offset(0, 4),
     ),
     railBg: Color(0xFFFFFFFF),
-    railSelectedBg: Color(0xFF3385FF),
+    railSelectedBg: Color(0xFFC5A059),
     railText: Color(0xFF64748B),
     railTextSelected: Color(0xFFFFFFFF),
-    railDivider: Color(0xFFE2E8F2),
+    railDivider: Color(0xFFE2E8F0),
   );
 
   static const dark = AppColors(
-    bgPage: Color(0xFF0F1623),
-    cardBg: Color(0xFF161D2F),
-    divider: Color(0xFF1E2A40),
-    rowDivider: Color(0xFF141B2B),
-    chipBg: Color(0xFF1A2236),
-    textPrimary: Color(0xFFE2E8F0),
-    textSecondary: Color(0xFFB0BECC),
-    textMuted: Color(0xFF7A8FA6),
-    textDisabled: Color(0xFF4A5A6E),
-    primaryBlue: Color(0xFF5BA3FF),
+    bgPage: Color(0xFF0B0F17),
+    cardBg: Color(0xFF161B26),
+    divider: Color(0xFF232B3B),
+    rowDivider: Color(0xFF1C2230),
+    chipBg: Color(0xFF212836),
+    searchFill: Color(0xFF1C2230),
+    textPrimary: Color(0xFFF8FAFC),
+    textSecondary: Color(0xFFCBD5E1),
+    textMuted: Color(0xFF8A99AD),
+    textDisabled: Color(0xFF475569),
+    primaryGreen: Color(0xFFD4AF37),
+    gold: Color(0xFFE5C158),
     teal: Color(0xFF14B8A6),
     tealLight: Color(0xFF2DD4BF),
-    amber: Color(0xFFFBBF24),
-    green: Color(0xFF34D399),
+    amber: Color(0xFFF59E0B),
+    green: Color(0xFF10B981),
     indigo: Color(0xFF818CF8),
     purple: Color(0xFFA78BFA),
-    red: Color(0xFFFC6B6B),
+    red: Color(0xFFF87171),
     orange: Color(0xFFFB923C),
     emergencyBg: Color(0xFF3B1919),
-    searchFill: Color(0xFF1A2236),
     cardShadow: BoxShadow(
-      color: Color(0x33000000),
-      blurRadius: 20,
+      color: Color(0x40000000),
+      blurRadius: 16,
       offset: Offset(0, 4),
     ),
-    railBg: Color(0xFF0C1320),
-    railSelectedBg: Color(0xFF3B82F6),
-    railText: Color(0xFF8A9BB5),
-    railTextSelected: Color(0xFFFFFFFF),
-    railDivider: Color(0xFF1E2A40),
+    railBg: Color(0xFF070A10),
+    railSelectedBg: Color(0xFFD4AF37),
+    railText: Color(0xFF8A99AD),
+    railTextSelected: Color(0xFF0F172A),
+    railDivider: Color(0xFF232B3B),
   );
 
   @override
@@ -136,7 +138,8 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? textSecondary,
     Color? textMuted,
     Color? textDisabled,
-    Color? primaryBlue,
+    Color? primaryGreen,
+    Color? gold,
     Color? teal,
     Color? tealLight,
     Color? amber,
@@ -164,7 +167,8 @@ class AppColors extends ThemeExtension<AppColors> {
       textSecondary: textSecondary ?? this.textSecondary,
       textMuted: textMuted ?? this.textMuted,
       textDisabled: textDisabled ?? this.textDisabled,
-      primaryBlue: primaryBlue ?? this.primaryBlue,
+      primaryGreen: primaryGreen ?? this.primaryGreen,
+      gold: gold ?? this.gold,
       teal: teal ?? this.teal,
       tealLight: tealLight ?? this.tealLight,
       amber: amber ?? this.amber,
@@ -197,7 +201,8 @@ class AppColors extends ThemeExtension<AppColors> {
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
-      primaryBlue: Color.lerp(primaryBlue, other.primaryBlue, t)!,
+      primaryGreen: Color.lerp(primaryGreen, other.primaryGreen, t)!,
+      gold: Color.lerp(gold, other.gold, t)!,
       teal: Color.lerp(teal, other.teal, t)!,
       tealLight: Color.lerp(tealLight, other.tealLight, t)!,
       amber: Color.lerp(amber, other.amber, t)!,
@@ -212,7 +217,11 @@ class AppColors extends ThemeExtension<AppColors> {
       railBg: Color.lerp(railBg, other.railBg, t)!,
       railSelectedBg: Color.lerp(railSelectedBg, other.railSelectedBg, t)!,
       railText: Color.lerp(railText, other.railText, t)!,
-      railTextSelected: Color.lerp(railTextSelected, other.railTextSelected, t)!,
+      railTextSelected: Color.lerp(
+        railTextSelected,
+        other.railTextSelected,
+        t,
+      )!,
       railDivider: Color.lerp(railDivider, other.railDivider, t)!,
     );
   }

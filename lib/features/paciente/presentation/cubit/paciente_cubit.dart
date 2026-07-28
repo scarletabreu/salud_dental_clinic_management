@@ -1,9 +1,13 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'paciente_state.dart';
@@ -33,49 +37,34 @@ class PacienteCubit extends Cubit<PacienteState> {
     emit(const PacienteDetailLoading());
     final result = await _repository.getPacienteById(id);
 
-    await result.fold(
-      (failure) async => emit(PacienteError(failure.message)),
-      (paciente) async {
-        final historial = await _historialDe(paciente.id);
-        emit(
-          PacienteDetailLoaded(
-            paciente.copyWith(
-              record: paciente.record.copyWith(consultas: historial.consultas),
-            ),
-            historialNoDisponible: historial.fallo,
+    await result.fold((failure) async => emit(PacienteError(failure.message)), (
+      paciente,
+    ) async {
+      final (historial, piezas) = await (
+        _historialDe(paciente.id),
+        _historialDePiezas(paciente.id),
+      ).wait;
+      emit(
+        PacienteDetailLoaded(
+          paciente.copyWith(
+            record: paciente.record.copyWith(consultas: historial.consultas),
           ),
-        );
-      },
-    );
+          historialNoDisponible: historial.fallo,
+          historialPiezas: piezas,
+        ),
+      );
+    });
   }
 
   Future<bool> isPaciente(String id) async {
     final result = await _repository.faltaRegistro(id);
-    emit(const PacienteDetailLoading());
 
-    return result.fold(
-      (failure) {
-        print("connection error");
-        emit(PacienteError(failure.message));
-        return false;
-      },
-      (success) {
-        if (!success) {
-          print("Si es paciente");
-          emit(PacienteOperationSuccess());
-          return true;
-        } else {
-          print("no es paciente");
-          emit(PacienteError('El paciente es nuevo, requiere registro.'));
-          return false;
-        }
-      },
-    );
+    return result.fold((failure) {
+      emit(PacienteError(failure.message));
+      return false;
+    }, (success) => !success);
   }
 
-  /// El expediente no debe romperse si falla el historial (p. ej. pacientes
-  /// de prueba con id no-uuid): se degrada a lista vacía, pero el fallo se
-  /// arrastra hasta la vista para que no se confunda con «no tiene consultas».
   Future<_Historial> _historialDe(String? pacienteId) async {
     if (pacienteId == null) return const _Historial(const []);
     try {
@@ -83,15 +72,21 @@ class PacienteCubit extends Cubit<PacienteState> {
         await _consultaRepository.getHistorialPaciente(pacienteId),
       );
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('No se pudo cargar el historial de $pacienteId: $e');
-      }
+      AppLog.error('historial de $pacienteId', e);
       return const _Historial(const [], fallo: true);
     }
   }
 
-  /// Carga el paciente para una consulta a partir del id de la persona de la
-  /// cita; si la persona aún no es paciente, se crea en este momento.
+  Future<HistorialPiezas> _historialDePiezas(String? pacienteId) async {
+    if (pacienteId == null) return HistorialPiezas.vacio;
+    try {
+      return await _consultaRepository.getHistorialPiezas(pacienteId);
+    } catch (e) {
+      AppLog.error('historial de piezas de $pacienteId', e);
+      return HistorialPiezas.vacio;
+    }
+  }
+
   Future<void> loadParaConsulta(String personaId) async {
     emit(const PacienteDetailLoading());
     final result = await _repository.getOrCreatePacienteByPersonaId(personaId);
@@ -121,40 +116,79 @@ class PacienteCubit extends Cubit<PacienteState> {
     emit(PacienteLoaded(todos: current.todos, filtrados: filtrados));
   }
 
-  // --- MÉTODOS DE CONCILIACIÓN PARA EL FORMULARIO ---
-
   Future<void> addPaciente(Paciente paciente) async {
     emit(const PacienteLoading());
     final result = await _repository.addPaciente(paciente);
     result.fold(
       (failure) => emit(PacienteError(failure.message)),
-      (_) {
-        emit(const PacienteOperationSuccess());
-        load();
-      },
+      (_) => emit(const PacienteOperationSuccess()),
     );
   }
 
-  Future<void> updatePaciente(Paciente paciente) async {
+  Future<void> updatePaciente(Paciente paciente, {Uint8List? fotoBytes}) async {
     emit(const PacienteLoading());
-    final result = await _repository.updatePaciente(paciente);
-    result.fold(
-      (failure) => emit(PacienteError(failure.message)),
-      (_) {
-        emit(const PacienteOperationSuccess());
-        load();
-      },
-    );
+
+    Paciente pacienteAActualizar = paciente;
+
+    if (fotoBytes != null && fotoBytes.isNotEmpty && paciente.id != null) {
+      const int maxFotoBytes = 10 * 1024 * 1024;
+      if (fotoBytes.length > maxFotoBytes) {
+        emit(
+          const PacienteError(
+            'El tamaño de la imagen es superior a 10 MB. Por favor elige una foto de menor peso.',
+          ),
+        );
+        return;
+      }
+
+      final uploadRes = await _repository.uploadFotoPaciente(
+        pacienteId: paciente.id!,
+        bytes: fotoBytes,
+      );
+
+      bool errorSubida = false;
+      uploadRes.fold(
+        (failure) {
+          errorSubida = true;
+          emit(
+            const PacienteError(
+              'No se pudo subir la fotografía. Asegúrate de que pese menos de 10 MB e intente nuevamente.',
+            ),
+          );
+        },
+        (publicUrl) {
+          pacienteAActualizar = paciente.copyWith(
+            fotoRuta: publicUrl,
+            fotoMimeType: 'image/jpeg',
+            fotoTamanoBytes: fotoBytes.length,
+            fotoActualizadaEn: DateTime.now(),
+          );
+        },
+      );
+
+      if (errorSubida) return;
+    }
+
+    final result = await _repository.updatePaciente(pacienteAActualizar);
+    result.fold((failure) {
+      if (failure.message.contains('pacientes_foto_tamano_bytes_check')) {
+        emit(
+          const PacienteError(
+            'El tamaño de la fotografía no es válido o excede el límite permitido. Por favor elige una foto de menor peso.',
+          ),
+        );
+      } else {
+        emit(PacienteError(failure.message));
+      }
+    }, (_) => emit(const PacienteOperationSuccess()));
   }
 
   Future<void> deletePaciente(String id) async {
     emit(const PacienteLoading());
 
     try {
-      // Verificar si hay citas pendientes para este paciente
       final citas = await _citaRepository.getCitasByPaciente(id);
 
-      // Estados terminales: completada, cancelada, no asistio
       final citasPendientes = citas.where((cita) {
         return cita.estado != EstadoCita.completada &&
             cita.estado != EstadoCita.cancelada &&
@@ -171,22 +205,17 @@ class PacienteCubit extends Cubit<PacienteState> {
         return;
       }
 
-      // Proceder con la eliminación
       final result = await _repository.deletePaciente(id);
       result.fold(
         (failure) => emit(PacienteError(failure.message)),
-        (_) {
-          emit(const PacienteOperationSuccess());
-          load();
-        },
+        (_) => emit(const PacienteOperationSuccess()),
       );
     } catch (e) {
       emit(PacienteError('Error al verificar citas: $e'));
     }
   }
 }
-/// Resultado de leer el historial: las consultas y si la lectura falló. Sin el
-/// segundo dato, una lista vacía es ambigua.
+
 class _Historial {
   final List<Consulta> consultas;
   final bool fallo;

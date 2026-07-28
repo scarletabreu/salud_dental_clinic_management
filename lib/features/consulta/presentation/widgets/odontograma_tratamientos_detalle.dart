@@ -8,12 +8,6 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_expediente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
 
-/// El odontograma archivado de la consulta —en cualquiera de sus dos vistas— y
-/// el desglose de tratamientos por diente (nombre + precio congelado, cargados
-/// por [ConsultaDetalleCubit]).
-///
-/// La vista de formulario se dibuja sobre papel blanco y con botón de imprimir,
-/// porque el expediente es lo que sale por la impresora.
 class OdontogramaTratamientosDetalle extends StatelessWidget {
   final Consulta consulta;
   final String nombrePaciente;
@@ -42,40 +36,41 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             .toList()
           ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
 
-    return VistasOdontograma(
-      odontograma: odontograma,
-      formularioPersonalizado: OdontodiagramaExpediente(
-        evaluacion: odontograma.evaluacion,
-        nombrePaciente: nombrePaciente,
-        fecha: consulta.fecha,
-      ),
-      pie: dientesConTratamientos.isEmpty
-          ? Text(
-              'No se registraron tratamientos en esta consulta.',
-              style: TextStyle(color: ac.textMuted, fontSize: 13),
-            )
-          : BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
-              builder: (context, state) {
-                if (state is! ConsultaDetalleListo) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+    return BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
+      builder: (context, state) {
+        final listo = state is ConsultaDetalleListo ? state : null;
+        return VistasOdontograma(
+          odontograma: odontograma,
+          historialPiezas: listo?.historialPiezas,
+          formularioPersonalizado: OdontodiagramaExpediente(
+            evaluacion: odontograma.evaluacion,
+            nombrePaciente: nombrePaciente,
+            fecha: consulta.fecha,
+          ),
+          pie: dientesConTratamientos.isEmpty
+              ? Text(
+                  'No se registraron tratamientos en esta consulta.',
+                  style: TextStyle(color: ac.textMuted, fontSize: 13),
+                )
+              : listo == null
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  );
-                }
-                return Column(
+                  ),
+                )
+              : Column(
                   children: [
                     for (final diente in dientesConTratamientos)
-                      _filaDiente(context, diente, state),
+                      _filaDiente(context, diente, listo),
                   ],
-                );
-              },
-            ),
+                ),
+        );
+      },
     );
   }
 

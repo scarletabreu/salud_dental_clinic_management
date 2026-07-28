@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
@@ -104,6 +106,14 @@ class MisCitasDelDiaPage extends StatelessWidget {
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
+
+          // AÑADIDO: crear citas es exclusivo de asistente/admin.
+          final authState = context.watch<AuthCubit>().state;
+          final puedeCrearCitas =
+              authState.rol == RolUsuario.asistente ||
+              authState.rol == RolUsuario.admin;
+          if (!puedeCrearCitas) return const SizedBox.shrink();
+
           Future<void> abrirNuevaCita() async {
             await NuevaCitaDialog.show(
               context,
@@ -1104,6 +1114,18 @@ class _CitaCard extends StatelessWidget {
     final hour = cita.date.hour.toString().padLeft(2, '0');
     final min = cita.date.minute.toString().padLeft(2, '0');
 
+    // AÑADIDO: resolución de permisos por rol para esta tarjeta puntual.
+    final authState = context.watch<AuthCubit>().state;
+    final usuario = authState.usuario;
+    final esAdmin = authState.rol == RolUsuario.admin;
+    final esAsistente = authState.rol == RolUsuario.asistente;
+    final esDoctorDeEstaCita =
+        authState.rol == RolUsuario.doctor && usuario?.id == cita.doctor.id;
+
+    // Crear/editar/cancelar/cambiar estado: solo asistente o admin.
+    final puedeGestionar = esAsistente || esAdmin;
+    final puedeEfectuarConsulta = esDoctorDeEstaCita;
+
     return Container(
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -1115,17 +1137,21 @@ class _CitaCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(
-                  value: context.read<CitaCubit>(),
-                  child: CitaEditPage(cita: cita),
-                ),
-              ),
-            );
-          },
+          // CAMBIO: un doctor sin permisos de gestión no navega al detalle
+          // de edición; su única acción sobre la tarjeta es "Iniciar consulta".
+          onTap: puedeGestionar
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<CitaCubit>(),
+                        child: CitaEditPage(cita: cita),
+                      ),
+                    ),
+                  );
+                }
+              : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             child: Column(
@@ -1255,9 +1281,9 @@ class _CitaCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // En móvil el selector de estado no cabe junto al nombre:
-                    // baja a su propia línea con el resto de acciones.
-                    if (!context.appLayout.isCompact) ...[
+                    // CAMBIO: el dropdown de estado solo aparece si el rol
+                    // puede gestionar la cita (asistente o admin).
+                    if (puedeGestionar && !context.appLayout.isCompact) ...[
                       const SizedBox(width: 8),
                       _EstadoDropdown(
                         cita: cita,
@@ -1267,7 +1293,7 @@ class _CitaCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (context.appLayout.isCompact)
+                if (puedeGestionar && context.appLayout.isCompact)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -1279,7 +1305,9 @@ class _CitaCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                _botonEfectuar(context),
+                // CAMBIO: el botón de consulta ahora depende también de
+                // puedeEfectuarConsulta, no solo del estado de la cita.
+                if (puedeEfectuarConsulta) _botonEfectuar(context),
               ],
             ),
           ),

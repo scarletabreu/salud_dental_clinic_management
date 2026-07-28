@@ -48,4 +48,15 @@ class DoctorRepositoryImpl implements DoctorRepository {
       return data == null ? null : DoctorModel.fromJson(data);
     }, context: 'obtener el doctor');
   }
+
+  // data/repositories/doctor_repository_impl.dart
+  @override
+  Future<List<String>> getDoctorIdsAsignados(String asistenteId) {
+    return runGuarded(() async {
+      final rows = await remoteDataSource.fetchDoctorAsistentesByAsistenteId(
+        asistenteId,
+      );
+      return rows.map((row) => row['doctor_id'].toString()).toList();
+    }, context: 'obtener los doctores asignados al asistente');
+  }
 }

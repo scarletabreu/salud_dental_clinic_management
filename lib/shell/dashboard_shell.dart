@@ -10,6 +10,8 @@ import 'package:salud_dental_clinic_management/shell/widgets/connectivity_banner
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
@@ -146,10 +148,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       icon: Icons.today_outlined,
       selectedIcon: Icons.today_rounded,
       label: 'Mis Citas del Día',
-      builder: (_) => BlocProvider(
-        create: (_) => sl<CitaCubit>()..load(),
-        child: const MisCitasDelDiaPage(),
-      ),
+      // CAMBIO: antes era `sl<CitaCubit>()..load()` directo. Ahora se
+      // delega a un widget que primero resuelve el filtro según el rol
+      // (el asistente requiere una consulta async a doctor_asistentes)
+      // y solo entonces llama a load().
+      builder: (_) => const _CitasDelDiaDestination(),
     ),
     ShellDestination(
       id: ShellDestinationId.consultas,
@@ -422,6 +425,66 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
               onDestinationSelected: _onDestinationSelected,
             )
           : null,
+    );
+  }
+}
+
+// AÑADIDO: widget dedicado a resolver el filtro de citas según el rol
+// antes de cargar el CitaCubit, y a proveerlo a MisCitasDelDiaPage.
+class _CitasDelDiaDestination extends StatefulWidget {
+  const _CitasDelDiaDestination();
+
+  @override
+  State<_CitasDelDiaDestination> createState() =>
+      _CitasDelDiaDestinationState();
+}
+
+class _CitasDelDiaDestinationState extends State<_CitasDelDiaDestination> {
+  late final CitaCubit _citaCubit = sl<CitaCubit>();
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarSegunRol();
+  }
+
+  Future<void> _cargarSegunRol() async {
+    final authState = context.read<AuthCubit>().state;
+    final usuario = authState.usuario;
+
+    if (authState.rol == RolUsuario.doctor &&
+        usuario is Doctor &&
+        usuario.id != null) {
+      _citaCubit.load(restringidoADoctorId: usuario.id);
+      return;
+    }
+
+    if (authState.rol == RolUsuario.asistente &&
+        usuario is Asistente &&
+        usuario.id != null) {
+      final doctorIds = await sl<DoctorRepository>().getDoctorIdsAsignados(
+        usuario.id!,
+      );
+      if (!mounted) return;
+      _citaCubit.load(doctorIdsPermitidos: doctorIds);
+      return;
+    }
+
+    // Admin: sin restricción, ve todas las citas.
+    _citaCubit.load();
+  }
+
+  @override
+  void dispose() {
+    _citaCubit.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: _citaCubit,
+      child: const MisCitasDelDiaPage(),
     );
   }
 }

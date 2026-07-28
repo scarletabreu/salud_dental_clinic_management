@@ -9,8 +9,8 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
 
   @override
   Future<void> createDoctor(String userId) async {
-    await supabaseClient.from('doctors').insert({
-      'user_id': userId,
+    await supabaseClient.from('doctores').insert({
+      'id': userId,
       'estatus': 'activo',
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
@@ -20,8 +20,8 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   @override
   Future<List<String>> fetchDoctorUserIds() async {
     final response = await supabaseClient
-        .from('doctors')
-        .select('user_id')
+        .from('doctores')
+        .select('id')
         .eq('estatus', 'activo')
         .filter('deleted_at', 'is', null);
 
@@ -32,13 +32,12 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
 
   @override
   Future<List<DoctorModel>> fetchActiveDoctores() async {
-    final response = await supabaseClient
-        .from('doctores')
-        .select('*, usuarios(*, personas(*))')
-        .isFilter('deleted_at', null);
+    final response = await supabaseClient.rpc('get_active_doctors');
+
+    print('RAW SUPABASE RESPONSE: $response');
 
     return (response as List)
-        .map((json) => DoctorModel.fromJson(json as Map<String, dynamic>))
+        .map((json) => DoctorModel.fromJsonFn(json as Map<String, dynamic>))
         .toList();
   }
 
@@ -46,9 +45,9 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   Future<bool> isDoctor(String userId) async {
     try {
       final response = await supabaseClient
-          .from('doctors')
-          .select('user_id')
-          .eq('user_id', userId)
+          .from('doctores')
+          .select('id')
+          .eq('id', userId)
           .eq('estatus', 'activo')
           .filter('deleted_at', 'is', null)
           .maybeSingle();
@@ -61,7 +60,7 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   @override
   Future<void> updateDoctor(String userId, String newUserId) async {
     await supabaseClient
-        .from('doctors')
+        .from('doctores')
         .update({
           'user_id': newUserId,
           'updated_at': DateTime.now().toIso8601String(),
@@ -96,10 +95,22 @@ class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   @override
   Future<Map<String, dynamic>?> fetchDoctorById(String userId) async {
     return await supabaseClient
-        .from('doctors')
+        .from('doctores')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .filter('deleted_at', 'is', null)
         .maybeSingle();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchDoctorAsistentesByAsistenteId(
+    String asistenteId,
+  ) async {
+    final response = await supabaseClient
+        .from('doctor_asistentes')
+        .select('doctor_id')
+        .eq('asistente_id', asistenteId);
+
+    return List<Map<String, dynamic>>.from(response as List);
   }
 }

@@ -9,4 +9,5 @@ abstract class DoctorRemoteDatasource {
   Future<void> deactivateDoctor(String userId);
   Future<void> reactivateDoctor(String userId);
   Future<Map<String, dynamic>?> fetchDoctorById(String userId);
+  Future<List<Map<String, dynamic>>> fetchDoctorAsistentesByAsistenteId(String asistenteId);
 }

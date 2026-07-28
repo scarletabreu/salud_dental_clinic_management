@@ -64,7 +64,6 @@ enum EstadoCita {
         ];
       case EstadoCita.enEspera:
         return const [
-          EstadoCita.enConsulta,
           EstadoCita.cancelada,
           EstadoCita.noAsistio,
         ];

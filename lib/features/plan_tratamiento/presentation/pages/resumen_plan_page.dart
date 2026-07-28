@@ -76,7 +76,7 @@ class _ResumenPlanView extends StatelessWidget {
         builder: (context, state) {
           if (state is ResumenPlanCargando) {
             return Center(
-              child: CircularProgressIndicator(color: ac.primaryBlue),
+              child: CircularProgressIndicator(color: ac.primaryGreen),
             );
           }
           if (state is ResumenPlanError) {
@@ -176,7 +176,7 @@ class _TotalesCard extends StatelessWidget {
                 ac.textSecondary,
                 ac,
               ),
-              _Totalito('Facturado', cargado.totalFacturado, ac.primaryBlue, ac),
+              _Totalito('Facturado', cargado.totalFacturado, ac.primaryGreen, ac),
               _Totalito('Pagado', cargado.totalPagado, ac.green, ac),
             ],
           ),
@@ -281,7 +281,7 @@ class _ActividadCard extends StatelessWidget {
                 value: progreso,
                 minHeight: 6,
                 backgroundColor: ac.divider,
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
               ),
             ),
             const SizedBox(height: 4),

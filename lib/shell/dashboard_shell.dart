@@ -2,41 +2,41 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
-import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/shell/widgets/connectivity_banner.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
-import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
+import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
+import 'package:salud_dental_clinic_management/features/consumible/presentation/pages/inventario_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_list_page.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
+import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
+import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/pages/inicio_page.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
+import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/shell/lazy_destination_stack.dart';
-import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
+import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
+import 'package:salud_dental_clinic_management/shell/widgets/connectivity_banner.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
 import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
-import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
-import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
-import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
-import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
-import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
-import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
-import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
-import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
-import 'package:salud_dental_clinic_management/features/consumible/presentation/pages/inventario_page.dart';
 
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
@@ -376,211 +376,457 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         compact:
             layout.usesBottomNavigation || mediaQuery.viewInsets.bottom > 0,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          const ConnectivityBanner(),
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: layout.usesBottomNavigation
-                  ? content
-                  : Padding(
-                      padding: ShellLayoutResolution.contentPadding(
-                        mediaQuery,
-                        layout,
-                      ),
-                      child: Row(
-                        children: [
-                          _SideRail(
-                            extended: layout.usesExtendedRail,
-                            sections: _visibleSections,
-                            configuration: _visibleConfiguracion,
-                            selectedIndex: selectedIndex,
-                            onDestinationSelected: _onDestinationSelected,
+          Column(
+            children: [
+              const ConnectivityBanner(),
+              Expanded(
+                child: SafeArea(
+                  top: false,
+                  bottom: !layout.usesBottomNavigation,
+                  child: layout.usesBottomNavigation
+                      ? content
+                      : Padding(
+                          padding: ShellLayoutResolution.contentPadding(
+                            mediaQuery,
+                            layout,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: content,
-                            ),
+                          child: Row(
+                            children: [
+                              _SideRail(
+                                extended: layout.usesExtendedRail,
+                                sections: _visibleSections,
+                                configuration: _visibleConfiguracion,
+                                selectedIndex: selectedIndex,
+                                onDestinationSelected: _onDestinationSelected,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: content,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-            ),
+                        ),
+                ),
+              ),
+            ],
           ),
+
+          if (layout.usesBottomNavigation)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ShellMobileNavigation(
+                destinations: destinos,
+                primaryDestinations: _visibleSections.isEmpty
+                    ? const []
+                    : _visibleSections.first.destinations,
+                selectedIndex: selectedIndex,
+                onDestinationSelected: _onDestinationSelected,
+                onNavigateTo: _navigateTo,
+              ),
+            ),
         ],
       ),
-      bottomNavigationBar: layout.usesBottomNavigation
-          ? ShellMobileNavigation(
-              destinations: destinos,
-              primaryDestinations: _visibleSections.isEmpty
-                  ? const []
-                  : _visibleSections.first.destinations,
-              selectedIndex: selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-            )
-          : null,
     );
   }
 }
 
-class ShellMobileNavigation extends StatelessWidget {
+/// 📱 NAVEGACIÓN MÓVIL CON MENÚ VERTICAL COMPACTO EN EL '+'
+class ShellMobileNavigation extends StatefulWidget {
   const ShellMobileNavigation({
     super.key,
     required this.destinations,
     required this.primaryDestinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
+    required this.onNavigateTo,
   });
 
   final List<ShellDestination> destinations;
   final List<ShellDestination> primaryDestinations;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
+  final ValueChanged<ShellDestinationId> onNavigateTo;
+
+  @override
+  State<ShellMobileNavigation> createState() => _ShellMobileNavigationState();
+}
+
+class _ShellMobileNavigationState extends State<ShellMobileNavigation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _expandAnimation;
+  late Animation<double> _rotationAnimation;
+  bool _menuAbierto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+
+    _expandAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutBack,
+      reverseCurve: Curves.easeIn,
+    );
+
+    _rotationAnimation = Tween<double>(begin: 0.0, end: 0.375).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _toggleMenu() {
+    setState(() {
+      _menuAbierto = !_menuAbierto;
+      if (_menuAbierto) {
+        _animController.forward();
+      } else {
+        _animController.reverse();
+      }
+    });
+  }
+
+  void _cerrarMenu() {
+    if (_menuAbierto) {
+      setState(() {
+        _menuAbierto = false;
+        _animController.reverse();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final primary = primaryDestinations;
-    final secondary = destinations
-        .where(
-          (destination) =>
-              !primary.map((item) => item.id).contains(destination.id),
-        )
-        .toList();
-    final selectedId = destinations[selectedIndex].id;
-    final selectedIsSecondary = secondary.any((item) => item.id == selectedId);
-    final hasMore = secondary.isNotEmpty;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        child: Container(
-          height: 72,
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: ac.railBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: ac.railDivider.withValues(alpha: 0.6),
-              width: 0.5,
+    final primary = widget.primaryDestinations;
+    final leftDestinations = primary.take(2).toList();
+    final rightDestinations = primary.skip(2).take(2).toList();
+
+    final secondary = widget.destinations
+        .where((d) => !primary.map((p) => p.id).contains(d.id))
+        .toList();
+
+    return PopScope(
+      canPop: !_menuAbierto,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _menuAbierto) {
+          _cerrarMenu();
+        }
+      },
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // 1. 🌑 Telón oscuro suave que cierra al tocar fuera
+          if (_menuAbierto)
+            GestureDetector(
+              onTap: _cerrarMenu,
+              child: AnimatedBuilder(
+                animation: _animController,
+                builder: (context, child) {
+                  return Container(
+                    color: Colors.black.withValues(
+                      alpha: disableAnimations
+                          ? 0.35
+                          : 0.35 * _animController.value,
+                    ),
+                    width: double.infinity,
+                    height: MediaQuery.of(context).size.height,
+                  );
+                },
+              ),
+            ),
+
+          // 2. 🎴 Tarjeta Flotante Vertical Compacta
+          Positioned(
+            bottom: 86,
+            child: ScaleTransition(
+              scale: disableAnimations
+                  ? const AlwaysStoppedAnimation(1.0)
+                  : _expandAnimation,
+              alignment: Alignment.bottomCenter,
+              child: FadeTransition(
+                opacity: disableAnimations
+                    ? const AlwaysStoppedAnimation(1.0)
+                    : _animController,
+                child: Container(
+                  constraints: const BoxConstraints(
+                    maxWidth: 230,
+                    maxHeight: 280,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ac.primaryGreen,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ac.primaryGreen.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < secondary.length; i++) ...[
+                          if (i > 0)
+                            Divider(
+                              height: 1,
+                              thickness: 0.5,
+                              color: Colors.white.withValues(alpha: 0.2),
+                            ),
+                          _QuickVerticalActionButton(
+                            icon: secondary[i].selectedIcon,
+                            label: secondary[i].label,
+                            onTap: () {
+                              _cerrarMenu();
+                              widget.onNavigateTo(secondary[i].id);
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              for (var index = 0; index < primary.length; index++)
-                Expanded(
-                  child: _MobileRailItem(
-                    destination: primary[index],
-                    label: _shortLabel(primary[index].label),
-                    selected: selectedId == primary[index].id,
-                    onTap: () => onDestinationSelected(
-                      destinations.indexWhere(
-                        (item) => item.id == primary[index].id,
+
+          // 3. 📱 Barra Inferior Flotante
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: ac.primaryGreen,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ac.primaryGreen.withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        for (final dest in leftDestinations)
+                          Expanded(
+                            child: _NavItem(
+                              destination: dest,
+                              selected:
+                                  widget
+                                      .destinations[widget.selectedIndex]
+                                      .id ==
+                                  dest.id,
+                              onTap: () {
+                                _cerrarMenu();
+                                widget.onDestinationSelected(
+                                  widget.destinations.indexOf(dest),
+                                );
+                              },
+                            ),
+                          ),
+
+                        const SizedBox(width: 56),
+
+                        for (final dest in rightDestinations)
+                          Expanded(
+                            child: _NavItem(
+                              destination: dest,
+                              selected:
+                                  widget
+                                      .destinations[widget.selectedIndex]
+                                      .id ==
+                                  dest.id,
+                              onTap: () {
+                                _cerrarMenu();
+                                widget.onDestinationSelected(
+                                  widget.destinations.indexOf(dest),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // ⚪ Botón Central '+'
+                  Positioned(
+                    top: -14,
+                    child: Semantics(
+                      button: true,
+                      label: _menuAbierto ? 'Cerrar opciones' : 'Más módulos',
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _toggleMenu,
+                            customBorder: const CircleBorder(),
+                            child: Center(
+                              child: RotationTransition(
+                                turns: disableAnimations
+                                    ? const AlwaysStoppedAnimation(0)
+                                    : _rotationAnimation,
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  color: ac.primaryGreen,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              if (hasMore)
-                Expanded(
-                  child: _MobileRailItem(
-                    destination: const ShellDestination(
-                      id: ShellDestinationId.configuracion,
-                      icon: Icons.more_horiz_rounded,
-                      selectedIcon: Icons.more_horiz_rounded,
-                      label: 'Más',
-                      builder: _emptyBuilder,
-                    ),
-                    label: 'Más',
-                    selected: selectedIsSecondary,
-                    onTap: () => _showMoreDestinations(context, secondary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickVerticalActionButton extends StatelessWidget {
+  const _QuickVerticalActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  static Widget _emptyBuilder(BuildContext context) => const SizedBox.shrink();
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
 
-  void _showMoreDestinations(
-    BuildContext context,
-    List<ShellDestination> secondary,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final ac = sheetContext.appColors;
-        return DraggableScrollableSheet(
-          initialChildSize: 0.55,
-          minChildSize: 0.35,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (context, controller) => Container(
-            decoration: BoxDecoration(
-              color: ac.railBg,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              border: Border.all(
-                color: ac.railDivider.withValues(alpha: 0.6),
-                width: 0.5,
-              ),
+  final ShellDestination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final ocultarTexto = width < 360;
+
+    final foreground = selected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.65);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? destination.selectedIcon : destination.icon,
+              size: 22,
+              color: foreground,
             ),
-            child: ListView(
-              controller: controller,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: ac.railDivider,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
+            if (!ocultarTexto) ...[
+              const SizedBox(height: 3),
+              Text(
+                _shortLabel(destination.label),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: foreground,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Más módulos',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: ac.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (var index = 0; index < secondary.length; index++)
-                  _MoreRailItem(
-                    destination: secondary[index],
-                    selected:
-                        destinations[selectedIndex].id == secondary[index].id,
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      onDestinationSelected(
-                        destinations.indexWhere(
-                          (item) => item.id == secondary[index].id,
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
-  static String _shortLabel(String label) {
+  String _shortLabel(String label) {
     switch (label) {
       case 'Mis Citas del Día':
         return 'Citas';
@@ -591,123 +837,6 @@ class ShellMobileNavigation extends StatelessWidget {
       default:
         return label;
     }
-  }
-}
-
-class _MobileRailItem extends StatelessWidget {
-  const _MobileRailItem({
-    required this.destination,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ShellDestination destination;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final foreground = selected ? ac.railTextSelected : ac.railText;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: ValueKey('mobile-navigation-$label'),
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-          decoration: BoxDecoration(
-            color: selected ? ac.railSelectedBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                selected ? destination.selectedIcon : destination.icon,
-                size: 21,
-                color: foreground,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: foreground,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  height: 1,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreRailItem extends StatelessWidget {
-  const _MoreRailItem({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ShellDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    final foreground = selected ? ac.railTextSelected : ac.railText;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: selected ? ac.railSelectedBg : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selected ? destination.selectedIcon : destination.icon,
-                  size: 22,
-                  color: foreground,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    destination.label,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: foreground,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

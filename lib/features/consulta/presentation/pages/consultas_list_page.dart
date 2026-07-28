@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
@@ -785,6 +786,11 @@ class _ConsultaCard extends StatelessWidget {
     final ac = context.appColors;
     final esEliminable = esConsultaEliminable(consulta);
 
+    final authState = context.watch<AuthCubit>().state;
+    final usuario = authState.usuario;
+    final esDoctorDeEstaConsulta = usuario?.id == consulta.doctorId;
+    final puedeContinuar = esDoctorDeEstaConsulta;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -925,7 +931,7 @@ class _ConsultaCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      if (!consulta.finalizada)
+                      if (!consulta.finalizada && puedeContinuar)
                         TextButton.icon(
                           onPressed: () async {
                             final resultado = await Navigator.push<bool>(

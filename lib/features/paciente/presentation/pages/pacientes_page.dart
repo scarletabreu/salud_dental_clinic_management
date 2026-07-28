@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
@@ -249,9 +251,16 @@ class _PacientesPageState extends State<PacientesPage> {
     }
     if (state is PacienteLoaded) {
       final compact = MediaQuery.sizeOf(context).width < 600;
+
+      // AÑADIDO: rol resuelto una sola vez para toda la lista.
+      final authState = context.watch<AuthCubit>().state;
+      final esDoctor = authState.rol == RolUsuario.doctor;
+
       return Column(
         children: [
-          if (!compact) _buildTableHeader(context),
+          // CAMBIO: cabecera de tabla condicionada al rol (sin
+          // cédula/teléfono para doctor).
+          if (!compact) _buildTableHeader(context, esDoctor: esDoctor),
           if (state.filtrados.isEmpty)
             Expanded(
               child: Center(
@@ -300,16 +309,19 @@ class _PacientesPageState extends State<PacientesPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildTableHeader(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(48, 8, 48, 12),
+  // CAMBIO: cabecera condicionada por rol.
+  Widget _buildTableHeader(BuildContext context, {required bool esDoctor}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(48, 8, 48, 12),
       child: Row(
         children: [
-          Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
-          Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
-          SizedBox(width: 108),
+          const Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
+          if (!esDoctor) ...[
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
+          ],
+          const Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
+          const SizedBox(width: 108),
         ],
       ),
     );
@@ -429,6 +441,15 @@ class _PacienteRowState extends State<_PacienteRow> {
     final p = widget.paciente;
     final ac = context.appColors;
 
+    // AÑADIDO: resolución de permisos por fila.
+    final authState = context.watch<AuthCubit>().state;
+    final esAdmin = authState.rol == RolUsuario.admin;
+    final esAsistente = authState.rol == RolUsuario.asistente;
+    final esDoctor = authState.rol == RolUsuario.doctor;
+    final puedeVerExpediente = esAdmin || esDoctor;
+    final puedeGestionar = esAdmin || esAsistente; // editar / eliminar
+    final puedeVerContacto = !esDoctor; // cédula, teléfono, email, dirección
+
     final fondoTarjeta = _expanded
         ? ac.primaryGreen.withValues(alpha: 0.04)
         : ac.cardBg;
@@ -437,6 +458,11 @@ class _PacienteRowState extends State<_PacienteRow> {
         : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
+
+    // CAMBIO: un doctor no puede expandir el detalle de contacto en línea
+    // (no tiene nada que ver ahí); su única acción es entrar al expediente.
+    final permiteExpandir = !esDoctor;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
@@ -457,13 +483,22 @@ class _PacienteRowState extends State<_PacienteRow> {
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: permiteExpandir
+                ? () => setState(() => _expanded = !_expanded)
+                : null,
             borderRadius: BorderRadius.circular(14),
             hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: compact
-                  ? _buildCompactRow(context, p, ac)
+                  ? _buildCompactRow(
+                      context,
+                      p,
+                      ac,
+                      puedeVerExpediente: puedeVerExpediente,
+                      puedeGestionar: puedeGestionar,
+                      puedeVerContacto: puedeVerContacto,
+                    )
                   : Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -487,33 +522,36 @@ class _PacienteRowState extends State<_PacienteRow> {
                             ],
                           ),
                         ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            p.govID,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.8),
-                                  fontFamily: 'monospace',
-                                  fontSize: 13,
-                                ),
+                        // CAMBIO: cédula/teléfono ocultos para doctor.
+                        if (puedeVerContacto) ...[
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              p.govID,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontFamily: 'monospace',
+                                    fontSize: 13,
+                                  ),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            _contacto?.numeroTelefono.isNotEmpty == true
-                                ? _contacto!.numeroTelefono
-                                : '—',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.8),
-                                  fontSize: 13,
-                                ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              _contacto?.numeroTelefono.isNotEmpty == true
+                                  ? _contacto!.numeroTelefono
+                                  : '—',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 13,
+                                  ),
+                            ),
                           ),
-                        ),
+                        ],
                         Expanded(
                           flex: 1,
                           child: Text(
@@ -531,31 +569,37 @@ class _PacienteRowState extends State<_PacienteRow> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              _ActionIcon(
-                                icon: Icons.visibility_outlined,
-                                tooltip: 'Ver expediente',
-                                color: ac.primaryGreen,
-                                onTap: widget.onVerDetalle,
-                              ),
-                              const SizedBox(width: 6),
-                              _ActionIcon(
-                                icon: Icons.edit_outlined,
-                                tooltip: 'Editar',
-                                color: colorScheme.onSurfaceVariant.withValues(
-                                  alpha: 0.5,
+                              // CAMBIO: "ver expediente" solo admin/doctor.
+                              if (puedeVerExpediente)
+                                _ActionIcon(
+                                  icon: Icons.visibility_outlined,
+                                  tooltip: 'Ver expediente',
+                                  color: ac.primaryGreen,
+                                  onTap: widget.onVerDetalle,
                                 ),
-                                onTap: widget.onEdit,
-                              ),
-                              const SizedBox(width: 6),
-                              _ActionIcon(
-                                icon: Icons.delete_outline_rounded,
-                                tooltip: 'Eliminar',
-                                color: colorScheme.error.withValues(alpha: 0.7),
-                                onTap: () => _showDeleteConfirmation(
-                                  context,
-                                  widget.paciente,
+                              // CAMBIO: editar/eliminar solo admin/asistente.
+                              if (puedeGestionar) ...[
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Editar',
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                  onTap: widget.onEdit,
                                 ),
-                              ),
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.delete_outline_rounded,
+                                  tooltip: 'Eliminar',
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  onTap: () => _showDeleteConfirmation(
+                                    context,
+                                    widget.paciente,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -563,7 +607,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                     ),
             ),
           ),
-          if (_expanded) _buildDetail(context, p),
+          if (_expanded && puedeVerContacto) _buildDetail(context, p),
         ],
       ),
     );
@@ -601,7 +645,15 @@ class _PacienteRowState extends State<_PacienteRow> {
     );
   }
 
-  Widget _buildCompactRow(BuildContext context, Paciente p, AppColors ac) {
+  // CAMBIO: recibe los flags de permiso para condicionar campos y acciones.
+  Widget _buildCompactRow(
+    BuildContext context,
+    Paciente p,
+    AppColors ac, {
+    required bool puedeVerExpediente,
+    required bool puedeGestionar,
+    required bool puedeVerContacto,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -620,32 +672,37 @@ class _PacienteRowState extends State<_PacienteRow> {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
-            _ActionIcon(
-              icon: Icons.visibility_outlined,
-              tooltip: 'Ver expediente',
-              color: ac.primaryGreen,
-              onTap: widget.onVerDetalle,
-            ),
-            _ActionIcon(
-              icon: Icons.edit_outlined,
-              tooltip: 'Editar',
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              onTap: widget.onEdit,
-            ),
+            if (puedeVerExpediente)
+              _ActionIcon(
+                icon: Icons.visibility_outlined,
+                tooltip: 'Ver expediente',
+                color: ac.primaryGreen,
+                onTap: widget.onVerDetalle,
+              ),
+            if (puedeGestionar)
+              _ActionIcon(
+                icon: Icons.edit_outlined,
+                tooltip: 'Editar',
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                onTap: widget.onEdit,
+              ),
           ],
         ),
         const SizedBox(height: 12),
+        // CAMBIO: cédula/teléfono ocultos para doctor; edad siempre visible.
         Wrap(
           spacing: 16,
           runSpacing: 6,
           children: [
-            _compactField('Cédula', p.govID),
-            _compactField(
-              'Teléfono',
-              _contacto?.numeroTelefono.isNotEmpty == true
-                  ? _contacto!.numeroTelefono
-                  : '—',
-            ),
+            if (puedeVerContacto) ...[
+              _compactField('Cédula', p.govID),
+              _compactField(
+                'Teléfono',
+                _contacto?.numeroTelefono.isNotEmpty == true
+                    ? _contacto!.numeroTelefono
+                    : '—',
+              ),
+            ],
             _compactField('Edad', '${p.age} años'),
           ],
         ),

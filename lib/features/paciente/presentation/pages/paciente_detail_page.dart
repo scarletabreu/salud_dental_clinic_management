@@ -103,6 +103,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final puedeExportar = context.select(
       (AuthCubit cubit) => cubit.state.roles.puedeVerExpedientes,
     );
+    // AÑADIDO: el doctor no puede editar al paciente ni ver su información
+    // de contacto (cédula, teléfono, email, dirección).
+    final esDoctor = context.select(
+      (AuthCubit cubit) => cubit.state.rol == RolUsuario.doctor,
+    );
+
     return BlocBuilder<PacienteCubit, PacienteState>(
       builder: (context, state) {
         final paciente = (state is PacienteDetailLoaded)
@@ -174,13 +180,13 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 ),
             ],
           ),
-          body: _buildBody(state, ac),
+          body: _buildBody(state, ac, esDoctor: esDoctor),
         );
       },
     );
   }
 
-  Widget _buildBody(PacienteState state, AppColors ac) {
+  Widget _buildBody(PacienteState state, AppColors ac, {required bool esDoctor}) {
     if (state is PacienteDetailLoading) {
       return Center(
         child: CircularProgressIndicator(
@@ -199,6 +205,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         state.paciente,
         historialNoDisponible: state.historialNoDisponible,
         historialPiezas: state.historialPiezas,
+        esDoctor: esDoctor,
       );
     }
 
@@ -209,6 +216,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     Paciente p, {
     bool historialNoDisponible = false,
     HistorialPiezas historialPiezas = HistorialPiezas.vacio,
+    required bool esDoctor,
   }) {
     final sortedConsultas = [...p.record.consultas]
       ..sort(
@@ -222,7 +230,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildIdentityCard(p),
+          _buildIdentityCard(p, esDoctor: esDoctor),
           const SizedBox(height: 16),
           _buildAlertasMedicas(p.record),
           ResumenFinancieroPaciente(
@@ -238,28 +246,33 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
           CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final contacto = _buildContactoCard(p);
-              final clinica = _buildInfoClinicaCard(p);
-              if (constraints.maxWidth < 620) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [contacto, const SizedBox(height: 16), clinica],
+          // CAMBIO: para el doctor, se omite por completo la tarjeta de
+          // Contacto; la Información Clínica ocupa el ancho disponible.
+          if (esDoctor)
+            _buildInfoClinicaCard(p)
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final contacto = _buildContactoCard(p);
+                final clinica = _buildInfoClinicaCard(p);
+                if (constraints.maxWidth < 620) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [contacto, const SizedBox(height: 16), clinica],
+                  );
+                }
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: contacto),
+                      const SizedBox(width: 16),
+                      Expanded(child: clinica),
+                    ],
+                  ),
                 );
-              }
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: contacto),
-                    const SizedBox(width: 16),
-                    Expanded(child: clinica),
-                  ],
-                ),
-              );
-            },
-          ),
+              },
+            ),
           const SizedBox(height: 16),
           PlanesTratamientoCard(pacienteId: p.id ?? widget.pacienteId),
           OdontogramArchWidget(
@@ -275,7 +288,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildIdentityCard(Paciente p) {
+  Widget _buildIdentityCard(Paciente p, {required bool esDoctor}) {
     final ac = context.appColors;
     final fotoUrl = p.fotoUrl;
     final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
@@ -306,40 +319,42 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      final pacienteCubit = context.read<PacienteCubit>();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BlocProvider.value(
-                            value: pacienteCubit,
-                            child: PacienteFormPage(paciente: p),
+                  // CAMBIO: "Editar" solo si NO es doctor (admin/asistente).
+                  if (!esDoctor)
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final pacienteCubit = context.read<PacienteCubit>();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BlocProvider.value(
+                              value: pacienteCubit,
+                              child: PacienteFormPage(paciente: p),
+                            ),
                           ),
+                        ).then((_) {
+                          if (!mounted) return;
+                          pacienteCubit.loadById(p.id!);
+                        });
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Editar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ac.textSecondary,
+                        side: BorderSide(color: ac.divider),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
                         ),
-                      ).then((_) {
-                        if (!mounted) return;
-                        pacienteCubit.loadById(p.id!);
-                      });
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('Editar'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: ac.textSecondary,
-                      side: BorderSide(color: ac.divider),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: () {
@@ -419,10 +434,13 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        _MetaItem(
-                          icon: Icons.badge_outlined,
-                          text: 'Cédula: ${p.govID}',
-                        ),
+                        // CAMBIO: cédula oculta para doctor (dato de
+                        // identificación/contacto).
+                        if (!esDoctor)
+                          _MetaItem(
+                            icon: Icons.badge_outlined,
+                            text: 'Cédula: ${p.govID}',
+                          ),
                         _MetaItem(
                           icon: Icons.cake_outlined,
                           text: _ageFormatted(p.birthDate),

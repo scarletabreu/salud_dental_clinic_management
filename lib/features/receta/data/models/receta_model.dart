@@ -19,6 +19,15 @@ class RecetaModel extends Receta {
     super.recetaReemplazadaId,
   });
 
+  /// Lee una fila de `recetas` sin asumir que trae las columnas del formato
+  /// antiguo (una medicina por fila).
+  ///
+  /// La tabla ya convive con el formato de SD-153: una receta es una cabecera
+  /// con `codigo_receta` y sus medicinas dentro del jsonb `items_receta`, y
+  /// entonces `titulo`, `dosis`, `medicina_id`, etc. quedan NULL por diseño.
+  /// Con los casts no-nulos anteriores esas filas lanzaban `TypeError`, y como
+  /// el parseo ocurre dentro del guard del repositorio, una sola receta así
+  /// tumbaba el listado completo de consultas con un error sin detalle.
   factory RecetaModel.fromJson(Map<String, dynamic> json) {
     final idStr = json['id'] as String?;
     final codigoBruto = json['codigo_receta'] ?? json['codigo'];

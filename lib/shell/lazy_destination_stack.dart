@@ -47,9 +47,9 @@ class LazyDestinationStack extends StatefulWidget {
 }
 
 class _LazyDestinationStackState extends State<LazyDestinationStack> {
-  /// Etiquetas vivas, de la usada hace más tiempo a la más reciente. El orden
+  /// Identificadores vivos, de la usada hace más tiempo a la más reciente. El orden
   /// *es* la política de descarte, por eso es una lista y no un `Set`.
-  final List<String> _vivas = <String>[];
+  final List<ShellDestinationId> _vivas = <ShellDestinationId>[];
 
   @override
   void initState() {
@@ -73,15 +73,15 @@ class _LazyDestinationStackState extends State<LazyDestinationStack> {
     final indice = widget.selectedIndex;
     if (indice < 0 || indice >= destinos.length) return;
 
-    final actual = destinos[indice].label;
+    final actual = destinos[indice].id;
     _vivas
       ..remove(actual)
       ..add(actual);
 
     // Un destino que dejó de ser visible —cambió el rol— no debe seguir
     // ocupando cupo ni memoria.
-    final visibles = destinos.map((d) => d.label).toSet();
-    _vivas.removeWhere((label) => !visibles.contains(label));
+    final visibles = destinos.map((d) => d.id).toSet();
+    _vivas.removeWhere((id) => !visibles.contains(id));
 
     final tope = widget.maxRetenidas < 1 ? 1 : widget.maxRetenidas;
     while (_vivas.length > tope) {
@@ -113,15 +113,15 @@ class _LazyDestinationStackState extends State<LazyDestinationStack> {
   }) {
     // Nunca visitada, o descartada por el tope: hueco vacío. No hay cubit ni
     // petición de red detrás de esto.
-    if (!_vivas.contains(destino.label)) {
+    if (!_vivas.contains(destino.id)) {
       return const SizedBox.shrink();
     }
 
-    // La clave va por etiqueta y no por posición: cuando cambian los roles la
+    // La clave va por identificador y no por posición: cuando cambian los roles la
     // lista se reordena, y sin esto Flutter emparejaría cada estado con la
     // pantalla equivocada.
     return KeyedSubtree(
-      key: ValueKey<String>(destino.label),
+      key: ValueKey<ShellDestinationId>(destino.id),
       child: TickerMode(
         enabled: visible,
         child: Builder(builder: destino.builder),

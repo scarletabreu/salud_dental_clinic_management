@@ -53,8 +53,7 @@ class CitaRepositoryImpl implements CitaRepository {
       () => remoteDataSource.fetchEstadoCita(id),
       context: 'consultar el estado de la cita',
     );
-    // `actual == null` => la cita no existe en BD (datos de prueba): no validamos.
-    if (actual != null && !actual.puedeTransicionarA(nuevoEstado)) {
+    if (!actual.puedeTransicionarA(nuevoEstado)) {
       throw TransicionEstadoInvalida(actual, nuevoEstado);
     }
     await runGuarded(
@@ -82,9 +81,7 @@ class CitaRepositoryImpl implements CitaRepository {
       () => remoteDataSource.fetchEstadoCita(cita.id!),
       context: 'consultar el estado de la cita',
     );
-    if (actual != null &&
-        actual != cita.estado &&
-        !actual.puedeTransicionarA(cita.estado)) {
+    if (actual != cita.estado && !actual.puedeTransicionarA(cita.estado)) {
       throw TransicionEstadoInvalida(actual, cita.estado);
     }
 

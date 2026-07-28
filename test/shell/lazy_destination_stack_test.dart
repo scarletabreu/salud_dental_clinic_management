@@ -20,10 +20,9 @@ class _PantallaEspia extends StatefulWidget {
 class _Registro {
   final Map<String, int> creaciones = {};
   final Map<String, int> destrucciones = {};
-  int get vivas =>
-      creaciones.keys
-          .where((k) => (creaciones[k] ?? 0) > (destrucciones[k] ?? 0))
-          .length;
+  int get vivas => creaciones.keys
+      .where((k) => (creaciones[k] ?? 0) > (destrucciones[k] ?? 0))
+      .length;
 }
 
 class _PantallaEspiaState extends State<_PantallaEspia> {
@@ -59,6 +58,7 @@ class _PantallaEspiaState extends State<_PantallaEspia> {
 List<ShellDestination> _destinos(_Registro registro, int cuantos) => [
   for (var i = 0; i < cuantos; i++)
     ShellDestination(
+      id: ShellDestinationId.values[i],
       icon: Icons.circle_outlined,
       selectedIcon: Icons.circle,
       label: 'P$i',
@@ -125,46 +125,54 @@ void main() {
       expect(registro.creaciones.containsKey('P5'), isFalse);
     });
 
-    testWidgets('volver a una pantalla retenida no la reconstruye ni pierde su estado', (
-      tester,
-    ) async {
-      final registro = _Registro();
-      await tester.pumpWidget(_Anfitrion(destinos: _destinos(registro, 12)));
+    testWidgets(
+      'volver a una pantalla retenida no la reconstruye ni pierde su estado',
+      (tester) async {
+        final registro = _Registro();
+        await tester.pumpWidget(_Anfitrion(destinos: _destinos(registro, 12)));
 
-      // El usuario deja P0 con estado propio (una búsqueda escrita, un scroll).
-      tester.state<_PantallaEspiaState>(find.byType(_PantallaEspia)).contador =
-          7;
+        // El usuario deja P0 con estado propio (una búsqueda escrita, un scroll).
+        tester
+                .state<_PantallaEspiaState>(find.byType(_PantallaEspia))
+                .contador =
+            7;
 
-      await _irA(tester, 1);
-      await _irA(tester, 0);
+        await _irA(tester, 1);
+        await _irA(tester, 0);
 
-      expect(
-        registro.creaciones['P0'],
-        1,
-        reason: 'volver no debía recrear la pantalla ni recargar sus datos',
-      );
-      expect(find.text('P0:7'), findsOneWidget, reason: 'se perdió el estado');
-    });
+        expect(
+          registro.creaciones['P0'],
+          1,
+          reason: 'volver no debía recrear la pantalla ni recargar sus datos',
+        );
+        expect(
+          find.text('P0:7'),
+          findsOneWidget,
+          reason: 'se perdió el estado',
+        );
+      },
+    );
 
-    testWidgets('pasado el tope se descarta la pantalla usada hace más tiempo', (
-      tester,
-    ) async {
-      final registro = _Registro();
-      await tester.pumpWidget(
-        _Anfitrion(destinos: _destinos(registro, 12), maxRetenidas: 3),
-      );
+    testWidgets(
+      'pasado el tope se descarta la pantalla usada hace más tiempo',
+      (tester) async {
+        final registro = _Registro();
+        await tester.pumpWidget(
+          _Anfitrion(destinos: _destinos(registro, 12), maxRetenidas: 3),
+        );
 
-      await _irA(tester, 1);
-      await _irA(tester, 2);
-      expect(registro.vivas, 3);
+        await _irA(tester, 1);
+        await _irA(tester, 2);
+        expect(registro.vivas, 3);
 
-      // La cuarta desaloja a P0, que es la que lleva más tiempo sin usarse.
-      await _irA(tester, 3);
+        // La cuarta desaloja a P0, que es la que lleva más tiempo sin usarse.
+        await _irA(tester, 3);
 
-      expect(registro.vivas, 3, reason: 'la retención debe estar acotada');
-      expect(registro.destrucciones['P0'], 1);
-      expect(registro.destrucciones.containsKey('P1'), isFalse);
-    });
+        expect(registro.vivas, 3, reason: 'la retención debe estar acotada');
+        expect(registro.destrucciones['P0'], 1);
+        expect(registro.destrucciones.containsKey('P1'), isFalse);
+      },
+    );
 
     testWidgets('una pantalla desalojada se reconstruye al volver a pedirla', (
       tester,

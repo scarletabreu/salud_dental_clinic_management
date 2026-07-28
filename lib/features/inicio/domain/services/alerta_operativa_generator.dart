@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entit
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
+import 'package:salud_dental_clinic_management/features/equipo/domain/entities/equipo.dart';
 import 'package:salud_dental_clinic_management/features/inicio/domain/entities/alerta_operativa.dart';
 import 'package:salud_dental_clinic_management/features/inicio/domain/enums/entidad_alerta.dart';
 import 'package:salud_dental_clinic_management/features/inicio/domain/enums/severidad_alerta.dart';
@@ -26,12 +27,14 @@ class AlertaOperativaGenerator {
   List<AlertaOperativa> generar({
     required List<Cita> citasDeHoy,
     List<Consumible> consumibles = const [],
+    List<Equipo> equipos = const [],
     CajaDiaria? cajaActual,
     required DateTime ahora,
   }) {
     final alertas = <AlertaOperativa>[
       ..._alertasDeCitas(citasDeHoy, ahora),
       ..._alertasDeInventario(consumibles, ahora),
+      ..._alertasDeEquipos(equipos, ahora),
       ..._alertasDeCaja(cajaActual, ahora),
     ];
 
@@ -44,6 +47,32 @@ class AlertaOperativaGenerator {
     });
 
     return alertas;
+  }
+
+  List<AlertaOperativa> _alertasDeEquipos(
+    List<Equipo> equipos,
+    DateTime ahora,
+  ) {
+    return equipos
+        .where((equipo) => equipo.id != null)
+        .where((equipo) => equipo.mantenimientoVencidoEn(ahora))
+        .map((equipo) {
+          final dias = equipo.diasParaMantenimiento(ahora).abs();
+          return AlertaOperativa(
+            id: 'mantenimiento_vencido_${equipo.id}',
+            tipo: TipoAlerta.mantenimientoVencido,
+            severidad: SeveridadAlerta.alta,
+            titulo: '${equipo.nombre}: mantenimiento vencido',
+            descripcion: dias == 0
+                ? 'El mantenimiento corresponde hoy'
+                : 'Vencido hace $dias día${dias == 1 ? '' : 's'}',
+            entidadTipo: EntidadAlerta.equipo,
+            entidadId: equipo.id,
+            rolesAutorizados: _rolesOperativos,
+            timestamp: equipo.proximoMantenimiento,
+          );
+        })
+        .toList();
   }
 
   List<AlertaOperativa> _alertasDeCitas(List<Cita> citas, DateTime ahora) {

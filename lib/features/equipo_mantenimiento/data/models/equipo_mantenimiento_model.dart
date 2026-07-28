@@ -4,10 +4,11 @@ class EquipoMantenimientoModel extends EquipoMantenimiento {
   EquipoMantenimientoModel({
     super.id,
     required super.equipoId,
-    required super.consumibleId,
+    super.consumibleId,
     required super.descripcion,
-    required super.suplidorId,
+    super.suplidorId,
     required super.costo,
+    required super.fechaMantenimiento,
   });
 
   factory EquipoMantenimientoModel.fromJson(Map<String, dynamic> json) {
@@ -18,6 +19,9 @@ class EquipoMantenimientoModel extends EquipoMantenimiento {
       descripcion: json['descripcion'] as String,
       suplidorId: json['suplidor_id'] ?? json['suplidorId'],
       costo: (json['costo'] as num).toDouble(),
+      fechaMantenimiento: DateTime.parse(
+        json['fecha_mantenimiento'] ?? json['fechaMantenimiento'],
+      ),
     );
   }
 
@@ -28,6 +32,7 @@ class EquipoMantenimientoModel extends EquipoMantenimiento {
       'descripcion': descripcion,
       'suplidor_id': suplidorId,
       'costo': costo,
+      'fecha_mantenimiento': fechaMantenimiento.toIso8601String(),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

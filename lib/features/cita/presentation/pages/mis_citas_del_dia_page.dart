@@ -171,7 +171,87 @@ class _CalendarioView extends StatelessWidget {
         children: [
           _ControlBar(state: state),
           const SizedBox(height: 12),
+          // Sin citas en toda la agenda: se dice explícitamente, porque el
+          // «Sin citas este día» del panel se lee igual estando la base vacía
+          // que estando llena, y antes un fallo de carga se veía como agenda
+          // llena de citas inventadas.
+          if (state.citas.isEmpty) ...[
+            const _AgendaVaciaAviso(),
+            const SizedBox(height: 12),
+          ],
           Expanded(child: _CalendarioBody(state: state)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AgendaVaciaAviso extends StatelessWidget {
+  const _AgendaVaciaAviso();
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: ac.divider.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.event_busy_outlined,
+                size: 20,
+                color: ac.textDisabled,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aún no hay citas registradas',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: ac.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'La agenda está vacía. Crea la primera con «Nueva Cita».',
+                      style: TextStyle(fontSize: 12, color: ac.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          TextButton.icon(
+            onPressed: context.read<CitaCubit>().load,
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Actualizar'),
+            style: TextButton.styleFrom(
+              foregroundColor: ac.primaryBlue,
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );

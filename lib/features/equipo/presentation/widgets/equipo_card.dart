@@ -128,7 +128,7 @@ class EquipoCard extends StatelessWidget {
                 icon: Icon(
                   Icons.handyman_outlined,
                   size: 20,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
                 tooltip: 'Registrar mantenimiento',
                 visualDensity: VisualDensity.compact,

@@ -190,8 +190,6 @@ class _EquipoListPageState extends State<EquipoListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Crear equipo se ofrece desde el botón flotante; un segundo "+" en
-          // la cabecera solo lo duplicaba.
           Text(
             'Equipos',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -236,7 +234,7 @@ class _EquipoListPageState extends State<EquipoListPage> {
                     )
                   : null,
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

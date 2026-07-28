@@ -244,7 +244,7 @@ class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                 size: 20,
               ),
               suffixIcon: _searchController.text.isNotEmpty
@@ -261,7 +261,7 @@ class _ConsumiblesTabBodyState extends State<_ConsumiblesTabBody> {
                     )
                   : null,
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

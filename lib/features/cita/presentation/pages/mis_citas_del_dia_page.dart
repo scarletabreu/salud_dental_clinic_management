@@ -211,11 +211,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.event_busy_outlined,
-                size: 20,
-                color: ac.textDisabled,
-              ),
+              Icon(Icons.event_busy_outlined, size: 20, color: ac.textDisabled),
               const SizedBox(width: 10),
               Flexible(
                 child: Column(
@@ -245,7 +241,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('Actualizar'),
             style: TextButton.styleFrom(
-              foregroundColor: ac.primaryBlue,
+              foregroundColor: ac.primaryGreen,
               textStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

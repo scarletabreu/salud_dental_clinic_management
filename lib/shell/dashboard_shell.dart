@@ -61,7 +61,7 @@ class _DashboardShellView extends StatefulWidget {
 }
 
 class _DashboardShellViewState extends State<_DashboardShellView> {
-  String _selectedLabel = 'Inicio';
+  ShellDestinationId _selectedId = ShellDestinationId.inicio;
 
   final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
 
@@ -291,41 +291,50 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   List<ShellSection> _visibleSections = const [];
   ShellDestination? _visibleConfiguracion;
 
-  /// Roles con los que se calculó [_visibleDestinations].
   List<RolUsuario>? _rolesResueltos;
-
-  /// Filtrar por permisos es barato, pero devolver una lista *nueva* en cada
-  /// build no lo es: obliga al rail y a la barra inferior a reconstruir todos
-  /// sus items en cada frame aunque nada haya cambiado. Memorizar la lista
-  /// mantiene la identidad estable y los deja quietos.
   List<ShellDestination> _destinosPara(List<RolUsuario> roles) {
     if (_rolesResueltos != null && listEquals(_rolesResueltos, roles)) {
       return _visibleDestinations;
     }
     _rolesResueltos = List<RolUsuario>.unmodifiable(roles);
-    _visibleDestinations = List<ShellDestination>.unmodifiable(
-      _allDestinations.where(
-        (destination) =>
-            ShellDestinationAccess.allows(destination.label, roles),
-      ),
-    );
+
+    final validSections = <ShellSection>[];
+    for (final section in _allSections) {
+      final validDestinations = section.destinations
+          .where((d) => ShellDestinationAccess.allows(d.id, roles))
+          .toList();
+
+      if (validDestinations.isNotEmpty) {
+        validSections.add(
+          ShellSection(title: section.title, destinations: validDestinations),
+        );
+      }
+    }
+
+    _visibleSections = List<ShellSection>.unmodifiable(validSections);
+
     _visibleConfiguracion =
         ShellDestinationAccess.allows(_configuracion.id, roles)
         ? _configuracion
         : null;
+
     _visibleDestinations = List<ShellDestination>.unmodifiable([
       for (final section in _visibleSections) ...section.destinations,
       ...[_visibleConfiguracion].whereType<ShellDestination>(),
     ]);
+
     return _visibleDestinations;
   }
 
   void _onDestinationSelected(int index) {
     final destinos = _visibleDestinations;
     if (index < 0 || index >= destinos.length) return;
+
     final id = destinos[index].id;
     if (_selectedId == id) return;
+
     setState(() => _selectedId = id);
+
     if (id == ShellDestinationId.consultas) {
       _consultasListCubit.recargar();
     }
@@ -340,7 +349,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   Widget build(BuildContext context) {
     final roles = context.select((AuthCubit cubit) => cubit.state.roles);
     final destinos = _destinosPara(roles);
-    var selectedIndex = destinos.indexWhere((d) => d.label == _selectedLabel);
+
+    var selectedIndex = destinos.indexWhere((d) => d.id == _selectedId);
     if (selectedIndex == -1) selectedIndex = 0;
 
     final mediaQuery = MediaQuery.of(context);

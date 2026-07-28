@@ -353,7 +353,7 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
                           )
                         : null,
                     filled: true,
-                    fillColor: colorScheme.surfaceContainerHighest,
+                    fillColor: context.appColors.searchFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,

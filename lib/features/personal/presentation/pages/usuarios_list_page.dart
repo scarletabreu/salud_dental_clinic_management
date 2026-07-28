@@ -154,7 +154,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
                     )
                   : null,
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

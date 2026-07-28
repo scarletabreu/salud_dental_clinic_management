@@ -110,7 +110,7 @@ class _SuplidoresTabViewState extends State<SuplidoresTabView> {
                 size: 20,
               ),
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,

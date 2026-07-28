@@ -167,7 +167,7 @@ class _RegistrarMantenimientoDialogState
         ),
         FilledButton.icon(
           onPressed: _guardando ? null : _guardar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           icon: _guardando
               ? const SizedBox.square(
                   dimension: 16,

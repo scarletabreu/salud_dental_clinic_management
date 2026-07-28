@@ -177,8 +177,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // La miga de pan repite el título que va justo debajo:
-                    // en móvil se omite para no robarle ancho ni alto.
                     if (!context.appLayout.isCompact) ...[
                       Row(
                         children: [
@@ -186,7 +184,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                             'Usuarios',
                             style: TextStyle(
                               fontSize: 11,
-                              color: ac.primaryBlue,
+                              color: ac.primaryGreen,
                             ),
                           ),
                           Icon(
@@ -210,8 +208,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                     ],
                     Text(
                       _isEditing ? 'Editar usuario' : 'Registro de usuario',
-                      // La barra tiene alto fijo: el título se recorta antes
-                      // que partirse en varias líneas y desbordarla.
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -223,8 +219,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   ],
                 ),
               ),
-              // En pantallas estrechas la flecha de la cabecera ya cancela; un
-              // segundo botón solo empujaría "Guardar" fuera de la barra.
               if (!context.appLayout.isCompact) ...[
                 OutlinedButton(
                   onPressed: isSaving ? null : () => Navigator.pop(context),
@@ -261,7 +255,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -286,8 +280,8 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withOpacity(0.10),
       icon: Icons.person_outline_rounded,
       title: 'Datos personales del usuario',
       child: Column(
@@ -412,7 +406,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   options: RolUsuario.values,
                   selected: _rolUsuario,
                   labelOf: (rol) => rol.name.toUpperCase(),
-                  activeColor: ac.primaryBlue,
+                  activeColor: ac.primaryGreen,
                   onSelected: (rol) => setState(() => _rolUsuario = rol),
                 ),
               ),
@@ -486,7 +480,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -578,7 +572,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),

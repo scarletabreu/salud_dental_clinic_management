@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/planes_paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/pages/resumen_plan_page.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/estado_plan_estilos.dart';
 
 /// Tarjeta del expediente con la vista longitudinal del plan: todos los planes
@@ -22,21 +23,20 @@ class PlanesTratamientoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Un paciente de prueba no tiene expediente en la base; la tarjeta se
-    // omite en vez de mostrar un error de red.
     if (!_esUuid(pacienteId)) return const SizedBox.shrink();
 
     return BlocProvider<PlanesPacienteCubit>(
       create: (_) =>
           PlanesPacienteCubit(repository: sl(), pacienteId: pacienteId)
             ..cargar(),
-      child: const _PlanesView(),
+      child: _PlanesView(pacienteId: pacienteId), // ya no es const
     );
   }
 }
 
 class _PlanesView extends StatelessWidget {
-  const _PlanesView();
+  final String pacienteId;
+  const _PlanesView({required this.pacienteId});
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +44,9 @@ class _PlanesView extends StatelessWidget {
 
     return BlocBuilder<PlanesPacienteCubit, PlanesPacienteState>(
       builder: (context, state) {
-        if (state is PlanesPacienteCargando ||
-            state is PlanesPacienteInicial) {
+        if (state is PlanesPacienteCargando || state is PlanesPacienteInicial) {
           return _Shell(
+            pacienteId: pacienteId,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -55,7 +55,7 @@ class _PlanesView extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
               ),
@@ -65,6 +65,7 @@ class _PlanesView extends StatelessWidget {
 
         if (state is PlanesPacienteError) {
           return _Shell(
+            pacienteId: pacienteId,
             child: Row(
               children: [
                 Icon(Icons.error_outline_rounded, size: 16, color: ac.red),
@@ -76,8 +77,7 @@ class _PlanesView extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      context.read<PlanesPacienteCubit>().cargar(),
+                  onPressed: () => context.read<PlanesPacienteCubit>().cargar(),
                   child: const Text('Reintentar'),
                 ),
               ],
@@ -88,6 +88,7 @@ class _PlanesView extends StatelessWidget {
         final cargado = state as PlanesPacienteCargado;
         if (cargado.planes.isEmpty) {
           return _Shell(
+            pacienteId: pacienteId,
             child: Text(
               'Este paciente no tiene planes de tratamiento registrados.',
               style: TextStyle(fontSize: 12, color: ac.textMuted),
@@ -96,6 +97,7 @@ class _PlanesView extends StatelessWidget {
         }
 
         return _Shell(
+          pacienteId: pacienteId,
           conteo: cargado.planes.length,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,10 +112,7 @@ class _PlanesView extends StatelessWidget {
               for (var i = 0; i < cargado.planes.length; i++) ...[
                 if (i > 0) ...[
                   const SizedBox(height: 12),
-                  Divider(
-                    height: 1,
-                    color: ac.divider.withValues(alpha: 0.5),
-                  ),
+                  Divider(height: 1, color: ac.divider.withValues(alpha: 0.5)),
                   const SizedBox(height: 12),
                 ],
                 _BloquePlan(plan: cargado.planes[i]),
@@ -139,16 +138,20 @@ class _BandejaPendientes extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.06),
+        color: ac.primaryGreen.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ac.primaryBlue.withValues(alpha: 0.20)),
+        border: Border.all(color: ac.primaryGreen.withValues(alpha: 0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.pending_actions_rounded, size: 15, color: ac.primaryBlue),
+              Icon(
+                Icons.pending_actions_rounded,
+                size: 15,
+                color: ac.primaryGreen,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -156,7 +159,7 @@ class _BandejaPendientes extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
               ),
@@ -165,7 +168,7 @@ class _BandejaPendientes extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
               ),
             ],
@@ -275,12 +278,16 @@ class _FilaItem extends StatelessWidget {
   }
 }
 
-/// Misma anatomía que el resto de tarjetas del expediente.
 class _Shell extends StatelessWidget {
   final Widget child;
   final int? conteo;
+  final String pacienteId;
 
-  const _Shell({required this.child, this.conteo});
+  const _Shell({
+    required this.child,
+    required this.pacienteId,
+    this.conteo,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -304,13 +311,13 @@ class _Shell extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: ac.primaryBlue.withValues(alpha: 0.10),
+                    color: ac.primaryGreen.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     Icons.fact_check_outlined,
                     size: 18,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -329,14 +336,13 @@ class _Shell extends StatelessWidget {
                   ),
                 ),
                 if (conteo != null) ...[
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.07),
+                      color: ac.primaryGreen.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -344,7 +350,23 @@ class _Shell extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Ver resumen financiero del plan',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.summarize_outlined,
+                      size: 19,
+                      color: ac.primaryGreen,
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ResumenPlanPage.porPaciente(pacienteId),
                       ),
                     ),
                   ),

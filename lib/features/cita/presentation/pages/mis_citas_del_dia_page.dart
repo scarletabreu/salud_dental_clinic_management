@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
@@ -104,6 +106,14 @@ class MisCitasDelDiaPage extends StatelessWidget {
       floatingActionButton: BlocBuilder<CitaCubit, CitaCubitState>(
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
+
+          // AÑADIDO: crear citas es exclusivo de asistente/admin.
+          final authState = context.watch<AuthCubit>().state;
+          final puedeCrearCitas =
+              authState.rol == RolUsuario.asistente ||
+              authState.rol == RolUsuario.admin;
+          if (!puedeCrearCitas) return const SizedBox.shrink();
+
           Future<void> abrirNuevaCita() async {
             await NuevaCitaDialog.show(
               context,
@@ -118,7 +128,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
           if (MediaQuery.sizeOf(context).width < 360) {
             return FloatingActionButton(
               heroTag: 'fab_nueva_cita_unique_tag',
-              backgroundColor: context.appColors.primaryBlue,
+              backgroundColor: context.appColors.primaryGreen,
               foregroundColor: Colors.white,
               elevation: 2,
               tooltip: 'Nueva Cita',
@@ -128,7 +138,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
           }
           return FloatingActionButton.extended(
             heroTag: 'fab_nueva_cita_unique_tag',
-            backgroundColor: context.appColors.primaryBlue,
+            backgroundColor: context.appColors.primaryGreen,
             foregroundColor: Colors.white,
             elevation: 2,
             onPressed: abrirNuevaCita,
@@ -147,7 +157,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
     if (state is CitaCubitLoading) {
       return Center(
         child: CircularProgressIndicator(
-          color: context.appColors.primaryBlue,
+          color: context.appColors.primaryGreen,
           strokeWidth: 2,
         ),
       );
@@ -211,11 +221,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.event_busy_outlined,
-                size: 20,
-                color: ac.textDisabled,
-              ),
+              Icon(Icons.event_busy_outlined, size: 20, color: ac.textDisabled),
               const SizedBox(width: 10),
               Flexible(
                 child: Column(
@@ -245,7 +251,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('Actualizar'),
             style: TextButton.styleFrom(
-              foregroundColor: ac.primaryBlue,
+              foregroundColor: ac.primaryGreen,
               textStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -353,7 +359,7 @@ class _ControlBar extends StatelessWidget {
                     _SummaryChip(
                       icon: Icons.calendar_today_rounded,
                       label: '${citasHoy.length} citas',
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     if (urgentes > 0)
                       _SummaryChip(
@@ -439,10 +445,10 @@ class _TodayButton extends StatelessWidget {
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: ac.primaryBlue.withValues(alpha: 0.08),
+          color: ac.primaryGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: ac.primaryBlue.withValues(alpha: 0.2),
+            color: ac.primaryGreen.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -452,7 +458,7 @@ class _TodayButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
         ),
       ),
@@ -651,7 +657,7 @@ class _DowCell extends StatelessWidget {
     final textColor = isWeekend
         ? ac.red
         : isToday
-        ? ac.primaryBlue
+        ? ac.primaryGreen
         : ac.textPrimary;
 
     return Container(
@@ -660,7 +666,9 @@ class _DowCell extends StatelessWidget {
         color: ac.cardBg,
         border: Border(
           bottom: BorderSide(
-            color: isToday ? ac.primaryBlue.withValues(alpha: 0.3) : ac.divider,
+            color: isToday
+                ? ac.primaryGreen.withValues(alpha: 0.3)
+                : ac.divider,
             width: isToday ? 2 : 1,
           ),
         ),
@@ -683,7 +691,7 @@ class _DowCell extends StatelessWidget {
               width: 16,
               height: 2,
               decoration: BoxDecoration(
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -716,12 +724,12 @@ class _DayCell extends StatelessWidget {
     final FontWeight dayWeight;
 
     if (isSelected) {
-      cellBg = ac.primaryBlue;
+      cellBg = ac.primaryGreen;
       dayColor = Colors.white;
       dayWeight = FontWeight.w700;
     } else if (isToday) {
-      cellBg = ac.primaryBlue.withValues(alpha: 0.12);
-      dayColor = ac.primaryBlue;
+      cellBg = ac.primaryGreen.withValues(alpha: 0.12);
+      dayColor = ac.primaryGreen;
       dayWeight = FontWeight.w700;
     } else {
       cellBg = Colors.transparent;
@@ -863,7 +871,7 @@ class _DetailPanel extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isToday ? ac.primaryBlue : ac.textPrimary,
+                            color: isToday ? ac.primaryGreen : ac.textPrimary,
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -874,7 +882,7 @@ class _DetailPanel extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: ac.primaryBlue.withValues(alpha: 0.1),
+                              color: ac.primaryGreen.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -882,7 +890,7 @@ class _DetailPanel extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                             ),
                           )
@@ -1106,6 +1114,18 @@ class _CitaCard extends StatelessWidget {
     final hour = cita.date.hour.toString().padLeft(2, '0');
     final min = cita.date.minute.toString().padLeft(2, '0');
 
+    // AÑADIDO: resolución de permisos por rol para esta tarjeta puntual.
+    final authState = context.watch<AuthCubit>().state;
+    final usuario = authState.usuario;
+    final esAdmin = authState.rol == RolUsuario.admin;
+    final esAsistente = authState.rol == RolUsuario.asistente;
+    final esDoctorDeEstaCita =
+        authState.rol == RolUsuario.doctor && usuario?.id == cita.doctor.id;
+
+    // Crear/editar/cancelar/cambiar estado: solo asistente o admin.
+    final puedeGestionar = esAsistente || esAdmin;
+    final puedeEfectuarConsulta = esDoctorDeEstaCita;
+
     return Container(
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -1117,17 +1137,21 @@ class _CitaCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(
-                  value: context.read<CitaCubit>(),
-                  child: CitaEditPage(cita: cita),
-                ),
-              ),
-            );
-          },
+          // CAMBIO: un doctor sin permisos de gestión no navega al detalle
+          // de edición; su única acción sobre la tarjeta es "Iniciar consulta".
+          onTap: puedeGestionar
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<CitaCubit>(),
+                        child: CitaEditPage(cita: cita),
+                      ),
+                    ),
+                  );
+                }
+              : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             child: Column(
@@ -1257,9 +1281,9 @@ class _CitaCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // En móvil el selector de estado no cabe junto al nombre:
-                    // baja a su propia línea con el resto de acciones.
-                    if (!context.appLayout.isCompact) ...[
+                    // CAMBIO: el dropdown de estado solo aparece si el rol
+                    // puede gestionar la cita (asistente o admin).
+                    if (puedeGestionar && !context.appLayout.isCompact) ...[
                       const SizedBox(width: 8),
                       _EstadoDropdown(
                         cita: cita,
@@ -1269,7 +1293,7 @@ class _CitaCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (context.appLayout.isCompact)
+                if (puedeGestionar && context.appLayout.isCompact)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -1281,7 +1305,9 @@ class _CitaCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                _botonEfectuar(context),
+                // CAMBIO: el botón de consulta ahora depende también de
+                // puedeEfectuarConsulta, no solo del estado de la cita.
+                if (puedeEfectuarConsulta) _botonEfectuar(context),
               ],
             ),
           ),
@@ -1315,7 +1341,7 @@ class _CitaCard extends StatelessWidget {
                   'Diagnostica, planifica y registra tratamientos sin salir.',
               child: FilledButton.icon(
                 onPressed: () => _abrirAtencion(context, pacienteId, doctorId),
-                style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+                style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
                 icon: const Icon(Icons.medical_services_outlined, size: 16),
                 label: const Text('Iniciar consulta'),
               ),
@@ -1501,7 +1527,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: ac.primaryBlue,
+                backgroundColor: ac.primaryGreen,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),

@@ -76,6 +76,7 @@ class TratamientoAplicado {
   final DateTime? anuladoEn;
 
   bool get estaAnulado => anuladoEn != null;
+  final double cantidadRealizada;
 
   TratamientoAplicado({
     this.id,
@@ -97,6 +98,7 @@ class TratamientoAplicado {
     this.doctorEjecutaId,
     this.fechaEjecucion,
     this.anuladoEn,
+    this.cantidadRealizada = 1,
   });
 
   TratamientoAplicado copyWith({
@@ -121,6 +123,7 @@ class TratamientoAplicado {
     String? doctorEjecutaId,
     DateTime? fechaEjecucion,
     DateTime? anuladoEn,
+    double? cantidadRealizada,
   }) {
     return TratamientoAplicado(
       id: id ?? this.id,
@@ -143,6 +146,7 @@ class TratamientoAplicado {
       doctorEjecutaId: doctorEjecutaId ?? this.doctorEjecutaId,
       fechaEjecucion: fechaEjecucion ?? this.fechaEjecucion,
       anuladoEn: anuladoEn ?? this.anuladoEn,
+      cantidadRealizada: cantidadRealizada ?? this.cantidadRealizada,
     );
   }
 }

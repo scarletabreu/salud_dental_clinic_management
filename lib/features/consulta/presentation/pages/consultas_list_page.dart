@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
@@ -112,7 +113,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.tune_rounded, color: ac.primaryBlue),
+                  Icon(Icons.tune_rounded, color: ac.primaryGreen),
                   const SizedBox(width: 8),
                   Text(
                     'Filtros Combinables de Consultas',
@@ -133,7 +134,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: finalizada == true,
-                activeThumbColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryGreen,
                 onChanged: (v) =>
                     setModalState(() => finalizada = v ? true : null),
               ),
@@ -143,7 +144,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneNotas == true,
-                activeThumbColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryGreen,
                 onChanged: (v) =>
                     setModalState(() => tieneNotas = v ? true : null),
               ),
@@ -153,7 +154,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneOdontograma == true,
-                activeThumbColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryGreen,
                 onChanged: (v) =>
                     setModalState(() => tieneOdontograma = v ? true : null),
               ),
@@ -163,7 +164,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneRecetas == true,
-                activeThumbColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryGreen,
                 onChanged: (v) =>
                     setModalState(() => tieneRecetas = v ? true : null),
               ),
@@ -173,7 +174,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                   style: TextStyle(fontSize: 13),
                 ),
                 value: tieneTratamientos == true,
-                activeThumbColor: ac.primaryBlue,
+                activeThumbColor: ac.primaryGreen,
                 onChanged: (v) =>
                     setModalState(() => tieneTratamientos = v ? true : null),
               ),
@@ -212,7 +213,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
                     icon: const Icon(Icons.check_rounded, size: 16),
                     label: const Text('Aplicar Filtros'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryBlue,
+                      backgroundColor: ac.primaryGreen,
                     ),
                   ),
                 ],
@@ -355,7 +356,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: ac.primaryBlue, width: 1.2),
+          borderSide: BorderSide(color: ac.primaryGreen, width: 1.2),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -394,7 +395,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
 
     final rangeButton = OutlinedButton.icon(
       onPressed: () => _seleccionarRango(state.rangoFechas),
-      icon: Icon(Icons.date_range_rounded, size: 18, color: ac.primaryBlue),
+      icon: Icon(Icons.date_range_rounded, size: 18, color: ac.primaryGreen),
       label: Text(
         state.rangoFechas == null
             ? 'Rango de fechas'
@@ -410,11 +411,11 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       style: OutlinedButton.styleFrom(
         backgroundColor: state.rangoFechas == null
             ? ac.searchFill
-            : ac.primaryBlue.withValues(alpha: 0.08),
+            : ac.primaryGreen.withValues(alpha: 0.08),
         side: BorderSide(
           color: state.rangoFechas == null
               ? colorScheme.outlineVariant.withValues(alpha: 0.3)
-              : ac.primaryBlue.withValues(alpha: 0.4),
+              : ac.primaryGreen.withValues(alpha: 0.4),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -427,7 +428,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       label: const Text('Filtros'),
       style: FilledButton.styleFrom(
         backgroundColor: state.hayFiltrosActivos
-            ? ac.primaryBlue
+            ? ac.primaryGreen
             : ac.searchFill,
         foregroundColor: state.hayFiltrosActivos
             ? Colors.white
@@ -586,7 +587,7 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),
@@ -639,7 +640,7 @@ class _CountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.07),
+        color: ac.primaryGreen.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -649,13 +650,13 @@ class _CountBadge extends StatelessWidget {
             '$count',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: ac.primaryBlue,
+              color: ac.primaryGreen,
             ),
           ),
           const SizedBox(width: 4),
           Icon(
             Icons.medical_information_rounded,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
             size: 13,
           ),
         ],
@@ -685,15 +686,15 @@ class _DoctorChip extends StatelessWidget {
       onSelected: (_) => onTap(),
       showCheckmark: false,
       labelStyle: TextStyle(
-        color: selected ? ac.primaryBlue : colorScheme.onSurfaceVariant,
+        color: selected ? ac.primaryGreen : colorScheme.onSurfaceVariant,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         fontSize: 13,
       ),
       backgroundColor: ac.searchFill,
-      selectedColor: ac.primaryBlue.withValues(alpha: 0.1),
+      selectedColor: ac.primaryGreen.withValues(alpha: 0.1),
       side: BorderSide(
         color: selected
-            ? ac.primaryBlue.withValues(alpha: 0.4)
+            ? ac.primaryGreen.withValues(alpha: 0.4)
             : colorScheme.outlineVariant.withValues(alpha: 0.3),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -807,6 +808,11 @@ class ConsultaListCard extends StatelessWidget {
     final esEliminable = esConsultaEliminable(consulta);
     final layout = context.appLayout;
 
+    final authState = context.watch<AuthCubit>().state;
+    final usuario = authState.usuario;
+    final esDoctorDeEstaConsulta = usuario?.id == consulta.doctorId;
+    final puedeContinuar = esDoctorDeEstaConsulta;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -828,7 +834,7 @@ class ConsultaListCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
-          hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
+          hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -883,6 +889,7 @@ class ConsultaListCard extends StatelessWidget {
                   consulta: consulta,
                   tieneTratamientos: tieneTratamientos,
                   esEliminable: esEliminable,
+                  puedeContinuar: puedeContinuar,
                   layout: layout,
                   onEliminar: () => _mostrarDialogoEliminar(context),
                   onContinuar: () async {
@@ -945,7 +952,7 @@ class _IndicadoresConsultasLeyenda extends StatelessWidget {
             ),
             _LeyendaIndicador(
               icon: Icons.receipt_long_rounded,
-              color: ac.primaryBlue,
+              color: ac.primaryGreen,
               label: 'Tiene receta',
               textoVisible: textoVisible,
             ),
@@ -1000,6 +1007,7 @@ class _AccionesConsulta extends StatelessWidget {
     required this.consulta,
     required this.tieneTratamientos,
     required this.esEliminable,
+    required this.puedeContinuar,
     required this.layout,
     required this.onEliminar,
     required this.onContinuar,
@@ -1008,6 +1016,7 @@ class _AccionesConsulta extends StatelessWidget {
   final Consulta consulta;
   final bool tieneTratamientos;
   final bool esEliminable;
+  final bool puedeContinuar;
   final AppLayout layout;
   final VoidCallback onEliminar;
   final Future<void> Function() onContinuar;
@@ -1043,7 +1052,7 @@ class _AccionesConsulta extends StatelessWidget {
         _IndicadorConsulta(
           presente: consulta.tieneRecetas,
           icon: Icons.receipt_long_rounded,
-          color: ac.primaryBlue,
+          color: ac.primaryGreen,
           label: 'Tiene receta',
           textoVisible: textoVisible,
         ),
@@ -1107,6 +1116,7 @@ class _AccionesConsulta extends StatelessWidget {
         ),
         _AccionPrincipalConsulta(
           consulta: consulta,
+          puedeContinuar: puedeContinuar,
           textoVisible: textoVisible,
           onContinuar: onContinuar,
         ),
@@ -1236,11 +1246,13 @@ class _IndicadorConsulta extends StatelessWidget {
 class _AccionPrincipalConsulta extends StatelessWidget {
   const _AccionPrincipalConsulta({
     required this.consulta,
+    required this.puedeContinuar,
     required this.textoVisible,
     required this.onContinuar,
   });
 
   final Consulta consulta;
+  final bool puedeContinuar;
   final bool textoVisible;
   final Future<void> Function() onContinuar;
 
@@ -1248,10 +1260,14 @@ class _AccionPrincipalConsulta extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final clave = ValueKey('consulta-accion-principal-${consulta.id}');
-    if (consulta.finalizada) {
+    // Solo el doctor de la consulta puede retomarla (SD-149); para el resto la
+    // fila conserva su ranura de acción con el chevron de solo lectura.
+    if (consulta.finalizada || !puedeContinuar) {
       return Semantics(
         key: clave,
-        label: 'Ver detalle de consulta finalizada',
+        label: consulta.finalizada
+            ? 'Ver detalle de consulta finalizada'
+            : 'Ver detalle de consulta',
         child: SizedBox(
           width: textoVisible ? 36 : 32,
           height: textoVisible ? 36 : 32,
@@ -1274,7 +1290,7 @@ class _AccionPrincipalConsulta extends StatelessWidget {
         child: IconButton(
           onPressed: onContinuar,
           icon: const Icon(Icons.navigate_next_rounded, size: 18),
-          color: ac.primaryBlue,
+          color: ac.primaryGreen,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 32, height: 32),
         ),
@@ -1289,7 +1305,7 @@ class _AccionPrincipalConsulta extends StatelessWidget {
         icon: const Icon(Icons.navigate_next_rounded, size: 16),
         label: const Text('Continuar'),
         style: TextButton.styleFrom(
-          foregroundColor: ac.primaryBlue,
+          foregroundColor: ac.primaryGreen,
           minimumSize: const Size(36, 36),
           padding: const EdgeInsets.symmetric(horizontal: 8),
         ),
@@ -1309,7 +1325,7 @@ class _DateBadge extends StatelessWidget {
       width: 54,
       height: 54,
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.07),
+        color: ac.primaryGreen.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1322,7 +1338,7 @@ class _DateBadge extends StatelessWidget {
               '${fecha.day}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 height: 1,
               ),
             ),
@@ -1330,7 +1346,7 @@ class _DateBadge extends StatelessWidget {
             Text(
               '${mesAbrevEs(fecha)} ${fecha.year}',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: ac.primaryBlue.withValues(alpha: 0.8),
+                color: ac.primaryGreen.withValues(alpha: 0.8),
                 fontSize: 9,
                 fontWeight: FontWeight.w600,
               ),
@@ -1339,7 +1355,7 @@ class _DateBadge extends StatelessWidget {
             Text(
               '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: ac.primaryBlue.withValues(alpha: 0.8),
+                color: ac.primaryGreen.withValues(alpha: 0.8),
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
               ),

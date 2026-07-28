@@ -58,10 +58,10 @@ class ShellDestinationAccess {
       case ShellDestinationId.perfiles:
       case ShellDestinationId.equipos:
       case ShellDestinationId.inventario:
-        return roles.contains(RolUsuario.admin);
-      case ShellDestinationId.consultas:
       case ShellDestinationId.medicinas:
       case ShellDestinationId.tratamientos:
+        return roles.contains(RolUsuario.admin);
+      case ShellDestinationId.consultas:
         return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
       case ShellDestinationId.pacientes:
       case ShellDestinationId.citasDelDia:

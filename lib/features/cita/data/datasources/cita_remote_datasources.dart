@@ -41,68 +41,81 @@ class CitaRemoteDataSource {
     return _assembleCitas(citasRes as List);
   }
 
-  Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
+ Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
     if (rawCitas.isEmpty) return [];
 
-    final doctorIds = rawCitas
-        .map((c) => (c as Map<String, dynamic>)['doctor_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-
     final personaIds = rawCitas
-        .map((c) => (c as Map<String, dynamic>)['persona_id'] as String?)
-        .whereType<String>()
+        .where((c) => (c as Map<String, dynamic>)['persona_id'] != null)
+        .map((c) => (c as Map<String, dynamic>)['persona_id'] as String)
         .toSet()
         .toList();
 
-    final Map<String, Map<String, dynamic>> doctorPersonas = {};
-    if (doctorIds.isNotEmpty) {
-      final res = await supabase
-          .from('personas')
-          .select('*')
-          .inFilter('id', doctorIds);
-      for (final row in res as List) {
-        final m = row as Map<String, dynamic>;
-        doctorPersonas[m['id'] as String] = m;
-      }
-    }
-    final Map<String, Map<String, dynamic>> pacientes = {};
-    if (personaIds.isNotEmpty) {
-      final res = await supabase
-          .from('pacientes')
-          .select(
-            '*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)',
-          )
-          .inFilter('id', personaIds);
-      for (final row in res as List) {
-        final m = row as Map<String, dynamic>;
-        pacientes[m['id'] as String] = m;
-      }
-
-      final missing = personaIds
-          .where((id) => !pacientes.containsKey(id))
-          .toList();
-      if (missing.isNotEmpty) {
-        final fallback = await supabase
-            .from('personas')
-            .select('*')
-            .inFilter('id', missing);
-        for (final row in fallback as List) {
-          final m = row as Map<String, dynamic>;
-          pacientes[m['id'] as String] = {'id': m['id'], 'personas': m};
+    // 1. OBTENER DOCTORES USANDO EL RPC SEGURO (Bypass / Respeta RLS correctamente)
+    final Map<String, Map<String, dynamic>> doctorMaps = {};
+    try {
+      final responseDoctores = await supabase.rpc('get_active_doctors');
+      for (final docJson in (responseDoctores as List)) {
+        final m = docJson as Map<String, dynamic>;
+        final id = m['doctor_id'] as String?;
+        if (id != null) {
+          doctorMaps[id] = m;
         }
       }
+    } catch (e) {
+      AppLog.error('Error cargando doctores en _assembleCitas', e);
     }
+
+    // 2. Obtener pacientes (esto suele tener menos restricciones o permisos distintos)
+    final Map<String, Map<String, dynamic>> pacientes = {};
+    if (personaIds.isNotEmpty) {
+      try {
+        final res = await supabase
+            .from('pacientes')
+            .select(
+              '*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)',
+            )
+            .inFilter('id', personaIds);
+        for (final row in res as List) {
+          final m = row as Map<String, dynamic>;
+          if (m['id'] != null) {
+            pacientes[m['id'] as String] = m;
+          }
+        }
+
+        final missing = personaIds
+            .where((id) => !pacientes.containsKey(id))
+            .toList();
+        if (missing.isNotEmpty) {
+          final fallback = await supabase
+              .from('personas')
+              .select('*')
+              .inFilter('id', missing);
+          for (final row in fallback as List) {
+            final m = row as Map<String, dynamic>;
+            final id = m['id'] as String?;
+            if (id != null) {
+              pacientes[id] = {'id': id, 'personas': m};
+            }
+          }
+        }
+      } catch (e) {
+        AppLog.error('Error cargando pacientes en _assembleCitas', e);
+      }
+    }
+
     final List<CitaModel> result = [];
 
+    // 3. Ensamblar las citas combinando la información obtenida
     for (final c in rawCitas) {
       try {
         final json = Map<String, dynamic>.from(c as Map);
+        final doctorId = json['doctor_id'] as String?;
 
-        final dp = doctorPersonas[json['doctor_id'] as String?] ?? {};
+        // Obtenemos los datos del doctor desde el mapa construido con el RPC
+        final dp = (doctorId != null ? doctorMaps[doctorId] : null) ?? {};
+        
         json['doctor'] = {
-          'id': json['doctor_id'],
+          'doctor_id': doctorId,
           'nombre': dp['nombre'] ?? '',
           'apellido': dp['apellido'] ?? '',
           'fecha_nacimiento': dp['fecha_nacimiento'] ?? '2000-01-01',
@@ -112,8 +125,8 @@ class CitaRemoteDataSource {
           'password_hash': dp['password_hash'] ?? '',
           'especialidad': dp['especialidad'] ?? '',
           'esta_disponible': dp['esta_disponible'] ?? true,
-          'assistants': <dynamic>[],
-          'contacto': const {
+          'assistants': dp['assistants'] ?? <dynamic>[],
+          'contacto': dp['contacto'] ?? const {
             'email': '',
             'numero_telefono': '',
             'direccion': '',

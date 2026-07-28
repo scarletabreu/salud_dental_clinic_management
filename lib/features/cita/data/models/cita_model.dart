@@ -14,25 +14,26 @@ class CitaModel extends Cita {
     required super.estado,
   });
 
-  factory CitaModel.fromJson(Map<String, dynamic> json) {
-    final String? fechaRaw = json['fecha'] ?? json['fecha_hora'];
+factory CitaModel.fromJson(Map<String, dynamic> json) {
+  final String? fechaRaw = json['fecha'] ?? json['fecha_hora'];
 
-    if (fechaRaw == null) {
-      throw Exception(
-        'Error de mapeo: La columna de fecha no se encuentra en el payload de la cita.',
-      );
-    }
-
-    return CitaModel(
-      id: json['id'] as String?,
-      doctor: DoctorModel.fromJson(json['doctor']),
-      persona: PersonaModel.fromJson(json['persona']),
-      date: DateTime.parse(fechaRaw).toLocal(),
-      duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
-      esEmergencia: json['es_emergencia'] ?? false,
-      estado: EstadoCita.fromDb(json['estado'] as String?),
+  if (fechaRaw == null) {
+    throw Exception(
+      'Error de mapeo: La columna de fecha no se encuentra en el payload de la cita.',
     );
   }
+
+  return CitaModel(
+    id: json['id'] as String?,
+
+    doctor: DoctorModel.fromJsonFn(json['doctor'] as Map<String, dynamic>),
+    persona: PersonaModel.fromJson(json['persona']),
+    date: DateTime.parse(fechaRaw).toLocal(),
+    duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
+    esEmergencia: json['es_emergencia'] ?? false,
+    estado: EstadoCita.fromDb(json['estado'] as String?),
+  );
+}
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'doctor_id': doctor.id,

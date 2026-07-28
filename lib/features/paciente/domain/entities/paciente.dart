@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Paciente extends Persona {
   final Genero genero;
@@ -14,6 +15,10 @@ class Paciente extends Persona {
   final TipoPaciente tipoPaciente;
   final double? peso;
   final double? altura;
+  final String? fotoRuta;
+  final String? fotoMimeType;
+  final int? fotoTamanoBytes;
+  final DateTime? fotoActualizadaEn;
 
   Paciente({
     super.id,
@@ -31,7 +36,37 @@ class Paciente extends Persona {
     required this.tipoPaciente,
     this.peso,
     this.altura,
+    this.fotoRuta,
+    this.fotoMimeType,
+    this.fotoTamanoBytes,
+    this.fotoActualizadaEn,
   });
+
+  bool get tieneFoto => fotoRuta != null && fotoRuta!.trim().isNotEmpty;
+
+  String? get fotoUrl {
+    if (!tieneFoto) return null;
+
+    final ruta = fotoRuta!.trim();
+    String urlBase;
+
+    if (ruta.startsWith('http://') || ruta.startsWith('https://')) {
+      urlBase = ruta;
+    } else {
+      urlBase = Supabase.instance.client.storage
+          .from('fotos-pacientes')
+          .getPublicUrl(ruta);
+    }
+
+    if (fotoActualizadaEn != null) {
+      final timestamp = fotoActualizadaEn!.millisecondsSinceEpoch;
+      return urlBase.contains('?')
+          ? '$urlBase&v=$timestamp'
+          : '$urlBase?v=$timestamp';
+    }
+
+    return urlBase;
+  }
 
   Paciente copyWith({
     String? govID,
@@ -44,6 +79,10 @@ class Paciente extends Persona {
     TipoPaciente? tipoPaciente,
     double? peso,
     double? altura,
+    String? fotoRuta,
+    String? fotoMimeType,
+    int? fotoTamanoBytes,
+    DateTime? fotoActualizadaEn,
   }) {
     return Paciente(
       id: id,
@@ -61,6 +100,10 @@ class Paciente extends Persona {
       tipoPaciente: tipoPaciente ?? this.tipoPaciente,
       peso: peso ?? this.peso,
       altura: altura ?? this.altura,
+      fotoRuta: fotoRuta ?? this.fotoRuta,
+      fotoMimeType: fotoMimeType ?? this.fotoMimeType,
+      fotoTamanoBytes: fotoTamanoBytes ?? this.fotoTamanoBytes,
+      fotoActualizadaEn: fotoActualizadaEn ?? this.fotoActualizadaEn,
     );
   }
 }

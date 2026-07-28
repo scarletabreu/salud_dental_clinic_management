@@ -132,7 +132,7 @@ class _PlanVacio extends StatelessWidget {
             onPressed: onConfigurar,
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Configurar plan'),
-            style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+            style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           ),
         ],
       ),
@@ -289,7 +289,7 @@ class _FilaCuota extends StatelessWidget {
                                 : 'Pagar cuota',
                           ),
                           style: TextButton.styleFrom(
-                            foregroundColor: ac.primaryBlue,
+                            foregroundColor: ac.primaryGreen,
                             visualDensity: VisualDensity.compact,
                           ),
                         ),
@@ -584,7 +584,7 @@ class _DialogoPlanCuotasState extends State<_DialogoPlanCuotas> {
         ),
         FilledButton(
           onPressed: preview.isEmpty || _guardando ? null : _confirmar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           child: _guardando
               ? const SizedBox(
                   width: 18,

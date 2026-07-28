@@ -230,7 +230,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                     ),
                   )
                 : CircularProgressIndicator(
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                     strokeWidth: 2,
                   ),
           ),
@@ -405,7 +405,7 @@ class _PanelPacienteButton extends StatelessWidget {
             color: ac.chipBg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryBlue),
+          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryGreen),
         ),
       ),
     );
@@ -506,7 +506,7 @@ class _StepPill extends StatelessWidget {
       fg = ac.green;
       textColor = ac.green;
     } else if (active) {
-      bg = ac.primaryBlue;
+      bg = ac.primaryGreen;
       fg = Colors.white;
       textColor = ac.textPrimary;
     } else {

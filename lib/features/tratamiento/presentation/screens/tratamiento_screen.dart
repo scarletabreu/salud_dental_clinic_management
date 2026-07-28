@@ -130,7 +130,7 @@ class _TratamientosViewState extends State<_TratamientosView> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: ac.primaryBlue.withOpacity(0.07),
+                        color: ac.primaryGreen.withOpacity(0.07),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -141,14 +141,14 @@ class _TratamientosViewState extends State<_TratamientosView> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: ac.primaryBlue,
+                              color: ac.primaryGreen,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Icon(
                             Icons.medical_services_outlined,
                             size: 13,
-                            color: ac.primaryBlue,
+                            color: ac.primaryGreen,
                           ),
                         ],
                       ),
@@ -164,7 +164,7 @@ class _TratamientosViewState extends State<_TratamientosView> {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
@@ -221,7 +221,7 @@ class _TratamientosViewState extends State<_TratamientosView> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: ac.primaryBlue, width: 1.2),
+                borderSide: BorderSide(color: ac.primaryGreen, width: 1.2),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -240,7 +240,7 @@ class _TratamientosViewState extends State<_TratamientosView> {
     TratamientoState state,
   ) {
     if (state is TratamientoLoading) {
-      return Center(child: CircularProgressIndicator(color: ac.primaryBlue));
+      return Center(child: CircularProgressIndicator(color: ac.primaryGreen));
     }
 
     if (state is TratamientoError) {
@@ -335,7 +335,7 @@ class _TratamientosViewState extends State<_TratamientosView> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

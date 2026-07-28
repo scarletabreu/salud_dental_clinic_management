@@ -79,12 +79,12 @@ Future<void> mostrarDialogoCrearCompra(BuildContext context) async {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: ac.primaryBlue.withValues(alpha: 0.12),
+                                color: ac.primaryGreen.withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 Icons.add_shopping_cart_rounded,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                                 size: 24,
                               ),
                             ),
@@ -247,7 +247,7 @@ Future<void> mostrarDialogoCrearCompra(BuildContext context) async {
                             const SizedBox(width: 8),
                             IconButton.filled(
                               style: IconButton.styleFrom(
-                                backgroundColor: ac.primaryBlue,
+                                backgroundColor: ac.primaryGreen,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -417,7 +417,7 @@ Future<void> mostrarDialogoCrearCompra(BuildContext context) async {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: ac.primaryBlue,
+                                  color: ac.primaryGreen,
                                 ),
                               ),
                             ],
@@ -438,7 +438,7 @@ Future<void> mostrarDialogoCrearCompra(BuildContext context) async {
                               icon: const Icon(Icons.check_rounded, size: 18),
                               label: const Text('Registrar Compra'),
                               style: FilledButton.styleFrom(
-                                backgroundColor: ac.primaryBlue,
+                                backgroundColor: ac.primaryGreen,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 12,

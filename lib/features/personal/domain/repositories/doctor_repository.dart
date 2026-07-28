@@ -6,4 +6,5 @@ abstract class DoctorRepository {
   Future<void> updateDoctor(String userId, String newUserId);
   Future<void> deleteDoctor(String userId);
   Future<Doctor?> getDoctorByUserId(String userId);
+  Future<List<String>> getDoctorIdsAsignados(String asistenteId);
 }

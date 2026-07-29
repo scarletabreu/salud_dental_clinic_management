@@ -178,6 +178,7 @@ class CitaRemoteDataSource {
       'duracion_minutos': cita.duracionMinutos,
       'es_emergencia': cita.esEmergencia,
       'estado': cita.estado.dbValue,
+      'motivo': CitaModel.normalizarMotivo(cita.motivo),
       'updated_at': DateTime.now().toIso8601String(),
     };
     await supabase.from('citas').update(data).eq('id', cita.id!);

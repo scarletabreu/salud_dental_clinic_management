@@ -109,9 +109,11 @@ class PacienteModel extends Paciente {
       fotoRuta: json['foto_ruta'] as String?,
       fotoMimeType: json['foto_mime_type'] as String?,
       fotoTamanoBytes: parseInt(json['foto_tamano_bytes']),
-      fotoActualizadaEn: json['foto_actualizada_en'] != null
-          ? DateTime.parse(json['foto_actualizada_en'] as String).toLocal()
-          : null,
+      fotoActualizadaEn: json['foto_actualizada_en'] == null
+          ? null
+          : DateTime.tryParse(
+              json['foto_actualizada_en'] as String,
+            )?.toLocal(),
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),
@@ -127,10 +129,7 @@ class PacienteModel extends Paciente {
       'referencia': referencia,
       'peso': peso,
       'altura': altura,
-      'foto_ruta': fotoRuta,
-      'foto_mime_type': fotoMimeType,
-      'foto_tamano_bytes': fotoTamanoBytes,
-      'foto_actualizada_en': fotoActualizadaEn?.toIso8601String(),
+      // Sin campos `foto_*`: solo `PacienteFotoStorage` escribe esas columnas.
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

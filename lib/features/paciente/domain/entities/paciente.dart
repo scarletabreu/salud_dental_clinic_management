@@ -15,6 +15,8 @@ class Paciente extends Persona {
   final TipoPaciente tipoPaciente;
   final double? peso;
   final double? altura;
+
+  /// Solo se persiste la ruta privada de Storage y datos técnicos, nunca una URL.
   final String? fotoRuta;
   final String? fotoMimeType;
   final int? fotoTamanoBytes;

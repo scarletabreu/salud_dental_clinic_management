@@ -515,6 +515,7 @@ class _CitaBlock extends StatelessWidget {
                   citaId: cita.id!,
                   pacienteId: pacienteId!,
                   doctorId: doctorId!,
+                  motivoCita: cita.motivo,
                 ),
               ),
             )

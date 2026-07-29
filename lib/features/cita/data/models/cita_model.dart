@@ -12,28 +12,39 @@ class CitaModel extends Cita {
     super.duracionMinutos = 30,
     required super.esEmergencia,
     required super.estado,
+    super.motivo,
   });
 
-factory CitaModel.fromJson(Map<String, dynamic> json) {
-  final String? fechaRaw = json['fecha'] ?? json['fecha_hora'];
+  /// Un motivo en blanco es "sin motivo": así el campo vacío del formulario no
+  /// se guarda como cadena vacía ni se pinta como si el paciente hubiera dicho
+  /// algo.
+  static String? normalizarMotivo(String? valor) {
+    final limpio = valor?.trim() ?? '';
+    return limpio.isEmpty ? null : limpio;
+  }
 
-  if (fechaRaw == null) {
-    throw Exception(
-      'Error de mapeo: La columna de fecha no se encuentra en el payload de la cita.',
+  factory CitaModel.fromJson(Map<String, dynamic> json) {
+    final String? fechaRaw = json['fecha'] ?? json['fecha_hora'];
+
+    if (fechaRaw == null) {
+      throw Exception(
+        'Error de mapeo: La columna de fecha no se encuentra en el payload de la cita.',
+      );
+    }
+
+    return CitaModel(
+      id: json['id'] as String?,
+      // dev aplanó el payload del doctor: la cita ya no trae el embed anidado.
+      doctor: DoctorModel.fromJsonFn(json['doctor'] as Map<String, dynamic>),
+      persona: PersonaModel.fromJson(json['persona']),
+      date: DateTime.parse(fechaRaw).toLocal(),
+      duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
+      esEmergencia: json['es_emergencia'] ?? false,
+      estado: EstadoCita.fromDb(json['estado'] as String?),
+      motivo: normalizarMotivo(json['motivo'] as String?),
     );
   }
 
-  return CitaModel(
-    id: json['id'] as String?,
-
-    doctor: DoctorModel.fromJsonFn(json['doctor'] as Map<String, dynamic>),
-    persona: PersonaModel.fromJson(json['persona']),
-    date: DateTime.parse(fechaRaw).toLocal(),
-    duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
-    esEmergencia: json['es_emergencia'] ?? false,
-    estado: EstadoCita.fromDb(json['estado'] as String?),
-  );
-}
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'doctor_id': doctor.id,
@@ -42,6 +53,7 @@ factory CitaModel.fromJson(Map<String, dynamic> json) {
       'duracion_minutos': duracionMinutos,
       'es_emergencia': esEmergencia,
       'estado': estado.dbValue,
+      'motivo': normalizarMotivo(motivo),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

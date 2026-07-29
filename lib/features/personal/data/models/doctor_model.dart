@@ -34,7 +34,7 @@ class DoctorModel extends Doctor {
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
 
-      estatus: _parseEstatus(personaData['estatus'] as String?),
+      estatus: _calcularEstatus(usuarioData['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
       passwordHash: usuarioData['password_hash'] as String? ?? '',
 
@@ -61,7 +61,7 @@ class DoctorModel extends Doctor {
           : DateTime.now(),
       govID: json['cedula'] as String? ?? '',
       contactos: [],
-      estatus: _parseEstatus(json['estatus'] as String?),
+      estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: json['username'] as String? ?? '',
       passwordHash: json['password_hash'] as String? ?? '',
 
@@ -72,13 +72,10 @@ class DoctorModel extends Doctor {
     );
   }
 
-  static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo;
-
-    return EstatusPersona.values.firstWhere(
-      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo,
-    );
+  static EstatusPersona _calcularEstatus(String? deletedAtStr) {
+    return deletedAtStr == null
+        ? EstatusPersona.activo
+        : EstatusPersona.inactivo;
   }
 
   static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {

@@ -41,7 +41,7 @@ class AdminModel extends Admin {
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
 
-      estatus: _parseEstatus(personaData['estatus'] as String?),
+      estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
       passwordHash: usuarioData['password_hash'] as String? ?? '',
 
@@ -49,13 +49,10 @@ class AdminModel extends Admin {
     );
   }
 
-  static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo;
-
-    return EstatusPersona.values.firstWhere(
-      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo,
-    );
+  static EstatusPersona _calcularEstatus(String? deletedAtStr) {
+    return deletedAtStr == null
+        ? EstatusPersona.activo
+        : EstatusPersona.inactivo;
   }
 
   static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {

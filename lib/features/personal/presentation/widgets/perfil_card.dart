@@ -3,14 +3,26 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 
+enum PerfilAccion { editar, desactivar }
+
 class PerfilCard extends StatelessWidget {
   final Usuario usuario;
   final VoidCallback? onTap;
+  final VoidCallback? onEditar;
+  final VoidCallback? onDesactivar;
 
-  const PerfilCard({super.key, required this.usuario, this.onTap});
+  const PerfilCard({
+    super.key,
+    required this.usuario,
+    this.onTap,
+    this.onEditar,
+    this.onDesactivar,
+  });
 
   bool get esActivo =>
       usuario.estatus.toString().toLowerCase().contains('activo');
+
+  bool get _esAdmin => usuario.rol == RolUsuario.admin;
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +68,6 @@ class PerfilCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nombre e insignias comparten línea mientras quepan; en
-                      // pantallas estrechas las insignias bajan a la siguiente.
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 8,
@@ -112,10 +122,51 @@ class PerfilCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.4),
-                ),
+                if (onEditar != null || onDesactivar != null)
+                  PopupMenuButton<PerfilAccion>(
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    ),
+                    onSelected: (accion) {
+                      switch (accion) {
+                        case PerfilAccion.editar:
+                          onEditar?.call();
+                        case PerfilAccion.desactivar:
+                          onDesactivar?.call();
+                      }
+                    },
+                    itemBuilder: (menuContext) => [
+                      const PopupMenuItem(
+                        value: PerfilAccion.editar,
+                        child: ListTile(
+                          leading: Icon(Icons.edit_outlined),
+                          title: Text('Editar'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      if (!_esAdmin)
+                        const PopupMenuItem(
+                          value: PerfilAccion.desactivar,
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.person_off_outlined,
+                              color: Colors.redAccent,
+                            ),
+                            title: Text(
+                              'Desactivar',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                    ],
+                  )
+                else
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  ),
               ],
             ),
           ),

@@ -9,6 +9,7 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/page
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
@@ -290,8 +291,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
   Widget _buildIdentityCard(Paciente p, {required bool esDoctor}) {
     final ac = context.appColors;
-    final fotoUrl = p.fotoUrl;
-    final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
 
     return Container(
       width: double.infinity,
@@ -393,27 +392,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: ac.bgPage,
-                  border: Border.all(
-                    color: ac.primaryGreen.withValues(alpha: 0.4),
-                    width: 2,
-                  ),
-                  image: tieneFoto
-                      ? DecorationImage(
-                          image: NetworkImage(fotoUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: !tieneFoto
-                    ? Icon(Icons.person_rounded, size: 40, color: ac.textMuted)
-                    : null,
-              ),
+              // El bucket de fotos es privado: PacienteAvatar pide la URL
+              // firmada en vez de construir una pública.
+              PacienteAvatar(paciente: p, size: 72),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

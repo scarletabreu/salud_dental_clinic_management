@@ -1,6 +1,10 @@
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
@@ -11,8 +15,13 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/recorte_foto_dialog.dart';
+import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 
@@ -45,6 +54,11 @@ class NuevaCitaDialog extends StatefulWidget {
   final PersonaRepository personaRepository;
   final DoctorRepository doctorRepository;
 
+  /// El paciente nuevo se registra por aquí y no por `personaRepository`: una
+  /// persona sin fila en `pacientes` no aparece en el listado ni puede
+  /// atenderse, y perdía el género y el tipo que este formulario ya pide.
+  final IPacienteRepository pacienteRepository;
+
   /// Momento con el que abre el diálogo cuando se llega desde una casilla de la
   /// agenda. Sin esto, tocar las 9:00 del miércoles abría un formulario vacío y
   /// obligaba a volver a elegir el día y la hora que ya se habían señalado.
@@ -53,6 +67,7 @@ class NuevaCitaDialog extends StatefulWidget {
   const NuevaCitaDialog._({
     required this.personaRepository,
     required this.doctorRepository,
+    required this.pacienteRepository,
     this.fechaInicial,
   });
 
@@ -60,6 +75,7 @@ class NuevaCitaDialog extends StatefulWidget {
     BuildContext context, {
     required PersonaRepository personaRepository,
     required DoctorRepository doctorRepository,
+    required IPacienteRepository pacienteRepository,
     DateTime? fechaInicial,
   }) {
     return showDialog<void>(
@@ -70,6 +86,7 @@ class NuevaCitaDialog extends StatefulWidget {
         child: NuevaCitaDialog._(
           personaRepository: personaRepository,
           doctorRepository: doctorRepository,
+          pacienteRepository: pacienteRepository,
           fechaInicial: fechaInicial,
         ),
       ),
@@ -104,6 +121,11 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
   DateTime? _fechaNacimiento;
   Genero _genero = Genero.masculino;
   TipoPaciente _tipoPaciente = TipoPaciente.integrado;
+
+  /// Foto ya recortada y comprimida. Se guarda en memoria hasta que el
+  /// paciente exista en la base: Storage necesita su id para la ruta.
+  Uint8List? _fotoPendiente;
+  bool _procesandoFoto = false;
 
   bool get _esNuevaPersona => _paso1Mode == _Paso1Mode.nuevaPersona;
 
@@ -252,14 +274,23 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
     if (_esNuevaPersona) {
       setState(() => _guardando = true);
-      try {
-        final nueva = _buildNuevaPersona();
-        persona = await widget.personaRepository.createPersona(nueva);
-      } catch (e) {
+      final resultado = await widget.pacienteRepository.addPaciente(
+        _buildNuevoPaciente(),
+      );
+      if (!mounted) return;
+
+      final creado = resultado.fold((failure) {
         setState(() => _guardando = false);
-        _showError('Error al registrar paciente: $e');
-        return;
-      }
+        _showError('Error al registrar paciente: ${failure.message}');
+        return null;
+      }, (id) => id);
+      if (creado == null) return;
+
+      persona = _buildNuevaPersona(id: creado);
+      // La foto es opcional: si falla se avisa, pero la cita igual se agenda
+      // porque el paciente ya quedó registrado.
+      await _subirFotoPendiente(creado);
+      if (!mounted) return;
     }
 
     if (persona == null) {
@@ -268,12 +299,14 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       return;
     }
 
+    final motivo = _motivoCtrl.text.trim();
     final cita = Cita(
       doctor: _doctorSeleccionado!,
       persona: persona,
       date: fechaHora.toUtc(),
       esEmergencia: _esEmergencia,
       estado: EstadoCita.programada,
+      motivo: motivo.isEmpty ? null : motivo,
     );
 
     if (!mounted) return;
@@ -287,8 +320,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     }
   }
 
-  Persona _buildNuevaPersona() {
+  Persona _buildNuevaPersona({String? id}) {
     return Persona(
+      id: id,
       nombre: _nombreCtrl.text.trim(),
       apellido: _apellidoCtrl.text.trim(),
       birthDate: _fechaNacimiento ?? DateTime(2000, 1, 1),
@@ -296,6 +330,40 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       contactos: _buildContactos(),
       estatus: EstatusPersona.activo,
     );
+  }
+
+  Paciente _buildNuevoPaciente() {
+    return Paciente(
+      nombre: _nombreCtrl.text.trim(),
+      apellido: _apellidoCtrl.text.trim(),
+      birthDate: _fechaNacimiento ?? DateTime(2000, 1, 1),
+      govID: _cedulaCtrl.text.trim(),
+      contactos: _buildContactos(),
+      estatus: EstatusPersona.activo,
+      genero: _genero,
+      tipoPaciente: _tipoPaciente,
+      trabajo: _trabajoCtrl.text.trim(),
+      referencia: '',
+      record: RecordModel.empty(),
+      citas: const [],
+    );
+  }
+
+  /// Sube la foto elegida en el paso 1, ya recortada y comprimida.
+  Future<void> _subirFotoPendiente(String pacienteId) async {
+    if (_fotoPendiente == null) return;
+    try {
+      await sl<PacienteFotoStorage>().guardar(
+        pacienteId: pacienteId,
+        bytes: _fotoPendiente!,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(
+        'El paciente se registró, pero no se pudo guardar la fotografía: '
+        '$error',
+      );
+    }
   }
 
   List<Contacto> _buildContactos() {
@@ -320,6 +388,66 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  /// La cámara solo existe en móvil y en navegador; en escritorio el plugin
+  /// resuelve la galería con un selector de archivos.
+  bool get _soportaCamara =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  Future<void> _elegirFoto() async {
+    ImageSource? source = ImageSource.gallery;
+    if (_soportaCamara) {
+      source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Tomar fotografía'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (source == null || !mounted) return;
+
+    setState(() => _procesandoFoto = true);
+    try {
+      final storage = sl<PacienteFotoStorage>();
+      final selected = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 95,
+      );
+      if (selected == null) return;
+      final decodificada = storage.decodificar(await selected.readAsBytes());
+      if (!mounted) return;
+      final optimizada = await RecorteFotoDialog.mostrar(
+        context,
+        imagen: decodificada,
+        storage: storage,
+      );
+      if (optimizada == null || !mounted) return;
+      setState(() => _fotoPendiente = optimizada);
+    } on FormatoFotoInvalido catch (error) {
+      _showError(error.message);
+    } catch (error) {
+      _showError('No se pudo preparar la fotografía: $error');
+    } finally {
+      if (mounted) setState(() => _procesandoFoto = false);
+    }
   }
 
   Future<void> _pickFechaNacimiento() async {
@@ -660,6 +788,103 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     );
   }
 
+  Widget _buildFotoPerfil(BuildContext context) {
+    final ac = context.appColors;
+
+    return Row(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ac.primaryGreen.withValues(alpha: 0.10),
+            border: Border.all(color: ac.divider),
+            image: _fotoPendiente != null
+                ? DecorationImage(
+                    image: MemoryImage(_fotoPendiente!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
+          child: _fotoPendiente != null
+              ? null
+              : Icon(
+                  Icons.person_outline_rounded,
+                  size: 26,
+                  color: ac.primaryGreen,
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Fotografía de identificación',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: ac.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Opcional. Se guarda al confirmar la cita.',
+                style: TextStyle(fontSize: 11, color: ac.textMuted),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  if (_procesandoFoto)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 10),
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _procesandoFoto ? null : _elegirFoto,
+                    icon: const Icon(Icons.photo_camera_outlined, size: 15),
+                    label: Text(
+                      _fotoPendiente != null ? 'Cambiar foto' : 'Agregar foto',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ac.primaryGreen,
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  if (_fotoPendiente != null) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _procesandoFoto
+                          ? null
+                          : () => setState(() => _fotoPendiente = null),
+                      style: TextButton.styleFrom(
+                        foregroundColor: ac.red,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Quitar',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFormNuevaPersona(BuildContext context) {
     final ac = context.appColors;
 
@@ -692,6 +917,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+
+              _buildFotoPerfil(context),
               const SizedBox(height: 14),
 
               Row(
@@ -1148,6 +1376,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           CircleAvatar(
             radius: 20,
             backgroundColor: ac.primaryGreen.withValues(alpha: 0.15),
+            foregroundImage: _fotoPendiente != null
+                ? MemoryImage(_fotoPendiente!)
+                : null,
             child: Text(
               nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P',
               style: TextStyle(

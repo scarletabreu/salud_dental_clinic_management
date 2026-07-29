@@ -54,7 +54,10 @@ class PacienteRemoteDatasource {
   String _generoDb(Genero g) =>
       g == Genero.noPrefiereDecir ? Genero.otro.name : g.name;
 
-  Future<void> addPaciente(PacienteModel paciente) async {
+  /// Devuelve el id del paciente creado (el mismo de su persona) para que
+  /// quien lo registra pueda seguir trabajando sobre él sin releer la lista:
+  /// agendarle la cita del mismo flujo o subirle la foto de perfil.
+  Future<String> addPaciente(PacienteModel paciente) async {
     if (paciente.contactos.isEmpty) {
       throw Exception('El paciente debe tener al menos un contacto.');
     }
@@ -99,6 +102,7 @@ class PacienteRemoteDatasource {
         ..['created_at'] = DateTime.now().toIso8601String()
         ..['updated_at'] = DateTime.now().toIso8601String();
       await client.from('pacientes').insert(data);
+      return personaId;
     } on PostgrestException {
       if (personaId != null) {
         await client
@@ -143,12 +147,10 @@ class PacienteRemoteDatasource {
           'referencia': paciente.referencia,
           'peso': paciente.peso,
           'altura': paciente.altura,
-          'foto_ruta': paciente.fotoRuta,
-          'foto_mime_type': paciente.fotoMimeType,
-          'foto_tamano_bytes': paciente.fotoTamanoBytes,
-          'foto_actualizada_en':
-              paciente.fotoActualizadaEn?.toIso8601String() ??
-              DateTime.now().toIso8601String(),
+          // Las columnas `foto_*` se omiten a propósito: su única ruta de
+          // escritura es `PacienteFotoStorage`, que las mantiene en sincronía
+          // con el objeto de Storage. Incluirlas aquí borraba la foto cada vez
+          // que se editaba cualquier otro dato de la ficha.
           'updated_at': now,
         })
         .eq('id', pacienteId);

@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/core/network/connectivity_check.d
 import 'package:salud_dental_clinic_management/core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 
 // Módulo Compras
 import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource.dart';
@@ -315,6 +316,9 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<SupabaseStorageHelper>(
     () => SupabaseStorageHelper(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<PacienteFotoStorage>(
+    () => PacienteFotoStorage(sl()),
   );
 
   // ── Repositories ─────────────────────────────────────────────────────────

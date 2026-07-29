@@ -12,11 +12,16 @@ class FormularioEvaluacion extends StatefulWidget {
   final String doctorId;
   final String? citaId;
 
+  /// Lo que se anotó al agendar la cita. Solo prellena el campo: el odontólogo
+  /// lo corrige o lo amplía antes de iniciar.
+  final String? motivoCita;
+
   const FormularioEvaluacion({
     super.key,
     required this.pacienteId,
     required this.doctorId,
     this.citaId,
+    this.motivoCita,
   });
 
   @override
@@ -36,6 +41,12 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
 
   final List<String> _condiciones = [];
   final List<DocumentoAdjunto> _adjuntos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _motivoController.text = widget.motivoCita ?? '';
+  }
 
   @override
   void dispose() {

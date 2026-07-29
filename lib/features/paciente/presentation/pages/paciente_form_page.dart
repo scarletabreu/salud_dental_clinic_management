@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:web/web.dart' as web;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,15 +12,16 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
-import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/recorte_foto_dialog.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
+import 'package:web/web.dart' as web;
 
 enum PacienteFormModo { editar, completarRegistro }
 
@@ -136,6 +135,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   bool _cargandoCondiciones = true;
   bool _guardandoCondiciones = false;
   bool _isProcessingSave = false;
+
+  // Variables para la selección de foto
+  XFile? _fotoFile;
+  Uint8List? _fotoBytesWeb;
+  bool _fotoEliminada = false;
+
   Uint8List? _fotoPendiente;
   bool _eliminarFotoPendiente = false;
   bool _procesandoFoto = false;
@@ -225,6 +230,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
 
     Uint8List? fotoCapturadaBytes;
 
+    if (!context.mounted) return null;
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -266,10 +273,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                 ctx.drawImage(videoElement, 0, 0);
 
                 final dataUrl = canvas.toDataURL('image/jpeg', 0.85.toJS);
-                final base64String = dataUrl.split(',').last;
                 fotoCapturadaBytes = Uri.parse(dataUrl).data?.contentAsBytes();
 
-                // Detener la cámara
                 stream?.getTracks().toDart.forEach((track) {
                   (track as web.MediaStreamTrack).stop();
                 });
@@ -320,160 +325,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     super.dispose();
   }
 
-  Future<void> _mostrarOpcionesFoto() async {
-    final picker = ImagePicker();
-    final ac = context.appColors;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: ac.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Fotografía del paciente',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: ac.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: ac.primaryGreen.withValues(alpha: 0.12),
-                    child: Icon(
-                      Icons.camera_alt_rounded,
-                      color: ac.primaryGreen,
-                    ),
-                  ),
-                  title: Text(
-                    'Tomar fotografía',
-                    style: TextStyle(color: ac.textPrimary),
-                  ),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-
-                    if (kIsWeb) {
-                      final Uint8List? fotoCapturada =
-                          await _mostrarDialogoCamaraWeb(context);
-                      if (fotoCapturada != null) {
-                        setState(() {
-                          _fotoBytesWeb = fotoCapturada;
-                          _fotoFile = XFile.fromData(
-                            fotoCapturada,
-                            name: 'foto_paciente.jpg',
-                          );
-                          _fotoEliminada = false;
-                        });
-                      }
-                    } else {
-                      try {
-                        final picked = await picker.pickImage(
-                          source: ImageSource.camera,
-                          imageQuality: 80,
-                        );
-                        if (picked != null) {
-                          _procesarFotoSeleccionada(picked);
-                        }
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: ac.red,
-                            content: Text('Error al abrir cámara: $e'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: ac.teal.withValues(alpha: 0.12),
-                    child: Icon(Icons.photo_library_rounded, color: ac.teal),
-                  ),
-                  title: Text(
-                    'Elegir de la galería',
-                    style: TextStyle(color: ac.textPrimary),
-                  ),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    try {
-                      final picked = await picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 85,
-                        maxWidth: 1000,
-                      );
-                      if (picked != null) _procesarFotoSeleccionada(picked);
-                    } catch (_) {}
-                  },
-                ),
-                if (_fotoFile != null ||
-                    (widget.paciente.fotoRuta != null && !_fotoEliminada))
-                  ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: ac.red.withValues(alpha: 0.12),
-                      child: Icon(Icons.delete_outline_rounded, color: ac.red),
-                    ),
-                    title: Text('Quitar foto', style: TextStyle(color: ac.red)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _fotoFile = null;
-                        _fotoBytesWeb = null;
-                        _fotoEliminada = true;
-                      });
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   static const int _maxFotoBytes = 10 * 1024 * 1024;
-
-  Future<void> _procesarFotoSeleccionada(XFile picked) async {
-    final bytes = await picked.readAsBytes();
-
-    if (bytes.length > _maxFotoBytes) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: context.appColors.amber,
-          content: const Text(
-            'La imagen seleccionada es muy pesada. Debe pesar menos de 10 MB.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _fotoFile = picked;
-      _fotoBytesWeb = bytes;
-      _fotoEliminada = false;
-    });
-  }
 
   void _addContacto() {
     setState(() {
@@ -564,8 +416,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       altura: double.tryParse(_alturaController.text.trim()),
       record: recordActualizado,
       citas: widget.paciente.citas,
-      // Las columnas foto_* las mantiene PacienteFotoStorage; aquí se
-      // conservan tal cual venían para no pisarlas al editar la ficha.
       fotoRuta: widget.paciente.fotoRuta,
       fotoMimeType: widget.paciente.fotoMimeType,
       fotoTamanoBytes: widget.paciente.fotoTamanoBytes,
@@ -657,8 +507,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           ruta: widget.paciente.fotoRuta!,
         );
       }
-      // El cubit ya recargó el listado al confirmar el resto de la ficha, antes
-      // de que existiera esta foto: hay que releer para que el avatar cambie.
       if (mounted) await context.read<PacienteCubit>().load();
     } catch (error) {
       if (!mounted) return false;
@@ -668,8 +516,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
           content: Text('No se pudo guardar la fotografía: $error'),
         ),
       );
-      // El resto de la ficha ya se guardó; dejamos la pantalla abierta para
-      // que el usuario pueda reintentar la foto sin perder su selección.
       return false;
     } finally {
       if (mounted) setState(() => _procesandoFoto = false);
@@ -677,8 +523,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return true;
   }
 
-  /// La cámara solo existe en móvil y en navegador; en escritorio el plugin
-  /// resuelve la galería con un selector de archivos y `camera` no está.
   bool get _soportaCamara =>
       kIsWeb ||
       defaultTargetPlatform == TargetPlatform.android ||
@@ -687,6 +531,24 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Future<void> _elegirFoto() async {
     ImageSource? source = ImageSource.gallery;
     if (_soportaCamara) {
+      if (kIsWeb) {
+        final Uint8List? fotoCapturada = await _mostrarDialogoCamaraWeb(
+          context,
+        );
+        if (fotoCapturada != null) {
+          setState(() {
+            _fotoBytesWeb = fotoCapturada;
+            _fotoFile = XFile.fromData(
+              fotoCapturada,
+              name: 'foto_paciente.jpg',
+            );
+            _fotoEliminada = false;
+            _fotoPendiente = fotoCapturada;
+          });
+        }
+        return;
+      }
+
       source = await showModalBottomSheet<ImageSource>(
         context: context,
         builder: (sheetContext) => SafeArea(
@@ -719,7 +581,22 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         imageQuality: 95,
       );
       if (selected == null) return;
-      final decodificada = storage.decodificar(await selected.readAsBytes());
+      final bytes = await selected.readAsBytes();
+
+      if (bytes.length > _maxFotoBytes) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.amber,
+            content: const Text(
+              'La imagen seleccionada es muy pesada. Debe pesar menos de 10 MB.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final decodificada = storage.decodificar(bytes);
       if (!mounted) return;
       final optimizada = await RecorteFotoDialog.mostrar(
         context,
@@ -729,6 +606,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       if (optimizada == null) return;
       if (mounted) {
         setState(() {
+          _fotoFile = selected;
+          _fotoBytesWeb = bytes;
+          _fotoEliminada = false;
           _fotoPendiente = optimizada;
           _eliminarFotoPendiente = false;
         });
@@ -847,8 +727,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               ),
             )
           else
-            // Con la eliminación pendiente se muestran las iniciales aunque el
-            // paciente todavía tenga foto guardada.
             PacienteAvatar(
               paciente: widget.paciente,
               size: 88,
@@ -888,6 +766,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                             ? null
                             : () => setState(() {
                                 _fotoPendiente = null;
+                                _fotoFile = null;
+                                _fotoBytesWeb = null;
+                                _fotoEliminada = true;
                                 _eliminarFotoPendiente =
                                     widget.paciente.fotoRuta != null;
                               }),
@@ -1022,7 +903,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       child: Column(
         children: [
           const SizedBox(height: 18),
-
           AppFormRow(
             children: [
               _FormField(

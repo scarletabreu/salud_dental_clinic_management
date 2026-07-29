@@ -10,11 +10,6 @@ import 'package:salud_dental_clinic_management/features/caja_diaria/presentation
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/caja_diaria_page.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart'; // AÑADIDO
-import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart'; // AÑADIDO
-import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
-import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/pages/inventario_page.dart';
@@ -22,6 +17,8 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_list_page.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
+import 'package:salud_dental_clinic_management/features/diagnosis/presentation/pages/diagnosos_list_page.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
 import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
@@ -30,7 +27,9 @@ import 'package:salud_dental_clinic_management/features/medicina/domain/reposito
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/pacientes_page.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
@@ -237,6 +236,14 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       label: 'Tratamientos',
       builder: (_) => const TratamientosScreen(),
     ),
+    // ⚡ Módulo de Diagnósticos
+    ShellDestination(
+      id: ShellDestinationId.diagnosticos,
+      icon: Icons.assignment_late_outlined,
+      selectedIcon: Icons.assignment_late_rounded,
+      label: 'Diagnósticos',
+      builder: (_) => DiagnosisListPage(repository: sl<DiagnosisRepository>()),
+    ),
     ShellDestination(
       id: ShellDestinationId.configuracion,
       icon: Icons.settings_outlined,
@@ -267,6 +274,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       title: 'Catálogos',
       destinations: _destinationsFor(const [
         ShellDestinationId.tratamientos,
+        ShellDestinationId.diagnosticos, // ⚡ Agregado a Catálogos
         ShellDestinationId.medicinas,
         ShellDestinationId.inventario,
       ]),
@@ -439,8 +447,6 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   }
 }
 
-// AÑADIDO: widget dedicado a resolver el filtro de citas según el rol
-// antes de cargar el CitaCubit, y a proveerlo a MisCitasDelDiaPage.
 class _CitasDelDiaDestination extends StatefulWidget {
   const _CitasDelDiaDestination();
 
@@ -480,7 +486,6 @@ class _CitasDelDiaDestinationState extends State<_CitasDelDiaDestination> {
       return;
     }
 
-    // Admin: sin restricción, ve todas las citas.
     _citaCubit.load();
   }
 
@@ -891,6 +896,8 @@ class _NavItem extends StatelessWidget {
         return 'Ajustes';
       case 'Tratamientos':
         return 'Servicios';
+      case 'Diagnósticos':
+        return 'Diagnósticos';
       default:
         return label;
     }
@@ -1125,6 +1132,8 @@ class _RailItem extends StatelessWidget {
         return 'Ajustes';
       case 'Tratamientos':
         return 'Servicios';
+      case 'Diagnósticos':
+        return 'Diagnósticos';
       default:
         return label;
     }

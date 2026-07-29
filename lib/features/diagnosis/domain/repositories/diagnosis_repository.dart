@@ -6,5 +6,7 @@ abstract class DiagnosisRepository {
   Future<List<Diagnosis>> getDiagnosisPorCategoria(
     CategoriaDiagnosis categoria,
   );
+  Future<void> agregarDiagnosis(Diagnosis diagnosis);
+  Future<void> actualizarDiagnosis(Diagnosis diagnosis);
   Future<void> eliminarDiagnosisDelCatalogo(String id);
 }

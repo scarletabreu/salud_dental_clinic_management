@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
-/// Identificador estable de un destino. La etiqueta es solo presentación y se
-/// puede traducir o renombrar sin alterar permisos, selección ni navegación.
 enum ShellDestinationId {
   inicio,
   citasDelDia,
@@ -11,6 +9,8 @@ enum ShellDestinationId {
   cuentasPorCobrar,
   caja,
   tratamientos,
+  procedimientos,
+  diagnosticos,
   medicinas,
   inventario,
   perfiles,
@@ -34,7 +34,6 @@ class ShellDestination {
   });
 }
 
-/// Bloque funcional del rail. Los bloques vacíos no se muestran.
 class ShellSection {
   final String title;
   final List<ShellDestination> destinations;
@@ -42,7 +41,6 @@ class ShellSection {
   const ShellSection({required this.title, required this.destinations});
 }
 
-/// Single permission policy shared by every responsive navigation surface.
 class ShellDestinationAccess {
   const ShellDestinationAccess._();
 
@@ -60,7 +58,9 @@ class ShellDestinationAccess {
       case ShellDestinationId.inventario:
       case ShellDestinationId.medicinas:
       case ShellDestinationId.tratamientos:
-        return roles.contains(RolUsuario.admin);
+      case ShellDestinationId.procedimientos:
+      case ShellDestinationId.diagnosticos:
+        return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
       case ShellDestinationId.consultas:
         return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
       case ShellDestinationId.pacientes:

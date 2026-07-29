@@ -1,6 +1,8 @@
 import 'dart:io';
-
-import 'package:flutter/foundation.dart';
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -181,6 +183,108 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cargarCondiciones();
   }
 
+  Future<Uint8List?> _mostrarDialogoCamaraWeb(BuildContext context) async {
+    final ac = context.appColors;
+    final viewType = 'web-camera-view-${DateTime.now().millisecondsSinceEpoch}';
+
+    web.HTMLVideoElement videoElement = web.HTMLVideoElement()
+      ..autoplay = true
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.objectFit = 'cover';
+
+    ui_web.platformViewRegistry.registerViewFactory(
+      viewType,
+      (int viewId) => videoElement,
+    );
+
+    web.MediaStream? stream;
+
+    try {
+      final mediaDevices = web.window.navigator.mediaDevices;
+      final constraints = web.MediaStreamConstraints(
+        video: true.toJS,
+        audio: false.toJS,
+      );
+
+      final mediaStreamPromise = mediaDevices.getUserMedia(constraints);
+      stream = await mediaStreamPromise.toDart;
+      videoElement.srcObject = stream;
+    } catch (e) {
+      if (!context.mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: ac.red,
+          content: const Text(
+            'No se pudo acceder a la cámara. Por favor permite el acceso en los permisos del navegador.',
+          ),
+        ),
+      );
+      return null;
+    }
+
+    Uint8List? fotoCapturadaBytes;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: ac.cardBg,
+          title: Text(
+            'Capturar fotografía',
+            style: TextStyle(color: ac.textPrimary, fontSize: 16),
+          ),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: HtmlElementView(viewType: viewType),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                stream?.getTracks().toDart.forEach((track) {
+                  (track as web.MediaStreamTrack).stop();
+                });
+                Navigator.pop(dialogCtx);
+              },
+              child: Text('Cancelar', style: TextStyle(color: ac.textMuted)),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
+              icon: const Icon(Icons.camera_rounded, size: 18),
+              label: const Text('Tirar foto'),
+              onPressed: () {
+                final canvas = web.HTMLCanvasElement()
+                  ..width = videoElement.videoWidth
+                  ..height = videoElement.videoHeight;
+
+                final ctx = canvas.context2D;
+                ctx.drawImage(videoElement, 0, 0);
+
+                final dataUrl = canvas.toDataURL('image/jpeg', 0.85.toJS);
+                final base64String = dataUrl.split(',').last;
+                fotoCapturadaBytes = Uri.parse(dataUrl).data?.contentAsBytes();
+
+                // Detener la cámara
+                stream?.getTracks().toDart.forEach((track) {
+                  (track as web.MediaStreamTrack).stop();
+                });
+
+                Navigator.pop(dialogCtx);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    return fotoCapturadaBytes;
+  }
+
   Future<void> _cargarCondiciones() async {
     try {
       final results = await Future.wait([
@@ -214,6 +318,161 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _mostrarOpcionesFoto() async {
+    final picker = ImagePicker();
+    final ac = context.appColors;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ac.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ac.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Fotografía del paciente',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ac.primaryGreen.withValues(alpha: 0.12),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: ac.primaryGreen,
+                    ),
+                  ),
+                  title: Text(
+                    'Tomar fotografía',
+                    style: TextStyle(color: ac.textPrimary),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+
+                    if (kIsWeb) {
+                      final Uint8List? fotoCapturada =
+                          await _mostrarDialogoCamaraWeb(context);
+                      if (fotoCapturada != null) {
+                        setState(() {
+                          _fotoBytesWeb = fotoCapturada;
+                          _fotoFile = XFile.fromData(
+                            fotoCapturada,
+                            name: 'foto_paciente.jpg',
+                          );
+                          _fotoEliminada = false;
+                        });
+                      }
+                    } else {
+                      try {
+                        final picked = await picker.pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 80,
+                        );
+                        if (picked != null) {
+                          _procesarFotoSeleccionada(picked);
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: ac.red,
+                            content: Text('Error al abrir cámara: $e'),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ac.teal.withValues(alpha: 0.12),
+                    child: Icon(Icons.photo_library_rounded, color: ac.teal),
+                  ),
+                  title: Text(
+                    'Elegir de la galería',
+                    style: TextStyle(color: ac.textPrimary),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 85,
+                        maxWidth: 1000,
+                      );
+                      if (picked != null) _procesarFotoSeleccionada(picked);
+                    } catch (_) {}
+                  },
+                ),
+                if (_fotoFile != null ||
+                    (widget.paciente.fotoRuta != null && !_fotoEliminada))
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: ac.red.withValues(alpha: 0.12),
+                      child: Icon(Icons.delete_outline_rounded, color: ac.red),
+                    ),
+                    title: Text('Quitar foto', style: TextStyle(color: ac.red)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _fotoFile = null;
+                        _fotoBytesWeb = null;
+                        _fotoEliminada = true;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static const int _maxFotoBytes = 10 * 1024 * 1024;
+
+  Future<void> _procesarFotoSeleccionada(XFile picked) async {
+    final bytes = await picked.readAsBytes();
+
+    if (bytes.length > _maxFotoBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.amber,
+          content: const Text(
+            'La imagen seleccionada es muy pesada. Debe pesar menos de 10 MB.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _fotoFile = picked;
+      _fotoBytesWeb = bytes;
+      _fotoEliminada = false;
+    });
   }
 
   void _addContacto() {

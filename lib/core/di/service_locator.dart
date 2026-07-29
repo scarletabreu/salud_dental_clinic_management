@@ -49,6 +49,10 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remore_datasource.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/repositories/procedimiento_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
 
 // Módulo Suplidores
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
@@ -81,6 +85,10 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/reposito
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 
 // Data Sources Impl
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/repositories/contraindicacion_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/repositories/contraindicacion_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/data/datasources/diagnosis_remote_datasource_impl.dart';
@@ -222,6 +230,9 @@ Future<void> init() async {
   sl.registerFactory<ConnectivityCubit>(() => ConnectivityCubit(sl())..start());
 
   // ── Remote Data Sources ──────────────────────────────────────────────────
+  sl.registerLazySingleton<ContraindicacionRemoteDatasource>(
+    () => ContraindicacionRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<MedicinaRemoteDatasource>(
     () => MedicinaRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -311,8 +322,14 @@ Future<void> init() async {
   );
 
   // ── Repositories ─────────────────────────────────────────────────────────
+  sl.registerLazySingleton<ContraindicacionRepository>(
+    () => ContraindicacionRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton<IMedicinaRepository>(
-    () => MedicinaRepositoryImpl(remoteDataSource: sl()),
+    () => MedicinaRepositoryImpl(
+      remoteDataSource: sl(),
+      contraindicacionRepository: sl(),
+    ),
   );
   sl.registerLazySingleton<CuentaRepository>(
     () => CuentaRepositoryImpl(remoteDataSource: sl()),
@@ -589,5 +606,17 @@ Future<void> init() async {
 
   sl.registerFactory(
     () => CompraCubit(repository: sl(), recibirCompraUseCase: sl()),
+  );
+
+  // --- PROCEDIMIENTOS ---
+  sl.registerLazySingleton<ProcedimientoRemoteDatasource>(
+    () => ProcedimientoRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+
+  sl.registerLazySingleton<ProcedimientoRepository>(
+    () => ProcedimientoRepositoryImpl(
+      remoteDataSource: sl(),
+      contraindicacionRepository: sl(),
+    ),
   );
 }

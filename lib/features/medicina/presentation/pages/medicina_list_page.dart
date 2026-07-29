@@ -28,10 +28,6 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   late final DeleteMedicina _deleteMedicina;
   final _searchController = TextEditingController();
   Timer? _debounce;
-
-  // Filtro adicional (en cliente) por efectos adversos de las
-  // contraindicaciones — el cubit no lo maneja, así que se aplica aquí
-  // sobre la lista ya filtrada por búsqueda/efecto secundario.
   final Set<EfectoAdverso> _efectosAdversosSeleccionados = {};
 
   @override
@@ -297,16 +293,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // A Row would clip the counter badge once the title and the
-              // action button no longer fit; wrapping drops the button down.
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  // Título y contador: con texto ampliado el contador baja de
-                  // línea en vez de empujar el título fuera de la cabecera.
                   Wrap(
                     spacing: 12,
                     runSpacing: 4,
@@ -460,9 +452,6 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // El rótulo cede antes que el contador y la flecha: con el texto
-            // ampliado en 320 px la etiqueta entera no cabe, y sin holgura el
-            // botón desbordaba en vez de recortarse.
             const Flexible(
               child: Text('Efecto adverso', overflow: TextOverflow.ellipsis),
             ),

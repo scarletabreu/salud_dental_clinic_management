@@ -25,11 +25,17 @@ class Contraindicacion {
       medicinaId,
       tratamientoId,
       procedimientoId,
-    ].where((e) => e != null).length;
+    ].where((e) => e != null && e.trim().isNotEmpty).length;
 
     if (count != 1) {
       throw ArgumentError(
-        'Error de integridad: Una contraindicación debe estar vinculada exactamente a una medicinaId, tratamientoId o procedimientoId.',
+        'Error de integridad: Una contraindicación debe estar vinculada exactamente a un medicinaId, tratamientoId o procedimientoId no vacío.',
+      );
+    }
+
+    if (condicionId.trim().isEmpty || condicionId == 'TODO') {
+      throw ArgumentError(
+        'Error de integridad: Debe proporcionar un condicionId válido.',
       );
     }
   }

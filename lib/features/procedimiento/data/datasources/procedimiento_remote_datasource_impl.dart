@@ -19,19 +19,30 @@ class ProcedimientoRemoteDatasourceImpl
   }
 
   @override
-  Future<void> createProcedimiento(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> insertProcedimiento(
+    Map<String, dynamic> data,
+  ) async {
     data.remove('id');
-
     final now = DateTime.now().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
-    await supabaseClient.from('procedimientos').insert(data);
+    final response = await supabaseClient
+        .from('procedimientos')
+        .insert(data)
+        .select()
+        .single();
+
+    return Map<String, dynamic>.from(response);
   }
 
   @override
   Future<void> upsertProcedimiento(Map<String, dynamic> data) async {
-    data.remove('id');
+    if (data['id'] == null ||
+        data['id'].toString().length != 36 ||
+        !data['id'].toString().contains('-')) {
+      data.remove('id');
+    }
     data['updated_at'] = DateTime.now().toIso8601String();
     await supabaseClient.from('procedimientos').upsert(data);
   }

@@ -48,6 +48,10 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remore_datasource.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/repositories/procedimiento_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
 
 // Módulo Suplidores
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
@@ -598,5 +602,17 @@ Future<void> init() async {
 
   sl.registerFactory(
     () => CompraCubit(repository: sl(), recibirCompraUseCase: sl()),
+  );
+
+  // --- PROCEDIMIENTOS ---
+  sl.registerLazySingleton<ProcedimientoRemoteDatasource>(
+    () => ProcedimientoRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+
+  sl.registerLazySingleton<ProcedimientoRepository>(
+    () => ProcedimientoRepositoryImpl(
+      remoteDataSource: sl(),
+      contraindicacionRepository: sl(),
+    ),
   );
 }

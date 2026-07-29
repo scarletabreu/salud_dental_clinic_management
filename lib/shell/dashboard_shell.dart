@@ -32,6 +32,8 @@ import 'package:salud_dental_clinic_management/features/personal/domain/entities
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/presentarion/pages/procedimiento_list_page.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/shell/lazy_destination_stack.dart';
@@ -236,7 +238,14 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       label: 'Tratamientos',
       builder: (_) => const TratamientosScreen(),
     ),
-    // ⚡ Módulo de Diagnósticos
+    ShellDestination(
+      id: ShellDestinationId.procedimientos,
+      icon: Icons.healing_outlined,
+      selectedIcon: Icons.healing_rounded,
+      label: 'Procedimientos',
+      builder: (_) =>
+          ProcedimientoListPage(repository: sl<ProcedimientoRepository>()),
+    ),
     ShellDestination(
       id: ShellDestinationId.diagnosticos,
       icon: Icons.assignment_late_outlined,
@@ -274,7 +283,8 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
       title: 'Catálogos',
       destinations: _destinationsFor(const [
         ShellDestinationId.tratamientos,
-        ShellDestinationId.diagnosticos, // ⚡ Agregado a Catálogos
+        ShellDestinationId.procedimientos,
+        ShellDestinationId.diagnosticos,
         ShellDestinationId.medicinas,
         ShellDestinationId.inventario,
       ]),
@@ -896,6 +906,8 @@ class _NavItem extends StatelessWidget {
         return 'Ajustes';
       case 'Tratamientos':
         return 'Servicios';
+      case 'Procedimientos':
+        return 'Procedimientos';
       case 'Diagnósticos':
         return 'Diagnósticos';
       default:
@@ -1132,6 +1144,8 @@ class _RailItem extends StatelessWidget {
         return 'Ajustes';
       case 'Tratamientos':
         return 'Servicios';
+      case 'Procedimientos':
+        return 'Procedimientos';
       case 'Diagnósticos':
         return 'Diagnósticos';
       default:

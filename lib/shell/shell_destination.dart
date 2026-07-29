@@ -9,7 +9,8 @@ enum ShellDestinationId {
   cuentasPorCobrar,
   caja,
   tratamientos,
-  diagnosticos, // ⚡ Agregado
+  procedimientos,
+  diagnosticos,
   medicinas,
   inventario,
   perfiles,
@@ -57,7 +58,8 @@ class ShellDestinationAccess {
       case ShellDestinationId.inventario:
       case ShellDestinationId.medicinas:
       case ShellDestinationId.tratamientos:
-      case ShellDestinationId.diagnosticos: // ⚡ Acceso para Admin/Doctores
+      case ShellDestinationId.procedimientos:
+      case ShellDestinationId.diagnosticos:
         return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
       case ShellDestinationId.consultas:
         return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);

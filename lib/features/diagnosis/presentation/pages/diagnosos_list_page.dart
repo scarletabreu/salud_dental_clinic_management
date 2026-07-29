@@ -144,7 +144,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header con buscador y botón de nuevo
             Row(
               children: [
                 Expanded(
@@ -202,7 +201,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
             ),
             const SizedBox(height: 14),
 
-            // Chips de filtro por Categoría
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -261,7 +259,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
             ),
             const SizedBox(height: 16),
 
-            // Lista de Diagnósticos
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -313,7 +310,7 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
         severidadColor = ac.primaryGreen;
         break;
       case SeveridadDiagnosis.moderada:
-        severidadColor = const Color(0xFFD97706); // Amber
+        severidadColor = const Color(0xFFD97706);
         break;
       case SeveridadDiagnosis.grave:
         severidadColor = ac.red;
@@ -361,7 +358,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
                       ),
                     ),
 
-                    // Badge Categoría
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -379,7 +375,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
                     ),
                     const SizedBox(width: 6),
 
-                    // Badge Severidad
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -422,7 +417,6 @@ class _DiagnosisListPageState extends State<DiagnosisListPage> {
             ),
           ),
 
-          // Acciones
           IconButton(
             icon: Icon(Icons.edit_outlined, size: 18, color: ac.textMuted),
             onPressed: () => _openForm(diagnosis: diagnosis),

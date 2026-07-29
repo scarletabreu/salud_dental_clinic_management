@@ -11,33 +11,63 @@ class MedicinaModel extends Medicina {
   });
 
   factory MedicinaModel.fromJson(Map<String, dynamic> json) {
+    List<String> rawEfectosSecundarios = [];
+    final efectosSecData = json['efectos_secundarios'];
+
+    if (efectosSecData is List) {
+      rawEfectosSecundarios = efectosSecData.map((e) => e.toString()).toList();
+    } else if (efectosSecData is String && efectosSecData.isNotEmpty) {
+      final cleaned = efectosSecData
+          .replaceAll('{', '')
+          .replaceAll('}', '')
+          .trim();
+      if (cleaned.isNotEmpty) {
+        rawEfectosSecundarios = cleaned
+            .split(',')
+            .map((e) => e.trim())
+            .toList();
+      }
+    }
+
+    List<ContraindicacionModel> contras = [];
+    if (json['contraindicaciones'] != null &&
+        json['contraindicaciones'] is List) {
+      final rawList = json['contraindicaciones'] as List;
+      contras = rawList
+          .where((item) => item != null && item is Map<String, dynamic>)
+          .map(
+            (item) =>
+                ContraindicacionModel.fromJson(item as Map<String, dynamic>),
+          )
+          .toList();
+    }
+
     return MedicinaModel(
       id: json['id'] as String,
-      nombre: json['nombre'] as String,
-      contraindicaciones:
-          (json['contraindicaciones'] as List?)
-              ?.map((c) => ContraindicacionModel.fromJson(c))
-              .toList() ??
-          [],
-      efectosSecundarios:
-          (json['efectos_secundarios'] as List?)
-              ?.map(
-                (e) => EfectoSecundario.values.firstWhere(
-                  (val) => val.name == e,
-                  orElse: () => EfectoSecundario.inflamacion,
-                ),
-              )
-              .toList() ??
-          [],
+      nombre: json['nombre'] as String? ?? '',
+      contraindicaciones: contras,
+      efectosSecundarios: rawEfectosSecundarios
+          .map(
+            (e) => EfectoSecundario.values.firstWhere(
+              (val) => val.name.toLowerCase() == e.toLowerCase(),
+              orElse: () => EfectoSecundario.inflamacion,
+            ),
+          )
+          .toList(),
     );
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'nombre': nombre,
+      'nombre': nombre.trim(),
       'efectos_secundarios': efectosSecundarios.map((e) => e.name).toList(),
     };
-    if (id != null && id!.length == 36 && id!.contains('-')) {
+
+    if (id != null &&
+        id!.trim().isNotEmpty &&
+        id!.length == 36 &&
+        id!.contains('-') &&
+        !id!.startsWith('temp-')) {
       data['id'] = id;
     }
 

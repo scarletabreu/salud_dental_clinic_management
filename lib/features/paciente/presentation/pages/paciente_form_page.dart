@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -177,6 +180,108 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cargarCondiciones();
   }
 
+  Future<Uint8List?> _mostrarDialogoCamaraWeb(BuildContext context) async {
+    final ac = context.appColors;
+    final viewType = 'web-camera-view-${DateTime.now().millisecondsSinceEpoch}';
+
+    web.HTMLVideoElement videoElement = web.HTMLVideoElement()
+      ..autoplay = true
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.objectFit = 'cover';
+
+    ui_web.platformViewRegistry.registerViewFactory(
+      viewType,
+      (int viewId) => videoElement,
+    );
+
+    web.MediaStream? stream;
+
+    try {
+      final mediaDevices = web.window.navigator.mediaDevices;
+      final constraints = web.MediaStreamConstraints(
+        video: true.toJS,
+        audio: false.toJS,
+      );
+
+      final mediaStreamPromise = mediaDevices.getUserMedia(constraints);
+      stream = await mediaStreamPromise.toDart;
+      videoElement.srcObject = stream;
+    } catch (e) {
+      if (!context.mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: ac.red,
+          content: const Text(
+            'No se pudo acceder a la cámara. Por favor permite el acceso en los permisos del navegador.',
+          ),
+        ),
+      );
+      return null;
+    }
+
+    Uint8List? fotoCapturadaBytes;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: ac.cardBg,
+          title: Text(
+            'Capturar fotografía',
+            style: TextStyle(color: ac.textPrimary, fontSize: 16),
+          ),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: HtmlElementView(viewType: viewType),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                stream?.getTracks().toDart.forEach((track) {
+                  (track as web.MediaStreamTrack).stop();
+                });
+                Navigator.pop(dialogCtx);
+              },
+              child: Text('Cancelar', style: TextStyle(color: ac.textMuted)),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
+              icon: const Icon(Icons.camera_rounded, size: 18),
+              label: const Text('Tirar foto'),
+              onPressed: () {
+                final canvas = web.HTMLCanvasElement()
+                  ..width = videoElement.videoWidth
+                  ..height = videoElement.videoHeight;
+
+                final ctx = canvas.context2D;
+                ctx.drawImage(videoElement, 0, 0);
+
+                final dataUrl = canvas.toDataURL('image/jpeg', 0.85.toJS);
+                final base64String = dataUrl.split(',').last;
+                fotoCapturadaBytes = Uri.parse(dataUrl).data?.contentAsBytes();
+
+                // Detener la cámara
+                stream?.getTracks().toDart.forEach((track) {
+                  (track as web.MediaStreamTrack).stop();
+                });
+
+                Navigator.pop(dialogCtx);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    return fotoCapturadaBytes;
+  }
+
   Future<void> _cargarCondiciones() async {
     try {
       final results = await Future.wait([
@@ -261,20 +366,38 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ),
                   onTap: () async {
                     Navigator.pop(ctx);
-                    try {
-                      final picked = await picker.pickImage(
-                        source: ImageSource.camera,
-                        imageQuality: 85,
-                        maxWidth: 1000,
-                      );
-                      if (picked != null) _procesarFotoSeleccionada(picked);
-                    } catch (e) {
-                      final picked = await picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 85,
-                        maxWidth: 1000,
-                      );
-                      if (picked != null) _procesarFotoSeleccionada(picked);
+
+                    if (kIsWeb) {
+                      final Uint8List? fotoCapturada =
+                          await _mostrarDialogoCamaraWeb(context);
+                      if (fotoCapturada != null) {
+                        setState(() {
+                          _fotoBytesWeb = fotoCapturada;
+                          _fotoFile = XFile.fromData(
+                            fotoCapturada,
+                            name: 'foto_paciente.jpg',
+                          );
+                          _fotoEliminada = false;
+                        });
+                      }
+                    } else {
+                      try {
+                        final picked = await picker.pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 80,
+                        );
+                        if (picked != null) {
+                          _procesarFotoSeleccionada(picked);
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: ac.red,
+                            content: Text('Error al abrir cámara: $e'),
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
@@ -289,12 +412,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   ),
                   onTap: () async {
                     Navigator.pop(ctx);
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                      imageQuality: 85,
-                      maxWidth: 1000,
-                    );
-                    if (picked != null) _procesarFotoSeleccionada(picked);
+                    try {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 85,
+                        maxWidth: 1000,
+                      );
+                      if (picked != null) _procesarFotoSeleccionada(picked);
+                    } catch (_) {}
                   },
                 ),
                 if (_fotoFile != null ||

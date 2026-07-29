@@ -11,6 +11,7 @@ import 'package:salud_dental_clinic_management/features/personal/domain/reposito
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 class _CitaCubitDoble extends Cubit<CitaCubitState> implements CitaCubit {
   _CitaCubitDoble() : super(const CitaCubitLoading());
@@ -38,6 +39,8 @@ class _PersonaRepoDoble extends Fake implements PersonaRepository {
     ),
   ];
 }
+
+class _PacienteRepoDoble extends Fake implements IPacienteRepository {}
 
 class _DoctorRepoDoble extends Fake implements DoctorRepository {
   @override
@@ -73,6 +76,7 @@ void main() {
                       context,
                       personaRepository: _PersonaRepoDoble(),
                       doctorRepository: _DoctorRepoDoble(),
+                      pacienteRepository: _PacienteRepoDoble(),
                       // La casilla del miércoles a las 9:00 de la agenda semanal.
                       fechaInicial: DateTime(2026, 8, 12, 9),
                     ),
@@ -114,6 +118,7 @@ void main() {
                     context,
                     personaRepository: _PersonaRepoDoble(),
                     doctorRepository: _DoctorRepoDoble(),
+                    pacienteRepository: _PacienteRepoDoble(),
                   ),
                   child: const Text('abrir'),
                 ),

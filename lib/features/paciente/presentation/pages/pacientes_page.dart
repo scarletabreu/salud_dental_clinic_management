@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
@@ -506,7 +507,11 @@ class _PacienteRowState extends State<_PacienteRow> {
                           flex: 3,
                           child: Row(
                             children: [
-                              _buildAvatarPaciente(p, colorScheme),
+                              PacienteAvatar(
+                                paciente: p,
+                                size: 36,
+                                backgroundColor: ac.primaryGreen,
+                              ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
@@ -613,38 +618,6 @@ class _PacienteRowState extends State<_PacienteRow> {
     );
   }
 
-  Widget _buildAvatarPaciente(Paciente p, ColorScheme colorScheme) {
-    final fotoUrl = p.fotoUrl;
-    final tieneFoto = fotoUrl != null && fotoUrl.isNotEmpty;
-
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: colorScheme.onSurface.withValues(alpha: 0.04),
-        shape: BoxShape.circle,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: tieneFoto
-          ? Image.network(
-              fotoUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.person_outline_rounded,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                );
-              },
-            )
-          : Icon(
-              Icons.person_outline_rounded,
-              size: 20,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-    );
-  }
-
   // CAMBIO: recibe los flags de permiso para condicionar campos y acciones.
   Widget _buildCompactRow(
     BuildContext context,
@@ -660,7 +633,11 @@ class _PacienteRowState extends State<_PacienteRow> {
       children: [
         Row(
           children: [
-            _buildAvatarPaciente(p, colorScheme),
+            PacienteAvatar(
+              paciente: p,
+              size: 36,
+              backgroundColor: ac.primaryGreen,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

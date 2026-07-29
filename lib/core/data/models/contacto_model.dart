@@ -20,12 +20,14 @@ class ContactoModel extends Contacto {
     );
   }
 
+  /// Solo columnas de `contactos`. `es_emergencia` vive en la tabla puente
+  /// `persona_contactos`, no aquí: enviarlo hacía que PostgREST rechazara el
+  /// insert completo (PGRST204) y no se pudiera registrar un paciente nuevo.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'email': email,
       'numero_telefono': numeroTelefono,
       'direccion': direccion,
-      'es_emergencia': esEmergencia,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

@@ -16,6 +16,7 @@ import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 const _kMonths = [
   'Enero',
@@ -119,6 +120,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
               context,
               personaRepository: sl<PersonaRepository>(),
               doctorRepository: sl<DoctorRepository>(),
+              pacienteRepository: sl<IPacienteRepository>(),
             );
             if (context.mounted) context.read<CitaCubit>().load();
           }
@@ -1278,6 +1280,33 @@ class _CitaCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          // Lo que el paciente dijo al agendar: el odontólogo
+                          // llega a la consulta sabiendo a qué viene.
+                          if ((cita.motivo ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.notes_rounded,
+                                  size: 12,
+                                  color: ac.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    cita.motivo!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: ac.textSecondary,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1364,6 +1393,7 @@ class _CitaCard extends StatelessWidget {
           citaId: cita.id!,
           pacienteId: pacienteId,
           doctorId: doctorId,
+          motivoCita: cita.motivo,
         ),
       ),
     );

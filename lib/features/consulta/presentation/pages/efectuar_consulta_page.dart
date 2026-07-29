@@ -23,12 +23,16 @@ class EfectuarConsultaPage extends StatefulWidget {
   final String doctorId;
   final String? consultaId;
 
+  /// Motivo declarado al agendar la cita, para prellenar la evaluación.
+  final String? motivoCita;
+
   const EfectuarConsultaPage({
     super.key,
     required this.citaId,
     required this.pacienteId,
     required this.doctorId,
     this.consultaId,
+    this.motivoCita,
   });
 
   @override
@@ -192,6 +196,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                                     pacienteId: widget.pacienteId,
                                     doctorId: widget.doctorId,
                                     citaId: widget.citaId,
+                                    motivoCita: widget.motivoCita,
                                   ),
                           ),
                         ),

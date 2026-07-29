@@ -6,7 +6,9 @@ import '../entities/paciente.dart';
 abstract class IPacienteRepository {
   Future<Either<Failure, List<Paciente>>> getPacientes();
   Future<Either<Failure, bool>> faltaRegistro(String id);
-  Future<Either<Failure, void>> addPaciente(Paciente paciente);
+
+  /// Devuelve el id del paciente creado.
+  Future<Either<Failure, String>> addPaciente(Paciente paciente);
   Future<Either<Failure, void>> updatePaciente(Paciente paciente);
   Future<Either<Failure, Paciente>> getPacienteById(String id);
   Future<Either<Failure, Paciente>> getOrCreatePacienteByPersonaId(

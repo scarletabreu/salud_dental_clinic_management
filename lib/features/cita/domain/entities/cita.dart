@@ -11,6 +11,10 @@ class Cita {
   final bool esEmergencia;
   final EstadoCita estado;
 
+  /// Lo que dijo el paciente al agendar. Prellena el motivo de la consulta
+  /// cuando el odontólogo la atiende desde esta cita, sin reemplazarlo.
+  final String? motivo;
+
   Cita({
     this.id,
     required this.doctor,
@@ -19,6 +23,7 @@ class Cita {
     this.duracionMinutos = 30,
     required this.esEmergencia,
     required this.estado,
+    this.motivo,
   });
 
   DateTime get fechaFin => date.add(Duration(minutes: duracionMinutos));
@@ -31,6 +36,7 @@ class Cita {
     int? duracionMinutos,
     bool? esEmergencia,
     EstadoCita? estado,
+    String? motivo,
   }) {
     return Cita(
       id: id ?? this.id,
@@ -40,6 +46,7 @@ class Cita {
       duracionMinutos: duracionMinutos ?? this.duracionMinutos,
       esEmergencia: esEmergencia ?? this.esEmergencia,
       estado: estado ?? this.estado,
+      motivo: motivo ?? this.motivo,
     );
   }
 }

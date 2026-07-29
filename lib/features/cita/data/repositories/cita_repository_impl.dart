@@ -100,6 +100,7 @@ class CitaRepositoryImpl implements CitaRepository {
       duracionMinutos: cita.duracionMinutos,
       esEmergencia: cita.esEmergencia,
       estado: cita.estado,
+      motivo: cita.motivo,
     );
   }
 }

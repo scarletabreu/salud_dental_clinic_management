@@ -223,6 +223,70 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   }
 
   @override
+  Future<String?> desactivarUsuario({
+    required String usuarioId,
+    required RolUsuario rol,
+  }) {
+    return runGuarded(() async {
+      if (rol == RolUsuario.admin) {
+        return 'Los administradores no pueden desactivarse desde esta pantalla.';
+      }
+
+      final citasPendientes = await remoteDataSource.contarCitasPendientes(
+        usuarioId,
+      );
+      if (citasPendientes > 0) {
+        return 'Tiene $citasPendientes cita${citasPendientes == 1 ? '' : 's'} '
+            'pendiente${citasPendientes == 1 ? '' : 's'} como doctor asignado. '
+            'Debe finalizarlas o cancelarlas antes de desactivar.';
+      }
+
+      final consultasPendientes = await remoteDataSource
+          .contarConsultasPendientes(usuarioId);
+      if (consultasPendientes > 0) {
+        return 'Tiene $consultasPendientes consulta${consultasPendientes == 1 ? '' : 's'} '
+            'sin finalizar. Debe completarlas antes de desactivar.';
+      }
+
+      await remoteDataSource.desactivarUsuarioRemoto(usuarioId);
+      return null;
+    }, context: 'desactivar el usuario');
+  }
+
+  @override
+  Future<List<Usuario>> getAsistentesDisponibles() {
+    return runGuarded(() async {
+      final list = await remoteDataSource.getTodosAsistentes();
+      if (list == null) return [];
+      return list
+          .map((json) => AsistenteModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }, context: 'cargar la lista de asistentes');
+  }
+
+  @override
+  Future<List<String>> getAsistentesAsignadosIds(String doctorId) {
+    return runGuarded(
+      () => remoteDataSource.getAsistenteIdsAsignados(doctorId),
+      context: 'cargar los asistentes asignados',
+    );
+  }
+
+  @override
+  Future<void> asignarAsistentes({
+    required String doctorId,
+    required List<String> asistenteIds,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.reemplazarAsistentesDoctor(
+        doctorId,
+        asistenteIds,
+      ),
+      context: 'asignar los asistentes',
+    );
+  }
+
+  @override
   Stream<supabase.AuthState> get onAuthStateChange =>
       remoteDataSource.authStateChanges;
 }

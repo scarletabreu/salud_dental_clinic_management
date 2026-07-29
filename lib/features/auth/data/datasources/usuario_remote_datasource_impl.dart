@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   final SupabaseClient supabase;
+  static const _selectPerfilCompleto =
+      '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
 
   UsuarioRemoteDataSourceImpl(this.supabase);
 
@@ -128,5 +130,76 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   ) async {
     data['updated_at'] = DateTime.now().toIso8601String();
     await supabase.from('usuarios').update(data).eq('id', usuarioId);
+  }
+
+  /// Cuenta citas donde este usuario es el doctor asignado y aún no están
+  /// terminadas ni canceladas.
+  @override
+  Future<int> contarCitasPendientes(String doctorId) async {
+    final response = await supabase
+        .from('citas')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .not('estado', 'in', '(TERMINADA,CANCELADA)');
+    return (response as List).length;
+  }
+
+  /// Cuenta consultas de este doctor que no se han finalizado.
+  @override
+  Future<int> contarConsultasPendientes(String doctorId) async {
+    final response = await supabase
+        .from('consultas')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .filter('fecha_fin', 'is', null);
+    return (response as List).length;
+  }
+
+  /// Marca `deleted_at` en `usuarios`. El trigger en Supabase se encarga
+  /// de cascadear hacia `doctor`/`asistente`/`admin` según corresponda.
+  @override
+  Future<void> desactivarUsuarioRemoto(String usuarioId) async {
+    await supabase
+        .from('usuarios')
+        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .eq('id', usuarioId);
+  }
+
+  @override
+  Future<List<dynamic>?> getTodosAsistentes() async {
+    final response = await supabase
+        .from('asistentes')
+        .select(_selectPerfilCompleto);
+    return response as List<dynamic>?;
+  }
+
+  @override
+  Future<List<String>> getAsistenteIdsAsignados(String doctorId) async {
+    final response = await supabase
+        .from('doctor_asistentes')
+        .select('asistente_id')
+        .eq('doctor_id', doctorId);
+    return (response as List)
+        .map((row) => row['asistente_id'] as String)
+        .toList();
+  }
+
+  @override
+  Future<void> reemplazarAsistentesDoctor(
+    String doctorId,
+    List<String> asistenteIds,
+  ) async {
+    await supabase.from('doctor_asistentes').delete().eq(
+      'doctor_id',
+      doctorId,
+    );
+
+    if (asistenteIds.isNotEmpty) {
+      await supabase.from('doctor_asistentes').insert(
+        asistenteIds
+            .map((id) => {'doctor_id': doctorId, 'asistente_id': id})
+            .toList(),
+      );
+    }
   }
 }

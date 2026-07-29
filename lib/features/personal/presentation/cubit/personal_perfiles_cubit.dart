@@ -70,11 +70,15 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
     String? especialidad,
     String? departamento,
     String? turno,
+    // Solo aplica para Doctor/Admin. Si es null, no se toca la asignación.
+    List<String>? asistenteIdsAsignados,
   }) async {
     emit(const PerfilLoading());
     try {
+      String? doctorIdParaAsignar;
+
       if (existente == null) {
-        await _usuarioRepository.crearUsuario(
+        final creado = await _usuarioRepository.crearUsuario(
           email: email!,
           password: nuevaPassword!,
           nombre: nombre,
@@ -88,6 +92,7 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
           departamento: departamento,
           turno: turno,
         );
+        doctorIdParaAsignar = creado.id;
       } else {
         await _usuarioRepository.actualizarUsuario(
           usuarioId: existente.id!,
@@ -103,10 +108,51 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
             nuevaPassword: nuevaPassword,
           );
         }
+        doctorIdParaAsignar = existente.id;
       }
+
+      if (asistenteIdsAsignados != null && doctorIdParaAsignar != null) {
+        await _usuarioRepository.asignarAsistentes(
+          doctorId: doctorIdParaAsignar,
+          asistenteIds: asistenteIdsAsignados,
+        );
+      }
+
       await cargarUsuarios();
     } catch (e) {
       emit(PerfilError(e.toString()));
     }
+  }
+
+  Future<String?> desactivarUsuario(Usuario usuario) async {
+    if (usuario.id == null) {
+      return 'No se pudo identificar al usuario a desactivar.';
+    }
+
+    try {
+      final motivoBloqueo = await _usuarioRepository.desactivarUsuario(
+        usuarioId: usuario.id!,
+        rol: usuario.rol,
+      );
+
+      if (motivoBloqueo == null) {
+        await cargarUsuarios();
+      }
+
+      return motivoBloqueo;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Lista de asistentes disponibles para el multi-select del form.
+  Future<List<Usuario>> cargarAsistentesDisponibles() {
+    return _usuarioRepository.getAsistentesDisponibles();
+  }
+
+  /// IDs ya asignados a un doctor/admin, para pre-marcar el multi-select
+  /// en modo edición.
+  Future<List<String>> cargarAsistentesAsignados(String doctorId) {
+    return _usuarioRepository.getAsistentesAsignadosIds(doctorId);
   }
 }

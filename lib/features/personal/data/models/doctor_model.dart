@@ -26,8 +26,8 @@ class DoctorModel extends Doctor {
     return DoctorModel(
       id: json['id'] as String?,
 
-      nombre: personaData['nombre'] as String? ?? '',
-      apellido: personaData['apellido'] as String? ?? '',
+      nombre: personaData['nombre'] as String? ?? 'nombre',
+      apellido: personaData['apellido'] as String? ?? 'apellido',
       birthDate: personaData['fecha_nacimiento'] != null
           ? DateTime.parse(personaData['fecha_nacimiento'])
           : DateTime.now(),
@@ -46,6 +46,29 @@ class DoctorModel extends Doctor {
               ?.map((e) => AsistenteModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+    );
+  }
+
+   factory DoctorModel.fromJsonFn(Map<String, dynamic> json) {
+
+    return DoctorModel(
+      id: json['doctor_id'] as String?,
+
+      nombre: json['nombre'] as String? ?? 'nombre',
+      apellido: json['apellido'] as String? ?? 'apellido',
+      birthDate: json['fecha_nacimiento'] != null
+          ? DateTime.parse(json['fecha_nacimiento'])
+          : DateTime.now(),
+      govID: json['cedula'] as String? ?? '',
+      contactos: [],
+      estatus: _parseEstatus(json['estatus'] as String?),
+      username: json['username'] as String? ?? '',
+      passwordHash: json['password_hash'] as String? ?? '',
+
+      specialty: json['especialidad'] as String? ?? '',
+      isAvailable: json['esta_disponible'] as bool? ?? true,
+
+      assistants: []
     );
   }
 

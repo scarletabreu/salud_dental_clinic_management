@@ -18,4 +18,12 @@ abstract class PlanTratamientoRemoteDatasource {
   Future<Map<String, dynamic>?> fetchPlanPorConsulta(String consultaId);
 
   Future<List<Map<String, dynamic>>> fetchItemsEjecutables(String pacienteId);
+
+    /// Lee `resumen_actividad_plan` filtrado por plan.
+  Future<List<Map<String, dynamic>>> fetchResumenPorPlan(String planId);
+
+  /// Lee `resumen_actividad_plan` filtrado por paciente (todas sus actividades,
+  /// de todos sus planes).
+  Future<List<Map<String, dynamic>>> fetchResumenPorPaciente(String pacienteId);
+  Future<void> insertEjecucion(Map<String, dynamic> data);
 }

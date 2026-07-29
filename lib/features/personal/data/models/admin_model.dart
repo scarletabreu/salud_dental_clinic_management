@@ -14,14 +14,24 @@ class AdminModel extends Admin {
     required super.username,
     required super.passwordHash,
     required super.departamento,
+    required super.assistants,
+    required super.specialty,
+    super.isAvailable = true,
   });
 
   factory AdminModel.fromJson(Map<String, dynamic> json) {
-    final usuarioData = json['usuarios'] as Map<String, dynamic>? ?? {};
+    final doctorData = json['doctores'] as Map<String, dynamic>? ?? {};
+    final usuarioData = doctorData['usuarios'] as Map<String, dynamic>? ?? {};
     final personaData = usuarioData['personas'] as Map<String, dynamic>? ?? {};
 
     return AdminModel(
       id: json['id'] as String?,
+
+      
+      specialty: doctorData['especialidad'] as String? ?? '',
+      isAvailable: doctorData['esta_disponible'] as bool? ?? true,
+
+      assistants: [],
 
       nombre: personaData['nombre'] as String? ?? '',
       apellido: personaData['apellido'] as String? ?? '',

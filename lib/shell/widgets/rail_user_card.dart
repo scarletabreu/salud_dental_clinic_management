@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
 class RailUserCard extends StatelessWidget {
   final bool extended;
@@ -16,28 +16,44 @@ class RailUserCard extends StatelessWidget {
     final usuario = context.select((AuthCubit c) => c.state.usuario);
 
     String initials() {
-      if (usuario == null) return 'JM';
+      if (usuario == null) return 'SD';
       final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
       final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
       final s = (n + a).trim();
-      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+      return s.isNotEmpty ? s.toUpperCase() : 'SD';
     }
 
     final avatar = Container(
       width: 36,
       height: 36,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.10),
+        color: ac.primaryGreen.withValues(alpha: 0.08),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: ac.primaryGreen.withValues(alpha: 0.2),
+          width: 0.8,
+        ),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        initials(),
-        style: textTheme.labelLarge?.copyWith(
-          color: ac.primaryBlue,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-          letterSpacing: -0.2,
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/logo.png',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              alignment: Alignment.center,
+              color: ac.primaryGreen.withValues(alpha: 0.12),
+              child: Text(
+                initials(),
+                style: textTheme.labelLarge?.copyWith(
+                  color: ac.primaryGreen,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -66,8 +82,6 @@ class RailUserCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            // Opaque: the rail's destination list scrolls underneath and used
-            // to show through this card.
             color: ac.cardBg,
             borderRadius: BorderRadius.circular(50),
             border: Border.all(

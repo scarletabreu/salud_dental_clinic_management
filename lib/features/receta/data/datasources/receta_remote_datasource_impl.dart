@@ -1,4 +1,6 @@
 import 'package:salud_dental_clinic_management/features/receta/data/datasources/receta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/item_receta_model.dart';
+import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
@@ -6,30 +8,44 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
 
   RecetaRemoteDatasourceImpl({required this.supabaseClient});
 
+  // 1. Ya no hace falta join a items_receta(*) porque la columna JSONB viene automáticamente con el *
+  static const _selectRecetaCompleta = '''
+    *,
+    doctor:doctores(id, usuarios(personas(nombre, apellido)))
+  ''';
+
   @override
-  Future<void> crearReceta(Map<String, dynamic> data) async {
-    data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('recetas').insert(data);
+  Future<String> emitirRecetaCompleta({
+    required RecetaModel receta,
+    required List<ItemRecetaModel> items,
+  }) async {
+    final payloadCabecera = receta.toCabeceraJson();
+
+    payloadCabecera['items_receta'] = items.map((i) => i.toJson()).toList();
+
+    final res = await supabaseClient
+        .from('recetas')
+        .insert(payloadCabecera)
+        .select('id')
+        .single();
+
+    return res['id'] as String;
   }
 
   @override
-  Future<void> actualizarReceta(Map<String, dynamic> data) async {
-    data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('recetas').upsert(data);
-  }
-
-  @override
-  Future<void> anularReceta(String id) async {
+  Future<void> anularReceta({
+    required String recetaId,
+    required String motivo,
+  }) async {
+    final now = DateTime.now().toIso8601String();
     await supabaseClient
         .from('recetas')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'estado': 'anulada',
+          'motivo_anulacion': motivo,
+          'updated_at': now,
         })
-        .eq('id', id);
+        .eq('id', recetaId);
   }
 
   @override
@@ -38,10 +54,24 @@ class RecetaRemoteDatasourceImpl implements RecetaRemoteDatasource {
   ) async {
     final response = await supabaseClient
         .from('recetas')
-        .select('*, medicina:medicinas(nombre)')
+        .select(_selectRecetaCompleta)
         .eq('paciente_id', pacienteId)
-        .filter('deleted_at', 'is', null)
-        .order('created_at', ascending: false);
+        .isFilter('deleted_at', null)
+        .order('fecha_emision', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchRecetasByConsulta(
+    String consultaId,
+  ) async {
+    final response = await supabaseClient
+        .from('recetas')
+        .select(_selectRecetaCompleta)
+        .eq('consulta_id', consultaId)
+        .isFilter('deleted_at', null)
+        .order('fecha_emision', ascending: false);
 
     return List<Map<String, dynamic>>.from(response as List);
   }

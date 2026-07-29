@@ -231,7 +231,7 @@ class _CrearEditarEquipoPageState extends State<CrearEditarEquipoPage> {
                 child: FilledButton(
                   onPressed: _guardando ? null : _guardar,
                   style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryBlue,
+                    backgroundColor: ac.primaryGreen,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -317,7 +317,7 @@ class _CrearEditarEquipoPageState extends State<CrearEditarEquipoPage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: context.appColors.primaryBlue,
+            color: context.appColors.primaryGreen,
             width: 1.5,
           ),
         ),

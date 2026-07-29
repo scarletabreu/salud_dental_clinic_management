@@ -34,7 +34,8 @@ class CitaModel extends Cita {
 
     return CitaModel(
       id: json['id'] as String?,
-      doctor: DoctorModel.fromJson(json['doctor']),
+      // dev aplanó el payload del doctor: la cita ya no trae el embed anidado.
+      doctor: DoctorModel.fromJsonFn(json['doctor'] as Map<String, dynamic>),
       persona: PersonaModel.fromJson(json['persona']),
       date: DateTime.parse(fechaRaw).toLocal(),
       duracionMinutos: (json['duracion_minutos'] as num?)?.toInt() ?? 30,
@@ -43,6 +44,7 @@ class CitaModel extends Cita {
       motivo: normalizarMotivo(json['motivo'] as String?),
     );
   }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'doctor_id': doctor.id,

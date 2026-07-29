@@ -37,22 +37,18 @@ dependencies:
   # usan iconos de iOS, hay que volver a añadirlo.
   dartz: ^0.10.1
   equatable: ^2.0.8
-  supabase_flutter: ^2.12.2
+  supabase_flutter: ^2.16.0
   get_it: ^9.2.1
   flutter_bloc: ^9.0.0
   table_calendar: ^3.1.0
   path_drawing: ^1.0.1
+  image_picker: ^1.2.3
   file_picker: ^8.1.4
-  image_picker: ^1.1.2
   image: ^4.3.0
   fl_chart: ^1.2.0
   connectivity_plus: ^6.1.0
   printing: ^5.14.3
   pdf: ^3.12.0
-  # Se usaba de forma transitiva (vía `printing`) en pantallas de caja, cuentas
-  # y equipos; queda declarada para que el formato de fechas y montos no dependa
-  # del árbol de dependencias de otro paquete.
-  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

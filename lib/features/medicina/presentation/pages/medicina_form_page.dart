@@ -32,7 +32,7 @@ InputDecoration _sharedInputDeco(
   ),
   focusedBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(10),
-    borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+    borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
   ),
   errorBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(10),
@@ -170,7 +170,10 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                       children: [
                         Text(
                           'Inventario',
-                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ac.primaryGreen,
+                          ),
                         ),
                         Icon(
                           Icons.chevron_right,
@@ -231,7 +234,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: const Text('Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -256,8 +259,8 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
   Widget _buildInfoCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withOpacity(0.10),
       icon: Icons.medication_outlined,
       title: 'Información general',
       child: _FormField(
@@ -375,13 +378,13 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
       subtitle: 'Condiciones en las que no se debe usar este medicamento.',
       action: TextButton.icon(
         onPressed: () => _showContraindicacionDialog(context),
-        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
         label: Text(
           'Agregar',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
         ),
         style: TextButton.styleFrom(
@@ -680,7 +683,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),
@@ -1008,7 +1011,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       FilledButton(
                         onPressed: _confirm,
                         style: FilledButton.styleFrom(
-                          backgroundColor: ac.primaryBlue,
+                          backgroundColor: ac.primaryGreen,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,

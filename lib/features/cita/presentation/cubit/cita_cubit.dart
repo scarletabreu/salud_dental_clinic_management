@@ -7,19 +7,31 @@ import 'cita_cubit_state.dart';
 
 class CitaCubit extends Cubit<CitaCubitState> {
   final CitaRepository _repository;
+  List<String>? _doctorIdsPermitidos;
 
   CitaCubit(this._repository) : super(const CitaCubitLoading());
 
-  Future<void> load() async {
+  Future<void> load({
+    String? restringidoADoctorId,
+    List<String>? doctorIdsPermitidos,
+  }) async {
     if (isClosed) return;
+
+    if (restringidoADoctorId != null) {
+      _doctorIdsPermitidos = [restringidoADoctorId];
+    } else if (doctorIdsPermitidos != null) {
+      _doctorIdsPermitidos = doctorIdsPermitidos;
+    }
+
     emit(const CitaCubitLoading());
     try {
       final citas = await _repository.getCitas();
+      final citasFiltradas = _aplicarFiltroDoctor(citas);
       if (isClosed) return;
       final now = DateTime.now();
       emit(
         CitaCubitLoaded(
-          citas: citas,
+          citas: citasFiltradas,
           focusedDay: now,
           selectedDay: now,
           viewMode: CalendarioViewMode.mensual,
@@ -29,6 +41,12 @@ class CitaCubit extends Cubit<CitaCubitState> {
       if (isClosed) return;
       emit(CitaCubitError(e.toString()));
     }
+  }
+
+  List<Cita> _aplicarFiltroDoctor(List<Cita> citas) {
+    final permitidos = _doctorIdsPermitidos;
+    if (permitidos == null) return citas;
+    return citas.where((c) => permitidos.contains(c.doctor.id)).toList();
   }
 
   bool _tieneConflictoHorario(Cita nuevaCita, List<Cita> todasLasCitas) {
@@ -196,7 +214,9 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
       await _repository.updateCita(citaActualizada);
 
-      final citasActualizadas = await _repository.getCitas();
+      final citasActualizadas = _aplicarFiltroDoctor(
+        await _repository.getCitas(),
+      );
 
       emit(
         current.copyWith(

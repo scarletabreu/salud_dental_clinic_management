@@ -1,20 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-// ── core ──────────────────────────────────────────────────────────────────────
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-
-// ── features ──────────────────────────────────────────────────────────────────
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
-
-// ── shell ─────────────────────────────────────────────────────────────────────
-import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 class PacientesPage extends StatefulWidget {
   const PacientesPage({super.key});
@@ -56,17 +52,24 @@ class _PacientesPageState extends State<PacientesPage> {
   }
 
   Future<void> _openDetalle(Paciente paciente) async {
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
     final cubit = context.read<PacienteCubit>();
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: cubit,
-          child: PacienteDetailPage(pacienteId: paciente.id!),
+          child: PacienteDetailPage(pacienteId: pacienteId),
         ),
       ),
     );
-    if (mounted) cubit.load();
+
+    if (context.mounted) {
+      cubit.load();
+    }
   }
 
   @override
@@ -93,8 +96,6 @@ class _PacientesPageState extends State<PacientesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // A Row would clip the counter badge once the title and the action
-          // button no longer fit; wrapping drops the button to its own line.
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -124,7 +125,7 @@ class _PacientesPageState extends State<PacientesPage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.07),
+                            color: ac.primaryGreen.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -135,13 +136,13 @@ class _PacientesPageState extends State<PacientesPage> {
                                 style: Theme.of(context).textTheme.labelMedium
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: ac.primaryBlue,
+                                      color: ac.primaryGreen,
                                     ),
                               ),
                               const SizedBox(width: 4),
                               Icon(
                                 Icons.people_alt_rounded,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                                 size: 13,
                               ),
                             ],
@@ -157,7 +158,7 @@ class _PacientesPageState extends State<PacientesPage> {
           Text(
             'Listado completo de pacientes registrados en el sistema.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 20),
@@ -167,12 +168,12 @@ class _PacientesPageState extends State<PacientesPage> {
             decoration: InputDecoration(
               hintText: 'Buscar por nombre o cédula...',
               hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.45),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                 fontSize: 14,
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 size: 20,
               ),
               suffixIcon: _searchController.text.isNotEmpty
@@ -197,14 +198,14 @@ class _PacientesPageState extends State<PacientesPage> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: colorScheme.outlineVariant.withOpacity(0.2),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: context.appColors.primaryBlue,
+                  color: context.appColors.primaryGreen,
                   width: 1.2,
                 ),
               ),
@@ -251,9 +252,16 @@ class _PacientesPageState extends State<PacientesPage> {
     }
     if (state is PacienteLoaded) {
       final compact = MediaQuery.sizeOf(context).width < 600;
+
+      // AÑADIDO: rol resuelto una sola vez para toda la lista.
+      final authState = context.watch<AuthCubit>().state;
+      final esDoctor = authState.rol == RolUsuario.doctor;
+
       return Column(
         children: [
-          if (!compact) _buildTableHeader(context),
+          // CAMBIO: cabecera de tabla condicionada al rol (sin
+          // cédula/teléfono para doctor).
+          if (!compact) _buildTableHeader(context, esDoctor: esDoctor),
           if (state.filtrados.isEmpty)
             Expanded(
               child: Center(
@@ -302,16 +310,19 @@ class _PacientesPageState extends State<PacientesPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildTableHeader(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(48, 8, 48, 12),
+  // CAMBIO: cabecera condicionada por rol.
+  Widget _buildTableHeader(BuildContext context, {required bool esDoctor}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(48, 8, 48, 12),
       child: Row(
         children: [
-          Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
-          Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
-          SizedBox(width: 108),
+          const Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
+          if (!esDoctor) ...[
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
+          ],
+          const Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
+          const SizedBox(width: 108),
         ],
       ),
     );
@@ -327,7 +338,9 @@ class _HeaderLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.65),
+        color: Theme.of(
+          context,
+        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,
         fontSize: 10,
@@ -361,7 +374,7 @@ Widget _buildFooter(BuildContext context, PacienteLoaded state) {
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-              color: shown == total ? ac.primaryBlue : ac.amber,
+              color: shown == total ? ac.primaryGreen : ac.amber,
               shape: BoxShape.circle,
             ),
           ),
@@ -429,14 +442,28 @@ class _PacienteRowState extends State<_PacienteRow> {
     final p = widget.paciente;
     final ac = context.appColors;
 
+    // AÑADIDO: resolución de permisos por fila.
+    final authState = context.watch<AuthCubit>().state;
+    final esAdmin = authState.rol == RolUsuario.admin;
+    final esAsistente = authState.rol == RolUsuario.asistente;
+    final esDoctor = authState.rol == RolUsuario.doctor;
+    final puedeVerExpediente = esAdmin || esDoctor;
+    final puedeGestionar = esAdmin || esAsistente; // editar / eliminar
+    final puedeVerContacto = !esDoctor; // cédula, teléfono, email, dirección
+
     final fondoTarjeta = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.04)
+        ? ac.primaryGreen.withValues(alpha: 0.04)
         : ac.cardBg;
     final colorBorde = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.25)
-        : colorScheme.outlineVariant.withOpacity(0.4);
+        ? ac.primaryGreen.withValues(alpha: 0.25)
+        : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
+
+    // CAMBIO: un doctor no puede expandir el detalle de contacto en línea
+    // (no tiene nada que ver ahí); su única acción es entrar al expediente.
+    final permiteExpandir = !esDoctor;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
@@ -446,7 +473,9 @@ class _PacienteRowState extends State<_PacienteRow> {
         border: Border.all(color: colorBorde, width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(_expanded ? 0.03 : 0.01),
+            color: colorScheme.shadow.withValues(
+              alpha: _expanded ? 0.03 : 0.01,
+            ),
             blurRadius: _expanded ? 10 : 4,
             offset: const Offset(0, 4),
           ),
@@ -455,13 +484,22 @@ class _PacienteRowState extends State<_PacienteRow> {
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: permiteExpandir
+                ? () => setState(() => _expanded = !_expanded)
+                : null,
             borderRadius: BorderRadius.circular(14),
-            hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
+            hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: compact
-                  ? _buildCompactRow(context, p, ac)
+                  ? _buildCompactRow(
+                      context,
+                      p,
+                      ac,
+                      puedeVerExpediente: puedeVerExpediente,
+                      puedeGestionar: puedeGestionar,
+                      puedeVerContacto: puedeVerContacto,
+                    )
                   : Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -472,7 +510,7 @@ class _PacienteRowState extends State<_PacienteRow> {
                               PacienteAvatar(
                                 paciente: p,
                                 size: 36,
-                                backgroundColor: ac.primaryBlue,
+                                backgroundColor: ac.primaryGreen,
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -489,33 +527,36 @@ class _PacienteRowState extends State<_PacienteRow> {
                             ],
                           ),
                         ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            p.govID,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.8),
-                                  fontFamily: 'monospace',
-                                  fontSize: 13,
-                                ),
+                        // CAMBIO: cédula/teléfono ocultos para doctor.
+                        if (puedeVerContacto) ...[
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              p.govID,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontFamily: 'monospace',
+                                    fontSize: 13,
+                                  ),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            _contacto?.numeroTelefono.isNotEmpty == true
-                                ? _contacto!.numeroTelefono
-                                : '—',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant
-                                      .withOpacity(0.8),
-                                  fontSize: 13,
-                                ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              _contacto?.numeroTelefono.isNotEmpty == true
+                                  ? _contacto!.numeroTelefono
+                                  : '—',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 13,
+                                  ),
+                            ),
                           ),
-                        ),
+                        ],
                         Expanded(
                           flex: 1,
                           child: Text(
@@ -533,31 +574,37 @@ class _PacienteRowState extends State<_PacienteRow> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              _ActionIcon(
-                                icon: Icons.visibility_outlined,
-                                tooltip: 'Ver expediente',
-                                color: ac.primaryBlue,
-                                onTap: widget.onVerDetalle,
-                              ),
-                              const SizedBox(width: 6),
-                              _ActionIcon(
-                                icon: Icons.edit_outlined,
-                                tooltip: 'Editar',
-                                color: colorScheme.onSurfaceVariant.withOpacity(
-                                  0.5,
+                              // CAMBIO: "ver expediente" solo admin/doctor.
+                              if (puedeVerExpediente)
+                                _ActionIcon(
+                                  icon: Icons.visibility_outlined,
+                                  tooltip: 'Ver expediente',
+                                  color: ac.primaryGreen,
+                                  onTap: widget.onVerDetalle,
                                 ),
-                                onTap: widget.onEdit,
-                              ),
-                              const SizedBox(width: 6),
-                              _ActionIcon(
-                                icon: Icons.delete_outline_rounded,
-                                tooltip: 'Eliminar',
-                                color: colorScheme.error.withOpacity(0.7),
-                                onTap: () => _showDeleteConfirmation(
-                                  context,
-                                  widget.paciente,
+                              // CAMBIO: editar/eliminar solo admin/asistente.
+                              if (puedeGestionar) ...[
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Editar',
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                  onTap: widget.onEdit,
                                 ),
-                              ),
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.delete_outline_rounded,
+                                  tooltip: 'Eliminar',
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  onTap: () => _showDeleteConfirmation(
+                                    context,
+                                    widget.paciente,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -565,13 +612,21 @@ class _PacienteRowState extends State<_PacienteRow> {
                     ),
             ),
           ),
-          if (_expanded) _buildDetail(context, p),
+          if (_expanded && puedeVerContacto) _buildDetail(context, p),
         ],
       ),
     );
   }
 
-  Widget _buildCompactRow(BuildContext context, Paciente p, AppColors ac) {
+  // CAMBIO: recibe los flags de permiso para condicionar campos y acciones.
+  Widget _buildCompactRow(
+    BuildContext context,
+    Paciente p,
+    AppColors ac, {
+    required bool puedeVerExpediente,
+    required bool puedeGestionar,
+    required bool puedeVerContacto,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,7 +636,7 @@ class _PacienteRowState extends State<_PacienteRow> {
             PacienteAvatar(
               paciente: p,
               size: 36,
-              backgroundColor: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -594,32 +649,37 @@ class _PacienteRowState extends State<_PacienteRow> {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
-            _ActionIcon(
-              icon: Icons.visibility_outlined,
-              tooltip: 'Ver expediente',
-              color: ac.primaryBlue,
-              onTap: widget.onVerDetalle,
-            ),
-            _ActionIcon(
-              icon: Icons.edit_outlined,
-              tooltip: 'Editar',
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              onTap: widget.onEdit,
-            ),
+            if (puedeVerExpediente)
+              _ActionIcon(
+                icon: Icons.visibility_outlined,
+                tooltip: 'Ver expediente',
+                color: ac.primaryGreen,
+                onTap: widget.onVerDetalle,
+              ),
+            if (puedeGestionar)
+              _ActionIcon(
+                icon: Icons.edit_outlined,
+                tooltip: 'Editar',
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                onTap: widget.onEdit,
+              ),
           ],
         ),
         const SizedBox(height: 12),
+        // CAMBIO: cédula/teléfono ocultos para doctor; edad siempre visible.
         Wrap(
           spacing: 16,
           runSpacing: 6,
           children: [
-            _compactField('Cédula', p.govID),
-            _compactField(
-              'Teléfono',
-              _contacto?.numeroTelefono.isNotEmpty == true
-                  ? _contacto!.numeroTelefono
-                  : '—',
-            ),
+            if (puedeVerContacto) ...[
+              _compactField('Cédula', p.govID),
+              _compactField(
+                'Teléfono',
+                _contacto?.numeroTelefono.isNotEmpty == true
+                    ? _contacto!.numeroTelefono
+                    : '—',
+              ),
+            ],
             _compactField('Edad', '${p.age} años'),
           ],
         ),
@@ -667,7 +727,7 @@ class _PacienteRowState extends State<_PacienteRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(
-            color: colorScheme.outlineVariant.withOpacity(0.25),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.25),
             height: 1,
           ),
           const SizedBox(height: 20),
@@ -717,6 +777,9 @@ class _PacienteRowState extends State<_PacienteRow> {
 
   void _showDeleteConfirmation(BuildContext context, Paciente paciente) {
     final colorScheme = Theme.of(context).colorScheme;
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -766,7 +829,7 @@ class _PacienteRowState extends State<_PacienteRow> {
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(dialogContext);
-              context.read<PacienteCubit>().deletePaciente(paciente.id!);
+              context.read<PacienteCubit>().deletePaciente(pacienteId);
             },
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
             label: const Text('Eliminar'),
@@ -793,7 +856,7 @@ class _DetailItem extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             letterSpacing: 0.8,
             fontWeight: FontWeight.bold,
             fontSize: 9,

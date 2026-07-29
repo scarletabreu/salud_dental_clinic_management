@@ -207,6 +207,9 @@ import 'package:salud_dental_clinic_management/features/pago/domain/usecases/reg
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_cubit.dart';
 
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/resumen_plan_cubit.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/usecases/get_resumen_actividad_plan.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init() async {
@@ -440,6 +443,8 @@ Future<void> init() async {
   sl.registerFactory<PlanTratamientoCubit>(
     () => PlanTratamientoCubit(repository: sl()),
   );
+  sl.registerFactory(() => GetResumenActividadPlan(sl()));
+  sl.registerFactory(() => ResumenPlanCubit(sl()));
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl(), sl()));
   sl.registerFactory<ConsultasListCubit>(

@@ -158,7 +158,7 @@ class _IdentityHeader extends StatelessWidget {
           PacienteAvatar(
             paciente: paciente,
             size: 48,
-            backgroundColor: ac.primaryBlue,
+            backgroundColor: ac.primaryGreen,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -181,13 +181,13 @@ class _IdentityHeader extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: ac.primaryBlue.withValues(alpha: 0.08),
+                    color: ac.primaryGreen.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _capitalize(paciente.tipoPaciente.name),
                     style: TextStyle(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -261,7 +261,7 @@ class _InfoCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = item.highlight
-        ? (item.highlightColor ?? ac.primaryBlue)
+        ? (item.highlightColor ?? ac.primaryGreen)
         : ac.teal;
 
     return Container(

@@ -77,7 +77,7 @@ class _PacienteAvatarState extends State<PacienteAvatar> {
             width: widget.size,
             height: widget.size,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallback(error: true),
+            errorBuilder: (_, _, _) => _fallback(error: true),
           ),
         );
       },

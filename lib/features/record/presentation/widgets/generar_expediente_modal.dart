@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
-import 'package:salud_dental_clinic_management/features/record/domain/entities/expediente_print_options.dart';
-import 'package:salud_dental_clinic_management/features/record/presentation/helpers/expediente_pdf_builder.dart';
+import 'package:salud_dental_clinic_management/features/record/presentation/pages/expediente_page.dart';
 
 class GenerarExpedienteModal extends StatefulWidget {
   final Paciente paciente;
@@ -54,6 +52,7 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
     final nombrePaciente =
         '${widget.paciente.nombre} ${widget.paciente.apellido}';
@@ -62,9 +61,12 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
       decoration: BoxDecoration(
         color: ac.cardBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: colorScheme.shadow.withValues(alpha: 0.15),
             blurRadius: 24,
             offset: const Offset(0, -6),
           ),
@@ -78,13 +80,13 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Center(
               child: Container(
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: ac.divider,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -98,12 +100,12 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.12),
+                      color: ac.primaryGreen.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
                       Icons.print_rounded,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       size: 24,
                     ),
                   ),
@@ -117,7 +119,7 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: ac.textPrimary,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -125,7 +127,7 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: ac.primaryBlue,
+                            color: ac.primaryGreen,
                           ),
                         ),
                       ],
@@ -181,7 +183,13 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.onSurface,
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -195,16 +203,23 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                     flex: 2,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: ac.primaryBlue,
+                        backgroundColor: ac.primaryGreen,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () {
-                        final navigator = Navigator.of(context);
-                        navigator.pop();
-                        _abrirPrevisualizacion(navigator);
+                        Navigator.pop(context);
+                        ExpedientePage.navegar(
+                          context,
+                          paciente: widget.paciente,
+                          odontogramaActual: widget.odontogramaActual,
+                          consultasConOdontograma:
+                              widget.consultasConOdontograma,
+                          historialPiezas: widget.historialPiezas,
+                        );
                       },
                       key: const Key('generar_expediente_pdf'),
                       icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
@@ -215,50 +230,6 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _abrirPrevisualizacion(NavigatorState navigator) {
-    final incluirOdontograma =
-        _opcionSeleccionada == TipoExpedienteImpresion.conOdontograma;
-
-    final historialOdontogramas = incluirOdontograma
-        ? widget.consultasConOdontograma
-              .map((c) => c.odontograma)
-              .whereType<Odontograma>()
-              .toList()
-        : const <Odontograma>[];
-
-    final hp = incluirOdontograma ? widget.historialPiezas : null;
-
-    final options = ExpedientePrintOptions(
-      incluirOdontograma: incluirOdontograma,
-    );
-    final nombrePaciente =
-        '${widget.paciente.nombre} ${widget.paciente.apellido}';
-
-    navigator.push(
-      MaterialPageRoute(
-        builder: (ctx) => Scaffold(
-          appBar: AppBar(
-            backgroundColor: context.appColors.primaryBlue,
-            foregroundColor: Colors.white,
-            title: Text('Expediente de $nombrePaciente'),
-          ),
-          body: PdfPreview(
-            build: (format) => ExpedientePdfBuilder.buildPdf(
-              paciente: widget.paciente,
-              options: options,
-              odontograma: incluirOdontograma ? widget.odontogramaActual : null,
-              historialOdontogramas: historialOdontogramas,
-              historialPiezas: hp,
-            ),
-            allowPrinting: true,
-            allowSharing: true,
-            canChangeOrientation: false,
-          ),
         ),
       ),
     );
@@ -285,16 +256,20 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? ac.primaryBlue.withValues(alpha: 0.08) : ac.cardBg,
+          color: selected ? ac.primaryGreen.withValues(alpha: 0.08) : ac.cardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? ac.primaryBlue : ac.divider,
+            color: selected
+                ? ac.primaryGreen
+                : colorScheme.outlineVariant.withValues(alpha: 0.4),
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -302,7 +277,9 @@ class _OptionTile extends StatelessWidget {
           children: [
             Icon(
               icono,
-              color: selected ? ac.primaryBlue : ac.textSecondary,
+              color: selected
+                  ? ac.primaryGreen
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -315,12 +292,17 @@ class _OptionTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: ac.textPrimary,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   Text(
                     subtitulo,
-                    style: TextStyle(fontSize: 11, color: ac.textSecondary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.75,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -331,9 +313,11 @@ class _OptionTile extends StatelessWidget {
               height: 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selected ? ac.primaryBlue : Colors.transparent,
+                color: selected ? ac.primaryGreen : Colors.transparent,
                 border: Border.all(
-                  color: selected ? ac.primaryBlue : ac.divider,
+                  color: selected
+                      ? ac.primaryGreen
+                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
                   width: 2,
                 ),
               ),

@@ -175,7 +175,7 @@ class _DayHeaders extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                       color: isToday
-                          ? ac.primaryBlue
+                          ? ac.primaryGreen
                           : isWeekend
                           ? ac.red.withValues(alpha: 0.7)
                           : ac.textMuted,
@@ -186,7 +186,7 @@ class _DayHeaders extends StatelessWidget {
                     width: diametro,
                     height: diametro,
                     decoration: BoxDecoration(
-                      color: isToday ? ac.primaryBlue : Colors.transparent,
+                      color: isToday ? ac.primaryGreen : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
@@ -340,11 +340,11 @@ class _DayColumn extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  Expanded(child: Container(height: 2, color: ac.primaryBlue)),
+                  Expanded(child: Container(height: 2, color: ac.primaryGreen)),
                 ],
               ),
             ),
@@ -469,10 +469,10 @@ class _CitaBlock extends StatelessWidget {
                 Icon(
                   Icons.medical_services_outlined,
                   size: 16,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _AccionClinicaMenu(color: ac.primaryBlue)),
+                Expanded(child: _AccionClinicaMenu(color: ac.primaryGreen)),
               ],
             ),
           ),

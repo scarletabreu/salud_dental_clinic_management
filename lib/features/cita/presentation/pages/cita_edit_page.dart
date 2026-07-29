@@ -184,7 +184,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               ScaffoldMessenger.of(listenerContext).showSnackBar(
                 SnackBar(
                   content: const Text('Cita actualizada con éxito.'),
-                  backgroundColor: listenerContext.appColors.primaryBlue,
+                  backgroundColor: listenerContext.appColors.primaryGreen,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -242,11 +242,11 @@ class _CitaEditPageState extends State<CitaEditPage> {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: ac.primaryBlue.withOpacity(0.10),
+            backgroundColor: ac.primaryGreen.withOpacity(0.10),
             child: Text(
               initials,
               style: TextStyle(
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -295,7 +295,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: CircularProgressIndicator(
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                   strokeWidth: 2,
                 ),
               ),
@@ -344,7 +344,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
 
     return _EditCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
+      iconColor: ac.primaryGreen,
       icon: Icons.calendar_today_outlined,
       title: 'Fecha y hora',
       child: AppFormRow(
@@ -587,7 +587,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
@@ -694,7 +694,7 @@ class _FieldGroup extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),
@@ -745,7 +745,7 @@ class _TapField extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: hasValue ? ac.primaryBlue : ac.textMuted,
+              color: hasValue ? ac.primaryGreen : ac.textMuted,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -754,7 +754,7 @@ class _TapField extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: hasValue ? ac.primaryBlue : ac.textMuted,
+                  color: hasValue ? ac.primaryGreen : ac.textMuted,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

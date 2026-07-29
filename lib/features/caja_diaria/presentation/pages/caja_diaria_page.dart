@@ -55,7 +55,7 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(
-              backgroundColor: context.appColors.primaryBlue,
+              backgroundColor: context.appColors.primaryGreen,
             ),
             child: const Text('Abrir caja'),
           ),
@@ -225,7 +225,7 @@ class _AperturaView extends StatelessWidget {
                         abriendo ? 'Abriendo caja...' : 'Abrir caja de hoy',
                       ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: ac.primaryBlue,
+                        backgroundColor: ac.primaryGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -307,7 +307,7 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                         formatMoneda(widget.state.montoEsperado),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          color: ac.primaryBlue,
+                          color: ac.primaryGreen,
                           fontSize: 14,
                         ),
                       ),
@@ -680,7 +680,7 @@ class _CajaAbiertaViewState extends State<_CajaAbiertaView> {
                     label: 'Apertura',
                     value: formatMoneda(widget.state.caja.montoApertura),
                     icon: Icons.lock_open_rounded,
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                   ),
                   _MetricCard(
                     width: width,

@@ -96,7 +96,7 @@ class WeekTimelineView extends StatelessWidget {
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(vertical: 8),
               color: isToday
-                  ? ac.primaryBlue.withValues(alpha: 0.05)
+                  ? ac.primaryGreen.withValues(alpha: 0.05)
                   : Colors.transparent,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -106,14 +106,14 @@ class WeekTimelineView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: isToday ? ac.primaryBlue : ac.textMuted,
+                      color: isToday ? ac.primaryGreen : ac.textMuted,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Container(
                     padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                      color: isToday ? ac.primaryBlue : Colors.transparent,
+                      color: isToday ? ac.primaryGreen : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Text(

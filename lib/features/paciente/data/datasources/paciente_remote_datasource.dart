@@ -1,5 +1,4 @@
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'dart:typed_data';
 import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
 import 'package:salud_dental_clinic_management/features/condicion/data/models/record_condicion_model.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/models/paciente_model.dart';
@@ -18,6 +17,26 @@ class PacienteRemoteDatasource {
       '*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus, '
       'persona_contacto:persona_contactos(contactos(*)))';
 
+  Future<String> uploadFotoPaciente({
+    required String pacienteId,
+    required Uint8List bytes,
+  }) async {
+    final path = '$pacienteId/perfil.jpg';
+
+    await client.storage
+        .from('fotos-pacientes')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'image/jpeg',
+          ),
+        );
+
+    return path;
+  }
+
   Future<List<PacienteModel>> getPacientes() async {
     final pacientesRes = await client
         .from('pacientes')
@@ -28,211 +47,9 @@ class PacienteRemoteDatasource {
         .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
         .toList();
 
-    if (lista.isEmpty) lista.addAll(_pacientesPrueba);
     lista.sort((a, b) => a.nombre.compareTo(b.nombre));
     return lista;
   }
-
-  static final _pacientesPrueba = [
-    PacienteModel(
-      id: 'p1',
-      nombre: 'Pedro',
-      apellido: 'Alonso',
-      birthDate: DateTime(1985, 4, 10),
-      govID: '001-1000001-0',
-      contactos: [
-        ContactoModel(
-          id: 'c-p1',
-          email: 'pedro.alonso@email.com',
-          numeroTelefono: '809-555-0001',
-          direccion: 'Calle Las Flores #1, Santo Domingo',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.masculino,
-      record: RecordModel.empty(),
-      trabajo: 'Médico',
-      referencia: '',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'p2',
-      nombre: 'María',
-      apellido: 'Santos',
-      birthDate: DateTime(1992, 8, 25),
-      govID: '001-1000002-1',
-      contactos: [
-        ContactoModel(
-          id: 'c-p2',
-          email: 'maria.santos@email.com',
-          numeroTelefono: '829-555-0002',
-          direccion: 'Av. Independencia #22, Santiago',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.femenino,
-      record: RecordModel.empty(),
-      trabajo: 'Abogada',
-      referencia: 'Dr. Fernández',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'p3',
-      nombre: 'Juan',
-      apellido: 'Méndez',
-      birthDate: DateTime(1978, 2, 14),
-      govID: '001-1000003-2',
-      contactos: [
-        ContactoModel(
-          id: 'c-p3',
-          email: 'juan.mendez@email.com',
-          numeroTelefono: '849-555-0003',
-          direccion: 'Los Alcarrizos, Santo Domingo Oeste',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.masculino,
-      record: RecordModel.empty(),
-      trabajo: 'Empresario',
-      referencia: '',
-      citas: const [],
-      tipoPaciente: TipoPaciente.emergencia,
-    ),
-    PacienteModel(
-      id: 'p4',
-      nombre: 'Laura',
-      apellido: 'Castillo',
-      birthDate: DateTime(2000, 11, 3),
-      govID: '001-1000004-3',
-      contactos: [
-        ContactoModel(
-          id: 'c-p4',
-          email: 'laura.castillo@email.com',
-          numeroTelefono: '809-555-0004',
-          direccion: 'Bella Vista, Santo Domingo',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.femenino,
-      record: RecordModel.empty(),
-      trabajo: 'Estudiante',
-      referencia: 'Familiar',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'p5',
-      nombre: 'Roberto',
-      apellido: 'García',
-      birthDate: DateTime(1970, 6, 20),
-      govID: '001-1000005-4',
-      contactos: [
-        ContactoModel(
-          id: 'c-p5',
-          email: 'roberto.garcia@email.com',
-          numeroTelefono: '829-555-0005',
-          direccion: 'Naco, Santo Domingo',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.masculino,
-      record: RecordModel.empty(),
-      trabajo: 'Contador',
-      referencia: '',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'p6',
-      nombre: 'Sofía',
-      apellido: 'Herrera',
-      birthDate: DateTime(1995, 9, 8),
-      govID: '001-1000006-5',
-      contactos: [
-        ContactoModel(
-          id: 'c-p6',
-          email: 'sofia.herrera@email.com',
-          numeroTelefono: '849-555-0006',
-          direccion: 'Piantini, Santo Domingo',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.femenino,
-      record: RecordModel.empty(),
-      trabajo: 'Diseñadora',
-      referencia: 'Dr. Rodríguez',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'test-001',
-      nombre: 'Carlos',
-      apellido: 'Méndez',
-      birthDate: DateTime(1990, 3, 15),
-      govID: '001-1234567-8',
-      contactos: [
-        ContactoModel(
-          id: 'c-001',
-          email: 'carlos.mendez@email.com',
-          numeroTelefono: '809-555-0101',
-          direccion: 'Calle Primera #10, Santo Domingo',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.masculino,
-      record: RecordModel.empty(),
-      trabajo: 'Ingeniero',
-      referencia: 'Dr. López',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'test-002',
-      nombre: 'María',
-      apellido: 'Rodríguez',
-      birthDate: DateTime(1998, 7, 22),
-      govID: '002-9876543-1',
-      contactos: [
-        ContactoModel(
-          id: 'c-002',
-          email: 'maria.rodriguez@email.com',
-          numeroTelefono: '829-555-0202',
-          direccion: 'Av. Winston Churchill, Santiago',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.femenino,
-      record: RecordModel.empty(),
-      trabajo: 'Maestra',
-      referencia: 'Familiar',
-      citas: const [],
-      tipoPaciente: TipoPaciente.integrado,
-    ),
-    PacienteModel(
-      id: 'test-003',
-      nombre: 'Pedro',
-      apellido: 'Almonte',
-      birthDate: DateTime(1975, 11, 5),
-      govID: '003-1112223-4',
-      contactos: [
-        ContactoModel(
-          id: 'c-003',
-          email: 'pedro.almonte@email.com',
-          numeroTelefono: '849-555-0303',
-          direccion: 'Los Prados, Santo Domingo Norte',
-        ),
-      ],
-      estatus: EstatusPersona.activo,
-      genero: Genero.masculino,
-      record: RecordModel.empty(),
-      trabajo: 'Contador',
-      referencia: '',
-      citas: const [],
-      tipoPaciente: TipoPaciente.emergencia,
-    ),
-  ];
 
   String _generoDb(Genero g) =>
       g == Genero.noPrefiereDecir ? Genero.otro.name : g.name;
@@ -398,13 +215,6 @@ class PacienteRemoteDatasource {
       return pacienteModel.copyWithModel(record: record);
     }
 
-    if (!_isValidUuid(normalizedId)) {
-      final local = _pacientesPrueba
-          .where((p) => p.id == normalizedId)
-          .firstOrNull;
-      if (local != null) return local;
-    }
-
     throw Exception('Paciente con id "$normalizedId" no encontrado.');
   }
 
@@ -426,13 +236,6 @@ class PacienteRemoteDatasource {
     if (pacienteModel != null) {
       final record = await _loadOrCreateRecord(pacienteModel.id!);
       return pacienteModel.copyWithModel(record: record);
-    }
-
-    if (!_isValidUuid(normalizedId)) {
-      final local = _pacientesPrueba
-          .where((p) => p.id == normalizedId)
-          .firstOrNull;
-      if (local != null) return local;
     }
 
     final now = DateTime.now().toIso8601String();

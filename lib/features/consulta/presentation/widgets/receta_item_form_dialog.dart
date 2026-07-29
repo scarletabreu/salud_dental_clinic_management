@@ -2,33 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
-import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 
-/// Formulario para completar dosis, frecuencia, duración e indicaciones
-/// de una medicina ya seleccionada y ya validada contra contraindicaciones.
-/// Devuelve la [Receta] armada o null si se cancela.
-Future<Receta?> mostrarRecetaItemFormDialog(
+Future<ItemReceta?> mostrarRecetaItemFormDialog(
   BuildContext context,
   Medicina medicina, {
-  String? justificacionClinica,
+  ItemReceta? itemExistente,
 }) {
-  return showDialog<Receta>(
+  return showDialog<ItemReceta>(
     context: context,
-    builder: (ctx) => _RecetaItemFormDialog(
-      medicina: medicina,
-      justificacionClinica: justificacionClinica,
-    ),
+    builder: (ctx) =>
+        _RecetaItemFormDialog(medicina: medicina, itemExistente: itemExistente),
   );
 }
 
 class _RecetaItemFormDialog extends StatefulWidget {
   final Medicina medicina;
-  final String? justificacionClinica;
+  final ItemReceta? itemExistente;
 
-  const _RecetaItemFormDialog({
-    required this.medicina,
-    this.justificacionClinica,
-  });
+  const _RecetaItemFormDialog({required this.medicina, this.itemExistente});
 
   @override
   State<_RecetaItemFormDialog> createState() => _RecetaItemFormDialogState();
@@ -36,16 +28,45 @@ class _RecetaItemFormDialog extends StatefulWidget {
 
 class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _dosisController = TextEditingController();
-  final _frecuenciaController = TextEditingController();
-  final _duracionController = TextEditingController();
-  final _indicacionesController = TextEditingController();
+
+  late final TextEditingController _dosisController;
+  late final TextEditingController _presentacionController;
+  late final TextEditingController _viaController;
+  late final TextEditingController _frecuenciaController;
+  late final TextEditingController _duracionController;
+  late final TextEditingController _cantidadController;
+  late final TextEditingController _indicacionesController;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.itemExistente;
+
+    _dosisController = TextEditingController(text: item?.dosis ?? '');
+    _presentacionController = TextEditingController(
+      text: item?.presentacionConcentracion ?? '',
+    );
+    _viaController = TextEditingController(
+      text: item?.viaAdministracion ?? 'vía oral',
+    );
+    _frecuenciaController = TextEditingController(text: item?.frecuencia ?? '');
+    _duracionController = TextEditingController(text: item?.duracion ?? '');
+    _cantidadController = TextEditingController(
+      text: item?.cantidadIndicada ?? '',
+    );
+    _indicacionesController = TextEditingController(
+      text: item?.indicacionesEspecificas ?? '',
+    );
+  }
 
   @override
   void dispose() {
     _dosisController.dispose();
+    _presentacionController.dispose();
+    _viaController.dispose();
     _frecuenciaController.dispose();
     _duracionController.dispose();
+    _cantidadController.dispose();
     _indicacionesController.dispose();
     super.dispose();
   }
@@ -53,33 +74,37 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
   void _confirmar() {
     if (!_formKey.currentState!.validate()) return;
 
-    final receta = Receta(
-      title: widget.medicina.nombre,
-      createdAt: DateTime.now(),
-      medicinaId: widget.medicina.id ?? '',
+    final item = ItemReceta(
+      id: widget.itemExistente?.id,
+      medicamentoId: widget.medicina.id,
+      nombreMedicamento: widget.medicina.nombre,
+      presentacionConcentracion: _presentacionController.text.trim(),
       dosis: _dosisController.text.trim(),
+      viaAdministracion: _viaController.text.trim(),
       frecuencia: _frecuenciaController.text.trim(),
       duracion: _duracionController.text.trim(),
-      indicaciones: _indicacionesController.text.trim(),
-      notas: widget.justificacionClinica,
+      cantidadIndicada: _cantidadController.text.trim(),
+      indicacionesEspecificas: _indicacionesController.text.trim().isEmpty
+          ? null
+          : _indicacionesController.text.trim(),
     );
 
-    Navigator.of(context).pop(receta);
+    Navigator.of(context).pop(item);
   }
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
     return AppDialog(
-      preferredWidth: 380,
+      preferredWidth: 460,
       title: Row(
         children: [
-          Icon(Icons.medication_rounded, size: 20, color: ac.primaryBlue),
+          Icon(Icons.medication_rounded, size: 22, color: ac.primaryGreen),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               widget.medicina.nombre,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -91,24 +116,82 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _campo(ac, _dosisController, 'Dosis', 'Ej. 500mg'),
-              const SizedBox(height: 12),
-              _campo(
-                ac,
-                _frecuenciaController,
-                'Frecuencia',
-                'Ej. Cada 8 horas',
+              Row(
+                children: [
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _dosisController,
+                      'Dosis *',
+                      'Ej. 500mg / 1 tab',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _presentacionController,
+                      'Concentración',
+                      'Ej. Tabletas',
+                      requerido: false,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
-              _campo(ac, _duracionController, 'Duración', 'Ej. 7 días'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _frecuenciaController,
+                      'Frecuencia *',
+                      'Ej. Cada 8 horas',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _viaController,
+                      'Vía de Adm.',
+                      'Ej. Vía oral',
+                      requerido: false,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _duracionController,
+                      'Duración *',
+                      'Ej. 7 días',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _campo(
+                      ac,
+                      _cantidadController,
+                      'Cantidad Despacho',
+                      'Ej. 21 tabletas',
+                      requerido: false,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               _campo(
                 ac,
                 _indicacionesController,
-                'Indicaciones',
-                'Ej. Tomar con alimentos',
+                'Indicaciones específicas',
+                'Ej. Tomar junto con los alimentos',
                 requerido: false,
-                maxLines: 3,
+                maxLines: 2,
               ),
             ],
           ),
@@ -119,10 +202,11 @@ class _RecetaItemFormDialogState extends State<_RecetaItemFormDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _confirmar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
-          child: const Text('Agregar a la receta'),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Agregar renglón'),
         ),
       ],
     );

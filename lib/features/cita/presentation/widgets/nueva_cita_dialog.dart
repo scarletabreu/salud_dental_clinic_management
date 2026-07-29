@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -565,13 +564,13 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: ac.primaryBlue.withValues(alpha: 0.10),
+              color: ac.primaryGreen.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.calendar_month_rounded,
               size: 22,
-              color: ac.primaryBlue,
+              color: ac.primaryGreen,
             ),
           ),
           const SizedBox(width: 12),
@@ -628,7 +627,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
               margin: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                color: isStep2 ? ac.primaryBlue : ac.divider,
+                color: isStep2 ? ac.primaryGreen : ac.divider,
               ),
             ),
           ),
@@ -669,7 +668,11 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       decoration: InputDecoration(
         labelText: 'Buscar paciente existente',
         hintText: 'Nombre, apellido o cédula...',
-        prefixIcon: Icon(Icons.search_rounded, size: 20, color: ac.primaryBlue),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: 20,
+          color: ac.primaryGreen,
+        ),
         suffixIcon: _buscando
             ? const Padding(
                 padding: EdgeInsets.all(12),
@@ -772,7 +775,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
                   label: const Text('Registrar Nuevo Paciente'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryBlue,
+                    backgroundColor: ac.primaryGreen,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -795,7 +798,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: ac.primaryBlue.withValues(alpha: 0.10),
+            color: ac.primaryGreen.withValues(alpha: 0.10),
             border: Border.all(color: ac.divider),
             image: _fotoPendiente != null
                 ? DecorationImage(
@@ -809,7 +812,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
               : Icon(
                   Icons.person_outline_rounded,
                   size: 26,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
         ),
         const SizedBox(width: 12),
@@ -850,7 +853,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                       style: const TextStyle(fontSize: 12),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: ac.primaryBlue,
+                      foregroundColor: ac.primaryGreen,
                       visualDensity: VisualDensity.compact,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -901,7 +904,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
             children: [
               Row(
                 children: [
-                  Icon(Icons.badge_outlined, size: 16, color: ac.primaryBlue),
+                  Icon(Icons.badge_outlined, size: 16, color: ac.primaryGreen),
                   const SizedBox(width: 8),
                   Text(
                     'DATOS DE REGISTRO DEL PACIENTE',
@@ -984,7 +987,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                             Icon(
                               Icons.cake_outlined,
                               size: 16,
-                              color: ac.primaryBlue,
+                              color: ac.primaryGreen,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -1072,14 +1075,14 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: sel
-                                          ? ac.primaryBlue
+                                          ? ac.primaryGreen
                                           : ac.textSecondary,
                                     ),
                                   ),
                                   selected: sel,
                                   onSelected: (_) =>
                                       setState(() => _genero = g),
-                                  selectedColor: ac.primaryBlue.withValues(
+                                  selectedColor: ac.primaryGreen.withValues(
                                     alpha: 0.12,
                                   ),
                                   backgroundColor: ac.cardBg,
@@ -1195,7 +1198,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                     prefixIcon: Icon(
                       Icons.medical_services_outlined,
                       size: 18,
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                     ),
                     filled: true,
                     fillColor: ac.bgPage,
@@ -1333,7 +1336,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                         ),
                   label: Text(_guardando ? 'Guardando...' : 'Confirmar Cita'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryBlue,
+                    backgroundColor: ac.primaryGreen,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
@@ -1364,22 +1367,22 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.05),
+        color: ac.primaryGreen.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ac.primaryBlue.withValues(alpha: 0.2)),
+        border: Border.all(color: ac.primaryGreen.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: ac.primaryBlue.withValues(alpha: 0.15),
+            backgroundColor: ac.primaryGreen.withValues(alpha: 0.15),
             foregroundImage: _fotoPendiente != null
                 ? MemoryImage(_fotoPendiente!)
                 : null,
             child: Text(
               nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P',
               style: TextStyle(
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -1490,7 +1493,7 @@ class _StepDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = active || completed ? ac.primaryBlue : ac.divider;
+    final bg = active || completed ? ac.primaryGreen : ac.divider;
     final fg = active || completed ? Colors.white : ac.textMuted;
 
     return AnimatedContainer(
@@ -1548,7 +1551,7 @@ class _FormField extends StatelessWidget {
         labelText: label,
         hintText: hint,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, size: 17, color: ac.primaryBlue)
+            ? Icon(prefixIcon, size: 17, color: ac.primaryGreen)
             : null,
         filled: true,
         fillColor: ac.cardBg,
@@ -1588,11 +1591,11 @@ class _PersonaTile extends StatelessWidget {
         onTap: onTap,
         leading: CircleAvatar(
           radius: 16,
-          backgroundColor: ac.primaryBlue.withValues(alpha: 0.1),
+          backgroundColor: ac.primaryGreen.withValues(alpha: 0.1),
           child: Text(
             iniciales,
             style: TextStyle(
-              color: ac.primaryBlue,
+              color: ac.primaryGreen,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -1629,7 +1632,7 @@ class _SectionLabel extends StatelessWidget {
     final ac = context.appColors;
     return Row(
       children: [
-        Icon(icon, size: 15, color: ac.primaryBlue),
+        Icon(icon, size: 15, color: ac.primaryGreen),
         const SizedBox(width: 6),
         Text(
           label,
@@ -1662,7 +1665,7 @@ class _DateTimeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
-    final color = error ? ac.red : (hasValue ? ac.primaryBlue : ac.textMuted);
+    final color = error ? ac.red : (hasValue ? ac.primaryGreen : ac.textMuted);
 
     return OutlinedButton.icon(
       onPressed: onTap,

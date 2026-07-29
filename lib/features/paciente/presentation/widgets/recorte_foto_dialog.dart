@@ -63,7 +63,12 @@ class _RecorteFotoDialogState extends State<RecorteFotoDialog> {
     _anchoBase = ancho * _escalaCover;
     _altoBase = alto * _escalaCover;
     _controller.value = Matrix4.identity()
-      ..translate((_viewport - _anchoBase) / 2, (_viewport - _altoBase) / 2);
+      ..translateByDouble(
+        (_viewport - _anchoBase) / 2,
+        (_viewport - _altoBase) / 2,
+        0,
+        1,
+      );
   }
 
   @override

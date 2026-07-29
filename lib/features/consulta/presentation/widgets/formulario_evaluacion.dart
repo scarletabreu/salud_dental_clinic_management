@@ -137,7 +137,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
           _FormCard(
             ac: ac,
             icon: Icons.notes_rounded,
-            iconColor: ac.primaryBlue,
+            iconColor: ac.primaryGreen,
             title: 'Motivo de consulta',
             subtitle: 'Describe el motivo principal',
             child: TextFormField(
@@ -334,7 +334,7 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: ac.primaryBlue, width: 1.5),
+          borderSide: BorderSide(color: ac.primaryGreen, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -365,7 +365,7 @@ class _PageHeader extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
             borderRadius: BorderRadius.circular(12),
           ),
           alignment: Alignment.center,
@@ -504,7 +504,7 @@ class _AddButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: ac.primaryBlue,
+          color: ac.primaryGreen,
           borderRadius: BorderRadius.circular(10),
         ),
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
@@ -671,7 +671,7 @@ class _IniciarButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onTap,
         style: FilledButton.styleFrom(
-          backgroundColor: ac.primaryBlue,
+          backgroundColor: ac.primaryGreen,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),

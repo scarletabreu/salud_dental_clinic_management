@@ -16,11 +16,11 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.estado,
     super.nombreTratamiento,
     super.claveOdontograma,
-    super.fechaAplicacion,
     super.itemPlanId,
     super.justificacionNoPlanificada,
     super.doctorEjecutaId,
     super.fechaEjecucion,
+    super.cantidadRealizada,
     super.anuladoEn,
   });
 
@@ -48,13 +48,11 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       claveOdontograma:
           catalogo['clave_odontograma'] as String? ??
           catalogo['claveOdontograma'] as String?,
-      fechaAplicacion: _parseFecha(
-        json['fecha_aplicacion'] ?? json['created_at'],
-      ),
       itemPlanId: json['item_plan_id'] as String?,
       justificacionNoPlanificada:
           json['justificacion_no_planificada'] as String?,
       doctorEjecutaId: json['doctor_ejecuta_id'] as String?,
+      cantidadRealizada: _toDouble(json['cantidad_realizada']) ?? 1,
       fechaEjecucion: _parseFecha(json['fecha_ejecucion']),
       anuladoEn: _parseFecha(json['deleted_at']),
     );
@@ -92,11 +90,11 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'precio_aplicado': precioAplicado,
       'notas': notas,
       'estado': estado.dbValue,
-      'fecha_aplicacion': fechaAplicacion?.toIso8601String(),
       'item_plan_id': itemPlanId,
       'justificacion_no_planificada': justificacionNoPlanificada,
       'doctor_ejecuta_id': doctorEjecutaId,
       'fecha_ejecucion': fechaEjecucion?.toIso8601String(),
+      'cantidad_realizada': cantidadRealizada,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

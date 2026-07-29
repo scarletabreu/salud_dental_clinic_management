@@ -16,6 +16,9 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   static const _selectPerfilCompleto =
       '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
 
+    static const _selectPerfilAdmin =
+      '*, doctores(*, usuarios(*, personas(*, persona_contactos(*, contactos(*)))))';
+
   @override
   String? getCurrentUserId() {
     try {
@@ -65,6 +68,13 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   @override
   Future<Usuario?> getPerfilPorUuid(String uuid) {
     return runGuarded(() async {
+      final adminData = await remoteDataSource.getPerfilPorTabla(
+        tabla: 'admins',
+        uuid: uuid,
+        selectColumns: _selectPerfilAdmin,
+      );
+      if (adminData != null) return AdminModel.fromJson(adminData);
+
       final doctorData = await remoteDataSource.getPerfilPorTabla(
         tabla: 'doctores',
         uuid: uuid,
@@ -72,12 +82,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       );
       if (doctorData != null) return DoctorModel.fromJson(doctorData);
 
-      final adminData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'admins',
-        uuid: uuid,
-        selectColumns: _selectPerfilCompleto,
-      );
-      if (adminData != null) return AdminModel.fromJson(adminData);
+
 
       final asistenteData = await remoteDataSource.getPerfilPorTabla(
         tabla: 'asistentes',
@@ -111,7 +116,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       final List<dynamic>? listAdmins = await remoteDataSource
           .getPerfilesPorTabla(
             tabla: 'admins',
-            selectColumns: _selectPerfilCompleto,
+            selectColumns: _selectPerfilAdmin,
           );
       if (listAdmins != null) {
         usuariosConsolidados.addAll(

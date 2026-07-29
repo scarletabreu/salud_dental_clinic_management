@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -255,7 +257,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     });
   }
 
-  void _save() {
+  void _save() async {
     if (!_formKey.currentState!.validate() || _fechaNacimiento == null) {
       if (_fechaNacimiento == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -276,13 +278,15 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       return;
     }
 
+    final pacienteId = widget.paciente.id;
+
     final recordActualizado = widget.paciente.record.copyWith(
       historialFamiliar: _historialFamiliarController.text.trim(),
       cantHijos: int.tryParse(_cantHijosController.text.trim()) ?? 0,
     );
 
     final paciente = Paciente(
-      id: widget.paciente.id,
+      id: pacienteId,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
@@ -301,6 +305,12 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       altura: double.tryParse(_alturaController.text.trim()),
       record: recordActualizado,
       citas: widget.paciente.citas,
+      // Las columnas foto_* las mantiene PacienteFotoStorage; aquí se
+      // conservan tal cual venían para no pisarlas al editar la ficha.
+      fotoRuta: widget.paciente.fotoRuta,
+      fotoMimeType: widget.paciente.fotoMimeType,
+      fotoTamanoBytes: widget.paciente.fotoTamanoBytes,
+      fotoActualizadaEn: widget.paciente.fotoActualizadaEn,
     );
 
     context.read<PacienteCubit>().updatePaciente(paciente);
@@ -562,8 +572,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
         widget.paciente.fotoRuta != null && !_eliminarFotoPendiente;
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
       icon: Icons.account_circle_outlined,
       title: 'Fotografía de identificación',
       child: Row(
@@ -644,9 +654,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ac.amber.withOpacity(0.08),
+        color: ac.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ac.amber.withOpacity(0.25)),
+        border: Border.all(color: ac.amber.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -700,9 +710,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                       _isCompletarRegistro
                           ? 'Completar ficha clínica'
                           : 'Editar paciente',
-                      // La barra mide 72 px fijos: sin recortar, el título se
-                      // parte en varias líneas en una pantalla estrecha y
-                      // desborda su propia cabecera.
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -728,7 +735,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -749,12 +756,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
       icon: Icons.person_outline_rounded,
       title: 'Datos personales',
       child: Column(
         children: [
+          const SizedBox(height: 18),
+
           AppFormRow(
             children: [
               _FormField(
@@ -797,8 +806,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               decoration: _inputDeco(ac, hint: '000-0000000-0'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Cédula obligatoria';
-                if (v.replaceAll('-', '').length != 11)
+                if (v.replaceAll('-', '').length != 11) {
                   return 'Debe tener 11 dígitos';
+                }
                 return null;
               },
             ),
@@ -854,7 +864,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               options: Genero.values,
               selected: _genero,
               labelOf: (g) => g.label,
-              activeColor: ac.primaryBlue,
+              activeColor: ac.primaryGreen,
               onSelected: (g) => setState(() => _genero = g),
             ),
           ),
@@ -867,15 +877,15 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.teal,
-      iconBg: ac.teal.withOpacity(0.10),
+      iconBg: ac.teal.withValues(alpha: 0.10),
       icon: Icons.phone_outlined,
       title: 'Contactos',
       action: TextButton.icon(
         onPressed: _addContacto,
-        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
         label: Text(
           'Agregar',
-          style: TextStyle(fontSize: 12, color: ac.primaryBlue),
+          style: TextStyle(fontSize: 12, color: ac.primaryGreen),
         ),
       ),
       child: Column(
@@ -915,14 +925,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   Icon(
                     isFirst ? Icons.phone : Icons.contact_emergency,
                     size: 16,
-                    color: isFirst ? ac.primaryBlue : ac.red,
+                    color: isFirst ? ac.primaryGreen : ac.red,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isFirst
                           ? 'Contacto principal *'
-                          : 'Contacto de emergencia #${index}',
+                          : 'Contacto de emergencia #$index',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -1082,7 +1092,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.indigo,
-      iconBg: ac.indigo.withOpacity(0.10),
+      iconBg: ac.indigo.withValues(alpha: 0.10),
       icon: Icons.family_restroom_outlined,
       title: 'Antecedentes y contexto familiar',
       child: Column(
@@ -1123,7 +1133,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.red,
-      iconBg: ac.red.withOpacity(0.10),
+      iconBg: ac.red.withValues(alpha: 0.10),
       icon: Icons.health_and_safety_outlined,
       title: 'Condiciones médicas generales',
       child: _cargandoCondiciones
@@ -1144,7 +1154,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                   label: Text(c.nombre),
                   selected: isActive,
                   onSelected: (v) => _toggleCondicion(c, v),
-                  selectedColor: ac.red.withOpacity(0.12),
+                  selectedColor: ac.red.withValues(alpha: 0.12),
                   checkmarkColor: ac.red,
                   backgroundColor: ac.bgPage,
                   labelStyle: TextStyle(
@@ -1174,7 +1184,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     alignLabelWithHint: alignLabelWithHint,
   );
@@ -1266,7 +1276,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Expanded(
               child: Text(
@@ -1318,10 +1328,12 @@ class _ChipSelector<T> extends StatelessWidget {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.10) : ac.bgPage,
+              color: isActive ? activeColor.withValues(alpha: 0.10) : ac.bgPage,
               borderRadius: BorderRadius.circular(100),
               border: Border.all(
-                color: isActive ? activeColor.withOpacity(0.50) : ac.divider,
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.50)
+                    : ac.divider,
                 width: isActive ? 1.0 : 0.5,
               ),
             ),

@@ -1,8 +1,8 @@
 import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
-import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
 
@@ -82,6 +82,12 @@ class PacienteModel extends Paciente {
       return null;
     }
 
+    int? parseInt(dynamic val) {
+      if (val is num) return val.toInt();
+      if (val is String) return int.tryParse(val);
+      return null;
+    }
+
     return PacienteModel(
       id: json['id'] as String,
       nombre: persona['nombre'] as String? ?? '',
@@ -102,10 +108,12 @@ class PacienteModel extends Paciente {
       altura: parseDouble(json['altura']),
       fotoRuta: json['foto_ruta'] as String?,
       fotoMimeType: json['foto_mime_type'] as String?,
-      fotoTamanoBytes: (json['foto_tamano_bytes'] as num?)?.toInt(),
+      fotoTamanoBytes: parseInt(json['foto_tamano_bytes']),
       fotoActualizadaEn: json['foto_actualizada_en'] == null
           ? null
-          : DateTime.tryParse(json['foto_actualizada_en'] as String),
+          : DateTime.tryParse(
+              json['foto_actualizada_en'] as String,
+            )?.toLocal(),
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),

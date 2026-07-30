@@ -14,9 +14,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
@@ -352,11 +350,9 @@ ConsultaCubit _consultaCubit({
   required _CitaRepoFalso citas,
 }) => ConsultaCubit(
   crear,
-  _FinalizarNoUsado(),
   _StorageNoUsado(),
   citas,
   _ConsultaRepoFalso(),
-  _DescontarNoUsado(),
 );
 
 /// Captura la consulta que se manda a crear, que es donde se observa la fecha.
@@ -449,8 +445,6 @@ class _ConsultaRepoFalso extends Fake implements ConsultaRepository {
 }
 
 // Colaboradores que `iniciar` no llega a usar en estos casos.
-class _FinalizarNoUsado extends Fake implements FinalizarConsultaUseCase {}
 
 class _StorageNoUsado extends Fake implements SupabaseStorageHelper {}
 
-class _DescontarNoUsado extends Fake implements DescontarStockPorConsumo {}

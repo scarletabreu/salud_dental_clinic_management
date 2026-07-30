@@ -4,7 +4,9 @@ import 'package:salud_dental_clinic_management/features/consulta/data/datasource
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
@@ -144,69 +146,120 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   }
 
   @override
-  Future<String> finalizarConsulta({required String consultaId, String? nota}) {
-    return runGuarded(
-      () => remoteDataSource.finalizarConsulta(
+  Future<ResultadoBorradorConsulta> guardarBorradorConsulta({
+    required String consultaId,
+    int? version,
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
+    String? notas,
+    Map<String, dynamic>? signosVitales,
+  }) {
+    return runGuarded(() async {
+      final respuesta = await remoteDataSource.guardarBorradorConsulta(
         consultaId: consultaId,
-        nota: nota,
-      ),
-      context: 'finalizar la consulta',
-    );
+        version: version,
+        payload: _payloadClinico(
+          odontograma: odontograma,
+          recetas: recetas,
+          insumos: insumos,
+          notas: notas,
+          signosVitales: signosVitales,
+        ),
+      );
+      return ResultadoBorradorConsulta.fromRpc(respuesta);
+    }, context: 'guardar el resultado de la consulta');
   }
 
   @override
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  Future<ResultadoCierreConsulta> cerrarConsulta({
     required String consultaId,
-    required String? pacienteId,
+    int? version,
     required Odontograma odontograma,
     required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
     String? notas,
     Map<String, dynamic>? signosVitales,
-    bool? finalizada,
+    required String idempotenciaKey,
+    String? nota,
   }) {
     return runGuarded(() async {
-      final dientesPorFdi = <int, Map<String, dynamic>>{
-        for (final diente in odontograma.dientes)
-          diente.fdiCode: {
-            'esta_ausente': diente.estaAusente,
-            'observaciones': diente.observaciones,
-            'tratamientos': [
-              for (final t in diente.tratamientos)
-                {
-                  if (t.id != null) 'id': t.id,
-                  'tratamiento_id': t.tratamientoId,
-                  'es_continuo': t.esContinuo,
-                  'esta_terminado': t.estaTerminado,
-                  'superficie': t.superficie?.name.toLowerCase(),
-                  'precio_aplicado': t.precioAplicado,
-                  'notas': t.notas,
-                  'estado': t.estado.dbValue,
-                  'item_plan_id': t.itemPlanId,
-                  'justificacion_no_planificada': t.justificacionNoPlanificada,
-                  'doctor_ejecuta_id': t.doctorEjecutaId,
-                  'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
-                      ?.toUtc()
-                      .toIso8601String(),
-                },
-            ],
-            'diagnosticos': [
-              for (final diagnostico in diente.diagnosis)
-                {
-                  if (diagnostico.id != null) 'id': diagnostico.id,
-                  'diagnosis_id': diagnostico.diagnosisId,
-                  'severidad': diagnostico.severidad.name,
-                  'fecha_aplicacion': diagnostico.fechaAplicacion
-                      .toUtc()
-                      .toIso8601String(),
-                  'superficiecle': diagnostico.superficie?.name.toLowerCase(),
-                  'origen': diagnostico.origen.name,
-                  'notas': diagnostico.notas,
-                },
-            ],
-          },
-      };
+      final respuesta = await remoteDataSource.cerrarConsulta(
+        consultaId: consultaId,
+        version: version,
+        payload: _payloadClinico(
+          odontograma: odontograma,
+          recetas: recetas,
+          insumos: insumos,
+          notas: notas,
+          signosVitales: signosVitales,
+        ),
+        idempotenciaKey: idempotenciaKey,
+        nota: nota,
+      );
+      return ResultadoCierreConsulta.fromRpc(respuesta);
+    }, context: 'cerrar la consulta');
+  }
 
-      final recetasJson = [
+  /// Contrato versionado que entienden `guardar_borrador_consulta` y
+  /// `cerrar_consulta`. Una clave presente describe el conjunto completo
+  /// deseado; lo que falte en ella se anula del lado del servidor.
+  Map<String, dynamic> _payloadClinico({
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    required List<InsumoUtilizado> insumos,
+    String? notas,
+    Map<String, dynamic>? signosVitales,
+  }) {
+    final dientes = [
+      for (final diente in odontograma.dientes)
+        {
+          'fdi_code': diente.fdiCode,
+          'esta_ausente': diente.estaAusente,
+          'observaciones': diente.observaciones,
+          'tratamientos': [
+            for (final t in diente.tratamientos)
+              {
+                if (t.id != null) 'id': t.id,
+                'tratamiento_id': t.tratamientoId,
+                'es_continuo': t.esContinuo,
+                'esta_terminado': t.estaTerminado,
+                'superficie': t.superficie?.name.toLowerCase(),
+                'precio_aplicado': t.precioAplicado,
+                'notas': t.notas,
+                'estado': t.estado.dbValue,
+                'item_plan_id': t.itemPlanId,
+                'justificacion_no_planificada': t.justificacionNoPlanificada,
+                'doctor_ejecuta_id': t.doctorEjecutaId,
+                'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
+                    ?.toUtc()
+                    .toIso8601String(),
+              },
+          ],
+          'diagnosticos': [
+            for (final diagnostico in diente.diagnosis)
+              {
+                if (diagnostico.id != null) 'id': diagnostico.id,
+                'diagnosis_id': diagnostico.diagnosisId,
+                'severidad': diagnostico.severidad.name,
+                'fecha_aplicacion': diagnostico.fechaAplicacion
+                    .toUtc()
+                    .toIso8601String(),
+                'superficie': diagnostico.superficie?.name.toLowerCase(),
+                'origen': diagnostico.origen.name,
+                'notas': diagnostico.notas,
+              },
+          ],
+        },
+    ];
+
+    return {
+      'version_payload': 1,
+      if (notas != null) 'notas': notas,
+      if (signosVitales != null) 'signos_vitales': signosVitales,
+      'evaluacion_clinica': odontograma.evaluacionToJson(),
+      'dientes': dientes,
+      'recetas': [
         for (final r in recetas)
           {
             ...RecetaModel.fromEntity(r).toCabeceraJson(),
@@ -215,19 +268,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                 ItemRecetaModel.fromEntity(item).toJson(recetaId: r.id ?? ''),
             ],
           },
-      ];
-
-      return remoteDataSource.guardarResultadoConsulta(
-        consultaId: consultaId,
-        pacienteId: pacienteId,
-        dientesPorFdi: dientesPorFdi,
-        recetas: recetasJson,
-        evaluacionOdontologica: odontograma.evaluacionToJson(),
-        notas: notas,
-        signosVitales: signosVitales,
-        finalizada: finalizada,
-      );
-    }, context: 'guardar el resultado de la consulta');
+      ],
+      'insumos': [for (final insumo in insumos) insumo.toJson()],
+    };
   }
 
   @override

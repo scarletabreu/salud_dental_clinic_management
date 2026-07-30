@@ -1,37 +1,38 @@
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
-
 abstract class ConsultaRemoteDatasource {
   Future<String> crearConsultaCompleta(Map<String, dynamic> params);
 
-  /// Cierra la consulta y genera su pre-factura (cuenta + ítems) de forma
-  /// atómica vía RPC. Devuelve el id de la cuenta creada.
-  Future<String> finalizarConsulta({
+  /// Guarda el borrador clínico completo en una sola transacción
+  /// (`guardar_borrador_consulta`).
+  ///
+  /// [payload] es el contrato versionado del ticket HFX-CLIN-002: una clave
+  /// ausente no se toca, y una presente describe el conjunto completo deseado.
+  /// Lo que desaparece de una colección se anula con `deleted_at`, nunca se
+  /// borra: un expediente clínico no reescribe su historia.
+  ///
+  /// [version] es la versión que el cliente cree tener. Si el servidor tiene
+  /// otra, no escribe nada y responde `CL001`.
+  ///
+  /// Devuelve, por FDI, los ids confirmados en el mismo orden en que llegaron,
+  /// más la nueva versión de la consulta.
+  Future<Map<String, dynamic>> guardarBorradorConsulta({
     required String consultaId,
-    String metodoPago,
-    String? nota,
+    int? version,
+    required Map<String, dynamic> payload,
   });
 
-  /// Persiste el trabajo clínico de la consulta.
+  /// Cierra la consulta en una única operación (`cerrar_consulta`): guarda el
+  /// borrador final, descuenta inventario, emite recetas, crea la pre-factura
+  /// y completa la cita. O se confirma todo, o no cambia nada.
   ///
-  /// [dientesPorFdi] lleva, por código FDI, el estado completo de la pieza:
-  /// `esta_ausente`, `observaciones` y la lista `tratamientos`. Cada
-  /// tratamiento con `id` corresponde a una fila ya persistida y se actualiza
-  /// en su sitio; los que no lo llevan se insertan. Lo que desaparece de la
-  /// lista se anula con `deleted_at`, nunca se borra: un expediente clínico no
-  /// reescribe su historia.
-  ///
-  /// Devuelve, por FDI, los ids de los tratamientos en el mismo orden en que
-  /// llegaron, para que quien llama pueda sellarlos sobre su estado en memoria
-  /// y el siguiente guardado los reconozca en vez de duplicarlos.
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  /// [idempotenciaKey] identifica el intento lógico: repetirlo devuelve el
+  /// resultado existente en vez de descontar stock o facturar otra vez.
+  Future<Map<String, dynamic>> cerrarConsulta({
     required String consultaId,
-    required String? pacienteId,
-    required Map<int, Map<String, dynamic>> dientesPorFdi,
-    required List<Map<String, dynamic>> recetas,
-    required Map<String, dynamic> evaluacionOdontologica,
-    String? notas,
-    Map<String, dynamic>? signosVitales,
-    bool? finalizada,
+    int? version,
+    Map<String, dynamic> payload,
+    required String idempotenciaKey,
+    String metodoPago,
+    String? nota,
   });
 
   Future<List<Map<String, dynamic>>> fetchConsultas();

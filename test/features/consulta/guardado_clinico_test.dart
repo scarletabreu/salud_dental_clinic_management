@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
@@ -14,24 +13,25 @@ class _Vacio {
       throw UnimplementedError('${invocation.memberName} no se usa aquí');
 }
 
-/// Captura lo que el repositorio manda a persistir.
+/// Captura el payload que el repositorio manda a la RPC de borrador. Es el
+/// contrato real: lo que no viaje con el nombre exacto de su columna se pierde
+/// en silencio aunque la pantalla lo siga mostrando.
 class _DatasourceEspia extends _Vacio implements ConsultaRemoteDatasource {
-  Map<int, Map<String, dynamic>>? dientesRecibidos;
-  ResultadoGuardadoOdontograma respuesta = const ResultadoGuardadoOdontograma();
+  Map<String, dynamic>? payloadRecibido;
+
+  Map<int, Map<String, dynamic>> get dientesRecibidos => {
+    for (final diente in (payloadRecibido?['dientes'] as List? ?? const []))
+      (diente as Map<String, dynamic>)['fdi_code'] as int: diente,
+  };
 
   @override
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  Future<Map<String, dynamic>> guardarBorradorConsulta({
     required String consultaId,
-    required String? pacienteId,
-    required Map<int, Map<String, dynamic>> dientesPorFdi,
-    required List<Map<String, dynamic>> recetas,
-    required Map<String, dynamic> evaluacionOdontologica,
-    String? notas,
-    Map<String, dynamic>? signosVitales,
-    bool? finalizada,
+    int? version,
+    required Map<String, dynamic> payload,
   }) async {
-    dientesRecibidos = dientesPorFdi;
-    return respuesta;
+    payloadRecibido = payload;
+    return const {'version': 2, 'dientes': [], 'recetas': []};
   }
 }
 
@@ -43,17 +43,16 @@ Future<Map<String, dynamic>> _guardar(
   Diente diente,
 ) async {
   final repo = ConsultaRepositoryImpl(remoteDataSource: datasource);
-  await repo.guardarResultadoConsulta(
+  await repo.guardarBorradorConsulta(
     consultaId: 'c-1',
-    pacienteId: 'p-1',
     odontograma: _odontogramaCon(diente),
     recetas: const [],
   );
-  return datasource.dientesRecibidos![diente.fdiCode]!;
+  return datasource.dientesRecibidos[diente.fdiCode]!;
 }
 
 void main() {
-  group('guardarResultadoConsulta · lo que llega a la base de datos', () {
+  group('guardarBorradorConsulta · lo que llega a la base de datos', () {
     test(
       'la justificación clínica de una contraindicación se persiste',
       () async {

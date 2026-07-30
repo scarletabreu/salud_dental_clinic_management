@@ -104,7 +104,9 @@ class RecetaModel extends Receta {
   static EstadoReceta _parseEstado(dynamic estado) {
     if (estado == 'anulada') return EstadoReceta.anulada;
     if (estado == 'reemplazada') return EstadoReceta.reemplazada;
-    return EstadoReceta.activa;
+    if (estado == 'borrador') return EstadoReceta.borrador;
+    // `activa` es el estado anterior a HFX-CLIN-002: una receta ya entregada.
+    return EstadoReceta.emitida;
   }
 
   Map<String, dynamic> toCabeceraJson() {

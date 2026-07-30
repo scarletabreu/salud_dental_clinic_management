@@ -22,6 +22,11 @@ class Consulta {
   final bool finalizada;
   final TipoAtencionClinica tipoAtencion;
 
+  /// Versión confirmada por el servidor (HFX-CLIN-002). Viaja en cada guardado
+  /// para que dos pestañas no se pisen en silencio: si no coincide, el
+  /// servidor rechaza la escritura en vez de aceptar la última que llegó.
+  final int? version;
+
   final bool tienePreFactura;
 
   Consulta({
@@ -41,6 +46,7 @@ class Consulta {
     this.finalizada = false,
     this.tipoAtencion = TipoAtencionClinica.consulta,
     this.tienePreFactura = false,
+    this.version,
   });
 
   bool get tieneRecetas => recetas.isNotEmpty;
@@ -69,6 +75,7 @@ class Consulta {
     bool? finalizada,
     TipoAtencionClinica? tipoAtencion,
     bool? tienePreFactura,
+    int? version,
   }) {
     return Consulta(
       id: id ?? this.id,
@@ -88,6 +95,7 @@ class Consulta {
       finalizada: finalizada ?? this.finalizada,
       tipoAtencion: tipoAtencion ?? this.tipoAtencion,
       tienePreFactura: tienePreFactura ?? this.tienePreFactura,
+      version: version ?? this.version,
     );
   }
 }

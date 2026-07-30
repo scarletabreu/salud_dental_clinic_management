@@ -38,7 +38,6 @@ class _RepositorioLento extends Fake implements UsuarioRepository {
       contactos: const [],
       estatus: EstatusPersona.activo,
       username: 'bsantana',
-      passwordHash: 'x',
       // Un administrador es un doctor con capacidades añadidas: nace con
       // identidad clínica, así que su perfil siempre trae especialidad.
       specialty: 'Ortodoncia',

@@ -82,10 +82,13 @@ void main() {
 
   test('ningún rol trae contraseña desde el servidor', () {
     for (final rol in const ['admin', 'doctor', 'asistente']) {
-      final perfil = PerfilActualMapper.desdeFila(_fila(rol: rol));
+      final fila = _fila(rol: rol);
+      final perfil = PerfilActualMapper.desdeFila(fila);
+
+      expect(perfil, isNotNull);
       expect(
-        perfil!.passwordHash,
-        isEmpty,
+        fila,
+        isNot(contains('password_hash')),
         reason: 'la RPC no devuelve password_hash y el mapper no lo inventa',
       );
     }

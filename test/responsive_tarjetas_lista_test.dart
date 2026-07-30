@@ -50,7 +50,6 @@ Doctor _doctor() => Doctor(
   ],
   estatus: EstatusPersona.activo,
   username: 'bsantana',
-  passwordHash: 'x',
   specialty: 'Endodoncia y rehabilitación oral',
   assistants: const [],
 );

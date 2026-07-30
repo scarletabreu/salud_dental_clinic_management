@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
@@ -790,11 +791,26 @@ class ConsultaDetallePage extends StatelessWidget {
         trailing: IconButton(
           tooltip: 'Copiar enlace del documento',
           icon: Icon(Icons.link_rounded, size: 18, color: ac.primaryGreen),
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: doc.urlArchivo));
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Enlace copiado.')));
+          onPressed: () async {
+            try {
+              final url = await sl<SupabaseStorageHelper>().crearUrlFirmada(
+                doc.urlArchivo,
+              );
+              await Clipboard.setData(ClipboardData(text: url));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Enlace privado copiado por 5 minutos.'),
+                ),
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No se pudo autorizar el enlace privado.'),
+                ),
+              );
+            }
           },
         ),
       ),

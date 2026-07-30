@@ -24,7 +24,6 @@ Admin _admin({String id = 'admin-1'}) => Admin(
   contactos: const [],
   estatus: EstatusPersona.activo,
   username: 'ada',
-  passwordHash: '',
   assistants: const [],
   specialty: 'Ortodoncia',
   departamento: 'Dirección',
@@ -39,7 +38,6 @@ Doctor _doctor({String id = 'doctor-1'}) => Doctor(
   contactos: const [],
   estatus: EstatusPersona.activo,
   username: 'beto',
-  passwordHash: '',
   assistants: const [],
   specialty: 'Endodoncia',
 );
@@ -53,7 +51,6 @@ Asistente _asistente({String id = 'asistente-1'}) => Asistente(
   contactos: const [],
   estatus: EstatusPersona.activo,
   username: 'cami',
-  passwordHash: '',
   shift: 'matutino',
 );
 
@@ -66,7 +63,10 @@ void main() {
     });
 
     test('el asistente no firma actuaciones ni ve expedientes', () {
-      expect(RolUsuario.asistente.tiene(Capacidad.firmarActuacionPropia), isFalse);
+      expect(
+        RolUsuario.asistente.tiene(Capacidad.firmarActuacionPropia),
+        isFalse,
+      );
       expect(RolUsuario.asistente.tiene(Capacidad.verExpedientes), isFalse);
     });
 
@@ -77,10 +77,16 @@ void main() {
         Capacidad.verDatosDeContactoPaciente,
       ]) {
         expect(RolUsuario.admin.tiene(capacidad), isTrue, reason: '$capacidad');
-        expect(RolUsuario.asistente.tiene(capacidad), isTrue,
-            reason: '$capacidad');
-        expect(RolUsuario.doctor.tiene(capacidad), isFalse,
-            reason: '$capacidad');
+        expect(
+          RolUsuario.asistente.tiene(capacidad),
+          isTrue,
+          reason: '$capacidad',
+        );
+        expect(
+          RolUsuario.doctor.tiene(capacidad),
+          isFalse,
+          reason: '$capacidad',
+        );
       }
     });
 
@@ -98,10 +104,16 @@ void main() {
         Capacidad.accederACompras,
       ]) {
         expect(RolUsuario.admin.tiene(capacidad), isTrue, reason: '$capacidad');
-        expect(RolUsuario.doctor.tiene(capacidad), isFalse,
-            reason: '$capacidad');
-        expect(RolUsuario.asistente.tiene(capacidad), isFalse,
-            reason: '$capacidad');
+        expect(
+          RolUsuario.doctor.tiene(capacidad),
+          isFalse,
+          reason: '$capacidad',
+        );
+        expect(
+          RolUsuario.asistente.tiene(capacidad),
+          isFalse,
+          reason: '$capacidad',
+        );
       }
     });
   });
@@ -148,19 +160,25 @@ void main() {
     test('el filtro de agenda distingue quién la gestiona de quién ejerce', () {
       // Admin y asistente ven la agenda entera: sin restricción por doctor.
       expect(
-        AuthState(isAuthenticated: true, usuario: _admin())
-            .doctorIdParaFiltrarAgenda,
+        AuthState(
+          isAuthenticated: true,
+          usuario: _admin(),
+        ).doctorIdParaFiltrarAgenda,
         isNull,
       );
       expect(
-        AuthState(isAuthenticated: true, usuario: _asistente())
-            .doctorIdParaFiltrarAgenda,
+        AuthState(
+          isAuthenticated: true,
+          usuario: _asistente(),
+        ).doctorIdParaFiltrarAgenda,
         isNull,
       );
       // El doctor ve la suya.
       expect(
-        AuthState(isAuthenticated: true, usuario: _doctor())
-            .doctorIdParaFiltrarAgenda,
+        AuthState(
+          isAuthenticated: true,
+          usuario: _doctor(),
+        ).doctorIdParaFiltrarAgenda,
         'doctor-1',
       );
     });

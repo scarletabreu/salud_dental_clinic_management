@@ -10,6 +10,7 @@ import 'package:salud_dental_clinic_management/features/configuracion/presentati
 import 'core/presentation/app_theme.dart';
 import 'core/presentation/bootstrap_error_screen.dart';
 import 'core/presentation/connectivity_cubit.dart';
+import 'core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
@@ -56,10 +57,10 @@ void _mostrarFalloDeArranque(
   StackTrace stackTrace,
   BootstrapErrorKind tipo,
 ) {
-  debugPrint('Fallo de arranque ($tipo): $error\n$stackTrace');
+  AppLog.error('fallo de arranque: $tipo', error, stackTrace);
   runApp(
     BootstrapErrorScreen(
-      detalle: error is StateError ? error.message : '$error',
+      detalle: 'Revise la configuración del ambiente e intente nuevamente.',
       tipo: tipo,
     ),
   );

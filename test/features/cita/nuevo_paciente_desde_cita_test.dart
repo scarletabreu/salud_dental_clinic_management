@@ -63,7 +63,6 @@ class _DoctorRepoDoble extends Fake implements DoctorRepository {
       contactos: const <ContactoModel>[],
       estatus: EstatusPersona.activo,
       username: 'cmendoza',
-      passwordHash: '',
       specialty: 'General',
       assistants: const [],
     ),

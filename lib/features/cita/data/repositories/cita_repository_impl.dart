@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/datasources/cita_remote_datasources.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
@@ -28,6 +29,16 @@ class CitaRepositoryImpl implements CitaRepository {
     return runGuarded(
       () => remoteDataSource.fetchCitas(),
       context: 'obtener las citas',
+    );
+  }
+
+  @override
+  Future<List<ActividadPlanificada>> getActividadesAgendables(
+    String pacienteId,
+  ) {
+    return runGuarded(
+      () => remoteDataSource.fetchActividadesAgendables(pacienteId),
+      context: 'obtener las actividades del plan del paciente',
     );
   }
 
@@ -143,6 +154,7 @@ class CitaRepositoryImpl implements CitaRepository {
       esEmergencia: cita.esEmergencia,
       estado: cita.estado,
       motivo: cita.motivo,
+      actividades: cita.actividades,
     );
   }
 }

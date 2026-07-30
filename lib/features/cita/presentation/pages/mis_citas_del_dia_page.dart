@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -12,6 +13,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../presentation/widgets/nueva_cita_dialog.dart';
 import '../cubit/cita_cubit.dart';
 import '../cubit/cita_cubit_state.dart';
+import '../widgets/resumen_cita.dart';
 import '../widgets/timeline_view.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/pages/cita_edit_page.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
@@ -121,6 +123,7 @@ class MisCitasDelDiaPage extends StatelessWidget {
               personaRepository: sl<PersonaRepository>(),
               doctorRepository: sl<DoctorRepository>(),
               pacienteRepository: sl<IPacienteRepository>(),
+              citaRepository: sl<CitaRepository>(),
             );
             if (context.mounted) context.read<CitaCubit>().load();
           }
@@ -1128,216 +1131,238 @@ class _CitaCard extends StatelessWidget {
     final puedeGestionar = esAsistente || esAdmin;
     final puedeEfectuarConsulta = esDoctorDeEstaCita;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: ac.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border(left: BorderSide(color: statusColor, width: 3)),
-        boxShadow: [ac.cardShadow],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return ResumenCitaAccesible(
+      cita: cita,
+      child: Container(
+        decoration: BoxDecoration(
+          color: ac.cardBg,
           borderRadius: BorderRadius.circular(14),
-          // CAMBIO: un doctor sin permisos de gestión no navega al detalle
-          // de edición; su única acción sobre la tarjeta es "Iniciar consulta".
-          onTap: puedeGestionar
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider.value(
-                        value: context.read<CitaCubit>(),
-                        child: CitaEditPage(cita: cita),
+          border: Border(left: BorderSide(color: statusColor, width: 3)),
+          boxShadow: [ac.cardShadow],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            // CAMBIO: un doctor sin permisos de gestión no navega al detalle
+            // de edición; su única acción sobre la tarjeta es "Iniciar consulta".
+            onTap: puedeGestionar
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider.value(
+                          value: context.read<CitaCubit>(),
+                          child: CitaEditPage(cita: cita),
+                        ),
                       ),
-                    ),
-                  );
-                }
-              : null,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          hour,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: statusColor,
-                            height: 1,
-                          ),
-                        ),
-                        Text(
-                          min,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor.withValues(alpha: 0.6),
-                            height: 1.1,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      color: statusColor.withValues(alpha: 0.15),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    );
+                  }
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            runSpacing: 4,
-                            children: [
-                              Text(
-                                cita.persona.fullName,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: ac.textPrimary,
+                          Text(
+                            hour,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: statusColor,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            min,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor.withValues(alpha: 0.6),
+                              height: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        color: statusColor.withValues(alpha: 0.15),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  cita.persona.fullName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: ac.textPrimary,
+                                  ),
                                 ),
-                              ),
-                              if (cita.esEmergencia)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 6),
-                                  // Insignia decorativa de 10 px: su sentido lo
-                                  // llevan también el icono y el color de la
-                                  // ficha, así que su texto no crece sin fin.
-                                  child: MediaQuery.withClampedTextScaling(
-                                    maxScaleFactor: 1.4,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: ac.red.withValues(alpha: 0.10),
-                                        borderRadius: BorderRadius.circular(
-                                          100,
+                                if (cita.esEmergencia)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 6),
+                                    // Insignia decorativa de 10 px: su sentido lo
+                                    // llevan también el icono y el color de la
+                                    // ficha, así que su texto no crece sin fin.
+                                    child: MediaQuery.withClampedTextScaling(
+                                      maxScaleFactor: 1.4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.priority_high_rounded,
-                                            size: 10,
-                                            color: ac.red,
+                                        decoration: BoxDecoration(
+                                          color: ac.red.withValues(alpha: 0.10),
+                                          borderRadius: BorderRadius.circular(
+                                            100,
                                           ),
-                                          if (MediaQuery.textScalerOf(
-                                                context,
-                                              ).scale(1) <=
-                                              1.3) ...[
-                                            const SizedBox(width: 2),
-                                            Flexible(
-                                              child: Text(
-                                                'Urgente',
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: ac.red,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.priority_high_rounded,
+                                              size: 10,
+                                              color: ac.red,
+                                            ),
+                                            if (MediaQuery.textScalerOf(
+                                                  context,
+                                                ).scale(1) <=
+                                                1.3) ...[
+                                              const SizedBox(width: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  'Urgente',
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: ac.red,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person_outline_rounded,
-                                size: 12,
-                                color: ac.textMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: ac.textMuted,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          // Lo que el paciente dijo al agendar: el odontólogo
-                          // llega a la consulta sabiendo a qué viene.
-                          if ((cita.motivo ?? '').isNotEmpty) ...[
+                              ],
+                            ),
                             const SizedBox(height: 4),
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Icon(
-                                  Icons.notes_rounded,
+                                  Icons.person_outline_rounded,
                                   size: 12,
                                   color: ac.textMuted,
                                 ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    cita.motivo!,
+                                    'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: ac.textSecondary,
+                                      color: ac.textMuted,
                                     ),
-                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
+                            // Lo que se planificó tratar. Va antes del motivo
+                            // porque es la decisión clínica; el motivo es lo que
+                            // dijo el paciente (SD-146).
+                            if (cita.actividades.isNotEmpty)
+                              _ActividadesResumen(cita: cita),
+                            // Lo que el paciente dijo al agendar: el odontólogo
+                            // llega a la consulta sabiendo a qué viene.
+                            if ((cita.motivo ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.notes_rounded,
+                                    size: 12,
+                                    color: ac.textMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      cita.motivo!,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: ac.textSecondary,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    // CAMBIO: el dropdown de estado solo aparece si el rol
-                    // puede gestionar la cita (asistente o admin).
-                    if (puedeGestionar && !context.appLayout.isCompact) ...[
-                      const SizedBox(width: 8),
-                      _EstadoDropdown(
-                        cita: cita,
-                        onCancelar: () =>
-                            _mostrarDialogoCancelacion(context, cita.id!),
+                      // El resumen flotante solo lo dispara el ratón o el foco:
+                      // este botón es la vía táctil y la que anuncia el lector de
+                      // pantalla (SD-146).
+                      IconButton(
+                        tooltip: 'Ver resumen de la cita',
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          Icons.event_note_rounded,
+                          size: 18,
+                          color: ac.textMuted,
+                        ),
+                        onPressed: () => mostrarResumenCita(context, cita),
                       ),
+                      // CAMBIO: el dropdown de estado solo aparece si el rol
+                      // puede gestionar la cita (asistente o admin).
+                      if (puedeGestionar && !context.appLayout.isCompact) ...[
+                        const SizedBox(width: 8),
+                        _EstadoDropdown(
+                          cita: cita,
+                          onCancelar: () =>
+                              _mostrarDialogoCancelacion(context, cita.id!),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                if (puedeGestionar && context.appLayout.isCompact)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: _EstadoDropdown(
-                        cita: cita,
-                        onCancelar: () =>
-                            _mostrarDialogoCancelacion(context, cita.id!),
+                  ),
+                  if (puedeGestionar && context.appLayout.isCompact)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: _EstadoDropdown(
+                          cita: cita,
+                          onCancelar: () =>
+                              _mostrarDialogoCancelacion(context, cita.id!),
+                        ),
                       ),
                     ),
-                  ),
-                // CAMBIO: el botón de consulta ahora depende también de
-                // puedeEfectuarConsulta, no solo del estado de la cita.
-                if (puedeEfectuarConsulta) _botonEfectuar(context),
-              ],
+                  // CAMBIO: el botón de consulta ahora depende también de
+                  // puedeEfectuarConsulta, no solo del estado de la cita.
+                  if (puedeEfectuarConsulta) _botonEfectuar(context),
+                ],
+              ),
             ),
           ),
         ),
@@ -1398,6 +1423,65 @@ class _CitaCard extends StatelessWidget {
       ),
     );
     cubit.load();
+  }
+}
+
+/// Las actividades del plan que la cita va a atender, recortadas a lo que cabe
+/// en la ficha. La lista completa está en el resumen flotante.
+class _ActividadesResumen extends StatelessWidget {
+  const _ActividadesResumen({required this.cita});
+
+  final Cita cita;
+
+  static const _maximoVisibles = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final lineas = cita.resumenActividades;
+    final visibles = lineas.take(_maximoVisibles).toList();
+    final ocultas = lineas.length - visibles.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.checklist_rounded,
+              size: 12,
+              color: ac.primaryGreen,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final linea in visibles)
+                  Text(
+                    linea,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: ac.textSecondary,
+                      height: 1.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (ocultas > 0)
+                  Text(
+                    '+$ocultas actividad${ocultas > 1 ? 'es' : ''} más',
+                    style: TextStyle(fontSize: 11, color: ac.textMuted),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

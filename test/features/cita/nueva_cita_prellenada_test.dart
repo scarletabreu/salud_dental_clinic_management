@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/nueva_cita_dialog.dart';
@@ -55,6 +57,15 @@ Future<void> _elegirPersona(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// El paso 2 ofrece las actividades del plan (SD-146). Este paciente no tiene
+/// ninguna: la prueba no va de eso.
+class _CitaRepoDoble extends Fake implements CitaRepository {
+  @override
+  Future<List<ActividadPlanificada>> getActividadesAgendables(
+    String pacienteId,
+  ) async => const [];
+}
+
 void main() {
   testWidgets(
     'abrir la cita desde una casilla de la agenda trae su fecha y su hora',
@@ -77,6 +88,7 @@ void main() {
                       personaRepository: _PersonaRepoDoble(),
                       doctorRepository: _DoctorRepoDoble(),
                       pacienteRepository: _PacienteRepoDoble(),
+                      citaRepository: _CitaRepoDoble(),
                       // La casilla del miércoles a las 9:00 de la agenda semanal.
                       fechaInicial: DateTime(2026, 8, 12, 9),
                     ),
@@ -119,6 +131,7 @@ void main() {
                     personaRepository: _PersonaRepoDoble(),
                     doctorRepository: _DoctorRepoDoble(),
                     pacienteRepository: _PacienteRepoDoble(),
+                    citaRepository: _CitaRepoDoble(),
                   ),
                   child: const Text('abrir'),
                 ),

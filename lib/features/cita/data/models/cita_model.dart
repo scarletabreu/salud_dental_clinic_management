@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/core/data/models/persona_model.dart';
+import 'package:salud_dental_clinic_management/features/cita/data/models/actividad_planificada_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
@@ -13,6 +14,7 @@ class CitaModel extends Cita {
     required super.esEmergencia,
     required super.estado,
     super.motivo,
+    super.actividades,
   });
 
   /// Un motivo en blanco es "sin motivo": así el campo vacío del formulario no
@@ -42,6 +44,14 @@ class CitaModel extends Cita {
       esEmergencia: json['es_emergencia'] ?? false,
       estado: EstadoCita.fromDb(json['estado'] as String?),
       motivo: normalizarMotivo(json['motivo'] as String?),
+      // Las actividades no son columnas de `citas`: las inyecta el datasource
+      // desde `resumen_actividades_cita` (SD-146). Ausentes = no se pidieron.
+      actividades: [
+        for (final fila in (json['actividades'] as List? ?? const []))
+          ActividadPlanificadaModel.fromJson(
+            Map<String, dynamic>.from(fila as Map),
+          ),
+      ],
     );
   }
 

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/selector_actividades_plan.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -31,6 +34,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
   bool _esEmergencia = false;
   int _duracionMinutos = 30;
   final _motivoCtrl = TextEditingController();
+  List<ActividadPlanificada> _actividades = const [];
 
   @override
   void initState() {
@@ -40,6 +44,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
     _esEmergencia = widget.cita.esEmergencia;
     _duracionMinutos = widget.cita.duracionMinutos;
     _motivoCtrl.text = widget.cita.motivo ?? '';
+    _actividades = widget.cita.actividades;
     _cargarDoctores();
   }
 
@@ -117,6 +122,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
         duracionMinutos: _duracionMinutos,
         esEmergencia: _esEmergencia,
         motivo: _motivoCtrl.text.trim(),
+        actividades: _actividades,
       ),
     );
   }
@@ -208,6 +214,8 @@ class _CitaEditPageState extends State<CitaEditPage> {
                     _buildFechaHoraCard(ac, isSubmitting),
                     const SizedBox(height: 16),
                     _buildParametrosCard(ac, isSubmitting),
+                    const SizedBox(height: 16),
+                    _buildActividadesCard(ac, isSubmitting),
                     const SizedBox(height: 16),
                     _buildEmergenciaCard(ac, isSubmitting),
                     const SizedBox(height: 24),
@@ -429,6 +437,22 @@ class _CitaEditPageState extends State<CitaEditPage> {
           ),
           const SizedBox(height: 14),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActividadesCard(AppColors ac, bool isSubmitting) {
+    return _EditCard(
+      ac: ac,
+      iconColor: ac.primaryGreen,
+      icon: Icons.checklist_rounded,
+      title: 'Actividades del plan',
+      child: SelectorActividadesPlan(
+        pacienteId: widget.cita.persona.id,
+        repository: sl<CitaRepository>(),
+        seleccionadas: _actividades,
+        habilitado: !isSubmitting,
+        onChanged: (lista) => setState(() => _actividades = lista),
       ),
     );
   }

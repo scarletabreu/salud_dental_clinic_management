@@ -15,7 +15,12 @@ y reconstruir una instancia idéntica desde cero.
   27 tipos, 172 políticas RLS y las funciones/triggers vigentes. Sólo estructura,
   sin datos.
   Está al día con todas las migraciones listadas abajo, así que por sí sola
-  reconstruye la base completa.
+  reconstruye la base completa. **SD-146 (30 jul 2026)** añadió a mano sus
+  objetos (`citas_items_plan`, `resumen_actividades_cita`,
+  `actividades_agendables_paciente`, `validar_cita_item_plan`) en vez de
+  regenerar el archivo entero: un `db dump` completo habría arrastrado también
+  el drift ajeno que hoy tiene la instancia (`auditoria_log`, `items_receta`,
+  `resumen_actividad_plan`), que no pertenece a ese ticket.
 
   > Antes de ese refresco el archivo no definía **ninguna tabla** (sólo extensiones)
   > y era imposible levantar el proyecto desde cero: la primera migración moría con
@@ -146,6 +151,7 @@ así que no dejan datos, y abortan con `ERROR` si el contrato se rompe.
 | `tests/sd_111_trigger_caja_test.sql` | `pagos_registrar_ingreso_caja`: un pago `completado` genera **un** ingreso en la caja abierta de hoy; un pago pendiente no la toca; sin caja abierta el pago se rechaza (P0001) y no se persiste; la caja de ayer no habilita el cobro de hoy; no revivió el trigger duplicado `tr_pago_a_movimiento_caja`. |
 | `tests/sd_169_paciente_inactivo_test.sql` | `cancelar_citas_paciente_inactivo` (SD-169): pasar un paciente a inactivo **no falla** (antes moría con `42703`) y cancela sus citas futuras vivas (`programada`, `confirmada`, `en_espera`); deja intactas las `en_consulta`, las pasadas, las terminales y las de otros pacientes; la cita con **consulta abierta** ni se cancela ni aborta la baja (regla de SD-160); reactivar o reenviar el mismo `estatus` no vuelve a barrer la agenda. |
 | `tests/sd_135_plan_tratamiento_test.sql` | Separación evaluación / plan / ejecución (SD-135/SD-138): registrar hallazgos **no** crea tratamiento aplicado ni cuenta; una actividad todavía `propuesto` no se puede ejecutar; una ejecución aceptada completa su actividad planificada; el flujo unificado admite una intervención agregada durante la consulta sin justificación obligatoria y conserva su auditoría; `finalizar_consulta` cobra solo lo ejecutado e ignora lo planificado, y es idempotente. |
+| `tests/sd_146_cita_actividades_test.sql` | Vínculo cita ↔ actividades planificadas (SD-146): una cita puede cubrir varias actividades del plan de **su** paciente; `trg_validar_cita_item_plan` rechaza la actividad de otro paciente, la retirada del plan (`deleted_at`) y la ya rechazada/cancelada/completada; `resumen_actividades_cita` devuelve nombre del tratamiento y pieza FDI; `actividades_agendables_paciente` excluye lo rechazado y lo retirado; el **asistente** —que es quien agenda y no puede leer `items_plan_tratamiento`— sí lee las vistas y gestiona los vínculos; borrar la cita se lleva los suyos. |
 
 ```bash
 # Contra la base local levantada por el CLI

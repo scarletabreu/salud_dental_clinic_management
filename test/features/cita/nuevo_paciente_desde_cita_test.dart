@@ -8,7 +8,9 @@ import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/nueva_cita_dialog.dart';
@@ -68,6 +70,15 @@ class _DoctorRepoDoble extends Fake implements DoctorRepository {
   ];
 }
 
+/// El paso 2 ofrece las actividades del plan (SD-146). Este paciente no tiene
+/// ninguna: la prueba no va de eso.
+class _CitaRepoDoble extends Fake implements CitaRepository {
+  @override
+  Future<List<ActividadPlanificada>> getActividadesAgendables(
+    String pacienteId,
+  ) async => const [];
+}
+
 void main() {
   testWidgets(
     'el paciente nuevo de la agenda se registra como paciente y su id agenda la cita',
@@ -93,6 +104,7 @@ void main() {
                       personaRepository: _PersonaRepoDoble(),
                       doctorRepository: _DoctorRepoDoble(),
                       pacienteRepository: pacienteRepo,
+                      citaRepository: _CitaRepoDoble(),
                       fechaInicial: DateTime.now().add(
                         const Duration(days: 3, hours: 2),
                       ),
@@ -112,7 +124,10 @@ void main() {
       await tester.tap(find.text('Registrar Nuevo Paciente'));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.widgetWithText(TextFormField, 'Nombre *'), 'Maria');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre *'),
+        'Maria',
+      );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Apellido *'),
         'Sanchez',

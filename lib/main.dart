@@ -15,11 +15,6 @@ import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Nada de lo que ocurre en el arranque tiene interfaz todavía: si algo lanza,
-  // el framework nunca llega a `runApp` y en web el resultado es una página en
-  // blanco con el error escondido en la consola del navegador. Cada etapa se
-  // envuelve por separado para que el fallo llegue a la pantalla diciendo qué
-  // hay que corregir, en vez de morir en silencio.
   final AppConfig config;
   try {
     config = AppConfig.fromEnvironment();
@@ -37,7 +32,7 @@ Future<void> main() async {
   try {
     await Supabase.initialize(
       url: config.supabaseUrl,
-      publishableKey: config.supabasePublishableKey,
+      anonKey: config.supabasePublishableKey,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
       ),
@@ -83,19 +78,11 @@ class MyApp extends StatelessWidget {
           create: (_) => di.sl<ConnectivityCubit>(),
         ),
       ],
-
       child: const _RaizConTema(),
     );
   }
 }
 
-/// Raíz de la interfaz. Solo se reconstruye cuando cambia el modo de tema.
-///
-/// Antes era un `BlocBuilder` sobre `SettingsState` completo, de modo que
-/// cualquier ajuste —el idioma, por ejemplo— reconstruía el `MaterialApp` y
-/// con él todo el árbol de la app. Seleccionar únicamente `themeMode` deja
-/// fuera al resto del estado: es el rebuild más caro que existe aquí y ahora
-/// solo ocurre cuando de verdad cambia lo que el `MaterialApp` usa.
 class _RaizConTema extends StatelessWidget {
   const _RaizConTema();
 
@@ -106,7 +93,7 @@ class _RaizConTema extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Salud Dental',
+      title: 'Clínica Salud Dental Integral',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

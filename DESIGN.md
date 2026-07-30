@@ -28,7 +28,7 @@ final ac = context.appColors; // AppColors (light/dark resueltos por el tema)
 | `divider` / `rowDivider` | Líneas divisorias. |
 | `chipBg` | Fondo de chips / cabeceras de tabla. |
 | `searchFill` | Relleno de campos de búsqueda e inputs. |
-| `primaryBlue` | **Color de acento principal** (botones, selección, badges, énfasis). |
+| `primaryGreen` | **Color de acento principal** (botones, selección, badges, énfasis). |
 | `teal` / `tealLight` | Acentos secundarios (p. ej. tratamientos). |
 | `amber` / `green` / `indigo` / `purple` / `red` / `orange` | Acentos por categoría/estado. |
 | `cardShadow` | Sombra estándar de tarjeta. |
@@ -66,12 +66,12 @@ ColoredBox(surfaceContainerLowest)
 - Borde de card: `outlineVariant @ alpha 0.4`, width `1.1`.
 
 ### CountBadge (pill de conteo junto al título)
-Fondo `primaryBlue @0.07`, radio 20, número en `primaryBlue` bold + ícono 13px.
+Fondo `primaryGreen @0.07`, radio 20, número en `primaryGreen` bold + ícono 13px.
 
 ### Buscador
 `TextField` con `filled` + `fillColor: ac.searchFill`, radio 12, `prefixIcon`
 `search_rounded`, `suffixIcon` `clear_rounded` cuando hay texto, `focusedBorder`
-en `primaryBlue` width 1.2. Búsqueda **con debounce de 400 ms**.
+en `primaryGreen` width 1.2. Búsqueda **con debounce de 400 ms**.
 
 ### Footer
 `Container(color: ac.cardBg)`, padding `28 x 16`, texto
@@ -87,11 +87,11 @@ Patrón `Initial / Loading / Loaded(todas + filtradas + …) / Error`, con
 ## 3. Filtros
 
 - **Buscador por nombre:** `TextField` debounced → método del cubit.
-- **`FilterChip`:** `showCheckmark: false`, seleccionado en `primaryBlue @0.1`
-  con borde `primaryBlue @0.4` y label bold; no seleccionado en `searchFill`.
+- **`FilterChip`:** `showCheckmark: false`, seleccionado en `primaryGreen @0.1`
+  con borde `primaryGreen @0.4` y label bold; no seleccionado en `searchFill`.
   Siempre incluir un chip "Todos …" para limpiar la dimensión.
 - **Rango de fecha:** `OutlinedButton.icon` con `date_range_rounded`; al activarse
-  cambia a fondo `primaryBlue @0.08`. Abre `showDateRangePicker`. Mostrar botón
+  cambia a fondo `primaryGreen @0.08`. Abre `showDateRangePicker`. Mostrar botón
   para quitar el rango y un botón global **"Limpiar"** cuando hay filtros activos.
 
 ---
@@ -102,11 +102,11 @@ Patrón `Initial / Loading / Loaded(todas + filtradas + …) / Error`, con
 
 ```
 Row
-├─ _DateBadge (54x54, primaryBlue@0.07, radio 12): día grande + "mmm aaaa"
+├─ _DateBadge (54x54, primaryGreen@0.07, radio 12): día grande + "mmm aaaa"
 ├─ Expanded: nombre paciente (bodyMedium bold 15) + fila doctor (ícono + nombre)
 ├─ Indicadores (solo si aplican):
 │    • healing_rounded  (teal)        → tiene tratamientos aplicados
-│    • receipt_long_rounded (primaryBlue) → tiene receta
+│    • receipt_long_rounded (primaryGreen) → tiene receta
 └─ chevron_right_rounded
 ```
 

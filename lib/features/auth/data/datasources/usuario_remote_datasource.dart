@@ -15,6 +15,9 @@ abstract class UsuarioRemoteDataSource {
     required String selectColumns,
   });
 
+  /// Perfil de la sesión actual vía la RPC `perfil_actual()`.
+  Future<Map<String, dynamic>?> getPerfilActual();
+
   Future<Map<String, dynamic>?> getPerfilPorTabla({
     required String tabla,
     required String uuid,
@@ -35,4 +38,17 @@ abstract class UsuarioRemoteDataSource {
     required String personaId,
     required String telefono,
   });
+  Future<void> desactivarUsuarioRemoto(String usuarioId);
+  Future<int> contarConsultasPendientes(String doctorId);
+  Future<int> contarCitasPendientes(String doctorId);
+
+  Future<List<dynamic>?> getTodosAsistentes();
+
+  Future<List<String>> getAsistenteIdsAsignados(String doctorId);
+
+  Future<void> reemplazarAsistentesDoctor(
+    String doctorId,
+    List<String> asistenteIds,
+  );
+
 }

@@ -43,7 +43,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     });
   }
 
-  // Método auxiliar para navegar limpiamente a la página de creación
   void _navegarACrearUsuario() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -55,6 +54,139 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     );
   }
 
+  void _navegarAEditarUsuario(Usuario usuario) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<PersonalPerfilesCubit>(),
+          child: CrearUsuarioPage(usuario: usuario),
+        ),
+      ),
+    );
+  }
+
+  void _mostrarOpciones(BuildContext context, Usuario usuario) {
+    final esAdmin = usuario.rol == RolUsuario.admin;
+    final ac = context.appColors;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Editar usuario'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _navegarAEditarUsuario(usuario);
+                },
+              ),
+              if (!esAdmin)
+                ListTile(
+                  leading: const Icon(
+                    Icons.person_off_outlined,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Desactivar usuario',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _confirmarDesactivacion(usuario);
+                  },
+                )
+              else
+                ListTile(
+                  leading: Icon(Icons.lock_outline, color: ac.textMuted),
+                  title: Text(
+                    'Los administradores no pueden desactivarse desde aquí',
+                    style: TextStyle(color: ac.textMuted, fontSize: 13),
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmarDesactivacion(Usuario usuario) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Desactivar usuario?'),
+        content: Text(
+          'Se desactivará a ${usuario.nombre} ${usuario.apellido}. '
+          'No podrá iniciar sesión, pero su historial se conservará.\n\n'
+          'Si tiene consultas pendientes o una cita pautada sin terminar '
+          'o cancelar donde es el doctor asignado, no podrá desactivarse '
+          'hasta resolverlas.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Desactivar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmado != true || !mounted) return;
+
+    final cubit = context.read<PersonalPerfilesCubit>();
+    final motivoBloqueo = await cubit.desactivarUsuario(usuario);
+
+    if (!mounted) return;
+
+    if (motivoBloqueo != null) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('No se puede desactivar'),
+          content: Text(motivoBloqueo),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Usuario ${usuario.nombre} ${usuario.apellido} desactivado.',
+          ),
+          backgroundColor: context.appColors.primaryGreen,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -62,10 +194,9 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      // Botón flotante para acceder rápidamente a la creación
       floatingActionButton: FloatingActionButton(
         onPressed: _navegarACrearUsuario,
-        backgroundColor: ac.primaryBlue,
+        backgroundColor: ac.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -88,17 +219,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     );
   }
 
-  void _navegarAEditarUsuario(Usuario usuario) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: context.read<PersonalPerfilesCubit>(),
-          child: CrearUsuarioPage(usuario: usuario),
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeaderAndSearch(
     BuildContext context,
     PersonalPerfilesState state,
@@ -110,8 +230,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Crear usuario se ofrece desde el botón flotante; un segundo "+"
-          // en la cabecera solo lo duplicaba.
           Text(
             'Control de Usuarios',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -158,7 +276,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
                     )
                   : null,
               filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
+              fillColor: context.appColors.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -293,6 +411,8 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
                 return PerfilCard(
                   usuario: usuario,
                   onTap: () => _navegarAEditarUsuario(usuario),
+                  onEditar: () => _navegarAEditarUsuario(usuario),
+                  onDesactivar: () => _confirmarDesactivacion(usuario),
                 );
               },
             ),
@@ -333,7 +453,7 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),

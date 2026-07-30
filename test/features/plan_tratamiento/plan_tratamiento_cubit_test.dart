@@ -4,7 +4,9 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/errors/transicion_plan_invalida.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 
@@ -77,6 +79,36 @@ class _RepoFake implements PlanTratamientoRepository {
       );
     }
     return actualizado;
+  }
+
+  // Lecturas de resumen y registro de ejecución: el cubit de este test no las
+  // usa, pero la interfaz las exige desde SD-135/SD-144. Se dejan explícitas
+  // en vez de heredar de un Fake, para que una llamada inesperada falle a la
+  // vista en lugar de devolver null en silencio.
+  @override
+  Future<List<ResumenActividadPlan>> getResumenPorPlan(String planId) async {
+    llamadas.add('getResumenPorPlan');
+    return const [];
+  }
+
+  @override
+  Future<List<ResumenActividadPlan>> getResumenPorPaciente(
+    String pacienteId,
+  ) async {
+    llamadas.add('getResumenPorPaciente');
+    return const [];
+  }
+
+  @override
+  Future<void> registrarEjecucionItem({
+    required ItemPlanTratamiento item,
+    required String consultaId,
+    required String doctorId,
+    required double cantidadRealizada,
+    required EstadoTratamientoAplicado estadoTratamientoAplicado,
+    String? notas,
+  }) async {
+    llamadas.add('registrarEjecucionItem');
   }
 
   @override

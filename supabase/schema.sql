@@ -13,7 +13,21 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 
+CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
+
+
+
+
+
+
 COMMENT ON SCHEMA "public" IS 'standard public schema';
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
+
+
+
 
 
 
@@ -302,6 +316,15 @@ CREATE TYPE "public"."severidad_diagnosis" AS ENUM (
 ALTER TYPE "public"."severidad_diagnosis" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."tipo_atencion_clinica" AS ENUM (
+    'evaluacion',
+    'consulta'
+);
+
+
+ALTER TYPE "public"."tipo_atencion_clinica" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."tipo_condicion" AS ENUM (
     'fisiologica',
     'patologica',
@@ -312,15 +335,6 @@ CREATE TYPE "public"."tipo_condicion" AS ENUM (
 
 
 ALTER TYPE "public"."tipo_condicion" OWNER TO "postgres";
-
-
-CREATE TYPE "public"."tipo_atencion_clinica" AS ENUM (
-    'evaluacion',
-    'consulta'
-);
-
-
-ALTER TYPE "public"."tipo_atencion_clinica" OWNER TO "postgres";
 
 
 CREATE TYPE "public"."tipo_contraindicacion" AS ENUM (
@@ -471,29 +485,96 @@ $$;
 ALTER FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.estado = 'cancelada'::estado_cita
+     and (old.estado is distinct from new.estado)
+     and exists (
+       select 1
+       from consultas c
+       where c.cita_id = new.id
+         and c.deleted_at is null
+         and c.finalizada is not true
+     )
+  then
+    raise exception
+      'La cita % tiene una consulta en curso: finaliza o elimina la consulta antes de cancelarla.',
+      new.id
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() IS 'SD-160: impide cancelar una cita mientras su consulta siga abierta.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."cancelar_citas_paciente_inactivo"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
     AS $$
-BEGIN
-    -- Validamos el cambio a inactivo
-    IF (NEW.estatus = 'inactivo') THEN
-        UPDATE public.citas 
-        SET estado = 'cancelada' 
-        WHERE paciente_id = NEW.id 
-          AND fecha_hora > now() 
-          AND estado = 'pendiente';
-    END IF;
-    RETURN NEW;
-END;
+begin
+  -- Solo la TRANSICIÓN a inactivo cancela. La app manda `estatus` en cada
+  -- update de persona, así que sin esta comprobación un simple cambio de
+  -- teléfono en un paciente ya inactivo volvería a barrer su agenda.
+  if new.estatus = 'inactivo'::estatus_persona
+     and old.estatus is distinct from new.estatus
+  then
+    update citas
+       set estado     = 'cancelada'::estado_cita,
+           updated_at = now()
+     where persona_id = new.id
+       and deleted_at is null
+       and fecha_hora > now()
+       -- Estados vivos y anteriores a la atención. `en_consulta` queda fuera a
+       -- propósito: si al paciente lo están atendiendo ahora mismo, un cambio
+       -- administrativo no le cierra la cita por debajo. Los terminales
+       -- (completada, cancelada, no_asistio, no_asistida) tampoco se tocan.
+       and estado in (
+             'programada'::estado_cita,
+             'confirmada'::estado_cita,
+             'en_espera'::estado_cita
+           )
+       -- Regla de SD-160: no existe cita cancelada con consulta abierta. Sin
+       -- este filtro chocaríamos contra
+       -- `tr_bloquear_cancelacion_con_consulta_abierta`, cuyo P0001 volvería a
+       -- abortar la desactivación del paciente: cambiaríamos un fallo
+       -- permanente por uno intermitente y mucho peor de diagnosticar.
+       --
+       -- Decisión: esas citas se dejan VIVAS, no se silencian ni se marcan.
+       -- Su consulta está en curso; la cierra el flujo clínico, que es quien
+       -- sabe qué se hizo. Desactivar al paciente no puede reescribir un acto
+       -- clínico en marcha.
+       and not exists (
+             select 1
+             from consultas c
+             where c.cita_id = citas.id
+               and c.deleted_at is null
+               and c.finalizada is not true
+           );
+  end if;
+  return new;
+end;
 $$;
 
 
 ALTER FUNCTION "public"."cancelar_citas_paciente_inactivo"() OWNER TO "postgres";
 
 
+COMMENT ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() IS 'SD-169: al pasar una persona a inactivo, cancela sus citas futuras todavía vivas (programada, confirmada, en_espera). Excluye en_consulta y las citas con consulta abierta, que se dejan activas para que las cierre el flujo clínico (regla de SD-160).';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
     AS $$
 declare
   v_consulta_id    uuid;
@@ -585,12 +666,21 @@ declare
   v_consulta_id uuid;
 begin
   v_consulta_id := public.crear_consulta_completa(
-    p_paciente_id, p_doctor_id, p_cita_id, p_fecha, p_motivo_consulta,
-    p_temp_condiciones, p_dientes, p_documentos
+    p_paciente_id,
+    p_doctor_id,
+    p_cita_id,
+    p_fecha,
+    p_motivo_consulta,
+    p_temp_condiciones,
+    p_dientes,
+    p_documentos
   );
+
   update public.consultas
-     set tipo_atencion = p_tipo_atencion, updated_at = now()
+     set tipo_atencion = p_tipo_atencion,
+         updated_at = now()
    where id = v_consulta_id;
+
   return v_consulta_id;
 end;
 $$;
@@ -669,6 +759,18 @@ begin
     raise exception 'La consulta % no existe o fue eliminada.', p_consulta_id;
   end if;
 
+  -- Cierre clínico ANTES de cualquier retorno: finalizar una consulta cierra su
+  -- cita, y eso debe valer también cuando la pre-factura ya existía. El estado
+  -- terminal se respeta (no se reabre una cita cancelada a mano).
+  if v_cita_id is not null then
+    update citas
+       set estado     = 'completada'::estado_cita,
+           updated_at = now()
+     where id = v_cita_id
+       and estado <> 'completada'::estado_cita
+       and estado <> 'cancelada'::estado_cita;
+  end if;
+
   -- Idempotencia: reintentar finalizar no duplica la pre-factura.
   select id into v_cuenta_id from cuentas
   where consulta_id = p_consulta_id and deleted_at is null limit 1;
@@ -700,11 +802,6 @@ begin
   where ta.consulta_id = p_consulta_id
     and ta.deleted_at is null
     and coalesce(ta.estado, 'aplicado') <> 'indicado';
-
-  if v_cita_id is not null then
-    update citas set estado = 'completada'::estado_cita, updated_at = now()
-    where id = v_cita_id;
-  end if;
 
   return v_cuenta_id;
 end;
@@ -848,68 +945,128 @@ $$;
 ALTER FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_active_doctors"() RETURNS TABLE("doctor_id" "uuid", "especialidad" "text", "esta_disponible" boolean, "username" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "deleted_at" timestamp with time zone, "es_admin" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select d.id,
+         d.especialidad,
+         d.esta_disponible,
+         u.username,
+         p.nombre,
+         p.apellido,
+         p.fecha_nacimiento,
+         p.cedula,
+         u.deleted_at,
+         (a.id is not null) as es_admin
+    from public.doctores d
+    join public.usuarios u on u.id = d.id
+    join public.personas p on p.id = d.id
+    left join public.admins a on a.id = d.id and a.deleted_at is null
+   where d.deleted_at is null
+     and u.deleted_at is null
+     and p.deleted_at is null;
+$$;
+
+
+ALTER FUNCTION "public"."get_active_doctors"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_active_doctors"() IS 'HFX-CLIN-000: doctores activos, administradores incluidos. Ya no devuelve password_hash: era PII que acababa impresa en la consola del navegador.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 declare
-  v_persona_id uuid;
+  v_persona_id  uuid;
   v_contacto_id uuid;
-  v_meta jsonb := new.raw_user_meta_data;
-  v_rol text := v_meta ->> 'rol';
-  v_telefono text := v_meta ->> 'telefono';
+  v_meta        jsonb := new.raw_user_meta_data;
+  v_rol         text  := v_meta ->> 'rol';
+  v_telefono    text  := nullif(trim(v_meta ->> 'telefono'), '');
+  v_nombre      text  := nullif(trim(v_meta ->> 'nombre'), '');
+  v_apellido    text  := nullif(trim(v_meta ->> 'apellido'), '');
+  v_cedula      text  := nullif(trim(v_meta ->> 'cedula'), '');
+  v_username    text  := nullif(trim(v_meta ->> 'username'), '');
 begin
   if v_rol is null or v_rol not in ('doctor', 'admin', 'asistente') then
-    raise exception 'El rol proporcionado ("%") es inválido o no fue enviado en la metadata.', coalesce(v_rol, 'NULL');
+    raise exception
+      'El rol proporcionado ("%") es inválido o no fue enviado en la metadata.',
+      coalesce(v_rol, 'NULL')
+      using errcode = 'P0001';
   end if;
 
+  -- Validar antes de escribir: si falta un dato obligatorio, el alta no debe
+  -- dejar media persona creada ni un usuario de Auth sin perfil. `personas`
+  -- exige nombre, apellido, fecha de nacimiento y cédula, y `usuarios` exige
+  -- username; sin este bloque el fallo llegaba como un error de constraint.
+  if v_nombre is null
+     or v_apellido is null
+     or v_username is null
+     or v_cedula is null
+     or nullif(v_meta ->> 'fecha_nacimiento', '') is null
+  then
+    raise exception
+      'Faltan datos obligatorios para crear el usuario: nombre, apellido, fecha_nacimiento, cedula y username.'
+      using errcode = 'P0001',
+            hint = 'Los envía admin-crear-usuario dentro de user_metadata.';
+  end if;
+
+  if v_rol = 'asistente' and nullif(trim(v_meta ->> 'turno'), '') is null then
+    raise exception 'Un asistente necesita turno.' using errcode = 'P0001';
+  end if;
+
+  -- El UUID de Auth manda: es el mismo en persona, usuario y perfil, y es el
+  -- que compara `auth.uid()` en RLS y en las RPC clínicas.
   insert into public.personas (
-    nombre, 
-    apellido, 
-    fecha_nacimiento, 
-    cedula, 
-    estatus
+    id, nombre, apellido, fecha_nacimiento, cedula, estatus
   ) values (
-    v_meta ->> 'nombre',
-    v_meta ->> 'apellido',
+    new.id,
+    v_nombre,
+    v_apellido,
     nullif(v_meta ->> 'fecha_nacimiento', '')::date,
-    v_meta ->> 'cedula',
+    v_cedula,
     coalesce(v_meta ->> 'estatus', 'activo')::estatus_persona
   )
   returning id into v_persona_id;
 
-  if v_telefono is not null and v_telefono != '' then
+  if v_telefono is not null then
     insert into public.contactos (numero_telefono)
     values (v_telefono)
     returning id into v_contacto_id;
 
     insert into public.persona_contactos (
-      persona_id, 
-      tipo_contacto, 
-      contacto_id,
-      es_principal
+      persona_id, tipo_contacto, contacto_id, es_principal
     ) values (
-      v_persona_id,
-      'telefono',
-      v_contacto_id,
-      true
+      v_persona_id, 'telefono', v_contacto_id, true
     );
   end if;
 
   insert into public.usuarios (id, username)
-  values (v_persona_id, v_meta ->> 'username');
+  values (v_persona_id, v_username);
 
-  if v_rol = 'doctor' then
+  -- Doctor y admin comparten identidad clínica; el admin sólo añade la fila
+  -- administrativa encima.
+  if v_rol in ('doctor', 'admin') then
     insert into public.doctores (id, especialidad, esta_disponible)
-    values (v_persona_id, coalesce(v_meta ->> 'especialidad', 'General'), true);
-    
-  elsif v_rol = 'admin' then
+    values (
+      v_persona_id,
+      coalesce(nullif(trim(v_meta ->> 'especialidad'), ''), 'General'),
+      true
+    );
+  end if;
+
+  if v_rol = 'admin' then
     insert into public.admins (id, departamento)
-    values (v_persona_id, coalesce(v_meta ->> 'departamento', 'Administración'));
-    
+    values (
+      v_persona_id,
+      coalesce(nullif(trim(v_meta ->> 'departamento'), ''), 'Administración')
+    );
   elsif v_rol = 'asistente' then
     insert into public.asistentes (id, turno)
-    values (v_persona_id, coalesce(v_meta ->> 'turno', 'Matutino'));
+    values (v_persona_id, trim(v_meta ->> 'turno'));
   end if;
 
   return new;
@@ -918,6 +1075,10 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."handle_new_user"() IS 'HFX-CLIN-000: aprovisiona persona, usuario y perfil con el UUID de Auth. El admin recibe además fila en `doctores`, porque ejerce clínica.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."limpiar_diagnosticos_superficie"() RETURNS "trigger"
@@ -965,6 +1126,130 @@ $$;
 
 
 ALTER FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."marcar_item_plan_ejecutado"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.item_plan_id is null then
+    return new;
+  end if;
+
+  if new.deleted_at is not null then
+    if not exists (
+      select 1
+      from public.tratamientos_aplicados otra
+      where otra.item_plan_id = new.item_plan_id
+        and otra.id <> new.id
+        and otra.deleted_at is null
+    ) then
+      update public.items_plan_tratamiento
+         set estado = 'pendiente',
+             fecha_completado = null,
+             updated_at = now()
+       where id = new.item_plan_id
+         and deleted_at is null;
+    end if;
+    return new;
+  end if;
+
+  update public.items_plan_tratamiento
+     set estado = case
+           when new.estado = 'en_proceso' then 'en_proceso'::public.estado_item_plan
+           else 'completado'::public.estado_item_plan
+         end,
+         fecha_inicio = coalesce(fecha_inicio, new.fecha_ejecucion, now()),
+         fecha_completado = case
+           when new.estado = 'en_proceso' then fecha_completado
+           else coalesce(fecha_completado, new.fecha_ejecucion, now())
+         end,
+         updated_at = now()
+   where id = new.item_plan_id
+     and deleted_at is null;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."perfil_actual"() RETURNS TABLE("id" "uuid", "rol" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "estatus" "text", "username" "text", "telefono" "text", "email" "text", "direccion" "text", "especialidad" "text", "esta_disponible" boolean, "departamento" "text", "turno" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select
+    u.id,
+    case
+      when a.id is not null then 'admin'
+      when d.id is not null then 'doctor'
+      when s.id is not null then 'asistente'
+    end                                       as rol,
+    p.nombre,
+    p.apellido,
+    p.fecha_nacimiento,
+    p.cedula,
+    p.estatus::text,
+    u.username,
+    c.numero_telefono                         as telefono,
+    c.email,
+    c.direccion,
+    d.especialidad,
+    d.esta_disponible,
+    a.departamento,
+    s.turno
+  from public.usuarios u
+  join public.personas p on p.id = u.id
+  left join public.doctores   d on d.id = u.id and d.deleted_at is null
+  left join public.admins     a on a.id = u.id and a.deleted_at is null
+  left join public.asistentes s on s.id = u.id and s.deleted_at is null
+  left join lateral (
+    select ct.numero_telefono, ct.email, ct.direccion
+      from public.persona_contactos pc
+      join public.contactos ct on ct.id = pc.contacto_id
+     where pc.persona_id = p.id
+     order by pc.es_principal desc nulls last
+     limit 1
+  ) c on true
+ where u.id = auth.uid()
+   and u.deleted_at is null
+   and p.deleted_at is null
+   and (a.id is not null or d.id is not null or s.id is not null);
+$$;
+
+
+ALTER FUNCTION "public"."perfil_actual"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."perfil_actual"() IS 'HFX-CLIN-000: perfil de la sesión actual. Nunca devuelve password_hash y no admite consultar el perfil de otro usuario.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.fecha_hora is distinct from old.fecha_hora then
+    update consultas
+       set fecha      = new.fecha_hora,
+           updated_at = now()
+     where cita_id = new.id
+       and deleted_at is null
+       and finalizada is not true;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() IS 'SD-160: al mover una cita, su consulta abierta hereda la nueva fecha.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") RETURNS "void"
@@ -1060,6 +1345,55 @@ $$;
 
 
 ALTER FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_mantenimiento_id uuid;
+begin
+  if p_costo < 0 then
+    raise exception 'El costo no puede ser negativo.' using errcode = '22023';
+  end if;
+
+  if p_fecha_mantenimiento::date > current_date then
+    raise exception 'La fecha de mantenimiento no puede estar en el futuro.'
+      using errcode = '22023';
+  end if;
+
+  insert into public.equipos_mantenimientos (
+    equipo_id,
+    suplidor_id,
+    descripcion,
+    costo,
+    fecha_mantenimiento
+  ) values (
+    p_equipo_id,
+    p_suplidor_id,
+    coalesce(nullif(trim(p_descripcion), ''), 'Mantenimiento'),
+    p_costo,
+    p_fecha_mantenimiento
+  )
+  returning id into v_mantenimiento_id;
+
+  update public.equipos
+     set ultimo_mantenimiento = p_fecha_mantenimiento,
+         updated_at = now()
+   where id = p_equipo_id
+     and deleted_at is null;
+
+  if not found then
+    raise exception 'El equipo no existe o fue eliminado.' using errcode = 'P0002';
+  end if;
+
+  return v_mantenimiento_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
@@ -1332,6 +1666,66 @@ $$;
 ALTER FUNCTION "public"."validar_caja_abierta"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."validar_cita_item_plan"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_paciente_cita uuid;
+  v_paciente_item uuid;
+  v_estado        estado_item_plan;
+  v_anulada       timestamptz;
+begin
+  select persona_id into v_paciente_cita
+    from citas
+   where id = new.cita_id and deleted_at is null;
+
+  if v_paciente_cita is null then
+    raise exception 'La cita % no existe o fue eliminada.', new.cita_id
+      using errcode = '23503';
+  end if;
+
+  select pt.paciente_id, ipt.estado, ipt.deleted_at
+    into v_paciente_item, v_estado, v_anulada
+    from items_plan_tratamiento ipt
+    join planes_tratamiento pt on pt.id = ipt.plan_id
+   where ipt.id = new.item_plan_id
+     and pt.deleted_at is null;
+
+  if v_paciente_item is null then
+    raise exception 'La actividad % no existe o su plan fue eliminado.', new.item_plan_id
+      using errcode = '23503';
+  end if;
+
+  if v_anulada is not null then
+    raise exception 'La actividad % fue retirada del plan y no puede agendarse.', new.item_plan_id
+      using errcode = '23514';
+  end if;
+
+  if v_paciente_item <> v_paciente_cita then
+    raise exception 'La actividad % pertenece al plan de otro paciente.', new.item_plan_id
+      using errcode = '23514';
+  end if;
+
+  -- Agendar algo ya rechazado, cancelado o terminado no es una decisión válida:
+  -- es un defecto de quien llama.
+  if v_estado in ('rechazado', 'cancelado', 'completado') then
+    raise exception 'La actividad % está %; no puede agendarse.', new.item_plan_id, v_estado
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."validar_cita_item_plan"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."validar_cita_item_plan"() IS 'SD-146. Impide vincular a una cita una actividad de otro paciente, retirada del plan o ya decidida en contra/terminada.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."validar_disponibilidad_doctor_simple"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -1505,54 +1899,135 @@ $$;
 
 ALTER FUNCTION "public"."verificar_item_plan_ejecutable"() OWNER TO "postgres";
 
-
-CREATE OR REPLACE FUNCTION "public"."marcar_item_plan_ejecutado"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
-    AS $$
-begin
-  if new.item_plan_id is null then
-    return new;
-  end if;
-
-  if new.deleted_at is not null then
-    if not exists (
-      select 1
-      from public.tratamientos_aplicados otra
-      where otra.item_plan_id = new.item_plan_id
-        and otra.id <> new.id
-        and otra.deleted_at is null
-    ) then
-      update public.items_plan_tratamiento
-         set estado = 'pendiente', fecha_completado = null, updated_at = now()
-       where id = new.item_plan_id and deleted_at is null;
-    end if;
-    return new;
-  end if;
-
-  update public.items_plan_tratamiento
-     set estado = case
-           when new.estado = 'en_proceso' then 'en_proceso'::public.estado_item_plan
-           else 'completado'::public.estado_item_plan
-         end,
-         fecha_inicio = coalesce(fecha_inicio, new.fecha_ejecucion, now()),
-         fecha_completado = case
-           when new.estado = 'en_proceso' then fecha_completado
-           else coalesce(fecha_completado, new.fecha_ejecucion, now())
-         end,
-         updated_at = now()
-   where id = new.item_plan_id
-     and deleted_at is null;
-  return new;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
-
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."dientes" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "odontograma_id" "uuid" NOT NULL,
+    "fdi_code" smallint NOT NULL,
+    "observaciones" "text",
+    "diagnostico_principal_id" "uuid",
+    "tratamientos_aplicados_ids" "uuid"[] DEFAULT '{}'::"uuid"[],
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone,
+    "deleted_at" timestamp with time zone,
+    "superficies" "jsonb" DEFAULT '[]'::"jsonb",
+    "esta_ausente" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "check_fdi_range" CHECK ((("fdi_code" >= 11) AND ("fdi_code" <= 85)))
+);
+
+
+ALTER TABLE "public"."dientes" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."dientes"."deleted_at" IS 'Marca de tiempo para borrado lógico. Si es NULL, el registro está activo.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."items_plan_tratamiento" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "plan_id" "uuid" NOT NULL,
+    "tratamiento_id" "uuid" NOT NULL,
+    "diagnostico_aplicado_id" "uuid",
+    "diente_id" "uuid",
+    "superficie" "public"."tipo_superficie",
+    "estado" "public"."estado_item_plan" DEFAULT 'propuesto'::"public"."estado_item_plan" NOT NULL,
+    "precio_estimado" numeric(15,2) DEFAULT 0 NOT NULL,
+    "orden" integer DEFAULT 0 NOT NULL,
+    "notas" "text",
+    "doctor_propone_id" "uuid",
+    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "fecha_aceptacion" timestamp with time zone,
+    "fecha_rechazo" timestamp with time zone,
+    "motivo_rechazo" "text",
+    "fecha_inicio" timestamp with time zone,
+    "fecha_completado" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone,
+    CONSTRAINT "items_plan_fechas_coherentes" CHECK (((("estado" <> 'rechazado'::"public"."estado_item_plan") OR ("fecha_rechazo" IS NOT NULL)) AND (("estado" <> 'completado'::"public"."estado_item_plan") OR ("fecha_completado" IS NOT NULL)))),
+    CONSTRAINT "items_plan_precio_no_negativo" CHECK (("precio_estimado" >= (0)::numeric))
+);
+
+
+ALTER TABLE "public"."items_plan_tratamiento" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."items_plan_tratamiento" IS 'Actividad planificada sobre un diente/superficie. Su estado es la decisión clínica y del paciente; no genera cargo hasta ejecutarse.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."planes_tratamiento" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "paciente_id" "uuid" NOT NULL,
+    "evaluacion_id" "uuid",
+    "consulta_origen_id" "uuid",
+    "doctor_id" "uuid" NOT NULL,
+    "estado" "public"."estado_plan_tratamiento" DEFAULT 'borrador'::"public"."estado_plan_tratamiento" NOT NULL,
+    "notas" "text",
+    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "fecha_aceptacion" timestamp with time zone,
+    "fecha_rechazo" timestamp with time zone,
+    "motivo_rechazo" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."planes_tratamiento" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."planes_tratamiento" IS 'Lo que se decide tratar. Agrupa las actividades propuestas al paciente a partir de una evaluación; solo un subconjunto de los hallazgos llega aquí.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."tratamientos" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "nombre" "text" NOT NULL,
+    "descripcion" "text",
+    "costo" numeric(15,2) DEFAULT 0.00 NOT NULL,
+    "alcance" "public"."alcance" DEFAULT 'diente'::"public"."alcance" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
+    "clave_odontograma" "text"
+);
+
+
+ALTER TABLE "public"."tratamientos" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."tratamientos" IS 'Catálogo maestro de procedimientos dentales y sus costos base.';
+
+
+
+CREATE OR REPLACE VIEW "public"."actividades_agendables_paciente" AS
+ SELECT "pt"."paciente_id",
+    "ipt"."id" AS "item_plan_id",
+    "ipt"."plan_id",
+    "ipt"."tratamiento_id",
+    "t"."nombre" AS "tratamiento_nombre",
+    "d"."fdi_code" AS "fdi_diente",
+    "ipt"."superficie",
+    "ipt"."estado",
+    "ipt"."precio_estimado",
+    "ipt"."orden"
+   FROM ((("public"."items_plan_tratamiento" "ipt"
+     JOIN "public"."planes_tratamiento" "pt" ON (("pt"."id" = "ipt"."plan_id")))
+     LEFT JOIN "public"."tratamientos" "t" ON (("t"."id" = "ipt"."tratamiento_id")))
+     LEFT JOIN "public"."dientes" "d" ON (("d"."id" = "ipt"."diente_id")))
+  WHERE (("ipt"."deleted_at" IS NULL) AND ("pt"."deleted_at" IS NULL) AND ("ipt"."estado" = ANY (ARRAY['propuesto'::"public"."estado_item_plan", 'aceptado'::"public"."estado_item_plan", 'pendiente'::"public"."estado_item_plan", 'en_proceso'::"public"."estado_item_plan"])) AND ("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+ALTER VIEW "public"."actividades_agendables_paciente" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."actividades_agendables_paciente" IS 'SD-146. Actividades del plan de un paciente que todavía pueden agendarse en una cita. Mismo alcance de estados que acepta trg_validar_cita_item_plan.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."admins" (
@@ -1626,11 +2101,30 @@ CREATE TABLE IF NOT EXISTS "public"."citas" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "deleted_at" timestamp with time zone,
     "duracion_minutos" bigint,
-    "updated_at" timestamp with time zone
+    "updated_at" timestamp with time zone,
+    "motivo" "text"
 );
 
 
 ALTER TABLE "public"."citas" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."citas"."motivo" IS 'Motivo declarado al agendar la cita. Prellena consultas.motivo_consulta.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."citas_items_plan" (
+    "cita_id" "uuid" NOT NULL,
+    "item_plan_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."citas_items_plan" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."citas_items_plan" IS 'Actividades del plan de tratamiento que se piensan atender en una cita (SD-146). Relación N:M: una cita puede cubrir varias actividades y una actividad puede reprogramarse a otra cita.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."compras" (
@@ -1686,6 +2180,8 @@ ALTER TABLE "public"."consultas" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."consultas"."finalizada" IS 'Has the consult ended?';
+
+
 
 COMMENT ON COLUMN "public"."consultas"."tipo_atencion" IS 'Evaluación = documenta hallazgos y plan; consulta = registra ejecución clínica.';
 
@@ -1851,29 +2347,6 @@ CREATE TABLE IF NOT EXISTS "public"."diagnosticos_aplicados" (
 ALTER TABLE "public"."diagnosticos_aplicados" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."dientes" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "odontograma_id" "uuid" NOT NULL,
-    "fdi_code" smallint NOT NULL,
-    "observaciones" "text",
-    "diagnostico_principal_id" "uuid",
-    "tratamientos_aplicados_ids" "uuid"[] DEFAULT '{}'::"uuid"[],
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone,
-    "deleted_at" timestamp with time zone,
-    "superficies" "jsonb" DEFAULT '[]'::"jsonb",
-    "esta_ausente" boolean DEFAULT false NOT NULL,
-    CONSTRAINT "check_fdi_range" CHECK ((("fdi_code" >= 11) AND ("fdi_code" <= 85)))
-);
-
-
-ALTER TABLE "public"."dientes" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."dientes"."deleted_at" IS 'Marca de tiempo para borrado lógico. Si es NULL, el registro está activo.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."doctor_asistentes" (
     "doctor_id" "uuid" NOT NULL,
     "asistente_id" "uuid" NOT NULL
@@ -1978,39 +2451,6 @@ CREATE TABLE IF NOT EXISTS "public"."items_cuenta" (
 ALTER TABLE "public"."items_cuenta" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."items_plan_tratamiento" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "plan_id" "uuid" NOT NULL,
-    "tratamiento_id" "uuid" NOT NULL,
-    "diagnostico_aplicado_id" "uuid",
-    "diente_id" "uuid",
-    "superficie" "public"."tipo_superficie",
-    "estado" "public"."estado_item_plan" DEFAULT 'propuesto'::"public"."estado_item_plan" NOT NULL,
-    "precio_estimado" numeric(15,2) DEFAULT 0 NOT NULL,
-    "orden" integer DEFAULT 0 NOT NULL,
-    "notas" "text",
-    "doctor_propone_id" "uuid",
-    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "fecha_aceptacion" timestamp with time zone,
-    "fecha_rechazo" timestamp with time zone,
-    "motivo_rechazo" "text",
-    "fecha_inicio" timestamp with time zone,
-    "fecha_completado" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "deleted_at" timestamp with time zone,
-    CONSTRAINT "items_plan_fechas_coherentes" CHECK (((("estado" <> 'rechazado'::"public"."estado_item_plan") OR ("fecha_rechazo" IS NOT NULL)) AND (("estado" <> 'completado'::"public"."estado_item_plan") OR ("fecha_completado" IS NOT NULL)))),
-    CONSTRAINT "items_plan_precio_no_negativo" CHECK (("precio_estimado" >= (0)::numeric))
-);
-
-
-ALTER TABLE "public"."items_plan_tratamiento" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."items_plan_tratamiento" IS 'Actividad planificada sobre un diente/superficie. Su estado es la decisión clínica y del paciente; no genera cargo hasta ejecutarse.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."medicinas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "nombre" "text" NOT NULL,
@@ -2103,7 +2543,13 @@ CREATE TABLE IF NOT EXISTS "public"."pacientes" (
     "deleted_at" timestamp with time zone,
     "created_at" timestamp with time zone,
     "peso" numeric(5,2),
-    "altura" numeric(5,2)
+    "altura" numeric(5,2),
+    "foto_ruta" "text",
+    "foto_mime_type" "text",
+    "foto_tamano_bytes" integer,
+    "foto_actualizada_en" timestamp with time zone,
+    CONSTRAINT "pacientes_foto_mime_type_check" CHECK ((("foto_mime_type" IS NULL) OR ("foto_mime_type" = 'image/jpeg'::"text"))),
+    CONSTRAINT "pacientes_foto_tamano_bytes_check" CHECK ((("foto_tamano_bytes" IS NULL) OR (("foto_tamano_bytes" >= 1) AND ("foto_tamano_bytes" <= 2097152))))
 );
 
 
@@ -2166,31 +2612,6 @@ CREATE TABLE IF NOT EXISTS "public"."personas" (
 ALTER TABLE "public"."personas" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."planes_tratamiento" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "paciente_id" "uuid" NOT NULL,
-    "evaluacion_id" "uuid",
-    "consulta_origen_id" "uuid",
-    "doctor_id" "uuid" NOT NULL,
-    "estado" "public"."estado_plan_tratamiento" DEFAULT 'borrador'::"public"."estado_plan_tratamiento" NOT NULL,
-    "notas" "text",
-    "fecha_propuesta" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "fecha_aceptacion" timestamp with time zone,
-    "fecha_rechazo" timestamp with time zone,
-    "motivo_rechazo" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "deleted_at" timestamp with time zone
-);
-
-
-ALTER TABLE "public"."planes_tratamiento" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."planes_tratamiento" IS 'Lo que se decide tratar. Agrupa las actividades propuestas al paciente a partir de una evaluación; solo un subconjunto de los hallazgos llega aquí.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."procedimientos" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "nombre" "text" NOT NULL,
@@ -2206,22 +2627,39 @@ ALTER TABLE "public"."procedimientos" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."recetas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "consulta_id" "uuid" NOT NULL,
-    "medicina_id" "uuid" NOT NULL,
-    "titulo" "text" NOT NULL,
-    "dosis" "text" NOT NULL,
-    "frecuencia" "text" NOT NULL,
-    "indicaciones" "text" NOT NULL,
-    "duracion" "text" NOT NULL,
+    "medicina_id" "uuid",
+    "titulo" "text",
+    "dosis" "text",
+    "frecuencia" "text",
+    "indicaciones" "text",
+    "duracion" "text",
     "notas" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone,
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "title" "text",
-    "paciente_id" "uuid"
+    "paciente_id" "uuid",
+    "doctor_id" "uuid",
+    "fecha_emision" timestamp with time zone DEFAULT "now"(),
+    "indicaciones_generales" "text",
+    "justificacion_contraindicaciones" "text",
+    "estado" "text" DEFAULT 'activa'::"text",
+    "motivo_anulacion" "text",
+    "receta_reemplazada_id" "uuid",
+    "items_receta" "jsonb" DEFAULT '[]'::"jsonb",
+    CONSTRAINT "recetas_estado_check" CHECK (("estado" = ANY (ARRAY['activa'::"text", 'anulada'::"text", 'reemplazada'::"text"])))
 );
 
 
 ALTER TABLE "public"."recetas" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."recetas"."estado" IS 'activa | anulada | reemplazada. Una receta corregida apunta a la anterior con receta_reemplazada_id en vez de editarla.';
+
+
+
+COMMENT ON COLUMN "public"."recetas"."items_receta" IS 'SD-153: medicinas de la receta. Cada elemento lleva nombre, presentación, dosis, vía, frecuencia, duración, cantidad e indicaciones específicas.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."record_condicion" (
@@ -2259,6 +2697,32 @@ CREATE TABLE IF NOT EXISTS "public"."records" (
 
 
 ALTER TABLE "public"."records" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."resumen_actividades_cita" AS
+ SELECT "cip"."cita_id",
+    "ipt"."id" AS "item_plan_id",
+    "ipt"."plan_id",
+    "ipt"."tratamiento_id",
+    "t"."nombre" AS "tratamiento_nombre",
+    "d"."fdi_code" AS "fdi_diente",
+    "ipt"."superficie",
+    "ipt"."estado",
+    "ipt"."precio_estimado",
+    "ipt"."orden"
+   FROM (((("public"."citas_items_plan" "cip"
+     JOIN "public"."items_plan_tratamiento" "ipt" ON (("ipt"."id" = "cip"."item_plan_id")))
+     JOIN "public"."planes_tratamiento" "pt" ON (("pt"."id" = "ipt"."plan_id")))
+     LEFT JOIN "public"."tratamientos" "t" ON (("t"."id" = "ipt"."tratamiento_id")))
+     LEFT JOIN "public"."dientes" "d" ON (("d"."id" = "ipt"."diente_id")))
+  WHERE (("ipt"."deleted_at" IS NULL) AND ("pt"."deleted_at" IS NULL) AND ("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+ALTER VIEW "public"."resumen_actividades_cita" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."resumen_actividades_cita" IS 'SD-146. Resumen mínimo de las actividades planificadas de cada cita, legible por el asistente que agenda. No expone diagnóstico ni notas clínicas.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."superficies" (
@@ -2300,26 +2764,6 @@ CREATE TABLE IF NOT EXISTS "public"."suplidores_contactos" (
 ALTER TABLE "public"."suplidores_contactos" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."tratamientos" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "nombre" "text" NOT NULL,
-    "descripcion" "text",
-    "costo" numeric(15,2) DEFAULT 0.00 NOT NULL,
-    "alcance" "public"."alcance" DEFAULT 'diente'::"public"."alcance" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "deleted_at" timestamp with time zone,
-    "clave_odontograma" "text"
-);
-
-
-ALTER TABLE "public"."tratamientos" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."tratamientos" IS 'Catálogo maestro de procedimientos dentales y sus costos base.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "tratamiento_id" "uuid" NOT NULL,
@@ -2347,6 +2791,7 @@ ALTER TABLE "public"."tratamientos_aplicados" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico opcional para una ejecución sin item_plan_id.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."usuarios" (
@@ -2384,6 +2829,11 @@ ALTER TABLE ONLY "public"."cajas_diarias"
 
 ALTER TABLE ONLY "public"."cajas"
     ADD CONSTRAINT "cajas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_pkey" PRIMARY KEY ("cita_id", "item_plan_id");
 
 
 
@@ -2644,6 +3094,10 @@ CREATE INDEX "idx_afliccion_record" ON "public"."record_condicion" USING "btree"
 
 
 
+CREATE INDEX "idx_citas_items_plan_item" ON "public"."citas_items_plan" USING "btree" ("item_plan_id");
+
+
+
 CREATE INDEX "idx_compra_suplidor" ON "public"."consumibles_compras" USING "btree" ("suplidor_id");
 
 
@@ -2716,6 +3170,10 @@ CREATE INDEX "idx_recetas_consulta" ON "public"."recetas" USING "btree" ("consul
 
 
 
+CREATE INDEX "idx_recetas_paciente" ON "public"."recetas" USING "btree" ("paciente_id") WHERE ("deleted_at" IS NULL);
+
+
+
 CREATE INDEX "idx_suplidor_contacto_ref" ON "public"."suplidores_contactos" USING "btree" ("suplidor_id");
 
 
@@ -2756,6 +3214,10 @@ CREATE OR REPLACE TRIGGER "tr_actualizar_stock_al_recibir" AFTER UPDATE ON "publ
 
 
 
+CREATE OR REPLACE TRIGGER "tr_bloquear_cancelacion_con_consulta_abierta" BEFORE UPDATE OF "estado" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"();
+
+
+
 CREATE OR REPLACE TRIGGER "tr_cita_cancelada_log" AFTER UPDATE OF "estado" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."manejar_cita_cancelada"();
 
 
@@ -2765,6 +3227,10 @@ CREATE OR REPLACE TRIGGER "tr_limpiar_superficie_on_diagnosis_delete" AFTER DELE
 
 
 CREATE OR REPLACE TRIGGER "tr_paciente_inactivo_cancela_citas" AFTER UPDATE OF "estatus" ON "public"."personas" FOR EACH ROW EXECUTE FUNCTION "public"."cancelar_citas_paciente_inactivo"();
+
+
+
+CREATE OR REPLACE TRIGGER "tr_realinear_consulta_al_reprogramar_cita" AFTER UPDATE OF "fecha_hora" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"();
 
 
 
@@ -2816,7 +3282,20 @@ CREATE OR REPLACE TRIGGER "trg_sync_disponibilidad_doctor" AFTER INSERT OR DELET
 
 
 
+CREATE OR REPLACE TRIGGER "trg_validar_cita_item_plan" BEFORE INSERT OR UPDATE ON "public"."citas_items_plan" FOR EACH ROW EXECUTE FUNCTION "public"."validar_cita_item_plan"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_dientes_modtime" BEFORE UPDATE ON "public"."dientes" FOR EACH ROW EXECUTE FUNCTION "public"."update_modified_column"();
+
+
+
+ALTER TABLE ONLY "public"."admins"
+    ADD CONSTRAINT "admins_id_doctores_fkey" FOREIGN KEY ("id") REFERENCES "public"."doctores"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+COMMENT ON CONSTRAINT "admins_id_doctores_fkey" ON "public"."admins" IS 'HFX-CLIN-000: un administrador es un doctor con capacidades añadidas. Sin esta FK el login por PostgREST no puede resolver su perfil.';
 
 
 
@@ -2852,6 +3331,16 @@ ALTER TABLE ONLY "public"."cajas"
 
 ALTER TABLE ONLY "public"."citas"
     ADD CONSTRAINT "citas_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_cita_id_fkey" FOREIGN KEY ("cita_id") REFERENCES "public"."citas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_item_plan_id_fkey" FOREIGN KEY ("item_plan_id") REFERENCES "public"."items_plan_tratamiento"("id") ON DELETE CASCADE;
 
 
 
@@ -3136,12 +3625,22 @@ ALTER TABLE ONLY "public"."recetas"
 
 
 ALTER TABLE ONLY "public"."recetas"
+    ADD CONSTRAINT "recetas_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."recetas"
     ADD CONSTRAINT "recetas_medicina_id_fkey" FOREIGN KEY ("medicina_id") REFERENCES "public"."medicinas"("id") ON DELETE RESTRICT;
 
 
 
 ALTER TABLE ONLY "public"."recetas"
     ADD CONSTRAINT "recetas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id");
+
+
+
+ALTER TABLE ONLY "public"."recetas"
+    ADD CONSTRAINT "recetas_receta_reemplazada_id_fkey" FOREIGN KEY ("receta_reemplazada_id") REFERENCES "public"."recetas"("id") ON DELETE RESTRICT;
 
 
 
@@ -3315,6 +3814,21 @@ CREATE POLICY "citas_delete" ON "public"."citas" FOR DELETE TO "authenticated" U
 
 
 CREATE POLICY "citas_insert" ON "public"."citas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
+
+
+
+ALTER TABLE "public"."citas_items_plan" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "citas_items_plan_delete" ON "public"."citas_items_plan" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+
+CREATE POLICY "citas_items_plan_insert" ON "public"."citas_items_plan" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+
+CREATE POLICY "citas_items_plan_select" ON "public"."citas_items_plan" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
 
 
 
@@ -3625,7 +4139,7 @@ CREATE POLICY "equipos_mantenimientos_delete" ON "public"."equipos_mantenimiento
 
 
 
-CREATE POLICY "equipos_mantenimientos_insert" ON "public"."equipos_mantenimientos" FOR INSERT TO "authenticated" WITH CHECK ("public"."es_admin"());
+CREATE POLICY "equipos_mantenimientos_insert" ON "public"."equipos_mantenimientos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
 
 
 
@@ -4051,11 +4565,10 @@ CREATE POLICY "usuarios_update" ON "public"."usuarios" FOR UPDATE TO "authentica
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
-
-
-
-
 ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."movimientos_caja";
+
+
+
 
 
 
@@ -4063,6 +4576,15 @@ GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4225,6 +4747,12 @@ GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uui
 
 
 
+GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "anon";
+GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "anon";
 GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "service_role";
@@ -4234,6 +4762,8 @@ GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "service_
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "service_role";
+
+
 
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "authenticated";
 
@@ -4275,6 +4805,12 @@ GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cu
 
 
 
+REVOKE ALL ON FUNCTION "public"."get_active_doctors"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
@@ -4299,9 +4835,27 @@ GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO
 
 
 
+REVOKE ALL ON FUNCTION "public"."perfil_actual"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "anon";
+GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "service_role";
 
 
 
@@ -4338,6 +4892,11 @@ GRANT ALL ON FUNCTION "public"."update_timestamp"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "anon";
 GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "service_role";
 
 
 
@@ -4392,6 +4951,36 @@ GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "service_ro
 
 
 
+GRANT ALL ON TABLE "public"."dientes" TO "anon";
+GRANT ALL ON TABLE "public"."dientes" TO "authenticated";
+GRANT ALL ON TABLE "public"."dientes" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "anon";
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "authenticated";
+GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "anon";
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "authenticated";
+GRANT ALL ON TABLE "public"."planes_tratamiento" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."tratamientos" TO "anon";
+GRANT ALL ON TABLE "public"."tratamientos" TO "authenticated";
+GRANT ALL ON TABLE "public"."tratamientos" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."actividades_agendables_paciente" TO "anon";
+GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "authenticated";
+GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."admins" TO "anon";
 GRANT ALL ON TABLE "public"."admins" TO "authenticated";
 GRANT ALL ON TABLE "public"."admins" TO "service_role";
@@ -4419,6 +5008,12 @@ GRANT ALL ON TABLE "public"."cajas_diarias" TO "service_role";
 GRANT ALL ON TABLE "public"."citas" TO "anon";
 GRANT ALL ON TABLE "public"."citas" TO "authenticated";
 GRANT ALL ON TABLE "public"."citas" TO "service_role";
+
+
+
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."citas_items_plan" TO "anon";
+GRANT ALL ON TABLE "public"."citas_items_plan" TO "authenticated";
+GRANT ALL ON TABLE "public"."citas_items_plan" TO "service_role";
 
 
 
@@ -4494,12 +5089,6 @@ GRANT ALL ON TABLE "public"."diagnosticos_aplicados" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."dientes" TO "anon";
-GRANT ALL ON TABLE "public"."dientes" TO "authenticated";
-GRANT ALL ON TABLE "public"."dientes" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "anon";
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "authenticated";
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "service_role";
@@ -4539,12 +5128,6 @@ GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "service_role";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "anon";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "authenticated";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "anon";
-GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "authenticated";
-GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "service_role";
 
 
 
@@ -4602,12 +5185,6 @@ GRANT ALL ON TABLE "public"."personas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."planes_tratamiento" TO "anon";
-GRANT ALL ON TABLE "public"."planes_tratamiento" TO "authenticated";
-GRANT ALL ON TABLE "public"."planes_tratamiento" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."procedimientos" TO "anon";
 GRANT ALL ON TABLE "public"."procedimientos" TO "authenticated";
 GRANT ALL ON TABLE "public"."procedimientos" TO "service_role";
@@ -4632,6 +5209,12 @@ GRANT ALL ON TABLE "public"."records" TO "service_role";
 
 
 
+GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."resumen_actividades_cita" TO "anon";
+GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "authenticated";
+GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."superficies" TO "anon";
 GRANT ALL ON TABLE "public"."superficies" TO "authenticated";
 GRANT ALL ON TABLE "public"."superficies" TO "service_role";
@@ -4647,12 +5230,6 @@ GRANT ALL ON TABLE "public"."suplidores" TO "service_role";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "anon";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."tratamientos" TO "anon";
-GRANT ALL ON TABLE "public"."tratamientos" TO "authenticated";
-GRANT ALL ON TABLE "public"."tratamientos" TO "service_role";
 
 
 
@@ -4698,6 +5275,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+
+
+
+
+
+
+
 
 
 

@@ -16,16 +16,5 @@ enum RolUsuario {
     }
   }
 }
-
-extension RolPermisosLista on List<RolUsuario> {
-  bool get puedeAccederAConfiguracion => contains(RolUsuario.admin);
-  bool get puedeAccederACompras => contains(RolUsuario.admin);
-
-  bool get puedeVerExpedientes =>
-      contains(RolUsuario.admin) || contains(RolUsuario.doctor);
-
-  bool get puedeEditarAlertasYRecetas =>
-      contains(RolUsuario.admin) || contains(RolUsuario.doctor);
-
-  bool get puedeGestionarCitas => true;
-}
+// Los permisos por rol viven en `capacidades_usuario.dart`: la pantalla
+// pregunta por la capacidad que necesita, no por el nombre del rol.

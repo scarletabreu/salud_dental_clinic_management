@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/entities/usu
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
 import 'package:salud_dental_clinic_management/features/auth/data/datasources/usuario_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/auth/data/models/perfil_actual_mapper.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/admin_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/asistente_model.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
@@ -15,6 +16,9 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
 
   static const _selectPerfilCompleto =
       '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
+
+    static const _selectPerfilAdmin =
+      '*, doctores(*, usuarios(*, personas(*, persona_contactos(*, contactos(*)))))';
 
   @override
   String? getCurrentUserId() {
@@ -62,32 +66,48 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
     return perfil;
   }
 
+  /// El perfil de la sesión sale de un único contrato del servidor.
+  ///
+  /// El encadenado anterior de PostgREST (`admins` -> `doctores` -> `usuarios`
+  /// -> `personas`) dependía de una relación que no existía en toda base, y su
+  /// ausencia se manifestaba como una sesión que caía justo después de
+  /// autenticar. `uuid` se conserva en la firma por compatibilidad, pero quien
+  /// manda es `auth.uid()`: nadie puede pedir el perfil de otro.
   @override
   Future<Usuario?> getPerfilPorUuid(String uuid) {
     return runGuarded(() async {
-      final doctorData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'doctores',
-        uuid: uuid,
-        selectColumns: _selectPerfilCompleto,
-      );
-      if (doctorData != null) return DoctorModel.fromJson(doctorData);
-
-      final adminData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'admins',
-        uuid: uuid,
-        selectColumns: _selectPerfilCompleto,
-      );
-      if (adminData != null) return AdminModel.fromJson(adminData);
-
-      final asistenteData = await remoteDataSource.getPerfilPorTabla(
-        tabla: 'asistentes',
-        uuid: uuid,
-        selectColumns: _selectPerfilCompleto,
-      );
-      if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
-
-      return null;
+      final fila = await remoteDataSource.getPerfilActual();
+      if (fila == null) return null;
+      return PerfilActualMapper.desdeFila(fila);
     }, context: 'cargar el perfil');
+  }
+
+  /// Perfil de **otro** usuario, para el listado y para releer un alta recién
+  /// hecha. Va por la relación de PostgREST, que HFX-CLIN-000 garantiza al
+  /// crear la FK `admins.id -> doctores.id`.
+  Future<Usuario?> _perfilDeOtroUsuario(String uuid) async {
+    final adminData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'admins',
+      uuid: uuid,
+      selectColumns: _selectPerfilAdmin,
+    );
+    if (adminData != null) return AdminModel.fromJson(adminData);
+
+    final doctorData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'doctores',
+      uuid: uuid,
+      selectColumns: _selectPerfilCompleto,
+    );
+    if (doctorData != null) return DoctorModel.fromJson(doctorData);
+
+    final asistenteData = await remoteDataSource.getPerfilPorTabla(
+      tabla: 'asistentes',
+      uuid: uuid,
+      selectColumns: _selectPerfilCompleto,
+    );
+    if (asistenteData != null) return AsistenteModel.fromJson(asistenteData);
+
+    return null;
   }
 
   @override
@@ -111,7 +131,7 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       final List<dynamic>? listAdmins = await remoteDataSource
           .getPerfilesPorTabla(
             tabla: 'admins',
-            selectColumns: _selectPerfilCompleto,
+            selectColumns: _selectPerfilAdmin,
           );
       if (listAdmins != null) {
         usuariosConsolidados.addAll(
@@ -173,7 +193,12 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
       context: 'crear el usuario',
     );
 
-    final perfil = await getPerfilPorUuid(uuid);
+    // Ojo: el perfil que se relee es el del usuario recién creado, no el de la
+    // sesión que lo creó. `getPerfilPorUuid` resuelve siempre `auth.uid()`.
+    final perfil = await runGuarded(
+      () => _perfilDeOtroUsuario(uuid),
+      context: 'cargar el perfil del usuario creado',
+    );
     if (perfil == null) {
       throw Exception('Usuario creado pero no se pudo cargar el perfil.');
     }
@@ -214,6 +239,70 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
         nuevaPassword: nuevaPassword,
       ),
       context: 'restablecer la contraseña',
+    );
+  }
+
+  @override
+  Future<String?> desactivarUsuario({
+    required String usuarioId,
+    required RolUsuario rol,
+  }) {
+    return runGuarded(() async {
+      if (rol == RolUsuario.admin) {
+        return 'Los administradores no pueden desactivarse desde esta pantalla.';
+      }
+
+      final citasPendientes = await remoteDataSource.contarCitasPendientes(
+        usuarioId,
+      );
+      if (citasPendientes > 0) {
+        return 'Tiene $citasPendientes cita${citasPendientes == 1 ? '' : 's'} '
+            'pendiente${citasPendientes == 1 ? '' : 's'} como doctor asignado. '
+            'Debe finalizarlas o cancelarlas antes de desactivar.';
+      }
+
+      final consultasPendientes = await remoteDataSource
+          .contarConsultasPendientes(usuarioId);
+      if (consultasPendientes > 0) {
+        return 'Tiene $consultasPendientes consulta${consultasPendientes == 1 ? '' : 's'} '
+            'sin finalizar. Debe completarlas antes de desactivar.';
+      }
+
+      await remoteDataSource.desactivarUsuarioRemoto(usuarioId);
+      return null;
+    }, context: 'desactivar el usuario');
+  }
+
+  @override
+  Future<List<Usuario>> getAsistentesDisponibles() {
+    return runGuarded(() async {
+      final list = await remoteDataSource.getTodosAsistentes();
+      if (list == null) return [];
+      return list
+          .map((json) => AsistenteModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }, context: 'cargar la lista de asistentes');
+  }
+
+  @override
+  Future<List<String>> getAsistentesAsignadosIds(String doctorId) {
+    return runGuarded(
+      () => remoteDataSource.getAsistenteIdsAsignados(doctorId),
+      context: 'cargar los asistentes asignados',
+    );
+  }
+
+  @override
+  Future<void> asignarAsistentes({
+    required String doctorId,
+    required List<String> asistenteIds,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.reemplazarAsistentesDoctor(
+        doctorId,
+        asistenteIds,
+      ),
+      context: 'asignar los asistentes',
     );
   }
 

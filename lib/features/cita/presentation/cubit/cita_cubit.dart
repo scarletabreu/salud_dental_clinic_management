@@ -2,33 +2,91 @@ import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/errors/cancelacion_con_consulta_abierta.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/errors/transicion_estado_invalida.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/consulta_abierta_lookup.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'cita_cubit_state.dart';
 
 class CitaCubit extends Cubit<CitaCubitState> {
   final CitaRepository _repository;
+  final ConsultaAbiertaLookup? _consultas;
+  List<String>? _doctorIdsPermitidos;
+  String? _restringidoADoctorId;
 
-  CitaCubit(this._repository) : super(const CitaCubitLoading());
+  CitaCubit(this._repository, [this._consultas])
+    : super(const CitaCubitLoading());
 
-  Future<void> load() async {
+  Future<void> load({
+    String? restringidoADoctorId,
+    List<String>? doctorIdsPermitidos,
+  }) async {
     if (isClosed) return;
+
+    // El alcance se fija en la primera carga y sobrevive a los `load()` sin
+    // argumentos que hacen las pantallas al refrescar.
+    if (restringidoADoctorId != null) {
+      _restringidoADoctorId = restringidoADoctorId;
+      _doctorIdsPermitidos = [restringidoADoctorId];
+    } else if (doctorIdsPermitidos != null) {
+      _doctorIdsPermitidos = doctorIdsPermitidos;
+    }
+
     emit(const CitaCubitLoading());
     try {
-      final citas = await _repository.getCitas();
+      final citas = await _cargarSegunAlcance();
+      final citasFiltradas = _aplicarFiltroDoctor(citas);
+      final consultas = await _consultasDe(citasFiltradas);
       if (isClosed) return;
       final now = DateTime.now();
       emit(
         CitaCubitLoaded(
-          citas: citas,
+          citas: citasFiltradas,
           focusedDay: now,
           selectedDay: now,
           viewMode: CalendarioViewMode.mensual,
+          consultasPorCitaId: consultas,
         ),
       );
     } catch (e) {
       if (isClosed) return;
       emit(CitaCubitError(e.toString()));
     }
+  }
+
+  /// Un doctor pide al servidor solo sus citas, igual que la lista de consultas
+  /// pide `getConsultasByDoctor` (SD-160): la misma regla en los dos listados,
+  /// y así ninguna agenda ajena viaja al cliente para descartarse después.
+  ///
+  /// El alcance del asistente abarca varios doctores y no hay filtro remoto
+  /// equivalente, así que ahí sí se recorta en memoria.
+  Future<List<Cita>> _cargarSegunAlcance() {
+    final soloDoctor = _restringidoADoctorId;
+    if (soloDoctor != null) return _repository.getCitasByDoctor(soloDoctor);
+    return _repository.getCitas();
+  }
+
+  /// Consulta de cada cita, para que la agenda pueda enlazarla (SD-160). Es
+  /// información accesoria: si falla, las citas se muestran igual y solo se
+  /// pierde el enlace.
+  Future<Map<String, ConsultaDeCita>> _consultasDe(List<Cita> citas) async {
+    final lookup = _consultas;
+    if (lookup == null) return const {};
+    final ids = [for (final c in citas) ?c.id];
+    if (ids.isEmpty) return const {};
+    try {
+      return await lookup.paraCitas(ids);
+    } catch (e) {
+      AppLog.error('consultas de las citas', e);
+      return const {};
+    }
+  }
+
+  List<Cita> _aplicarFiltroDoctor(List<Cita> citas) {
+    final permitidos = _doctorIdsPermitidos;
+    if (permitidos == null) return citas;
+    return citas.where((c) => permitidos.contains(c.doctor.id)).toList();
   }
 
   bool _tieneConflictoHorario(Cita nuevaCita, List<Cita> todasLasCitas) {
@@ -94,6 +152,12 @@ class CitaCubit extends Cubit<CitaCubitState> {
       }).toList();
 
       emit(current.copyWith(citas: citasActualizadas));
+    } on CancelacionConConsultaAbierta catch (e) {
+      // Motivo accionable: el usuario tiene que cerrar la consulta primero. Un
+      // "no se pudo actualizar: <excepción>" no le diría qué hacer.
+      emit(current.copyWith(errorMessage: e.toString));
+    } on TransicionEstadoInvalida catch (e) {
+      emit(current.copyWith(errorMessage: e.toString));
     } catch (e) {
       emit(
         current.copyWith(
@@ -196,13 +260,16 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
       await _repository.updateCita(citaActualizada);
 
-      final citasActualizadas = await _repository.getCitas();
+      final citasActualizadas = _aplicarFiltroDoctor(
+        await _cargarSegunAlcance(),
+      );
 
       emit(
         current.copyWith(
           citas: citasActualizadas,
           isSubmitting: false,
           errorMessage: () => null,
+          consultasPorCitaId: await _consultasDe(citasActualizadas),
         ),
       );
     } catch (e) {

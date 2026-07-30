@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
@@ -49,10 +50,28 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
 
+  // Campos específicos por subtipo
+  late final TextEditingController _specialtyController;
+  late final TextEditingController _departamentoController;
+  late final TextEditingController _turnoController;
+  bool _isAvailable = true;
+
   RolUsuario _rolUsuario = RolUsuario.asistente;
   bool _obscurePassword = true;
 
+  // Asignación de asistentes (solo Doctor/Admin)
+  List<Usuario> _asistentesDisponibles = [];
+  final Set<String> _asistentesSeleccionadosIds = {};
+  bool _cargandoAsistentes = false;
+
   bool get _isEditing => widget.usuario != null;
+
+  // Doctor y admin comparten identidad clínica: los dos nacen con fila en
+  // `doctores`, así que los dos necesitan especialidad.
+  bool get _requiereSpecialty => _rolUsuario.tiene(Capacidad.ejercerClinica);
+  bool get _requiereDepartamento => _rolUsuario == RolUsuario.admin;
+  bool get _requiereTurno => _rolUsuario == RolUsuario.asistente;
+  bool get _puedeAsignarAsistentes => _requiereSpecialty;
 
   @override
   void initState() {
@@ -70,8 +89,76 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     _usernameController = TextEditingController(text: u?.username ?? '');
     _passwordController = TextEditingController();
 
+    _specialtyController = TextEditingController();
+    _departamentoController = TextEditingController();
+    _turnoController = TextEditingController();
+
     if (u != null) {
       _rolUsuario = u.rol;
+    }
+
+    // Campos específicos y asignación de asistentes solo aplican
+    // cuando ya existe el usuario (necesitamos su id) o al crear
+    // (se resuelve después de crear, en _save).
+    if (_isEditing) {
+      _cargarDatosEspecificosIniciales();
+    }
+  }
+
+  Future<void> _cargarDatosEspecificosIniciales() async {
+    final u = widget.usuario!;
+
+    // Los valores de specialty/departamento/turno vienen embebidos en la
+    // entidad Usuario si es Doctor/Admin/Asistente (según su subtipo real).
+    // Como el form trabaja con la interfaz genérica Usuario, se leen los
+    // campos disponibles vía un patrón dinámico simple.
+    try {
+      final dynamic usuarioDinamico = u;
+      _specialtyController.text =
+          (usuarioDinamico.specialty as String?) ?? '';
+      _isAvailable = (usuarioDinamico.isAvailable as bool?) ?? true;
+    } catch (_) {
+      // El usuario no es Doctor/Admin, no tiene estos campos.
+    }
+    try {
+      final dynamic usuarioDinamico = u;
+      _departamentoController.text =
+          (usuarioDinamico.departamento as String?) ?? '';
+    } catch (_) {}
+    try {
+      final dynamic usuarioDinamico = u;
+      _turnoController.text = (usuarioDinamico.shift as String?) ?? '';
+    } catch (_) {}
+
+    if (_puedeAsignarAsistentes && u.id != null) {
+      await _cargarAsistentes(doctorIdExistente: u.id);
+    }
+  }
+
+  Future<void> _cargarAsistentes({String? doctorIdExistente}) async {
+    setState(() => _cargandoAsistentes = true);
+    try {
+      final cubit = context.read<PersonalPerfilesCubit>();
+      final disponibles = await cubit.cargarAsistentesDisponibles();
+
+      List<String> asignadosIds = [];
+      if (doctorIdExistente != null) {
+        asignadosIds = await cubit.cargarAsistentesAsignados(
+          doctorIdExistente,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _asistentesDisponibles = disponibles;
+        _asistentesSeleccionadosIds
+          ..clear()
+          ..addAll(asignadosIds);
+        _cargandoAsistentes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cargandoAsistentes = false);
     }
   }
 
@@ -83,7 +170,17 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     _telefonoController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _specialtyController.dispose();
+    _departamentoController.dispose();
+    _turnoController.dispose();
     super.dispose();
+  }
+
+  void _onRolCambiado(RolUsuario rol) {
+    setState(() => _rolUsuario = rol);
+    if (_puedeAsignarAsistentes && _asistentesDisponibles.isEmpty) {
+      _cargarAsistentes(doctorIdExistente: widget.usuario?.id);
+    }
   }
 
   void _save() {
@@ -104,6 +201,16 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
           ? null
           : '${_usernameController.text.trim()}@saluddental.com',
       rol: _isEditing ? null : _rolUsuario,
+      especialidad: _requiereSpecialty
+          ? _specialtyController.text.trim()
+          : null,
+      departamento: _requiereDepartamento
+          ? _departamentoController.text.trim()
+          : null,
+      turno: _requiereTurno ? _turnoController.text.trim() : null,
+      asistenteIdsAsignados: _puedeAsignarAsistentes
+          ? _asistentesSeleccionadosIds.toList()
+          : null,
     );
 
     Navigator.pop(context);
@@ -135,6 +242,12 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   _buildDatosPersonalesCard(ac),
                   const SizedBox(height: 16),
                   _buildCredencialesCard(ac),
+                  const SizedBox(height: 16),
+                  _buildDatosEspecificosCard(ac),
+                  if (_puedeAsignarAsistentes) ...[
+                    const SizedBox(height: 16),
+                    _buildAsistentesAsignadosCard(ac),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -177,8 +290,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // La miga de pan repite el título que va justo debajo:
-                    // en móvil se omite para no robarle ancho ni alto.
                     if (!context.appLayout.isCompact) ...[
                       Row(
                         children: [
@@ -186,7 +297,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                             'Usuarios',
                             style: TextStyle(
                               fontSize: 11,
-                              color: ac.primaryBlue,
+                              color: ac.primaryGreen,
                             ),
                           ),
                           Icon(
@@ -210,8 +321,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                     ],
                     Text(
                       _isEditing ? 'Editar usuario' : 'Registro de usuario',
-                      // La barra tiene alto fijo: el título se recorta antes
-                      // que partirse en varias líneas y desbordarla.
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -223,8 +332,6 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   ],
                 ),
               ),
-              // En pantallas estrechas la flecha de la cabecera ya cancela; un
-              // segundo botón solo empujaría "Guardar" fuera de la barra.
               if (!context.appLayout.isCompact) ...[
                 OutlinedButton(
                   onPressed: isSaving ? null : () => Navigator.pop(context),
@@ -261,7 +368,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -286,8 +393,8 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
   Widget _buildDatosPersonalesCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withOpacity(0.10),
       icon: Icons.person_outline_rounded,
       title: 'Datos personales del usuario',
       child: Column(
@@ -412,8 +519,8 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                   options: RolUsuario.values,
                   selected: _rolUsuario,
                   labelOf: (rol) => rol.name.toUpperCase(),
-                  activeColor: ac.primaryBlue,
-                  onSelected: (rol) => setState(() => _rolUsuario = rol),
+                  activeColor: ac.primaryGreen,
+                  onSelected: _onRolCambiado,
                 ),
               ),
             ),
@@ -470,6 +577,193 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     );
   }
 
+  Widget _buildDatosEspecificosCard(AppColors ac) {
+    if (!_requiereSpecialty && !_requiereDepartamento && !_requiereTurno) {
+      return const SizedBox.shrink();
+    }
+
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.teal,
+      iconBg: ac.teal.withOpacity(0.10),
+      icon: Icons.work_outline_rounded,
+      title: 'Datos específicos del rol',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_requiereSpecialty) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.medical_services_outlined,
+              label: 'Especialidad *',
+              child: TextFormField(
+                controller: _specialtyController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Ortodoncia, General'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'La especialidad es obligatoria'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _FormField(
+              ac: ac,
+              icon: Icons.event_available_outlined,
+              label: 'Disponibilidad',
+              child: Row(
+                children: [
+                  Switch(
+                    value: _isAvailable,
+                    activeColor: ac.primaryGreen,
+                    onChanged: (v) => setState(() => _isAvailable = v),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isAvailable ? 'Disponible' : 'No disponible',
+                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (_requiereDepartamento) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.apartment_outlined,
+              label: 'Departamento *',
+              child: TextFormField(
+                controller: _departamentoController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Administración general'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'El departamento es obligatorio'
+                    : null,
+              ),
+            ),
+          ],
+          if (_requiereTurno) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.schedule_outlined,
+              label: 'Turno *',
+              child: TextFormField(
+                controller: _turnoController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Matutino, Vespertino'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'El turno es obligatorio'
+                    : null,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAsistentesAsignadosCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.indigo,
+      iconBg: ac.indigo.withOpacity(0.10),
+      icon: Icons.groups_outlined,
+      title: 'Asistentes asignados',
+      child: _cargandoAsistentes
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          : _asistentesDisponibles.isEmpty
+          ? Text(
+              'No hay asistentes activos disponibles para asignar.',
+              style: TextStyle(fontSize: 13, color: ac.textMuted),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selecciona los asistentes que apoyarán a este ${_rolUsuario == RolUsuario.admin ? 'administrador' : 'doctor'}.',
+                  style: TextStyle(fontSize: 12, color: ac.textMuted),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _asistentesDisponibles.map((asistente) {
+                    final id = asistente.id;
+                    if (id == null) return const SizedBox.shrink();
+                    final isSelected = _asistentesSeleccionadosIds.contains(
+                      id,
+                    );
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _asistentesSeleccionadosIds.remove(id);
+                          } else {
+                            _asistentesSeleccionadosIds.add(id);
+                          }
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? ac.indigo.withOpacity(0.10)
+                              : ac.bgPage,
+                          borderRadius: BorderRadius.circular(100),
+                          border: Border.all(
+                            color: isSelected
+                                ? ac.indigo.withOpacity(0.50)
+                                : ac.divider,
+                            width: isSelected ? 1.0 : 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.person_outline_rounded,
+                              size: 15,
+                              color: isSelected
+                                  ? ac.indigo
+                                  : ac.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${asistente.nombre} ${asistente.apellido}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                    ? ac.indigo
+                                    : ac.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+    );
+  }
+
   InputDecoration _inputDeco(AppColors ac, {String? hint}) => InputDecoration(
     hintText: hint,
     hintStyle: TextStyle(fontSize: 13, color: ac.textMuted),
@@ -486,7 +780,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -578,7 +872,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),

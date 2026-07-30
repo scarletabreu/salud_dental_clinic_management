@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   final SupabaseClient supabase;
+  static const _selectPerfilCompleto =
+      '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
 
   UsuarioRemoteDataSourceImpl(this.supabase);
 
@@ -26,6 +28,15 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     required String password,
   }) {
     return supabase.auth.signInWithPassword(email: email, password: password);
+  }
+
+  /// La RPC recibe `auth.uid()` implícitamente: no hay forma de pedir el
+  /// perfil de otro usuario, y la respuesta no contiene ninguna contraseña.
+  @override
+  Future<Map<String, dynamic>?> getPerfilActual() async {
+    final filas = await supabase.rpc('perfil_actual') as List?;
+    if (filas == null || filas.isEmpty) return null;
+    return Map<String, dynamic>.from(filas.first as Map);
   }
 
   @override
@@ -94,7 +105,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     required String telefono,
   }) async {
     final relacion = await supabase
-        .from('persona_contacto')
+        .from('persona_contactos')
         .select('contacto_id')
         .eq('persona_id', personaId)
         .eq('es_principal', true)
@@ -112,7 +123,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
           .select('id')
           .single();
 
-      await supabase.from('persona_contacto').insert({
+      await supabase.from('persona_contactos').insert({
         'persona_id': personaId,
         'contacto_id': nuevoContacto['id'],
         'tipo_contacto': 'personal',
@@ -128,5 +139,76 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   ) async {
     data['updated_at'] = DateTime.now().toIso8601String();
     await supabase.from('usuarios').update(data).eq('id', usuarioId);
+  }
+
+  /// Cuenta citas donde este usuario es el doctor asignado y aún no están
+  /// terminadas ni canceladas.
+  @override
+  Future<int> contarCitasPendientes(String doctorId) async {
+    final response = await supabase
+        .from('citas')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .not('estado', 'in', '(TERMINADA,CANCELADA)');
+    return (response as List).length;
+  }
+
+  /// Cuenta consultas de este doctor que no se han finalizado.
+  @override
+  Future<int> contarConsultasPendientes(String doctorId) async {
+    final response = await supabase
+        .from('consultas')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .filter('fecha_fin', 'is', null);
+    return (response as List).length;
+  }
+
+  /// Marca `deleted_at` en `usuarios`. El trigger en Supabase se encarga
+  /// de cascadear hacia `doctor`/`asistente`/`admin` según corresponda.
+  @override
+  Future<void> desactivarUsuarioRemoto(String usuarioId) async {
+    await supabase
+        .from('usuarios')
+        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .eq('id', usuarioId);
+  }
+
+  @override
+  Future<List<dynamic>?> getTodosAsistentes() async {
+    final response = await supabase
+        .from('asistentes')
+        .select(_selectPerfilCompleto);
+    return response as List<dynamic>?;
+  }
+
+  @override
+  Future<List<String>> getAsistenteIdsAsignados(String doctorId) async {
+    final response = await supabase
+        .from('doctor_asistentes')
+        .select('asistente_id')
+        .eq('doctor_id', doctorId);
+    return (response as List)
+        .map((row) => row['asistente_id'] as String)
+        .toList();
+  }
+
+  @override
+  Future<void> reemplazarAsistentesDoctor(
+    String doctorId,
+    List<String> asistenteIds,
+  ) async {
+    await supabase.from('doctor_asistentes').delete().eq(
+      'doctor_id',
+      doctorId,
+    );
+
+    if (asistenteIds.isNotEmpty) {
+      await supabase.from('doctor_asistentes').insert(
+        asistenteIds
+            .map((id) => {'doctor_id': doctorId, 'asistente_id': id})
+            .toList(),
+      );
+    }
   }
 }

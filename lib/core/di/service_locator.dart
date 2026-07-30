@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/core/network/connectivity_check.d
 import 'package:salud_dental_clinic_management/core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 
 // Módulo Compras
 import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource.dart';
@@ -16,6 +17,8 @@ import 'package:salud_dental_clinic_management/features/compra/presentation/cubi
 // Módulo Consulta
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/consulta_abierta_lookup.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_abierta_lookup_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/eliminar_consulta_usecase.dart';
@@ -48,6 +51,10 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remore_datasource.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/data/repositories/procedimiento_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
 
 // Módulo Suplidores
 import 'package:salud_dental_clinic_management/features/suplidor/domain/usecases/eliminar_suplidor.dart';
@@ -80,6 +87,10 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/reposito
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 
 // Data Sources Impl
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/data/repositories/contraindicacion_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/repositories/contraindicacion_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/data/datasources/diagnosis_remote_datasource_impl.dart';
@@ -206,6 +217,9 @@ import 'package:salud_dental_clinic_management/features/pago/domain/usecases/reg
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/get_historial_financiero_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/historial_financiero_cubit.dart';
 
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/resumen_plan_cubit.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/usecases/get_resumen_actividad_plan.dart';
+
 final sl = GetIt.instance;
 
 Future<void> init() async {
@@ -218,6 +232,9 @@ Future<void> init() async {
   sl.registerFactory<ConnectivityCubit>(() => ConnectivityCubit(sl())..start());
 
   // ── Remote Data Sources ──────────────────────────────────────────────────
+  sl.registerLazySingleton<ContraindicacionRemoteDatasource>(
+    () => ContraindicacionRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<MedicinaRemoteDatasource>(
     () => MedicinaRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -302,10 +319,19 @@ Future<void> init() async {
   sl.registerLazySingleton<SupabaseStorageHelper>(
     () => SupabaseStorageHelper(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<PacienteFotoStorage>(
+    () => PacienteFotoStorage(sl()),
+  );
 
   // ── Repositories ─────────────────────────────────────────────────────────
+  sl.registerLazySingleton<ContraindicacionRepository>(
+    () => ContraindicacionRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton<IMedicinaRepository>(
-    () => MedicinaRepositoryImpl(remoteDataSource: sl()),
+    () => MedicinaRepositoryImpl(
+      remoteDataSource: sl(),
+      contraindicacionRepository: sl(),
+    ),
   );
   sl.registerLazySingleton<CuentaRepository>(
     () => CuentaRepositoryImpl(remoteDataSource: sl()),
@@ -392,11 +418,20 @@ Future<void> init() async {
   sl.registerLazySingleton<PersonaRepository>(
     () => PersonaRepositoryImpl(sl()),
   );
-  sl.registerLazySingleton<CitaRepository>(
-    () => CitaRepositoryImpl(remoteDataSource: sl()),
-  );
   sl.registerLazySingleton<ConsultaRepository>(
     () => ConsultaRepositoryImpl(remoteDataSource: sl()),
+  );
+  // El lookup se resuelve perezosamente: la cita necesita preguntar por su
+  // consulta, y registrar `ConsultaRepository` antes evita la referencia
+  // circular entre ambos repositorios (SD-160).
+  sl.registerLazySingleton<ConsultaAbiertaLookup>(
+    () => ConsultaAbiertaLookupImpl(sl<ConsultaRepository>()),
+  );
+  sl.registerLazySingleton<CitaRepository>(
+    () => CitaRepositoryImpl(
+      remoteDataSource: sl(),
+      consultaAbiertaLookup: sl<ConsultaAbiertaLookup>(),
+    ),
   );
   sl.registerFactory<CrearConsultaUseCase>(() => CrearConsultaUseCase(sl()));
   sl.registerFactory<FinalizarConsultaUseCase>(
@@ -419,7 +454,9 @@ Future<void> init() async {
 
   // ── Cubits ───────────────────────────────────────────────────────────────
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl(), sl()));
-  sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<CitaCubit>(
+    () => CitaCubit(sl(), sl<ConsultaAbiertaLookup>()),
+  );
   sl.registerFactory<ConsultaCubit>(
     () => ConsultaCubit(
       sl<CrearConsultaUseCase>(),
@@ -431,11 +468,17 @@ Future<void> init() async {
     ),
   );
   sl.registerFactory<ConsultaDetalleCubit>(
-    () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
+    () => ConsultaDetalleCubit(
+      sl(),
+      sl<IMedicinaRepository>(),
+      sl<CitaRepository>(),
+    ),
   );
   sl.registerFactory<PlanTratamientoCubit>(
     () => PlanTratamientoCubit(repository: sl()),
   );
+  sl.registerFactory(() => GetResumenActividadPlan(sl()));
+  sl.registerFactory(() => ResumenPlanCubit(sl()));
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
   sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl(), sl()));
   sl.registerFactory<ConsultasListCubit>(
@@ -454,6 +497,7 @@ Future<void> init() async {
       medicinaRepository: sl(),
       consumibleRepository: sl(),
       cajaDiariaRepository: sl(),
+      equipoRepository: sl(),
     ),
   );
   sl.registerFactory<PersonalPerfilesCubit>(
@@ -524,6 +568,7 @@ Future<void> init() async {
       getInventario: sl(),
       registrarOActualizar: sl(),
       eliminar: sl(),
+      mantenimientoRepository: sl(),
     ),
   );
 
@@ -578,5 +623,17 @@ Future<void> init() async {
 
   sl.registerFactory(
     () => CompraCubit(repository: sl(), recibirCompraUseCase: sl()),
+  );
+
+  // --- PROCEDIMIENTOS ---
+  sl.registerLazySingleton<ProcedimientoRemoteDatasource>(
+    () => ProcedimientoRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+
+  sl.registerLazySingleton<ProcedimientoRepository>(
+    () => ProcedimientoRepositoryImpl(
+      remoteDataSource: sl(),
+      contraindicacionRepository: sl(),
+    ),
   );
 }

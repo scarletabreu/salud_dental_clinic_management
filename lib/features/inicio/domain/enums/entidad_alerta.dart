@@ -1,1 +1,1 @@
-enum EntidadAlerta { cita, consumible, cajaDiaria }
+enum EntidadAlerta { cita, consumible, cajaDiaria, equipo }

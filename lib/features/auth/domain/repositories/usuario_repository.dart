@@ -39,4 +39,18 @@ abstract interface class UsuarioRepository {
     required String usuarioId,
     required String nuevaPassword,
   });
+
+  Future<String?> desactivarUsuario({
+    required String usuarioId,
+    required RolUsuario rol,
+  });
+
+  Future<List<Usuario>> getAsistentesDisponibles();
+
+  Future<List<String>> getAsistentesAsignadosIds(String doctorId);
+
+  Future<void> asignarAsistentes({
+    required String doctorId,
+    required List<String> asistenteIds,
+  });
 }

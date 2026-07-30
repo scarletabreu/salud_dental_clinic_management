@@ -18,6 +18,7 @@ class DashboardAlertCenter extends StatefulWidget {
     this.onAlertaCita,
     this.onAlertaConsumible,
     this.onAlertaCaja,
+    this.onAlertaEquipo,
   });
 
   final List<AlertaOperativa> alertas;
@@ -25,6 +26,7 @@ class DashboardAlertCenter extends StatefulWidget {
   final VoidCallback? onAlertaCita;
   final VoidCallback? onAlertaConsumible;
   final VoidCallback? onAlertaCaja;
+  final VoidCallback? onAlertaEquipo;
 
   @override
   State<DashboardAlertCenter> createState() => _DashboardAlertCenterState();
@@ -231,7 +233,7 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ),
                   ),
@@ -251,6 +253,8 @@ class _DashboardAlertCenterState extends State<DashboardAlertCenter>
         widget.onAlertaConsumible?.call();
       case EntidadAlerta.cajaDiaria:
         widget.onAlertaCaja?.call();
+      case EntidadAlerta.equipo:
+        widget.onAlertaEquipo?.call();
     }
   }
 

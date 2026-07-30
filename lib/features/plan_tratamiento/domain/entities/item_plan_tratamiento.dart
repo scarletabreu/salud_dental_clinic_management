@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 
@@ -37,6 +38,9 @@ class ItemPlanTratamiento {
   /// pintar la lista.
   final String? nombreTratamiento;
 
+  final TipoEjecucionItemPlan tipoEjecucion;
+  final int? sesionesPlanificadas;
+
   /// Cuándo se retiró la actividad del plan (`deleted_at`). Retirarla no borra
   /// que se propuso: la línea de tiempo de la pieza la sigue mostrando como
   /// anulada (SD-144).
@@ -69,6 +73,8 @@ class ItemPlanTratamiento {
     this.fechaInicio,
     this.fechaCompletado,
     this.nombreTratamiento,
+    this.tipoEjecucion = TipoEjecucionItemPlan.unica,
+    this.sesionesPlanificadas,
     this.anuladoEn,
     this.consultaOrigenId,
   });
@@ -120,6 +126,8 @@ class ItemPlanTratamiento {
     DateTime? fechaInicio,
     DateTime? fechaCompletado,
     String? nombreTratamiento,
+    final TipoEjecucionItemPlan? tipoEjecucion,
+    final int? sesionesPlanificadas,
     DateTime? anuladoEn,
     String? consultaOrigenId,
   }) {
@@ -144,6 +152,8 @@ class ItemPlanTratamiento {
       fechaInicio: fechaInicio ?? this.fechaInicio,
       fechaCompletado: fechaCompletado ?? this.fechaCompletado,
       nombreTratamiento: nombreTratamiento ?? this.nombreTratamiento,
+      tipoEjecucion: tipoEjecucion ?? this.tipoEjecucion,
+      sesionesPlanificadas: sesionesPlanificadas ?? this.sesionesPlanificadas,
       anuladoEn: anuladoEn ?? this.anuladoEn,
       consultaOrigenId: consultaOrigenId ?? this.consultaOrigenId,
     );

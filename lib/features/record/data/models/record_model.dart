@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
+import 'package:salud_dental_clinic_management/features/condicion/data/models/record_condicion_model.dart';
 
 class RecordModel extends Record {
   RecordModel({
@@ -9,6 +10,7 @@ class RecordModel extends Record {
     required super.tipoSangre,
     super.consultas = const [],
     required super.condiciones,
+    super.detallesCondiciones = const [],
     super.cantHijos = 0,
     required super.cirugiasPrevias,
     required super.historialFamiliar,
@@ -22,12 +24,20 @@ class RecordModel extends Record {
         (e) => e.name == (json['tipo_sangre'] ?? json['tipoSangre']),
         orElse: () => TipoSangre.desconocido,
       ),
-      condiciones: (json['condiciones'] as List?)
-              ?.map(
-                (e) => CondicionModel.fromJson(e as Map<String, dynamic>),
-              )
+      condiciones:
+          (json['condiciones'] as List?)
+              ?.map((e) => CondicionModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      detallesCondiciones:
+          (json['detalles_condiciones'] as List?)
+              ?.map(
+                (e) => RecordCondicionModel.fromJson(
+                  Map<String, dynamic>.from(e as Map),
+                ),
+              )
+              .toList() ??
+          const [],
       cantHijos:
           (json['cant_hijos'] ?? json['cantHijos'] as num?)?.toInt() ?? 0,
       cirugiasPrevias: List<String>.from(
@@ -44,7 +54,11 @@ class RecordModel extends Record {
       'paciente_id': pacienteId,
       'tipo_sangre': tipoSangre.name,
       'condiciones': condiciones
-          .map((e) => e is CondicionModel ? e.toJson() : CondicionModel.fromEntity(e).toJson())
+          .map(
+            (e) => e is CondicionModel
+                ? e.toJson()
+                : CondicionModel.fromEntity(e).toJson(),
+          )
           .toList(),
       'cant_hijos': cantHijos,
       'cirugias_previas': cirugiasPrevias,
@@ -66,6 +80,9 @@ class RecordModel extends Record {
       consultas: record.consultas,
       condiciones: record.condiciones
           .map((e) => CondicionModel.fromEntity(e))
+          .toList(),
+      detallesCondiciones: record.detallesCondiciones
+          .map(RecordCondicionModel.fromEntity)
           .toList(),
       cantHijos: record.cantHijos,
       cirugiasPrevias: record.cirugiasPrevias,

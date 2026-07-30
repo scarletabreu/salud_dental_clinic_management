@@ -90,7 +90,7 @@ class _EditarDetalleCondicionDialogState
                 style: TextStyle(fontSize: 12, color: ac.textMuted),
               ),
               value: _activo,
-              activeColor: ac.primaryBlue,
+              activeColor: ac.primaryGreen,
               onChanged: (v) => setState(() => _activo = v),
             ),
             const SizedBox(height: 12),
@@ -166,7 +166,7 @@ class _EditarDetalleCondicionDialogState
         ),
         FilledButton(
           onPressed: _guardar,
-          style: FilledButton.styleFrom(backgroundColor: ac.primaryBlue),
+          style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
           child: const Text('Guardar indicación'),
         ),
       ],

@@ -16,7 +16,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
     case EstadoItemPlan.propuesto:
       return (color: ac.amber, icono: Icons.help_outline_rounded);
     case EstadoItemPlan.aceptado:
-      return (color: ac.primaryBlue, icono: Icons.task_alt_rounded);
+      return (color: ac.primaryGreen, icono: Icons.task_alt_rounded);
     case EstadoItemPlan.pendiente:
       return (color: ac.indigo, icono: Icons.schedule_rounded);
     case EstadoItemPlan.enProceso:
@@ -40,7 +40,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
     case EstadoPlanTratamiento.propuesto:
       return (color: ac.amber, icono: Icons.help_outline_rounded);
     case EstadoPlanTratamiento.aceptado:
-      return (color: ac.primaryBlue, icono: Icons.task_alt_rounded);
+      return (color: ac.primaryGreen, icono: Icons.task_alt_rounded);
     case EstadoPlanTratamiento.enProceso:
       return (color: ac.teal, icono: Icons.play_circle_outline_rounded);
     case EstadoPlanTratamiento.completado:

@@ -26,6 +26,10 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSCameraUsageDescription</key>
+	<string>La cámara se usa para tomar la fotografía de identificación del paciente.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La galería se usa para seleccionar la fotografía de identificación del paciente.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -23,12 +23,16 @@ class EfectuarConsultaPage extends StatefulWidget {
   final String doctorId;
   final String? consultaId;
 
+  /// Motivo declarado al agendar la cita, para prellenar la evaluación.
+  final String? motivoCita;
+
   const EfectuarConsultaPage({
     super.key,
     required this.citaId,
     required this.pacienteId,
     required this.doctorId,
     this.consultaId,
+    this.motivoCita,
   });
 
   @override
@@ -192,6 +196,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                                     pacienteId: widget.pacienteId,
                                     doctorId: widget.doctorId,
                                     citaId: widget.citaId,
+                                    motivoCita: widget.motivoCita,
                                   ),
                           ),
                         ),
@@ -230,7 +235,7 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                     ),
                   )
                 : CircularProgressIndicator(
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                     strokeWidth: 2,
                   ),
           ),
@@ -405,7 +410,7 @@ class _PanelPacienteButton extends StatelessWidget {
             color: ac.chipBg,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryBlue),
+          child: Icon(Icons.badge_outlined, size: 19, color: ac.primaryGreen),
         ),
       ),
     );
@@ -503,7 +508,7 @@ class _StepPill extends StatelessWidget {
       fg = ac.green;
       textColor = ac.green;
     } else if (active) {
-      bg = ac.primaryBlue;
+      bg = ac.primaryGreen;
       fg = Colors.white;
       textColor = ac.textPrimary;
     } else {

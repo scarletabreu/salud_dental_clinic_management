@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/selector_actividades_plan.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
@@ -30,6 +33,8 @@ class _CitaEditPageState extends State<CitaEditPage> {
   TimeOfDay? _horaSeleccionada;
   bool _esEmergencia = false;
   int _duracionMinutos = 30;
+  final _motivoCtrl = TextEditingController();
+  List<ActividadPlanificada> _actividades = const [];
 
   @override
   void initState() {
@@ -38,7 +43,15 @@ class _CitaEditPageState extends State<CitaEditPage> {
     _horaSeleccionada = TimeOfDay.fromDateTime(widget.cita.date.toLocal());
     _esEmergencia = widget.cita.esEmergencia;
     _duracionMinutos = widget.cita.duracionMinutos;
+    _motivoCtrl.text = widget.cita.motivo ?? '';
+    _actividades = widget.cita.actividades;
     _cargarDoctores();
+  }
+
+  @override
+  void dispose() {
+    _motivoCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarDoctores() async {
@@ -108,6 +121,8 @@ class _CitaEditPageState extends State<CitaEditPage> {
         date: fechaHoraFinal.toUtc(),
         duracionMinutos: _duracionMinutos,
         esEmergencia: _esEmergencia,
+        motivo: _motivoCtrl.text.trim(),
+        actividades: _actividades,
       ),
     );
   }
@@ -175,7 +190,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               ScaffoldMessenger.of(listenerContext).showSnackBar(
                 SnackBar(
                   content: const Text('Cita actualizada con éxito.'),
-                  backgroundColor: listenerContext.appColors.primaryBlue,
+                  backgroundColor: listenerContext.appColors.primaryGreen,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -199,6 +214,8 @@ class _CitaEditPageState extends State<CitaEditPage> {
                     _buildFechaHoraCard(ac, isSubmitting),
                     const SizedBox(height: 16),
                     _buildParametrosCard(ac, isSubmitting),
+                    const SizedBox(height: 16),
+                    _buildActividadesCard(ac, isSubmitting),
                     const SizedBox(height: 16),
                     _buildEmergenciaCard(ac, isSubmitting),
                     const SizedBox(height: 24),
@@ -233,11 +250,11 @@ class _CitaEditPageState extends State<CitaEditPage> {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: ac.primaryBlue.withOpacity(0.10),
+            backgroundColor: ac.primaryGreen.withOpacity(0.10),
             child: Text(
               initials,
               style: TextStyle(
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -286,7 +303,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: CircularProgressIndicator(
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                   strokeWidth: 2,
                 ),
               ),
@@ -335,7 +352,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
 
     return _EditCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
+      iconColor: ac.primaryGreen,
       icon: Icons.calendar_today_outlined,
       title: 'Fecha y hora',
       child: AppFormRow(
@@ -401,7 +418,41 @@ class _CitaEditPageState extends State<CitaEditPage> {
             ),
           ),
           const SizedBox(height: 14),
+          _FieldGroup(
+            ac: ac,
+            icon: Icons.notes_rounded,
+            label: 'Motivo de consulta',
+            child: TextFormField(
+              controller: _motivoCtrl,
+              enabled: !isSubmitting,
+              maxLines: 2,
+              maxLength: 300,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _dropDecoration(ac).copyWith(
+                hintText: 'Ej. Evaluación por dolor en molar superior...',
+                counterText: '',
+              ),
+              style: TextStyle(fontSize: 13, color: ac.textPrimary),
+            ),
+          ),
+          const SizedBox(height: 14),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActividadesCard(AppColors ac, bool isSubmitting) {
+    return _EditCard(
+      ac: ac,
+      iconColor: ac.primaryGreen,
+      icon: Icons.checklist_rounded,
+      title: 'Actividades del plan',
+      child: SelectorActividadesPlan(
+        pacienteId: widget.cita.persona.id,
+        repository: sl<CitaRepository>(),
+        seleccionadas: _actividades,
+        habilitado: !isSubmitting,
+        onChanged: (lista) => setState(() => _actividades = lista),
       ),
     );
   }
@@ -560,7 +611,7 @@ class _CitaEditPageState extends State<CitaEditPage> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: ac.primaryBlue,
+              backgroundColor: ac.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
@@ -667,7 +718,7 @@ class _FieldGroup extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),
@@ -718,7 +769,7 @@ class _TapField extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: hasValue ? ac.primaryBlue : ac.textMuted,
+              color: hasValue ? ac.primaryGreen : ac.textMuted,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -727,7 +778,7 @@ class _TapField extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: hasValue ? ac.primaryBlue : ac.textMuted,
+                  color: hasValue ? ac.primaryGreen : ac.textMuted,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

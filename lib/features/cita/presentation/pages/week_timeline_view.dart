@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/nueva_cita_dialog.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 class WeekTimelineView extends StatelessWidget {
   final List<Cita> citas;
@@ -95,7 +97,7 @@ class WeekTimelineView extends StatelessWidget {
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(vertical: 8),
               color: isToday
-                  ? ac.primaryBlue.withValues(alpha: 0.05)
+                  ? ac.primaryGreen.withValues(alpha: 0.05)
                   : Colors.transparent,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -105,14 +107,14 @@ class WeekTimelineView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: isToday ? ac.primaryBlue : ac.textMuted,
+                      color: isToday ? ac.primaryGreen : ac.textMuted,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Container(
                     padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                      color: isToday ? ac.primaryBlue : Colors.transparent,
+                      color: isToday ? ac.primaryGreen : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -274,6 +276,8 @@ class WeekTimelineView extends StatelessWidget {
       context,
       personaRepository: sl<PersonaRepository>(),
       doctorRepository: sl<DoctorRepository>(),
+      pacienteRepository: sl<IPacienteRepository>(),
+      citaRepository: sl<CitaRepository>(),
       fechaInicial: fechaPrellenada,
     );
 

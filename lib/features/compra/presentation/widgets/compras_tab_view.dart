@@ -59,7 +59,7 @@ class _ComprasTabViewState extends State<ComprasTabView> {
                 icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
                 label: const Text('Nueva Compra'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -155,12 +155,12 @@ class _ComprasTabViewState extends State<ComprasTabView> {
                         child: Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: ac.primaryBlue.withValues(
+                              backgroundColor: ac.primaryGreen.withValues(
                                 alpha: 0.1,
                               ),
                               child: Icon(
                                 Icons.receipt_long_rounded,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                             ),
                             const SizedBox(width: 14),

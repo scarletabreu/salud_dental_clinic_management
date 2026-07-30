@@ -8,20 +8,46 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchMedicinas() async {
-    final response = await supabaseClient
+    final medicinasResp = await supabaseClient
         .from('medicinas')
         .select('*')
         .filter('deleted_at', 'is', null);
 
-    return List<Map<String, dynamic>>.from(response as List);
+    final listMedicinas = List<Map<String, dynamic>>.from(
+      medicinasResp as List,
+    );
+    if (listMedicinas.isEmpty) return listMedicinas;
+
+    final contrasResp = await supabaseClient
+        .from('contraindicaciones')
+        .select('*')
+        .filter('deleted_at', 'is', null);
+
+    final listContras = List<Map<String, dynamic>>.from(contrasResp as List);
+
+    for (final med in listMedicinas) {
+      final medId = med['id'];
+      med['contraindicaciones'] = listContras
+          .where((c) => c['medicina_id'] == medId)
+          .toList();
+    }
+
+    return listMedicinas;
   }
 
   @override
-  Future<void> insertMedicina(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> insertMedicina(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('medicinas').insert(data);
+    data.remove('created_at');
+    data.remove('updated_at');
+
+    final response = await supabaseClient
+        .from('medicinas')
+        .insert(data)
+        .select()
+        .single();
+
+    return response as Map<String, dynamic>;
   }
 
   @override

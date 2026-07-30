@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
@@ -13,9 +15,13 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 class ConsultaDetalleCubit extends Cubit<ConsultaDetalleState> {
   final ConsultaRepository _consultaRepository;
   final IMedicinaRepository _medicinaRepository;
+  final CitaRepository _citaRepository;
 
-  ConsultaDetalleCubit(this._consultaRepository, this._medicinaRepository)
-    : super(const ConsultaDetalleCargando());
+  ConsultaDetalleCubit(
+    this._consultaRepository,
+    this._medicinaRepository,
+    this._citaRepository,
+  ) : super(const ConsultaDetalleCargando());
 
   Future<void> cargar(Consulta consulta) async {
     emit(const ConsultaDetalleCargando());
@@ -63,11 +69,26 @@ class ConsultaDetalleCubit extends Cubit<ConsultaDetalleState> {
       }
     }
 
+    // La cita de origen hace visible el vínculo que `Consulta.citaId` ya
+    // guardaba sin mostrar (SD-160): sin ella el detalle no puede decir de qué
+    // hueco de la agenda salió esta visita.
+    ReferenciaCita? citaOrigen;
+    final citaId = consulta.citaId;
+    if (citaId != null && citaId.isNotEmpty) {
+      try {
+        citaOrigen = await _citaRepository.getReferenciaCita(citaId);
+      } catch (_) {
+        citaOrigen = null;
+      }
+    }
+
     emit(
       ConsultaDetalleListo(
         tratamientos: tratamientos,
         nombresMedicinas: nombresMedicinas,
         historialPiezas: historialPiezas,
+        citaOrigen: citaOrigen,
+        citaOrigenAusente: citaId != null && citaId.isNotEmpty && citaOrigen == null,
       ),
     );
   }
@@ -94,10 +115,19 @@ class ConsultaDetalleListo extends ConsultaDetalleState {
   /// La línea de tiempo de cada pieza del paciente (SD-144).
   final HistorialPiezas historialPiezas;
 
+  /// Cita de la que nació la consulta. `null` en una atención sin cita.
+  final ReferenciaCita? citaOrigen;
+
+  /// La consulta apunta a una cita que ya no se puede leer (eliminada o sin
+  /// permiso). Se distingue del walk-in: aquí sí hubo cita y falta.
+  final bool citaOrigenAusente;
+
   const ConsultaDetalleListo({
     this.tratamientos = const {},
     this.nombresMedicinas = const {},
     this.historialPiezas = HistorialPiezas.vacio,
+    this.citaOrigen,
+    this.citaOrigenAusente = false,
   });
 
   TratamientoAplicadoDetalle? detalleDe(String tratamientoAplicadoId) =>
@@ -114,5 +144,9 @@ class ConsultaDetalleListo extends ConsultaDetalleState {
     tratamientos,
     nombresMedicinas,
     historialPiezas.porFdi.length,
+    citaOrigen?.id,
+    citaOrigen?.estado,
+    citaOrigen?.fechaHora,
+    citaOrigenAusente,
   ];
 }

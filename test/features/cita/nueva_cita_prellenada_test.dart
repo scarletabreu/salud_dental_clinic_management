@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/nueva_cita_dialog.dart';
@@ -11,6 +13,7 @@ import 'package:salud_dental_clinic_management/features/personal/domain/reposito
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 
 class _CitaCubitDoble extends Cubit<CitaCubitState> implements CitaCubit {
   _CitaCubitDoble() : super(const CitaCubitLoading());
@@ -39,6 +42,8 @@ class _PersonaRepoDoble extends Fake implements PersonaRepository {
   ];
 }
 
+class _PacienteRepoDoble extends Fake implements IPacienteRepository {}
+
 class _DoctorRepoDoble extends Fake implements DoctorRepository {
   @override
   Future<List<Doctor>> getDoctores() async => const [];
@@ -50,6 +55,15 @@ Future<void> _elegirPersona(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Ana Pérez').first);
   await tester.pumpAndSettle();
+}
+
+/// El paso 2 ofrece las actividades del plan (SD-146). Este paciente no tiene
+/// ninguna: la prueba no va de eso.
+class _CitaRepoDoble extends Fake implements CitaRepository {
+  @override
+  Future<List<ActividadPlanificada>> getActividadesAgendables(
+    String pacienteId,
+  ) async => const [];
 }
 
 void main() {
@@ -73,6 +87,8 @@ void main() {
                       context,
                       personaRepository: _PersonaRepoDoble(),
                       doctorRepository: _DoctorRepoDoble(),
+                      pacienteRepository: _PacienteRepoDoble(),
+                      citaRepository: _CitaRepoDoble(),
                       // La casilla del miércoles a las 9:00 de la agenda semanal.
                       fechaInicial: DateTime(2026, 8, 12, 9),
                     ),
@@ -114,6 +130,8 @@ void main() {
                     context,
                     personaRepository: _PersonaRepoDoble(),
                     doctorRepository: _DoctorRepoDoble(),
+                    pacienteRepository: _PacienteRepoDoble(),
+                    citaRepository: _CitaRepoDoble(),
                   ),
                   child: const Text('abrir'),
                 ),

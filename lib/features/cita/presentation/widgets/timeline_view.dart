@@ -4,11 +4,18 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/resumen_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 /// Valor centinela para iniciar el flujo clínico unificado.
 const _kEfectuarConsulta = 'efectuar_consulta';
+const _kAbrirConsulta = 'abrir_consulta';
+
+/// Abre el resumen de la cita como diálogo. Es la vía sin ratón: en táctil no
+/// hay hover que dispare la ventana flotante (SD-146).
+const _kVerResumen = 'ver_resumen';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -175,7 +182,7 @@ class _DayHeaders extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                       color: isToday
-                          ? ac.primaryBlue
+                          ? ac.primaryGreen
                           : isWeekend
                           ? ac.red.withValues(alpha: 0.7)
                           : ac.textMuted,
@@ -186,7 +193,7 @@ class _DayHeaders extends StatelessWidget {
                     width: diametro,
                     height: diametro,
                     decoration: BoxDecoration(
-                      color: isToday ? ac.primaryBlue : Colors.transparent,
+                      color: isToday ? ac.primaryGreen : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
@@ -340,11 +347,11 @@ class _DayColumn extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  Expanded(child: Container(height: 2, color: ac.primaryBlue)),
+                  Expanded(child: Container(height: 2, color: ac.primaryGreen)),
                 ],
               ),
             ),
@@ -451,6 +458,13 @@ class _CitaBlock extends StatelessWidget {
         doctorId != null &&
         cita.id != null;
 
+    // Enlace hacia la consulta que esta cita ya originó (SD-160): sin él, desde
+    // la agenda no había forma de llegar al acto clínico que le corresponde.
+    final estado = cubit.state;
+    final consulta = estado is CitaCubitLoaded ? estado.consultaDe(cita) : null;
+    final puedeAbrirConsulta =
+        consulta != null && pacienteId != null && doctorId != null;
+
     showMenu<Object>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -461,6 +475,56 @@ class _CitaBlock extends StatelessWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       items: [
+        PopupMenuItem<Object>(
+          value: _kVerResumen,
+          child: Row(
+            children: [
+              Icon(Icons.event_note_rounded, size: 16, color: ac.textSecondary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Ver resumen',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        if (puedeAbrirConsulta) ...[
+          PopupMenuItem<Object>(
+            value: _kAbrirConsulta,
+            child: Row(
+              children: [
+                Icon(
+                  consulta.estaAbierta
+                      ? Icons.play_circle_outline_rounded
+                      : Icons.assignment_turned_in_outlined,
+                  size: 16,
+                  color: consulta.estaAbierta ? ac.amber : ac.indigo,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    consulta.estaAbierta
+                        ? 'Continuar consulta'
+                        : 'Ver consulta',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
         if (puedeEfectuar) ...[
           PopupMenuItem<Object>(
             value: _kEfectuarConsulta,
@@ -469,10 +533,10 @@ class _CitaBlock extends StatelessWidget {
                 Icon(
                   Icons.medical_services_outlined,
                   size: 16,
-                  color: ac.primaryBlue,
+                  color: ac.primaryGreen,
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _AccionClinicaMenu(color: ac.primaryBlue)),
+                Expanded(child: _AccionClinicaMenu(color: ac.primaryGreen)),
               ],
             ),
           ),
@@ -507,6 +571,28 @@ class _CitaBlock extends StatelessWidget {
       ],
     ).then((value) {
       if (!context.mounted) return;
+      if (value == _kVerResumen) {
+        mostrarResumenCita(context, cita);
+        return;
+      }
+      if (value == _kAbrirConsulta && consulta != null) {
+        // Abierta: se reanuda donde quedó. Finalizada: se abre en modo lectura
+        // desde la misma pantalla, que ya distingue ambos casos por `finalizada`.
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id,
+                  pacienteId: pacienteId!,
+                  doctorId: doctorId!,
+                  consultaId: consulta.id,
+                  motivoCita: cita.motivo,
+                ),
+              ),
+            )
+            .then((_) => cubit.load());
+        return;
+      }
       if (value == _kEfectuarConsulta) {
         Navigator.of(context)
             .push(
@@ -515,6 +601,7 @@ class _CitaBlock extends StatelessWidget {
                   citaId: cita.id!,
                   pacienteId: pacienteId!,
                   doctorId: doctorId!,
+                  motivoCita: cita.motivo,
                 ),
               ),
             )
@@ -658,26 +745,39 @@ class _CitaBlock extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: () => _showStatusMenu(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [ac.cardShadow],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(height: 3, color: color),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
-                child: content,
-              ),
+    // El bloque de la agenda no da para más que el nombre y la hora. El resumen
+    // completo se asoma al pasar el cursor o al recibir el foco del teclado, y
+    // en táctil se llega por «Ver resumen» del menú (SD-146).
+    return ResumenCitaAccesible(
+      cita: cita,
+      child: Semantics(
+        button: true,
+        label:
+            'Cita de ${cita.persona.fullName} a las $timeRange. '
+            'Toca para ver el resumen y las acciones.',
+        child: GestureDetector(
+          onTap: () => _showStatusMenu(context),
+          onLongPress: () => mostrarResumenCita(context, cita),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [ac.cardShadow],
             ),
-          ],
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(height: 3, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
+                    child: content,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

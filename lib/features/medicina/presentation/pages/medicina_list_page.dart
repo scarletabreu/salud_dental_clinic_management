@@ -28,10 +28,6 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
   late final DeleteMedicina _deleteMedicina;
   final _searchController = TextEditingController();
   Timer? _debounce;
-
-  // Filtro adicional (en cliente) por efectos adversos de las
-  // contraindicaciones — el cubit no lo maneja, así que se aplica aquí
-  // sobre la lista ya filtrada por búsqueda/efecto secundario.
   final Set<EfectoAdverso> _efectosAdversosSeleccionados = {};
 
   @override
@@ -226,7 +222,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                         Navigator.pop(sheetContext);
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: ac.primaryBlue,
+                        backgroundColor: ac.primaryGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(
@@ -265,7 +261,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                 builder: (context, state) {
                   if (state is MedicinasLoading) {
                     return Center(
-                      child: CircularProgressIndicator(color: ac.primaryBlue),
+                      child: CircularProgressIndicator(color: ac.primaryGreen),
                     );
                   }
                   if (state is MedicinasError) {
@@ -297,16 +293,12 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // A Row would clip the counter badge once the title and the
-              // action button no longer fit; wrapping drops the button down.
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  // Título y contador: con texto ampliado el contador baja de
-                  // línea en vez de empujar el título fuera de la cabecera.
                   Wrap(
                     spacing: 12,
                     runSpacing: 4,
@@ -328,7 +320,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.07),
+                            color: ac.primaryGreen.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -339,14 +331,14 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: ac.primaryBlue,
+                                  color: ac.primaryGreen,
                                 ),
                               ),
                               const SizedBox(width: 4),
                               Icon(
                                 Icons.medication_outlined,
                                 size: 13,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                             ],
                           ),
@@ -361,7 +353,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryBlue,
+                      backgroundColor: ac.primaryGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 18,
@@ -421,7 +413,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ac.primaryBlue, width: 1.2),
+                    borderSide: BorderSide(color: ac.primaryGreen, width: 1.2),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -460,9 +452,6 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // El rótulo cede antes que el contador y la flecha: con el texto
-            // ampliado en 320 px la etiqueta entera no cabe, y sin holgura el
-            // botón desbordaba en vez de recortarse.
             const Flexible(
               child: Text('Efecto adverso', overflow: TextOverflow.ellipsis),
             ),
@@ -716,7 +705,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                     child: FilledButton(
                       onPressed: () => Navigator.pop(sheetContext),
                       style: FilledButton.styleFrom(
-                        backgroundColor: ac.primaryBlue,
+                        backgroundColor: ac.primaryGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(
@@ -825,7 +814,7 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: shown == total ? ac.primaryBlue : ac.amber,
+                color: shown == total ? ac.primaryGreen : ac.amber,
                 shape: BoxShape.circle,
               ),
             ),
@@ -1048,10 +1037,10 @@ class _MedicinaRowState extends State<_MedicinaRow> {
     final contras = widget.medicina.contraindicaciones;
 
     final fondoTarjeta = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.04)
+        ? ac.primaryGreen.withValues(alpha: 0.04)
         : ac.cardBg;
     final colorBorde = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.25)
+        ? ac.primaryGreen.withValues(alpha: 0.25)
         : ac.divider.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
@@ -1075,7 +1064,7 @@ class _MedicinaRowState extends State<_MedicinaRow> {
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(14),
-            hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
+            hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: compact
@@ -1091,13 +1080,15 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: ac.primaryBlue.withValues(alpha: 0.08),
+                                  color: ac.primaryGreen.withValues(
+                                    alpha: 0.08,
+                                  ),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   Icons.medication_outlined,
                                   size: 18,
-                                  color: ac.primaryBlue,
+                                  color: ac.primaryGreen,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -1240,13 +1231,13 @@ class _MedicinaRowState extends State<_MedicinaRow> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: ac.primaryBlue.withValues(alpha: .08),
+                color: ac.primaryGreen.withValues(alpha: .08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.medication_outlined,
                 size: 18,
-                color: ac.primaryBlue,
+                color: ac.primaryGreen,
               ),
             ),
             const SizedBox(width: 12),

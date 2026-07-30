@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/errors/guard.dart';
@@ -20,7 +21,7 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> faltaRegistro(String id){
+  Future<Either<Failure, bool>> faltaRegistro(String id) {
     return guard(
       () => remoteDataSource.esPersonaSinFichaClinica(id),
       context: 'verificar si es paciente',
@@ -28,7 +29,7 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
-  Future<Either<Failure, void>> addPaciente(Paciente paciente) {
+  Future<Either<Failure, String>> addPaciente(Paciente paciente) {
     return guard(
       () => remoteDataSource.addPaciente(PacienteModel.fromEntity(paciente)),
       context: 'agregar el paciente',
@@ -66,6 +67,20 @@ class PacienteRepositoryImpl implements IPacienteRepository {
     return guard(
       () => remoteDataSource.deletePaciente(id),
       context: 'eliminar el paciente',
+    );
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadFotoPaciente({
+    required String pacienteId,
+    required Uint8List bytes,
+  }) {
+    return guard(
+      () => remoteDataSource.uploadFotoPaciente(
+        pacienteId: pacienteId,
+        bytes: bytes,
+      ),
+      context: 'subir la foto del paciente',
     );
   }
 }

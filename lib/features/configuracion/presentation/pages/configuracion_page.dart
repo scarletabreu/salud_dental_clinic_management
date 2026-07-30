@@ -176,7 +176,7 @@ class _PageHeader extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue.withValues(alpha: 0.07),
+                      color: ac.primaryGreen.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -187,13 +187,13 @@ class _PageHeader extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: ac.primaryBlue,
+                                color: ac.primaryGreen,
                               ),
                         ),
                         const SizedBox(width: 4),
                         Icon(
                           Icons.tune_rounded,
-                          color: ac.primaryBlue,
+                          color: ac.primaryGreen,
                           size: 13,
                         ),
                       ],
@@ -239,13 +239,13 @@ class _SectionCard extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 10),
           child: Row(
             children: [
-              Icon(icon, size: 14, color: ac.primaryBlue),
+              Icon(icon, size: 14, color: ac.primaryGreen),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   title.toUpperCase(),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: ac.primaryBlue,
+                    color: ac.primaryGreen,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
                     fontSize: 10,
@@ -433,7 +433,7 @@ class _SwitchSettingRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: ac.primaryBlue,
+            activeThumbColor: ac.primaryGreen,
           ),
         ],
       ),
@@ -472,10 +472,10 @@ class _StyledDropdown<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.06),
+        color: ac.primaryGreen.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: ac.primaryBlue.withValues(alpha: 0.18),
+          color: ac.primaryGreen.withValues(alpha: 0.18),
           width: 1,
         ),
       ),
@@ -486,10 +486,10 @@ class _StyledDropdown<T> extends StatelessWidget {
           icon: Icon(
             Icons.expand_more_rounded,
             size: 16,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
@@ -542,13 +542,13 @@ class _VersionBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: ac.primaryBlue.withValues(alpha: 0.07),
+        color: ac.primaryGreen.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         '$version · b$buildNumber',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: ac.primaryBlue,
+          color: ac.primaryGreen,
           fontWeight: FontWeight.bold,
           fontSize: 11,
           letterSpacing: 0.4,

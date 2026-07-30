@@ -26,15 +26,15 @@ class DoctorModel extends Doctor {
     return DoctorModel(
       id: json['id'] as String?,
 
-      nombre: personaData['nombre'] as String? ?? '',
-      apellido: personaData['apellido'] as String? ?? '',
+      nombre: personaData['nombre'] as String? ?? 'nombre',
+      apellido: personaData['apellido'] as String? ?? 'apellido',
       birthDate: personaData['fecha_nacimiento'] != null
           ? DateTime.parse(personaData['fecha_nacimiento'])
           : DateTime.now(),
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
 
-      estatus: _parseEstatus(personaData['estatus'] as String?),
+      estatus: _calcularEstatus(usuarioData['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
       passwordHash: usuarioData['password_hash'] as String? ?? '',
 
@@ -49,13 +49,33 @@ class DoctorModel extends Doctor {
     );
   }
 
-  static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo;
+   factory DoctorModel.fromJsonFn(Map<String, dynamic> json) {
 
-    return EstatusPersona.values.firstWhere(
-      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo,
+    return DoctorModel(
+      id: json['doctor_id'] as String?,
+
+      nombre: json['nombre'] as String? ?? 'nombre',
+      apellido: json['apellido'] as String? ?? 'apellido',
+      birthDate: json['fecha_nacimiento'] != null
+          ? DateTime.parse(json['fecha_nacimiento'])
+          : DateTime.now(),
+      govID: json['cedula'] as String? ?? '',
+      contactos: [],
+      estatus: _calcularEstatus(json['deleted_at'] as String?),
+      username: json['username'] as String? ?? '',
+      passwordHash: json['password_hash'] as String? ?? '',
+
+      specialty: json['especialidad'] as String? ?? '',
+      isAvailable: json['esta_disponible'] as bool? ?? true,
+
+      assistants: []
     );
+  }
+
+  static EstatusPersona _calcularEstatus(String? deletedAtStr) {
+    return deletedAtStr == null
+        ? EstatusPersona.activo
+        : EstatusPersona.inactivo;
   }
 
   static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {

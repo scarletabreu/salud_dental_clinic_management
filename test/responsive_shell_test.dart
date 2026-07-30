@@ -1,39 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 
-const _labels = [
-  'Inicio',
-  'Mis Citas del Día',
-  'Consultas',
-  'Pacientes',
-  'Cuentas por Cobrar',
-  'Perfiles',
-  'Caja',
-  'Equipos',
-  'Medicinas',
-  'Tratamientos',
-  'Configuración',
-];
+const _ids = ShellDestinationId.values;
 
-List<ShellDestination> _destinations(List<String> labels) => [
-  for (final label in labels)
+List<ShellDestination> _destinations(List<ShellDestinationId> ids) => [
+  for (final id in ids)
     ShellDestination(
+      id: id,
       icon: Icons.circle_outlined,
       selectedIcon: Icons.circle,
-      label: label,
-      builder: (_) => Text(label),
+      label: id.name,
+      builder: (_) => Text(id.name),
     ),
 ];
 
 Widget _mobileShell(
-  List<String> labels,
+  List<ShellDestinationId> ids,
   ValueChanged<int> onSelect, {
   double textScale = 1,
+  ValueChanged<ShellDestinationId>? onNavigateTo,
 }) {
   return MaterialApp(
     theme: AppTheme.light,
@@ -46,13 +37,28 @@ Widget _mobileShell(
     home: Scaffold(
       body: const SizedBox.expand(),
       bottomNavigationBar: ShellMobileNavigation(
-        destinations: _destinations(labels),
+        destinations: _destinations(ids),
+        primaryDestinations: _destinations(ids.take(4).toList()),
         selectedIndex: 0,
         onDestinationSelected: onSelect,
+        onNavigateTo: onNavigateTo ?? (_) {},
       ),
     ),
   );
 }
+
+/// Opacidad del panel de módulos secundarios: 0 cerrado, 1 abierto.
+double _opacidadDelMenu(WidgetTester tester) => tester
+    .widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.text(ShellDestinationId.perfiles.name),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    )
+    .opacity
+    .value;
 
 void main() {
   final sizes = <double, ShellLayout>{
@@ -72,7 +78,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(_mobileShell(_labels, (_) {}));
+      await tester.pumpWidget(_mobileShell(_ids, (_) {}));
 
       expect(
         ShellLayoutResolution.of(
@@ -88,36 +94,43 @@ void main() {
     });
   }
 
-  testWidgets('mobile exposes every administrator module through Más', (
+  testWidgets('mobile exposes every secondary module through «Más módulos»', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    var selected = -1;
+    final navegados = <ShellDestinationId>[];
 
-    await tester.pumpWidget(_mobileShell(_labels, (index) => selected = index));
-    expect(
-      find.byKey(const ValueKey('mobile-navigation-Inicio')),
-      findsOneWidget,
+    await tester.pumpWidget(
+      _mobileShell(_ids, (_) {}, onNavigateTo: navegados.add),
     );
-    expect(find.byKey(const ValueKey('mobile-navigation-Más')), findsOneWidget);
-    expect(find.text('Perfiles'), findsNothing);
 
-    await tester.tap(find.text('Más'));
+    // Los cuatro primarios viven en la barra; el resto está montado pero
+    // invisible hasta abrir el menú.
+    expect(_opacidadDelMenu(tester), 0);
+
+    await tester.tap(find.bySemanticsLabel('Más módulos'));
     await tester.pumpAndSettle();
-    for (final label in _labels.skip(3)) {
+    expect(_opacidadDelMenu(tester), 1);
+
+    for (final id in _ids.skip(4)) {
       await tester.scrollUntilVisible(
-        find.text(label),
+        find.text(id.name),
         120,
         scrollable: find.byType(Scrollable).last,
       );
-      expect(find.text(label), findsOneWidget);
+      expect(find.text(id.name), findsOneWidget);
     }
 
-    await tester.tap(find.text('Configuración'));
+    await tester.scrollUntilVisible(
+      find.text(ShellDestinationId.configuracion.name),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text(ShellDestinationId.configuracion.name));
     await tester.pumpAndSettle();
-    expect(selected, _labels.indexOf('Configuración'));
+    expect(navegados, [ShellDestinationId.configuracion]);
     expect(tester.takeException(), isNull);
   });
 
@@ -128,24 +141,28 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(_mobileShell(_labels, (_) {}, textScale: 2));
-    expect(find.text('Más'), findsOneWidget);
+    await tester.pumpWidget(_mobileShell(_ids, (_) {}, textScale: 2));
+    expect(find.bySemanticsLabel('Más módulos'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('mobile navigation uses the sidebar visual language', (
     tester,
   ) async {
-    await tester.pumpWidget(_mobileShell(_labels, (_) {}));
+    await tester.pumpWidget(_mobileShell(_ids, (_) {}));
 
+    final verde = AppTheme.light.extension<AppColors>()!.primaryGreen;
     final itemDecorations = tester
         .widgetList<Container>(find.byType(Container))
         .map((container) => container.decoration)
         .whereType<BoxDecoration>();
 
+    // La barra no es un `NavigationBar` de serie: es una píldora redondeada
+    // con el verde de la marca, igual que el rail de escritorio.
     expect(
       itemDecorations.any(
-        (decoration) => decoration.borderRadius == BorderRadius.circular(12),
+        (decoration) =>
+            decoration.color == verde && decoration.borderRadius != null,
       ),
       isTrue,
     );
@@ -153,42 +170,161 @@ void main() {
   });
 
   test('permissions expose exactly the modules permitted by each role', () {
-    final admin = _labels
-        .where(
-          (label) => ShellDestinationAccess.allows(label, [RolUsuario.admin]),
-        )
+    final admin = _ids
+        .where((id) => ShellDestinationAccess.allows(id, [RolUsuario.admin]))
         .toList();
-    final doctor = _labels
-        .where(
-          (label) => ShellDestinationAccess.allows(label, [RolUsuario.doctor]),
-        )
+    final doctor = _ids
+        .where((id) => ShellDestinationAccess.allows(id, [RolUsuario.doctor]))
         .toList();
-    final assistant = _labels
+    final assistant = _ids
         .where(
-          (label) =>
-              ShellDestinationAccess.allows(label, [RolUsuario.asistente]),
+          (id) => ShellDestinationAccess.allows(id, [RolUsuario.asistente]),
         )
         .toList();
 
-    expect(admin, _labels);
+    expect(admin, _ids);
+    // El doctor ve todo menos Caja: gestionar caja es capacidad de admin y
+    // asistente. Perfiles, Equipos e Inventario siguen abiertos al doctor
+    // —así estaba antes de HFX-CLIN-000, que sólo sustituyó la comparación de
+    // roles por capacidades— y estrechar ese acceso se decide en HFX-CLIN-001.
     expect(doctor, [
-      'Inicio',
-      'Mis Citas del Día',
-      'Consultas',
-      'Pacientes',
-      'Cuentas por Cobrar',
-      'Medicinas',
-      'Tratamientos',
-      'Configuración',
+      ShellDestinationId.inicio,
+      ShellDestinationId.citasDelDia,
+      ShellDestinationId.consultas,
+      ShellDestinationId.pacientes,
+      ShellDestinationId.cuentasPorCobrar,
+      ShellDestinationId.tratamientos,
+      ShellDestinationId.procedimientos,
+      ShellDestinationId.diagnosticos,
+      ShellDestinationId.medicinas,
+      ShellDestinationId.inventario,
+      ShellDestinationId.perfiles,
+      ShellDestinationId.equipos,
+      ShellDestinationId.configuracion,
     ]);
+    expect(
+      doctor,
+      isNot(contains(ShellDestinationId.caja)),
+      reason: 'gestionar caja no es capacidad clínica',
+    );
     expect(assistant, [
-      'Inicio',
-      'Mis Citas del Día',
-      'Pacientes',
-      'Cuentas por Cobrar',
-      'Caja',
-      'Configuración',
+      ShellDestinationId.inicio,
+      ShellDestinationId.citasDelDia,
+      ShellDestinationId.pacientes,
+      ShellDestinationId.cuentasPorCobrar,
+      ShellDestinationId.caja,
+      ShellDestinationId.configuracion,
     ]);
+  });
+
+  test('renaming a destination label does not change its permissions', () {
+    final renamed = ShellDestination(
+      id: ShellDestinationId.consultas,
+      icon: Icons.circle_outlined,
+      selectedIcon: Icons.circle,
+      label: 'Clinical workspace',
+      builder: (_) => const SizedBox.shrink(),
+    );
+
+    expect(
+      ShellDestinationAccess.allows(renamed.id, [RolUsuario.doctor]),
+      isTrue,
+    );
+    expect(
+      ShellDestinationAccess.allows(renamed.id, [RolUsuario.asistente]),
+      isFalse,
+    );
+  });
+
+  test('each role sees only non-empty work sections in role order', () {
+    final sections = [
+      ShellSection(
+        title: 'Atención',
+        destinations: _destinations(const [
+          ShellDestinationId.inicio,
+          ShellDestinationId.citasDelDia,
+          ShellDestinationId.consultas,
+          ShellDestinationId.pacientes,
+        ]),
+      ),
+      ShellSection(
+        title: 'Facturación',
+        destinations: _destinations(const [
+          ShellDestinationId.cuentasPorCobrar,
+          ShellDestinationId.caja,
+        ]),
+      ),
+      ShellSection(
+        title: 'Catálogos',
+        destinations: _destinations(const [
+          ShellDestinationId.tratamientos,
+          ShellDestinationId.medicinas,
+          ShellDestinationId.inventario,
+        ]),
+      ),
+      ShellSection(
+        title: 'Administración',
+        destinations: _destinations(const [
+          ShellDestinationId.perfiles,
+          ShellDestinationId.equipos,
+        ]),
+      ),
+    ];
+
+    List<List<ShellDestinationId>> visibleFor(RolUsuario role) =>
+        ShellDestinationAccess.visibleSections(sections, [role])
+            .map(
+              (section) => section.destinations.map((item) => item.id).toList(),
+            )
+            .toList();
+
+    expect(visibleFor(RolUsuario.admin), [
+      [
+        ShellDestinationId.inicio,
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.consultas,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar, ShellDestinationId.caja],
+      [
+        ShellDestinationId.tratamientos,
+        ShellDestinationId.medicinas,
+        ShellDestinationId.inventario,
+      ],
+      [ShellDestinationId.perfiles, ShellDestinationId.equipos],
+    ]);
+    expect(visibleFor(RolUsuario.doctor), [
+      [
+        ShellDestinationId.inicio,
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.consultas,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar],
+      [
+        ShellDestinationId.tratamientos,
+        ShellDestinationId.medicinas,
+        ShellDestinationId.inventario,
+      ],
+      [ShellDestinationId.perfiles, ShellDestinationId.equipos],
+    ]);
+    expect(visibleFor(RolUsuario.asistente), [
+      [
+        ShellDestinationId.citasDelDia,
+        ShellDestinationId.inicio,
+        ShellDestinationId.pacientes,
+      ],
+      [ShellDestinationId.cuentasPorCobrar, ShellDestinationId.caja],
+    ]);
+
+    for (final role in RolUsuario.values) {
+      expect(
+        ShellDestinationAccess.visibleSections(sections, [role]),
+        everyElement(
+          predicate<ShellSection>((section) => section.destinations.isNotEmpty),
+        ),
+      );
+    }
   });
 
   test('landscape and keyboard remain compact', () {

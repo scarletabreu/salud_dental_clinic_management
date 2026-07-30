@@ -10,22 +10,37 @@ y reconstruir una instancia idéntica desde cero.
 
 ## 📌 Estado actual y línea base
 
-* **`supabase/schema.sql`**: línea base extraída de la instancia real con
-  `supabase db dump --linked`. **Refrescada el 25 jul 2026 (SD-135)**: 45 tablas,
-  27 tipos, 172 políticas RLS y las funciones/triggers vigentes. Sólo estructura,
-  sin datos.
-  Está al día con todas las migraciones listadas abajo, así que por sí sola
-  reconstruye la base completa.
+* **`supabase/migrations/`**: el canal válido para cambios de esquema, y desde
+  HFX-CLIN-000 (31 jul 2026) también el bootstrap. `supabase db reset` reconstruye
+  el proyecto entero sin intervención manual:
 
-  > Antes de ese refresco el archivo no definía **ninguna tabla** (sólo extensiones)
-  > y era imposible levantar el proyecto desde cero: la primera migración moría con
-  > `relation "public.cuotas" does not exist`. Si vuelve a quedar desfasado, se
-  > regenera con `supabase db dump --linked -f supabase/schema.sql`.
-* **`supabase/migrations/`**: cambios incrementales ordenados cronológicamente a partir
-  de la línea base. **Es el único canal válido para cambios de esquema.**
+  * `20260725000000_linea_base.sql` — esquema `public` completo, resultado de
+    aplicar en orden las 25 migraciones anteriores sobre la instancia validada;
+  * `20260725000100_linea_base_objetos_no_public.sql` — lo que un dump de esquema
+    no trae y sólo vivía en la instancia: los buckets de Storage
+    (`documentos-clinicos`, `fotos-pacientes`), sus políticas y la publicación de
+    realtime de `movimientos_caja`;
+  * las migraciones `2026073109…` del propio HFX-CLIN-000.
+
+* **`supabase/migrations_historicas/`**: las 25 migraciones anteriores al squash.
+  **No se borraron ni se aplican**: quedan como registro de cómo se llegó a la
+  línea base. Antes de este cambio no reconstruían nada —la primera asumía tablas
+  que ninguna creaba y otras cuatro abortaban con `already exists`—, que es
+  justamente por lo que se squashearon.
+
+* **`supabase/schema.sql`**: dump de referencia regenerado desde la base migrada.
+  Sirve para leer la estructura y para diffs; **ya no es el camino de bootstrap**.
+  Si queda desfasado se regenera con `supabase db dump --linked -f supabase/schema.sql`.
+
 * **`supabase/*.sql` (raíz)**: scripts históricos (`sd-81`, `sd-84`, `sd-96`, …) que se
   ejecutaron a mano antes de adoptar el CLI. Se conservan como registro. **No crear
   nuevos ni reejecutarlos**: varios ya quedaron desfasados respecto a la instancia.
+
+> ⚠️ **Sincronía con la instancia remota.** El squash dejó el historial local sin
+> correspondencia con `supabase_migrations.schema_migrations` de la instancia.
+> Antes del próximo `db push` hay que hacer un `supabase migration repair`
+> marcando la línea base como aplicada. **No se ha tocado nada remoto**, y no debe
+> tocarse sin decisión explícita.
 
 ---
 
@@ -93,31 +108,16 @@ select c.relname, t.tgname, p.proname
 
 ## 🛠️ Cómo reconstruir la BD desde cero
 
-Verificado de punta a punta el 25 jul 2026 contra una instancia local limpia:
+Verificado de punta a punta el 31 jul 2026 (HFX-CLIN-000) contra el stack local:
 
 ```bash
-supabase start                      # levanta el stack local
-export PGURL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-
-psql "$PGURL" -q -c "drop schema public cascade; create schema public;
-  grant all on schema public to postgres, anon, authenticated, service_role;"
-
-psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/schema.sql   # 1. estructura completa
-psql "$PGURL" -v ON_ERROR_STOP=1 -f supabase/seed.sql     # 2. día de caja de ejemplo
+supabase start     # levanta el stack local
+supabase db reset  # migraciones + seed, sin parches manuales
 ```
 
-`schema.sql` ya incluye todas las migraciones aplicadas hasta su fecha de dump, así
-que **no hay que reaplicarlas**. Sólo se aplican las migraciones *posteriores* al
-dump, con `supabase db push --linked`.
-
-> ⚠️ **`supabase db reset` no sirve para bootstrapear** este proyecto: aplica las
-> migraciones sobre una base vacía y la primera (`sd_103_plan_cuotas`) asume tablas
-> que ninguna migración crea. Usa el procedimiento de arriba.
->
-> Si aun así reaplicas migraciones sobre `schema.sql`, cuatro fallarán con
-> `already exists`: `sd_112_caja_diaria` (el `alter publication ... add table` no es
-> idempotente) y las tres de políticas RLS (`create policy` sin `drop policy if
-> exists` previo). Es ruido esperado, no un fallo de la base.
+Eso deja la base completa —esquema, buckets de Storage, realtime, el trigger
+`on_auth_user_created` y el seed de caja— y es lo que corre en la validación del
+ticket. No hay que cargar `schema.sql` a mano ni reaplicar nada.
 
 ---
 
@@ -144,32 +144,47 @@ así que no dejan datos, y abortan con `ERROR` si el contrato se rompe.
 | Script | Qué verifica |
 |---|---|
 | `tests/sd_111_trigger_caja_test.sql` | `pagos_registrar_ingreso_caja`: un pago `completado` genera **un** ingreso en la caja abierta de hoy; un pago pendiente no la toca; sin caja abierta el pago se rechaza (P0001) y no se persiste; la caja de ayer no habilita el cobro de hoy; no revivió el trigger duplicado `tr_pago_a_movimiento_caja`. |
+| `tests/sd_169_paciente_inactivo_test.sql` | `cancelar_citas_paciente_inactivo` (SD-169): pasar un paciente a inactivo **no falla** (antes moría con `42703`) y cancela sus citas futuras vivas (`programada`, `confirmada`, `en_espera`); deja intactas las `en_consulta`, las pasadas, las terminales y las de otros pacientes; la cita con **consulta abierta** ni se cancela ni aborta la baja (regla de SD-160); reactivar o reenviar el mismo `estatus` no vuelve a barrer la agenda. |
 | `tests/sd_135_plan_tratamiento_test.sql` | Separación evaluación / plan / ejecución (SD-135/SD-138): registrar hallazgos **no** crea tratamiento aplicado ni cuenta; una actividad todavía `propuesto` no se puede ejecutar; una ejecución aceptada completa su actividad planificada; el flujo unificado admite una intervención agregada durante la consulta sin justificación obligatoria y conserva su auditoría; `finalizar_consulta` cobra solo lo ejecutado e ignora lo planificado, y es idempotente. |
+| `tests/hfx_clin_000_identidad_admin_doctor_test.sql` | Identidad admin-doctor (HFX-CLIN-000): el alta de **admin** crea `usuarios` + `doctores` + `admins` con el UUID de Auth (antes `personas.id` era aleatorio y toda la RLS `id = auth.uid()` fallaba); la de **doctor** no crea fila de admin y la de **asistente** no otorga identidad clínica; un alta con campos obligatorios inválidos se revierte entera; la FK `admins.id → doctores.id` está activa; `perfil_actual()` devuelve el contrato de cada rol y nunca una contraseña; el admin aparece en `get_active_doctors()` y puede firmar su propia consulta; `anon` no ejecuta ninguna de las dos funciones. |
+| `tests/sd_146_cita_actividades_test.sql` | Vínculo cita ↔ actividades planificadas (SD-146): una cita puede cubrir varias actividades del plan de **su** paciente; `trg_validar_cita_item_plan` rechaza la actividad de otro paciente, la retirada del plan (`deleted_at`) y la ya rechazada/cancelada/completada; `resumen_actividades_cita` devuelve nombre del tratamiento y pieza FDI; `actividades_agendables_paciente` excluye lo rechazado y lo retirado; el **asistente** —que es quien agenda y no puede leer `items_plan_tratamiento`— sí lee las vistas y gestiona los vínculos; borrar la cita se lleva los suyos. |
 
 ```bash
-# Contra la base local levantada por el CLI
+# Contra la base local levantada por el CLI: las cinco suites de una pasada
 supabase db reset
-psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" \
-  -v ON_ERROR_STOP=1 -f supabase/tests/sd_111_trigger_caja_test.sql
+PGURL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+for t in supabase/tests/*.sql; do psql "$PGURL" -v ON_ERROR_STOP=1 -f "$t"; done
 
 # Contra una instancia remota (usar SIEMPRE una de staging, nunca producción)
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/sd_111_trigger_caja_test.sql
 ```
 
-Salida esperada: seis líneas `NOTICE  OK ...` y un `ROLLBACK` final. Cualquier
-`ERROR` es un fallo real del trigger, no del script.
+Salida esperada: las líneas `NOTICE  OK ...` de cada script y un `ROLLBACK` final.
+Cualquier `ERROR` es un fallo real del contrato, no del script.
 
 El script **no asume el estado de la base**: si encuentra una caja abierta la cierra
 dentro de su propia transacción (el `ROLLBACK` la devuelve intacta), porque si no el
 caso 3 —"sin caja abierta el pago se rechaza"— no probaría nada. Por eso se puede
 correr con el seed ya cargado, o contra una instancia con la jornada en curso.
 
-> ⚠️ **Ojo con el bootstrap desde cero.** `supabase db reset` sigue sin servir: aplica
-> las migraciones sobre una base vacía y la primera (`20260720190000_sd_103_plan_cuotas.sql`)
-> muere con `relation "public.cuotas" does not exist`. Usa el procedimiento de
-> «Cómo reconstruir la BD desde cero» (cargar `schema.sql` y luego `seed.sql`), que sí
-> deja la base completa: verificado el 25 jul 2026 cargando la línea base en una base
-> limpia y corriendo `tests/sd_135_plan_tratamiento_test.sql` sobre ella.
+### Smoke de sesión por rol
+
+`tests/hfx_clin_000_smoke_login_agenda.sh` recorre contra el stack **local** el
+mismo camino que el navegador: alta por Auth (que dispara `handle_new_user`),
+login con contraseña de los tres roles, `perfil_actual()`, `get_active_doctors()`
+y la lectura de `citas`. Comprueba además que el admin sale agendable, que
+ninguna respuesta trae `password_hash` y que `anon` no ejecuta nada. Crea sus
+usuarios con un sufijo aleatorio y los borra al terminar; no toca ninguna
+instancia remota.
+
+```bash
+supabase db reset
+./supabase/tests/hfx_clin_000_smoke_login_agenda.sh
+```
+
+> ✅ **Bootstrap desde cero.** Desde HFX-CLIN-000 el `supabase db reset` de arriba
+> deja la base lista para correr las cinco suites: verificado el 31 jul 2026 sobre
+> una base recién reconstruida.
 
 ### Verificación manual equivalente
 

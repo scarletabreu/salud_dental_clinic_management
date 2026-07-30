@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 
 class PanelPaciente extends StatelessWidget {
   final Paciente paciente;
@@ -150,31 +151,14 @@ class _IdentityHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iniciales =
-        '${paciente.nombre.isNotEmpty ? paciente.nombre[0] : ''}'
-        '${paciente.apellido.isNotEmpty ? paciente.apellido[0] : ''}';
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: ac.primaryBlue,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              iniciales.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                letterSpacing: 0.5,
-              ),
-            ),
+          PacienteAvatar(
+            paciente: paciente,
+            size: 48,
+            backgroundColor: ac.primaryGreen,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -197,13 +181,13 @@ class _IdentityHeader extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: ac.primaryBlue.withValues(alpha: 0.08),
+                    color: ac.primaryGreen.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _capitalize(paciente.tipoPaciente.name),
                     style: TextStyle(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -277,7 +261,7 @@ class _InfoCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = item.highlight
-        ? (item.highlightColor ?? ac.primaryBlue)
+        ? (item.highlightColor ?? ac.primaryGreen)
         : ac.teal;
 
     return Container(

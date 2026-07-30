@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/enums/categoria_condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/enums/tipo_condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/efecto_adverso.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/enums/tipo_contraindicacion.dart';
@@ -32,7 +37,7 @@ InputDecoration _sharedInputDeco(
   ),
   focusedBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(10),
-    borderSide: BorderSide(color: ac.primaryBlue, width: 1.0),
+    borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
   ),
   errorBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(10),
@@ -170,7 +175,10 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                       children: [
                         Text(
                           'Inventario',
-                          style: TextStyle(fontSize: 11, color: ac.primaryBlue),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ac.primaryGreen,
+                          ),
                         ),
                         Icon(
                           Icons.chevron_right,
@@ -231,7 +239,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                     : const Icon(Icons.save_outlined, size: 16),
                 label: const Text('Guardar'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryBlue,
+                  backgroundColor: ac.primaryGreen,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -256,8 +264,8 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
   Widget _buildInfoCard(AppColors ac) {
     return _FormCard(
       ac: ac,
-      iconColor: ac.primaryBlue,
-      iconBg: ac.primaryBlue.withOpacity(0.10),
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
       icon: Icons.medication_outlined,
       title: 'Información general',
       child: _FormField(
@@ -347,7 +355,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                 color: const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFFD97706).withOpacity(0.40),
+                  color: const Color(0xFFD97706).withValues(alpha: 0.40),
                 ),
               ),
               child: Text(
@@ -369,19 +377,19 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     return _FormCard(
       ac: ac,
       iconColor: ac.red,
-      iconBg: ac.red.withOpacity(0.10),
+      iconBg: ac.red.withValues(alpha: 0.10),
       icon: Icons.block_rounded,
       title: 'Contraindicaciones',
       subtitle: 'Condiciones en las que no se debe usar este medicamento.',
       action: TextButton.icon(
         onPressed: () => _showContraindicacionDialog(context),
-        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryBlue),
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
         label: Text(
           'Agregar',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: ac.primaryBlue,
+            color: ac.primaryGreen,
           ),
         ),
         style: TextButton.styleFrom(
@@ -403,7 +411,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                   Icon(
                     Icons.shield_outlined,
                     size: 26,
-                    color: ac.textMuted.withOpacity(0.5),
+                    color: ac.textMuted.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -434,7 +442,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                       color: ac.bgPage,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: ac.red.withOpacity(0.25),
+                        color: ac.red.withValues(alpha: 0.25),
                         width: 0.5,
                       ),
                     ),
@@ -445,7 +453,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                           width: 30,
                           height: 30,
                           decoration: BoxDecoration(
-                            color: ac.red.withOpacity(0.10),
+                            color: ac.red.withValues(alpha: 0.10),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -470,7 +478,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                                     decoration: BoxDecoration(
                                       color: isAbsoluta
                                           ? ac.red
-                                          : ac.red.withOpacity(0.60),
+                                          : ac.red.withValues(alpha: 0.60),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -505,12 +513,16 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: ac.red.withOpacity(0.08),
+                                            color: ac.red.withValues(
+                                              alpha: 0.08,
+                                            ),
                                             borderRadius: BorderRadius.circular(
                                               4,
                                             ),
                                             border: Border.all(
-                                              color: ac.red.withOpacity(0.25),
+                                              color: ac.red.withValues(
+                                                alpha: 0.25,
+                                              ),
                                             ),
                                           ),
                                           child: Text(
@@ -551,7 +563,7 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
                             child: Icon(
                               Icons.delete_outline_rounded,
                               size: 15,
-                              color: ac.red.withOpacity(0.70),
+                              color: ac.red.withValues(alpha: 0.70),
                             ),
                           ),
                         ),
@@ -571,13 +583,18 @@ class _MedicinaFormPageState extends State<MedicinaFormPage> {
     final existing = index != null ? _contraindicaciones[index] : null;
     final result = await showDialog<Contraindicacion>(
       context: context,
-      builder: (_) => _ContraindicacionDialog(existing: existing),
+      builder: (_) => _ContraindicacionDialog(
+        existing: existing,
+        medicinaIdReal: widget.medicina?.id,
+      ),
     );
     if (result == null) return;
     setState(() {
-      index != null
-          ? _contraindicaciones[index] = result
-          : _contraindicaciones.add(result);
+      if (index != null) {
+        _contraindicaciones[index] = result;
+      } else {
+        _contraindicaciones.add(result);
+      }
     });
   }
 }
@@ -639,7 +656,7 @@ class _FormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              ?action,
+              if (action != null) action!,
             ],
           ),
           if (subtitle != null) ...[
@@ -680,7 +697,7 @@ class _FormField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 13, color: ac.primaryBlue),
+            Icon(icon, size: 13, color: ac.primaryGreen),
             const SizedBox(width: 5),
             Text(
               label.toUpperCase(),
@@ -730,10 +747,12 @@ class _ChipSelector<T> extends StatelessWidget {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isActive ? activeColor.withOpacity(0.10) : ac.bgPage,
+              color: isActive ? activeColor.withValues(alpha: 0.10) : ac.bgPage,
               borderRadius: BorderRadius.circular(100),
               border: Border.all(
-                color: isActive ? activeColor.withOpacity(0.50) : ac.divider,
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.50)
+                    : ac.divider,
                 width: isActive ? 1.0 : 0.5,
               ),
             ),
@@ -763,7 +782,9 @@ class _ChipSelector<T> extends StatelessWidget {
 
 class _ContraindicacionDialog extends StatefulWidget {
   final Contraindicacion? existing;
-  const _ContraindicacionDialog({this.existing});
+  final String? medicinaIdReal;
+
+  const _ContraindicacionDialog({this.existing, this.medicinaIdReal});
 
   @override
   State<_ContraindicacionDialog> createState() =>
@@ -776,6 +797,10 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
   late TipoContraindicacion _tipo;
   late Set<EfectoAdverso> _efectosAdversos;
 
+  String? _condicionId;
+  List<Condicion> _condicionesDisponibles = [];
+  bool _loadingCondiciones = true;
+
   @override
   void initState() {
     super.initState();
@@ -785,6 +810,197 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
     _tipo =
         widget.existing?.tipoContraindicacion ?? TipoContraindicacion.relativa;
     _efectosAdversos = Set.from(widget.existing?.efectosAdversos ?? []);
+
+    if (widget.existing != null && widget.existing!.condicionId != 'TODO') {
+      _condicionId = widget.existing!.condicionId;
+    }
+
+    _cargarCondiciones();
+  }
+
+  Future<void> _cargarCondiciones() async {
+    try {
+      final list = await sl<CondicionRepository>().getCondiciones();
+      if (!mounted) return;
+      setState(() {
+        _condicionesDisponibles = List.from(list);
+        _loadingCondiciones = false;
+
+        if (_condicionId == null && _condicionesDisponibles.isNotEmpty) {
+          _condicionId = _condicionesDisponibles.first.id;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingCondiciones = false);
+    }
+  }
+
+  Future<Condicion?> _mostrarDialogoNuevaCondicion(BuildContext context) async {
+    final ac = context.appColors;
+    final nombreCtrl = TextEditingController();
+    TipoCondicion tipoSeleccionado = TipoCondicion.fisiologica;
+    CategoriaCondicion categoriaSeleccionada = CategoriaCondicion.cronica;
+    final formKeyCondicion = GlobalKey<FormState>();
+    bool savingCondicion = false;
+
+    return showDialog<Condicion>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: ac.cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: ac.primaryGreen.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.health_and_safety_outlined,
+                      size: 16,
+                      color: ac.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Nueva Condición Médica',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              content: Form(
+                key: formKeyCondicion,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: nombreCtrl,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: _sharedInputDeco(
+                          ac,
+                          hint: 'Ej. Diabetes Mellitus',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Ingresa el nombre'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<TipoCondicion>(
+                        initialValue: tipoSeleccionado,
+                        decoration: _sharedInputDeco(ac, hint: 'Tipo'),
+                        items: TipoCondicion.values.map((t) {
+                          return DropdownMenuItem(
+                            value: t,
+                            child: Text(t.displayName),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() => tipoSeleccionado = v);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<CategoriaCondicion>(
+                        initialValue: categoriaSeleccionada,
+                        decoration: _sharedInputDeco(ac, hint: 'Categoría'),
+                        items: CategoriaCondicion.values.map((c) {
+                          return DropdownMenuItem(
+                            value: c,
+                            child: Text(c.displayName),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() => categoriaSeleccionada = v);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: savingCondicion
+                      ? null
+                      : () => Navigator.pop(dialogCtx),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ac.primaryGreen,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: savingCondicion
+                      ? null
+                      : () async {
+                          if (!formKeyCondicion.currentState!.validate())
+                            return;
+                          setDialogState(() => savingCondicion = true);
+
+                          try {
+                            final borrador = Condicion(
+                              nombre: nombreCtrl.text.trim(),
+                              tipo: tipoSeleccionado,
+                              categoria: categoriaSeleccionada,
+                            );
+
+                            final nuevaCondicionGuardada =
+                                await sl<CondicionRepository>()
+                                    .registrarNuevaCondicion(borrador);
+
+                            if (!dialogCtx.mounted) return;
+                            Navigator.pop(dialogCtx, nuevaCondicionGuardada);
+                          } catch (e) {
+                            if (!dialogCtx.mounted) return;
+                            setDialogState(() => savingCondicion = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error al crear condición: $e'),
+                              ),
+                            );
+                          }
+                        },
+                  child: savingCondicion
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Crear'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -795,14 +1011,30 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
 
   void _confirm() {
     if (!_formKey.currentState!.validate()) return;
+    if (_condicionId == null || _condicionId!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor selecciona una condición médica.'),
+        ),
+      );
+      return;
+    }
+
+    final idMedicinaValida =
+        (widget.medicinaIdReal != null &&
+            widget.medicinaIdReal!.trim().isNotEmpty &&
+            widget.medicinaIdReal!.contains('-'))
+        ? widget.medicinaIdReal!.trim()
+        : '00000000-0000-0000-0000-000000000000';
+
     Navigator.pop(
       context,
       Contraindicacion(
         id: widget.existing?.id,
-        condicionId: 'TODO',
-        medicinaId: widget.existing?.medicinaId ?? '',
-        procedimientoId: widget.existing?.procedimientoId ?? '',
-        tratamientoId: widget.existing?.tratamientoId ?? '',
+        condicionId: _condicionId!,
+        medicinaId: idMedicinaValida,
+        procedimientoId: null,
+        tratamientoId: null,
         descripcion: _descripcionController.text.trim(),
         tipoContraindicacion: _tipo,
         efectosAdversos: _efectosAdversos.toList(),
@@ -835,7 +1067,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: ac.red.withOpacity(0.10),
+                          color: ac.red.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -863,8 +1095,92 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
 
                   _FormField(
                     ac: ac,
+                    icon: Icons.health_and_safety_outlined,
+                    label: 'Condición médica *',
+                    child: _loadingCondiciones
+                        ? const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  key: ValueKey(_condicionId),
+                                  value: _condicionId,
+                                  decoration: _sharedInputDeco(
+                                    ac,
+                                    hint: 'Seleccionar condición',
+                                  ),
+                                  items: _condicionesDisponibles.map((c) {
+                                    return DropdownMenuItem<String>(
+                                      value: c.id,
+                                      child: Text(
+                                        c.nombre,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  validator: (val) =>
+                                      (val == null || val.trim().isEmpty)
+                                      ? 'Selecciona una condición médica'
+                                      : null,
+                                  onChanged: (val) =>
+                                      setState(() => _condicionId = val),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              Tooltip(
+                                message: 'Crear nueva condición médica',
+                                child: InkWell(
+                                  onTap: () async {
+                                    final creada =
+                                        await _mostrarDialogoNuevaCondicion(
+                                          context,
+                                        );
+                                    if (creada != null && creada.id != null) {
+                                      setState(() {
+                                        _condicionesDisponibles = [
+                                          ..._condicionesDisponibles,
+                                          creada,
+                                        ];
+                                        _condicionId = creada.id;
+                                      });
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    height: 44,
+                                    width: 44,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: ac.primaryGreen.withValues(
+                                        alpha: 0.10,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: ac.primaryGreen.withValues(
+                                          alpha: 0.30,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.add_rounded,
+                                      color: ac.primaryGreen,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  _FormField(
+                    ac: ac,
                     icon: Icons.notes_rounded,
-                    label: 'Descripción',
+                    label: 'Descripción *',
                     child: TextFormField(
                       controller: _descripcionController,
                       textCapitalization: TextCapitalization.sentences,
@@ -878,43 +1194,6 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? 'La descripción no puede estar vacía'
                           : null,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  _FormField(
-                    ac: ac,
-                    icon: Icons.local_hospital_outlined,
-                    label: 'Condición médica',
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: ac.amber.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: ac.amber.withOpacity(0.25)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            size: 16,
-                            color: ac.amber,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Próximamente podrás asociar esta contraindicación '
-                              'a una condición médica del catálogo.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: ac.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -957,12 +1236,12 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? ac.red.withOpacity(0.08)
+                                  ? ac.red.withValues(alpha: 0.08)
                                   : ac.bgPage,
                               borderRadius: BorderRadius.circular(100),
                               border: Border.all(
                                 color: selected
-                                    ? ac.red.withOpacity(0.50)
+                                    ? ac.red.withValues(alpha: 0.50)
                                     : ac.divider,
                                 width: selected ? 1.0 : 0.5,
                               ),
@@ -1008,7 +1287,7 @@ class _ContraindicacionDialogState extends State<_ContraindicacionDialog> {
                       FilledButton(
                         onPressed: _confirm,
                         style: FilledButton.styleFrom(
-                          backgroundColor: ac.primaryBlue,
+                          backgroundColor: ac.primaryGreen,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,

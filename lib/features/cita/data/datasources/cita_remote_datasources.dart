@@ -1,33 +1,27 @@
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/features/cita/data/models/actividad_planificada_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
 class CitaRemoteDataSource {
   final SupabaseClient supabase;
 
   CitaRemoteDataSource(this.supabase);
 
+  /// Citas reales de la base. Un fallo de red, de RLS o de esquema se propaga
+  /// para que el guard del repositorio lo convierta en un `Failure` tipado y la
+  /// agenda pinte su estado de error: nunca se sustituye por datos inventados.
   Future<List<CitaModel>> fetchCitas() async {
-    try {
-      final citasRes = await supabase
-          .from('citas')
-          .select('*')
-          .filter('deleted_at', 'is', null);
+    final citasRes = await supabase
+        .from('citas')
+        .select('*')
+        .filter('deleted_at', 'is', null);
 
-      final raw = citasRes as List;
-      if (raw.isEmpty) return _citasPrueba;
-
-      final real = await _assembleCitas(raw);
-      return real.isEmpty ? _citasPrueba : real;
-    } catch (e, stack) {
-      AppLog.error('fetchCitas', e, stack);
-      return _citasPrueba;
-    }
+    return _assembleCitas(citasRes as List);
   }
 
   Future<List<CitaModel>> fetchCitasByPaciente(String pacienteId) async {
@@ -53,65 +47,88 @@ class CitaRemoteDataSource {
   Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
     if (rawCitas.isEmpty) return [];
 
-    final doctorIds = rawCitas
-        .map((c) => (c as Map<String, dynamic>)['doctor_id'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList();
-
     final personaIds = rawCitas
-        .map((c) => (c as Map<String, dynamic>)['persona_id'] as String?)
-        .whereType<String>()
+        .where((c) => (c as Map<String, dynamic>)['persona_id'] != null)
+        .map((c) => (c as Map<String, dynamic>)['persona_id'] as String)
         .toSet()
         .toList();
 
-    final Map<String, Map<String, dynamic>> doctorPersonas = {};
-    if (doctorIds.isNotEmpty) {
-      final res = await supabase
-          .from('personas')
-          .select('*')
-          .inFilter('id', doctorIds);
-      for (final row in res as List) {
-        final m = row as Map<String, dynamic>;
-        doctorPersonas[m['id'] as String] = m;
-      }
-    }
-    final Map<String, Map<String, dynamic>> pacientes = {};
-    if (personaIds.isNotEmpty) {
-      final res = await supabase
-          .from('pacientes')
-          .select(
-            '*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)',
-          )
-          .inFilter('id', personaIds);
-      for (final row in res as List) {
-        final m = row as Map<String, dynamic>;
-        pacientes[m['id'] as String] = m;
-      }
-
-      final missing = personaIds
-          .where((id) => !pacientes.containsKey(id))
-          .toList();
-      if (missing.isNotEmpty) {
-        final fallback = await supabase
-            .from('personas')
-            .select('*')
-            .inFilter('id', missing);
-        for (final row in fallback as List) {
-          final m = row as Map<String, dynamic>;
-          pacientes[m['id'] as String] = {'id': m['id'], 'personas': m};
+    // 1. OBTENER DOCTORES USANDO EL RPC SEGURO (Bypass / Respeta RLS correctamente)
+    final Map<String, Map<String, dynamic>> doctorMaps = {};
+    try {
+      final responseDoctores = await supabase.rpc('get_active_doctors');
+      for (final docJson in (responseDoctores as List)) {
+        final m = docJson as Map<String, dynamic>;
+        final id = m['doctor_id'] as String?;
+        if (id != null) {
+          doctorMaps[id] = m;
         }
       }
+    } catch (e) {
+      AppLog.error('Error cargando doctores en _assembleCitas', e);
     }
+
+    // 2. Obtener pacientes (esto suele tener menos restricciones o permisos distintos)
+    final Map<String, Map<String, dynamic>> pacientes = {};
+    if (personaIds.isNotEmpty) {
+      try {
+        final res = await supabase
+            .from('pacientes')
+            .select(
+              '*, personas(id, nombre, apellido, fecha_nacimiento, cedula, estatus)',
+            )
+            .inFilter('id', personaIds);
+        for (final row in res as List) {
+          final m = row as Map<String, dynamic>;
+          if (m['id'] != null) {
+            pacientes[m['id'] as String] = m;
+          }
+        }
+
+        final missing = personaIds
+            .where((id) => !pacientes.containsKey(id))
+            .toList();
+        if (missing.isNotEmpty) {
+          final fallback = await supabase
+              .from('personas')
+              .select('*')
+              .inFilter('id', missing);
+          for (final row in fallback as List) {
+            final m = row as Map<String, dynamic>;
+            final id = m['id'] as String?;
+            if (id != null) {
+              pacientes[id] = {'id': id, 'personas': m};
+            }
+          }
+        }
+      } catch (e) {
+        AppLog.error('Error cargando pacientes en _assembleCitas', e);
+      }
+    }
+
+    // 2b. Actividades planificadas de cada cita (SD-146). Se piden en un solo
+    // viaje para que la agenda pueda mostrar el resumen sin ir al servidor en
+    // cada hover. Es información accesoria: si falla, las citas se ven igual.
+    final citaIds = rawCitas
+        .map((c) => (c as Map<String, dynamic>)['id'] as String?)
+        .whereType<String>()
+        .toList();
+    final actividadesPorCita = await _fetchActividadesDeCitas(citaIds);
+
     final List<CitaModel> result = [];
 
+    // 3. Ensamblar las citas combinando la información obtenida
     for (final c in rawCitas) {
       try {
         final json = Map<String, dynamic>.from(c as Map);
+        final doctorId = json['doctor_id'] as String?;
+        json['actividades'] = actividadesPorCita[json['id']] ?? const [];
 
-        final dp = doctorPersonas[json['doctor_id'] as String?] ?? {};
+        // Obtenemos los datos del doctor desde el mapa construido con el RPC
+        final dp = (doctorId != null ? doctorMaps[doctorId] : null) ?? {};
+
         json['doctor'] = {
-          'id': json['doctor_id'],
+          'doctor_id': doctorId,
           'nombre': dp['nombre'] ?? '',
           'apellido': dp['apellido'] ?? '',
           'fecha_nacimiento': dp['fecha_nacimiento'] ?? '2000-01-01',
@@ -121,12 +138,10 @@ class CitaRemoteDataSource {
           'password_hash': dp['password_hash'] ?? '',
           'especialidad': dp['especialidad'] ?? '',
           'esta_disponible': dp['esta_disponible'] ?? true,
-          'assistants': <dynamic>[],
-          'contacto': const {
-            'email': '',
-            'numero_telefono': '',
-            'direccion': '',
-          },
+          'assistants': dp['assistants'] ?? <dynamic>[],
+          'contacto':
+              dp['contacto'] ??
+              const {'email': '', 'numero_telefono': '', 'direccion': ''},
         };
 
         final pac = pacientes[json['persona_id'] as String?] ?? {};
@@ -149,6 +164,57 @@ class CitaRemoteDataSource {
     return result;
   }
 
+  /// Resumen de las actividades de un lote de citas, agrupado por `cita_id`.
+  ///
+  /// Lee la vista `resumen_actividades_cita` y no las tablas del plan: el
+  /// asistente que gestiona la agenda no tiene permiso de lectura sobre
+  /// `items_plan_tratamiento` ni sobre el catálogo de tratamientos (SD-146).
+  Future<Map<String, List<Map<String, dynamic>>>> _fetchActividadesDeCitas(
+    List<String> citaIds,
+  ) async {
+    if (citaIds.isEmpty) return const {};
+    try {
+      final res = await supabase
+          .from('resumen_actividades_cita')
+          .select()
+          .inFilter('cita_id', citaIds);
+
+      final agrupadas = <String, List<Map<String, dynamic>>>{};
+      for (final row in res as List) {
+        final fila = Map<String, dynamic>.from(row as Map);
+        final citaId = fila['cita_id'] as String?;
+        if (citaId == null) continue;
+        agrupadas.putIfAbsent(citaId, () => []).add(fila);
+      }
+      return agrupadas;
+    } catch (e) {
+      AppLog.error('actividades planificadas de las citas', e);
+      return const {};
+    }
+  }
+
+  /// Actividades del plan de [pacienteId] que todavía pueden agendarse.
+  ///
+  /// A diferencia de las anteriores, un fallo aquí sí se propaga: el formulario
+  /// tiene que distinguir «este paciente no tiene actividades pendientes» de
+  /// «no se pudieron cargar», o el usuario agendaría a ciegas.
+  Future<List<ActividadPlanificada>> fetchActividadesAgendables(
+    String pacienteId,
+  ) async {
+    final res = await supabase
+        .from('actividades_agendables_paciente')
+        .select()
+        .eq('paciente_id', pacienteId)
+        .order('orden');
+
+    return [
+      for (final row in res as List)
+        ActividadPlanificadaModel.fromJson(
+          Map<String, dynamic>.from(row as Map),
+        ),
+    ];
+  }
+
   Future<void> addCita(CitaModel cita) async {
     final data = cita.toJson();
 
@@ -160,7 +226,74 @@ class CitaRemoteDataSource {
     data['created_at'] = now;
     data['updated_at'] = now;
 
-    await supabase.from('citas').insert(data);
+    final fila = await supabase
+        .from('citas')
+        .insert(data)
+        .select('id')
+        .single();
+    await _vincularActividades(fila['id'] as String, cita.actividades);
+  }
+
+  /// Reemplaza los vínculos de la cita por [actividades].
+  ///
+  /// Se hace en dos pasos (borrar los que sobran, insertar los que faltan) en
+  /// vez de borrar todo y reinsertar: así reprogramar una cita sin tocar sus
+  /// actividades no pierde el `created_at` del vínculo.
+  Future<void> _sincronizarActividades(
+    String citaId,
+    List<ActividadPlanificada> actividades,
+  ) async {
+    final deseados = {for (final a in actividades) a.itemPlanId};
+
+    final actuales = await supabase
+        .from('citas_items_plan')
+        .select('item_plan_id')
+        .eq('cita_id', citaId);
+    final existentes = {
+      for (final row in actuales as List)
+        (row as Map<String, dynamic>)['item_plan_id'] as String,
+    };
+
+    final sobran = existentes.difference(deseados);
+    if (sobran.isNotEmpty) {
+      await supabase
+          .from('citas_items_plan')
+          .delete()
+          .eq('cita_id', citaId)
+          .inFilter('item_plan_id', sobran.toList());
+    }
+
+    final faltan = deseados.difference(existentes);
+    if (faltan.isNotEmpty) {
+      await supabase.from('citas_items_plan').insert([
+        for (final itemPlanId in faltan)
+          {'cita_id': citaId, 'item_plan_id': itemPlanId},
+      ]);
+    }
+  }
+
+  /// Vincula las actividades de una cita recién creada.
+  ///
+  /// La cita ya existe cuando esto corre, así que un fallo aquí deja una cita
+  /// sin sus actividades. El mensaje lo dice explícitamente para que nadie la
+  /// vuelva a crear pensando que no se guardó: el trigger
+  /// `trg_validar_cita_item_plan` solo rechaza lo que el formulario no ofrece
+  /// (actividad de otro paciente, retirada o ya cerrada), así que llegar aquí es
+  /// un defecto o una caída de red.
+  Future<void> _vincularActividades(
+    String citaId,
+    List<ActividadPlanificada> actividades,
+  ) async {
+    if (actividades.isEmpty) return;
+    try {
+      await _sincronizarActividades(citaId, actividades);
+    } catch (e) {
+      AppLog.error('vincular actividades de la cita $citaId', e);
+      throw ServerFailure(
+        'La cita se guardó, pero no se pudieron vincular sus actividades del '
+        'plan: $e. Edítala para volver a seleccionarlas.',
+      );
+    }
   }
 
   Future<void> updateCita(CitaModel cita) async {
@@ -174,9 +307,11 @@ class CitaRemoteDataSource {
       'duracion_minutos': cita.duracionMinutos,
       'es_emergencia': cita.esEmergencia,
       'estado': cita.estado.dbValue,
+      'motivo': CitaModel.normalizarMotivo(cita.motivo),
       'updated_at': DateTime.now().toIso8601String(),
     };
     await supabase.from('citas').update(data).eq('id', cita.id!);
+    await _sincronizarActividades(cita.id!, cita.actividades);
   }
 
   Future<void> deleteCita(String id) async {
@@ -189,20 +324,45 @@ class CitaRemoteDataSource {
         .eq('id', id);
   }
 
-  /// Devuelve el estado actual de la cita en la BD, o `null` si no existe
-  /// (p. ej. datos de prueba con ids que no son UUID).
-  Future<EstadoCita?> fetchEstadoCita(String id) async {
-    try {
-      final res = await supabase
-          .from('citas')
-          .select('estado')
-          .eq('id', id)
-          .maybeSingle();
-      if (res == null) return null;
-      return EstadoCita.fromDb(res['estado'] as String?);
-    } on PostgrestException {
-      return null;
+  /// Estado actual de la cita en la BD.
+  ///
+  /// Falla si el id no corresponde a ninguna fila. Antes devolvía `null` para
+  /// tolerar los ids sintéticos de la agenda de prueba; eliminada esa fuente
+  /// (SD-161), un id desconocido o mal formado es un defecto real y debe verse
+  /// como error en vez de saltarse la validación de transiciones.
+  Future<EstadoCita> fetchEstadoCita(String id) async {
+    final res = await supabase
+        .from('citas')
+        .select('estado')
+        .eq('id', id)
+        .maybeSingle();
+    if (res == null) {
+      throw ServerFailure('La cita $id ya no existe o fue eliminada.');
     }
+    return EstadoCita.fromDb(res['estado'] as String?);
+  }
+
+  /// Datos programados de la cita, sin ensamblar doctor ni paciente.
+  ///
+  /// La consulta que nace de una cita hereda de aquí su `fecha` (SD-160): el
+  /// día que cuenta es el agendado, no el del clic. Devuelve `null` si el id no
+  /// corresponde a ninguna cita viva, para que quien llame decida si eso es un
+  /// defecto o un caso legítimo.
+  Future<ReferenciaCita?> fetchReferenciaCita(String id) async {
+    final res = await supabase
+        .from('citas')
+        .select('id, fecha_hora, estado, doctor_id, motivo')
+        .eq('id', id)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    if (res == null) return null;
+    return ReferenciaCita(
+      id: res['id'] as String,
+      fechaHora: DateTime.parse(res['fecha_hora'] as String).toLocal(),
+      estado: EstadoCita.fromDb(res['estado'] as String?),
+      doctorId: res['doctor_id'] as String,
+      motivo: res['motivo'] as String?,
+    );
   }
 
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {
@@ -217,292 +377,4 @@ class CitaRemoteDataSource {
 
   bool _isValidUuid(dynamic id) =>
       id != null && id is String && id.length == 36 && id.contains('-');
-
-  static final _empty = [ContactoModel.empty()];
-
-  static Doctor _doc(
-    String id,
-    String nombre,
-    String apellido,
-    String especialidad,
-  ) => Doctor(
-    id: id,
-    nombre: nombre,
-    apellido: apellido,
-    birthDate: DateTime(1980, 1, 1),
-    govID: '001-0000000-0',
-    contactos: _empty,
-    estatus: EstatusPersona.activo,
-    username: '',
-    passwordHash: '',
-    specialty: especialidad,
-    assistants: const [],
-  );
-
-  static Persona _pac(String id, String nombre, String apellido) => Persona(
-    id: id,
-    nombre: nombre,
-    apellido: apellido,
-    birthDate: DateTime(1990, 1, 1),
-    govID: '001-0000000-0',
-    contactos: _empty,
-    estatus: EstatusPersona.activo,
-  );
-
-  static final _docFernandez = _doc('d1', 'Carlos', 'Fernández', 'Ortodoncia');
-  static final _docRodriguez = _doc('d2', 'Ana', 'Rodríguez', 'Endodoncia');
-  static final _docLopez = _doc('d3', 'Luis', 'López', 'Periodoncia');
-
-  static final _pacAlonso = _pac('p1', 'Pedro', 'Alonso');
-  static final _pacSantos = _pac('p2', 'María', 'Santos');
-  static final _pacMendez = _pac('p3', 'Juan', 'Méndez');
-  static final _pacCastillo = _pac('p4', 'Laura', 'Castillo');
-  static final _pacGarcia = _pac('p5', 'Roberto', 'García');
-  static final _pacHerrera = _pac('p6', 'Sofía', 'Herrera');
-
-  static CitaModel _cita(
-    String id,
-    Doctor doc,
-    Persona pac,
-    int month,
-    int day,
-    int hour,
-    int min,
-    EstadoCita estado, {
-    bool urgente = false,
-    int duracion = 30,
-  }) => CitaModel(
-    id: id,
-    doctor: doc,
-    persona: pac,
-    date: DateTime(2026, month, day, hour, min),
-    duracionMinutos: duracion,
-    esEmergencia: urgente,
-    estado: estado,
-  );
-
-  static final List<CitaModel> _citasPrueba = [
-    _cita(
-      't01',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      5,
-      9,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't02',
-      _docRodriguez,
-      _pacSantos,
-      5,
-      12,
-      10,
-      30,
-      EstadoCita.completada,
-      duracion: 90,
-    ),
-    _cita(
-      't03',
-      _docLopez,
-      _pacMendez,
-      5,
-      12,
-      14,
-      0,
-      EstadoCita.completada,
-      duracion: 45,
-    ),
-    _cita(
-      't04',
-      _docFernandez,
-      _pacCastillo,
-      5,
-      13,
-      11,
-      0,
-      EstadoCita.cancelada,
-      duracion: 60,
-    ),
-    _cita(
-      't05',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      18,
-      8,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't06',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      18,
-      10,
-      0,
-      EstadoCita.programada,
-      urgente: true,
-      duracion: 30,
-    ),
-    _cita(
-      't07',
-      _docLopez,
-      _pacHerrera,
-      5,
-      18,
-      15,
-      30,
-      EstadoCita.programada,
-      duracion: 90,
-    ),
-    _cita(
-      't08',
-      _docFernandez,
-      _pacSantos,
-      5,
-      19,
-      9,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't09',
-      _docRodriguez,
-      _pacMendez,
-      5,
-      19,
-      14,
-      0,
-      EstadoCita.completada,
-      duracion: 120,
-    ),
-    _cita(
-      't10',
-      _docLopez,
-      _pacCastillo,
-      5,
-      20,
-      10,
-      30,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-    _cita(
-      't11',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      21,
-      9,
-      0,
-      EstadoCita.completada,
-      urgente: true,
-      duracion: 45,
-    ),
-    _cita(
-      't12',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      21,
-      16,
-      0,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't13',
-      _docLopez,
-      _pacHerrera,
-      5,
-      22,
-      11,
-      0,
-      EstadoCita.cancelada,
-      duracion: 30,
-    ),
-    _cita(
-      't14',
-      _docFernandez,
-      _pacSantos,
-      5,
-      25,
-      8,
-      30,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't15',
-      _docRodriguez,
-      _pacMendez,
-      5,
-      25,
-      11,
-      0,
-      EstadoCita.programada,
-      duracion: 90,
-    ),
-    _cita(
-      't16',
-      _docLopez,
-      _pacCastillo,
-      5,
-      25,
-      14,
-      30,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't17',
-      _docFernandez,
-      _pacAlonso,
-      5,
-      25,
-      17,
-      0,
-      EstadoCita.programada,
-      duracion: 30,
-    ),
-    _cita(
-      't18',
-      _docRodriguez,
-      _pacGarcia,
-      5,
-      27,
-      9,
-      0,
-      EstadoCita.programada,
-      duracion: 60,
-    ),
-    _cita(
-      't19',
-      _docLopez,
-      _pacHerrera,
-      5,
-      27,
-      13,
-      0,
-      EstadoCita.completada,
-      duracion: 45,
-    ),
-    _cita(
-      't20',
-      _docFernandez,
-      _pacSantos,
-      5,
-      28,
-      10,
-      0,
-      EstadoCita.completada,
-      duracion: 60,
-    ),
-  ];
 }

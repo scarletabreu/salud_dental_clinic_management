@@ -79,6 +79,25 @@ else
 fi
 echo
 
+# Lee una marca de build/start_up_info.json en microsegundos.
+#
+# Con `awk` y no con `python3` a propósito: en Windows esto se corre desde Git
+# Bash, que trae awk, sort y mktemp pero **no** trae Python. Con python3 el
+# script moría al terminar de medir, después de gastar las seis compilaciones.
+# El archivo es JSON plano, una clave por línea, así que no hace falta más.
+# Ninguna de las claves contiene dígitos, de ahí que valga con borrar todo lo
+# que no sea número.
+marca() {
+  awk -v clave="$1" '
+    index($0, "\"" clave "\"") {
+      gsub(/[^0-9]/, "", $0)
+      if ($0 != "") { print $0; encontrada = 1 }
+      exit
+    }
+    END { if (!encontrada) exit 1 }
+  ' "$SALIDA"
+}
+
 total=$(( REPETICIONES + 1 ))
 echo "→ flutter run ${ARGS[*]}"
 echo "  $total ejecuciones; se descarta la primera y se reporta la mediana de $REPETICIONES"
@@ -113,16 +132,12 @@ for i in $(seq 1 "$total"); do
     exit 1
   fi
 
-  ms=$(python3 -c '
-import json, sys
-d = json.load(open(sys.argv[1]))
-for c in ("timeToFirstFrameRasterizedMicros", "timeToFirstFrameMicros"):
-    if c in d:
-        print(round(d[c] / 1000))
-        break
-else:
-    sys.exit("sin marca de primer frame en " + sys.argv[1])
-' "$SALIDA")
+  micros=$(marca timeToFirstFrameRasterizedMicros || marca timeToFirstFrameMicros || true)
+  if [ -z "$micros" ]; then
+    echo "Sin marca de primer frame en $SALIDA (ejecución $i)." >&2
+    exit 1
+  fi
+  ms=$(( (micros + 500) / 1000 ))
 
   if [ "$i" -eq 1 ]; then
     echo "  calentamiento: $ms ms (descartada)"
@@ -133,25 +148,23 @@ else:
 done
 
 echo
-python3 - "$PRESUPUESTO_MS" "${medidas[@]}" <<'PY'
-import sys
-
-techo = int(sys.argv[1])
-medidas = sorted(int(x) for x in sys.argv[2:])
 
 # Mediana y no promedio: una sola ejecución lenta por ruido de la máquina no
 # debe mover el número de referencia.
-mediana = medidas[len(medidas) // 2]
-
-print(f'Primer frame en pantalla (mediana de {len(medidas)}): {mediana} ms')
-print(f'  mejor {medidas[0]} ms · peor {medidas[-1]} ms')
-print()
-print(f'Para PERFORMANCE.md §1: medida {mediana} ms · '
-      f'trinquete sugerido {round(mediana * 1.15 / 10) * 10} ms (+15 %)')
-print()
-
-if mediana > techo:
-    print(f'✗ {mediana} ms supera el presupuesto de {techo} ms. Ver PERFORMANCE.md.')
-    sys.exit(1)
-print(f'✓ {mediana} ms dentro del presupuesto de {techo} ms.')
-PY
+resumen=$(printf '%s\n' "${medidas[@]}" | sort -n | awk -v techo="$PRESUPUESTO_MS" '
+  { v[NR] = $1 }
+  END {
+    mediana = v[int(NR / 2) + 1]
+    printf "Primer frame en pantalla (mediana de %d): %d ms\n", NR, mediana
+    printf "  mejor %d ms · peor %d ms\n\n", v[1], v[NR]
+    printf "Para PERFORMANCE.md §1: medida %d ms · trinquete sugerido %d ms (+15 %%)\n\n",
+           mediana, int(mediana * 1.15 / 10 + 0.5) * 10
+    if (mediana > techo) {
+      printf "✗ %d ms supera el presupuesto de %d ms. Ver PERFORMANCE.md.\n", mediana, techo
+      exit 1
+    }
+    printf "✓ %d ms dentro del presupuesto de %d ms.\n", mediana, techo
+  }
+') && estado=0 || estado=$?
+echo "$resumen"
+exit "$estado"

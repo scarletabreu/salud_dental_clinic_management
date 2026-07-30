@@ -112,6 +112,18 @@ Sale con código 1 si algún artefacto pasa su techo.
 
 ### Arranque en un dispositivo real
 
+Antes de medir hacen falta tres cosas, y la primera es la que más tiempo hace
+perder porque no está en el repo:
+
+1. **`dart_define.json`.** Está en `.gitignore`, así que no viene al clonar:
+   `cp dart_define.example.json dart_define.json` y rellenar las credenciales de
+   Supabase (ver README). Sin él la app no arranca y el script aborta.
+2. **El dispositivo en modo depuración** y aceptada la huella del PC, de forma
+   que aparezca en `flutter devices` y en `adb devices`.
+3. **Un shell con `bash`.** En Windows, **Git Bash** (viene con Git para
+   Windows); PowerShell no ejecuta `.sh`. No hace falta Python: el script usa
+   solo `bash`, `awk`, `sort` y `mktemp`, que Git Bash ya trae.
+
 ```bash
 flutter devices                  # localiza el dispositivo
 tool/perf/medir_arranque.sh <id>
@@ -119,6 +131,11 @@ tool/perf/medir_arranque.sh <id>
 REPETICIONES_ARRANQUE=7 tool/perf/medir_arranque.sh <id>      # más muestras
 PRESUPUESTO_ARRANQUE_MS=3200 tool/perf/medir_arranque.sh <id> # otro techo
 ```
+
+En Windows el `<id>` del propio PC es `windows`; en Android es el que sale en
+`adb devices`. El script no necesita más argumentos: compila en `--profile`,
+mide, descarta el calentamiento y escribe al final la línea que hay que copiar
+a la tabla de §1.
 
 Usa `--profile --trace-startup` y lee
 `timeToFirstFrameRasterizedMicros` de `build/start_up_info.json`: el instante

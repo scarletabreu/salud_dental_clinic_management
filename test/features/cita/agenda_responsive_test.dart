@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
@@ -20,13 +22,26 @@ class _CitaCubitDoble extends Cubit<CitaCubitState> implements CitaCubit {
   _CitaCubitDoble(super.initialState);
 
   @override
-  Future<void> load() async {}
+  Future<void> load({
+    String? restringidoADoctorId,
+    List<String>? doctorIdsPermitidos,
+  }) async {}
 
   @override
   List<Cita> eventLoader(DateTime day) {
     final actual = state;
     return actual is CitaCubitLoaded ? actual.citasForDay(day) : const [];
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// La agenda lee el rol desde `AuthCubit` (roles y usuario). El cubit real se
+/// suscribe al stream de Supabase Auth al construirse, así que aquí se sustituye
+/// por un doble con el estado ya puesto.
+class _AuthCubitDoble extends Cubit<AuthState> implements AuthCubit {
+  _AuthCubitDoble(super.initialState);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -110,8 +125,15 @@ Widget _app(CitaCubitState estado, {double textScale = 1}) => MaterialApp(
     ).copyWith(textScaler: TextScaler.linear(textScale)),
     child: inner!,
   ),
-  home: BlocProvider<CitaCubit>(
-    create: (_) => _CitaCubitDoble(estado),
+  home: MultiBlocProvider(
+    providers: [
+      BlocProvider<CitaCubit>(create: (_) => _CitaCubitDoble(estado)),
+      BlocProvider<AuthCubit>(
+        create: (_) => _AuthCubitDoble(
+          AuthState(isAuthenticated: true, usuario: _doctor()),
+        ),
+      ),
+    ],
     child: const MisCitasDelDiaPage(),
   ),
 );

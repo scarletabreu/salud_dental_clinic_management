@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
@@ -40,6 +41,32 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       final data = await remoteDataSource.fetchConsultasByDoctor(doctorId);
       return _parsearConsultas(data);
     }, context: 'obtener las consultas');
+  }
+
+  @override
+  Future<Map<String, ConsultaDeCita>> getConsultasPorCitaIds(
+    List<String> citaIds,
+  ) {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchConsultasPorCitaIds(citaIds);
+      final porCita = <String, ConsultaDeCita>{};
+      for (final fila in filas) {
+        final citaId = fila['cita_id'] as String?;
+        final id = fila['id'] as String?;
+        if (citaId == null || id == null) continue;
+        final referencia = ConsultaDeCita(
+          id: id,
+          finalizada: (fila['finalizada'] ?? false) as bool,
+        );
+        // Con varias consultas por cita (dato inconsistente) prevalece la
+        // abierta: es la que impide cancelar y la que conviene abrir.
+        final previa = porCita[citaId];
+        if (previa == null || (previa.finalizada && referencia.estaAbierta)) {
+          porCita[citaId] = referencia;
+        }
+      }
+      return porCita;
+    }, context: 'obtener las consultas de las citas');
   }
 
   /// Una fila que no se puede leer se registra y se omite, en vez de abortar

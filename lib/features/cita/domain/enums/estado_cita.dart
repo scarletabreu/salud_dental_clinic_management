@@ -64,6 +64,10 @@ enum EstadoCita {
         ];
       case EstadoCita.enEspera:
         return const [
+          // Sin esta arista `enConsulta` queda inalcanzable y toda consulta
+          // abierta desde una cita falla al intentar marcarla (regresión de
+          // 8729c4d, cubierta por el test del grafo de SD-81).
+          EstadoCita.enConsulta,
           EstadoCita.cancelada,
           EstadoCita.noAsistio,
         ];

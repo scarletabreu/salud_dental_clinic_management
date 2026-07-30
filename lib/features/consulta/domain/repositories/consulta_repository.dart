@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
@@ -11,6 +12,13 @@ import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/dom
 abstract class ConsultaRepository {
   Future<List<Consulta>> getConsultas();
   Future<List<Consulta>> getConsultasByDoctor(String doctorId);
+
+  /// Consulta asociada a cada cita, indexada por `citaId`. Ante datos corruptos
+  /// con varias consultas para una misma cita, gana la que siga abierta: es la
+  /// que condiciona tanto el enlace de la agenda como la cancelación (SD-160).
+  Future<Map<String, ConsultaDeCita>> getConsultasPorCitaIds(
+    List<String> citaIds,
+  );
 
   Future<String> crearConsultaCompleta(Consulta consulta);
 

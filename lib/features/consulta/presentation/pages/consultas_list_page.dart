@@ -903,6 +903,15 @@ class _ConsultaCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                      // Una consulta sin cita no es un error, pero explica por
+                      // qué no aparece en la agenda (SD-160): marcarla evita
+                      // buscarla ahí en vano.
+                      if (consulta.citaId == null || consulta.citaId!.isEmpty)
+                        _IndicadorIcono(
+                          icon: Icons.event_busy_rounded,
+                          color: ac.textMuted,
+                          tooltip: 'Consulta sin cita (no está en la agenda)',
+                        ),
                       if (tieneTratamientos)
                         _IndicadorIcono(
                           icon: Icons.healing_rounded,

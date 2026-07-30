@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
@@ -80,6 +81,8 @@ class ConsultaDetallePage extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               children: [
                 _cardDatosGenerales(context),
+                const SizedBox(height: 16),
+                _seccionCitaOrigen(context),
                 if (consulta.signosVitales != null &&
                     !consulta.signosVitales!.estaVacia) ...[
                   const SizedBox(height: 16),
@@ -944,6 +947,143 @@ class ConsultaDetallePage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Cita de la que salió esta consulta. `Consulta.citaId` se guardaba desde
+  /// siempre pero no se mostraba en ninguna pantalla (SD-160): sin este bloque
+  /// no había forma de saltar de la lista de consultas a la agenda ni de
+  /// distinguir una atención sin cita de una cita perdida.
+  Widget _seccionCitaOrigen(BuildContext context) {
+    final ac = context.appColors;
+    return BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
+      builder: (context, state) {
+        final listo = state is ConsultaDetalleListo ? state : null;
+        final cita = listo?.citaOrigen;
+
+        final Widget cuerpo;
+        if (listo == null) {
+          cuerpo = Row(
+            children: [
+              SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ac.textMuted,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Buscando la cita de origen…',
+                style: TextStyle(color: ac.textMuted, fontSize: 13),
+              ),
+            ],
+          );
+        } else if (cita != null) {
+          final hora = TimeOfDay.fromDateTime(cita.fechaHora);
+          cuerpo = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _datoCitaOrigen(
+                context,
+                Icons.event_rounded,
+                fechaLargaEs(cita.fechaHora),
+              ),
+              _datoCitaOrigen(
+                context,
+                Icons.schedule_rounded,
+                hora.format(context),
+              ),
+              _chipEstadoCita(context, cita.estado),
+            ],
+          );
+        } else if (listo.citaOrigenAusente) {
+          cuerpo = _avisoCitaOrigen(
+            context,
+            ac.amber,
+            Icons.link_off_rounded,
+            'La cita de origen no está disponible: pudo eliminarse después de '
+            'registrar la consulta.',
+          );
+        } else {
+          cuerpo = _avisoCitaOrigen(
+            context,
+            ac.textMuted,
+            Icons.event_busy_rounded,
+            'Consulta sin cita: se atendió sin pasar por la agenda.',
+          );
+        }
+
+        return _seccion(
+          context,
+          'Cita de origen',
+          Icons.event_available_rounded,
+          ac.indigo,
+          cuerpo,
+        );
+      },
+    );
+  }
+
+  Widget _datoCitaOrigen(BuildContext context, IconData icono, String texto) {
+    final ac = context.appColors;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icono, size: 15, color: ac.textMuted),
+        const SizedBox(width: 6),
+        Text(
+          texto,
+          style: TextStyle(
+            color: ac.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _chipEstadoCita(BuildContext context, EstadoCita estado) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: estado.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: estado.color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        estado.label,
+        style: TextStyle(
+          color: estado.color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _avisoCitaOrigen(
+    BuildContext context,
+    Color color,
+    IconData icono,
+    String texto,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icono, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            texto,
+            style: TextStyle(color: color, fontSize: 13, height: 1.4),
+          ),
+        ),
+      ],
     );
   }
 

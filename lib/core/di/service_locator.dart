@@ -17,6 +17,8 @@ import 'package:salud_dental_clinic_management/features/compra/presentation/cubi
 // Módulo Consulta
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource_impl.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/consulta_abierta_lookup.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_abierta_lookup_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/repositories/consulta_repository_impl.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/eliminar_consulta_usecase.dart';
@@ -416,11 +418,20 @@ Future<void> init() async {
   sl.registerLazySingleton<PersonaRepository>(
     () => PersonaRepositoryImpl(sl()),
   );
-  sl.registerLazySingleton<CitaRepository>(
-    () => CitaRepositoryImpl(remoteDataSource: sl()),
-  );
   sl.registerLazySingleton<ConsultaRepository>(
     () => ConsultaRepositoryImpl(remoteDataSource: sl()),
+  );
+  // El lookup se resuelve perezosamente: la cita necesita preguntar por su
+  // consulta, y registrar `ConsultaRepository` antes evita la referencia
+  // circular entre ambos repositorios (SD-160).
+  sl.registerLazySingleton<ConsultaAbiertaLookup>(
+    () => ConsultaAbiertaLookupImpl(sl<ConsultaRepository>()),
+  );
+  sl.registerLazySingleton<CitaRepository>(
+    () => CitaRepositoryImpl(
+      remoteDataSource: sl(),
+      consultaAbiertaLookup: sl<ConsultaAbiertaLookup>(),
+    ),
   );
   sl.registerFactory<CrearConsultaUseCase>(() => CrearConsultaUseCase(sl()));
   sl.registerFactory<FinalizarConsultaUseCase>(
@@ -443,7 +454,9 @@ Future<void> init() async {
 
   // ── Cubits ───────────────────────────────────────────────────────────────
   sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl(), sl()));
-  sl.registerFactory<CitaCubit>(() => CitaCubit(sl()));
+  sl.registerFactory<CitaCubit>(
+    () => CitaCubit(sl(), sl<ConsultaAbiertaLookup>()),
+  );
   sl.registerFactory<ConsultaCubit>(
     () => ConsultaCubit(
       sl<CrearConsultaUseCase>(),
@@ -455,7 +468,11 @@ Future<void> init() async {
     ),
   );
   sl.registerFactory<ConsultaDetalleCubit>(
-    () => ConsultaDetalleCubit(sl(), sl<IMedicinaRepository>()),
+    () => ConsultaDetalleCubit(
+      sl(),
+      sl<IMedicinaRepository>(),
+      sl<CitaRepository>(),
+    ),
   );
   sl.registerFactory<PlanTratamientoCubit>(
     () => PlanTratamientoCubit(repository: sl()),

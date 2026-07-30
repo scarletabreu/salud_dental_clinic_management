@@ -1416,6 +1416,66 @@ $$;
 ALTER FUNCTION "public"."validar_caja_abierta"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."validar_cita_item_plan"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_paciente_cita uuid;
+  v_paciente_item uuid;
+  v_estado        estado_item_plan;
+  v_anulada       timestamptz;
+begin
+  select persona_id into v_paciente_cita
+    from citas
+   where id = new.cita_id and deleted_at is null;
+
+  if v_paciente_cita is null then
+    raise exception 'La cita % no existe o fue eliminada.', new.cita_id
+      using errcode = '23503';
+  end if;
+
+  select pt.paciente_id, ipt.estado, ipt.deleted_at
+    into v_paciente_item, v_estado, v_anulada
+    from items_plan_tratamiento ipt
+    join planes_tratamiento pt on pt.id = ipt.plan_id
+   where ipt.id = new.item_plan_id
+     and pt.deleted_at is null;
+
+  if v_paciente_item is null then
+    raise exception 'La actividad % no existe o su plan fue eliminado.', new.item_plan_id
+      using errcode = '23503';
+  end if;
+
+  if v_anulada is not null then
+    raise exception 'La actividad % fue retirada del plan y no puede agendarse.', new.item_plan_id
+      using errcode = '23514';
+  end if;
+
+  if v_paciente_item <> v_paciente_cita then
+    raise exception 'La actividad % pertenece al plan de otro paciente.', new.item_plan_id
+      using errcode = '23514';
+  end if;
+
+  -- Agendar algo ya rechazado, cancelado o terminado no es una decisión válida:
+  -- es un defecto de quien llama.
+  if v_estado in ('rechazado', 'cancelado', 'completado') then
+    raise exception 'La actividad % está %; no puede agendarse.', new.item_plan_id, v_estado
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."validar_cita_item_plan"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."validar_cita_item_plan"() IS 'SD-146. Impide vincular a una cita una actividad de otro paciente, retirada del plan o ya decidida en contra/terminada.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."validar_disponibilidad_doctor_simple"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -1719,6 +1779,20 @@ ALTER TABLE "public"."citas" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."citas"."motivo" IS 'Motivo declarado al agendar la cita. Prellena consultas.motivo_consulta.';
+
+
+CREATE TABLE IF NOT EXISTS "public"."citas_items_plan" (
+    "cita_id" "uuid" NOT NULL,
+    "item_plan_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."citas_items_plan" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."citas_items_plan" IS 'Actividades del plan de tratamiento que se piensan atender en una cita (SD-146). Relación N:M: una cita puede cubrir varias actividades y una actividad puede reprogramarse a otra cita.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."compras" (
@@ -2455,6 +2529,57 @@ COMMENT ON COLUMN "public"."usuarios"."password_hash" IS 'Hash Bcrypt o Argon2 d
 
 
 
+CREATE OR REPLACE VIEW "public"."resumen_actividades_cita" AS
+ SELECT "cip"."cita_id",
+    "ipt"."id" AS "item_plan_id",
+    "ipt"."plan_id",
+    "ipt"."tratamiento_id",
+    "t"."nombre" AS "tratamiento_nombre",
+    "d"."fdi_code" AS "fdi_diente",
+    "ipt"."superficie",
+    "ipt"."estado",
+    "ipt"."precio_estimado",
+    "ipt"."orden"
+   FROM (((("public"."citas_items_plan" "cip"
+     JOIN "public"."items_plan_tratamiento" "ipt" ON (("ipt"."id" = "cip"."item_plan_id")))
+     JOIN "public"."planes_tratamiento" "pt" ON (("pt"."id" = "ipt"."plan_id")))
+     LEFT JOIN "public"."tratamientos" "t" ON (("t"."id" = "ipt"."tratamiento_id")))
+     LEFT JOIN "public"."dientes" "d" ON (("d"."id" = "ipt"."diente_id")))
+  WHERE (("ipt"."deleted_at" IS NULL) AND ("pt"."deleted_at" IS NULL) AND ("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+ALTER VIEW "public"."resumen_actividades_cita" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."resumen_actividades_cita" IS 'SD-146. Resumen mínimo de las actividades planificadas de cada cita, legible por el asistente que agenda. No expone diagnóstico ni notas clínicas.';
+
+
+
+CREATE OR REPLACE VIEW "public"."actividades_agendables_paciente" AS
+ SELECT "pt"."paciente_id",
+    "ipt"."id" AS "item_plan_id",
+    "ipt"."plan_id",
+    "ipt"."tratamiento_id",
+    "t"."nombre" AS "tratamiento_nombre",
+    "d"."fdi_code" AS "fdi_diente",
+    "ipt"."superficie",
+    "ipt"."estado",
+    "ipt"."precio_estimado",
+    "ipt"."orden"
+   FROM ((("public"."items_plan_tratamiento" "ipt"
+     JOIN "public"."planes_tratamiento" "pt" ON (("pt"."id" = "ipt"."plan_id")))
+     LEFT JOIN "public"."tratamientos" "t" ON (("t"."id" = "ipt"."tratamiento_id")))
+     LEFT JOIN "public"."dientes" "d" ON (("d"."id" = "ipt"."diente_id")))
+  WHERE (("ipt"."deleted_at" IS NULL) AND ("pt"."deleted_at" IS NULL) AND ("ipt"."estado" = ANY (ARRAY['propuesto'::"public"."estado_item_plan", 'aceptado'::"public"."estado_item_plan", 'pendiente'::"public"."estado_item_plan", 'en_proceso'::"public"."estado_item_plan"])) AND ("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+ALTER VIEW "public"."actividades_agendables_paciente" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."actividades_agendables_paciente" IS 'SD-146. Actividades del plan de un paciente que todavía pueden agendarse en una cita. Mismo alcance de estados que acepta trg_validar_cita_item_plan.';
+
+
+
 ALTER TABLE ONLY "public"."admins"
     ADD CONSTRAINT "admin_pkey" PRIMARY KEY ("id");
 
@@ -2472,6 +2597,11 @@ ALTER TABLE ONLY "public"."cajas_diarias"
 
 ALTER TABLE ONLY "public"."cajas"
     ADD CONSTRAINT "cajas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_pkey" PRIMARY KEY ("cita_id", "item_plan_id");
 
 
 
@@ -2732,6 +2862,10 @@ CREATE INDEX "idx_afliccion_record" ON "public"."record_condicion" USING "btree"
 
 
 
+CREATE INDEX "idx_citas_items_plan_item" ON "public"."citas_items_plan" USING "btree" ("item_plan_id");
+
+
+
 CREATE INDEX "idx_compra_suplidor" ON "public"."consumibles_compras" USING "btree" ("suplidor_id");
 
 
@@ -2904,6 +3038,10 @@ CREATE OR REPLACE TRIGGER "trg_sync_disponibilidad_doctor" AFTER INSERT OR DELET
 
 
 
+CREATE OR REPLACE TRIGGER "trg_validar_cita_item_plan" BEFORE INSERT OR UPDATE ON "public"."citas_items_plan" FOR EACH ROW EXECUTE FUNCTION "public"."validar_cita_item_plan"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_dientes_modtime" BEFORE UPDATE ON "public"."dientes" FOR EACH ROW EXECUTE FUNCTION "public"."update_modified_column"();
 
 
@@ -2940,6 +3078,16 @@ ALTER TABLE ONLY "public"."cajas"
 
 ALTER TABLE ONLY "public"."citas"
     ADD CONSTRAINT "citas_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_cita_id_fkey" FOREIGN KEY ("cita_id") REFERENCES "public"."citas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."citas_items_plan"
+    ADD CONSTRAINT "citas_items_plan_item_plan_id_fkey" FOREIGN KEY ("item_plan_id") REFERENCES "public"."items_plan_tratamiento"("id") ON DELETE CASCADE;
 
 
 
@@ -3406,11 +3554,27 @@ CREATE POLICY "citas_insert" ON "public"."citas" FOR INSERT TO "authenticated" W
 
 
 
+CREATE POLICY "citas_items_plan_delete" ON "public"."citas_items_plan" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+
+CREATE POLICY "citas_items_plan_insert" ON "public"."citas_items_plan" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+
+CREATE POLICY "citas_items_plan_select" ON "public"."citas_items_plan" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+
+
+
 CREATE POLICY "citas_select" ON "public"."citas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
 
 
 
 CREATE POLICY "citas_update" ON "public"."citas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
+
+
+
+ALTER TABLE "public"."citas_items_plan" ENABLE ROW LEVEL SECURITY;
 
 
 
@@ -4435,6 +4599,11 @@ GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "anon";
 GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "service_role";
@@ -4486,6 +4655,11 @@ GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "service_ro
 
 
 
+GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "authenticated";
+GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."admins" TO "anon";
 GRANT ALL ON TABLE "public"."admins" TO "authenticated";
 GRANT ALL ON TABLE "public"."admins" TO "service_role";
@@ -4513,6 +4687,11 @@ GRANT ALL ON TABLE "public"."cajas_diarias" TO "service_role";
 GRANT ALL ON TABLE "public"."citas" TO "anon";
 GRANT ALL ON TABLE "public"."citas" TO "authenticated";
 GRANT ALL ON TABLE "public"."citas" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."citas_items_plan" TO "authenticated";
+GRANT ALL ON TABLE "public"."citas_items_plan" TO "service_role";
 
 
 
@@ -4723,6 +4902,11 @@ GRANT ALL ON TABLE "public"."record_condicion" TO "service_role";
 GRANT ALL ON TABLE "public"."records" TO "anon";
 GRANT ALL ON TABLE "public"."records" TO "authenticated";
 GRANT ALL ON TABLE "public"."records" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "authenticated";
+GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "service_role";
 
 
 

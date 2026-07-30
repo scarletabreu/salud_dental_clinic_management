@@ -5,12 +5,17 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/cit
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/resumen_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 /// Valor centinela para iniciar el flujo clínico unificado.
 const _kEfectuarConsulta = 'efectuar_consulta';
 const _kAbrirConsulta = 'abrir_consulta';
+
+/// Abre el resumen de la cita como diálogo. Es la vía sin ratón: en táctil no
+/// hay hover que dispare la ventana flotante (SD-146).
+const _kVerResumen = 'ver_resumen';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -470,6 +475,26 @@ class _CitaBlock extends StatelessWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       items: [
+        PopupMenuItem<Object>(
+          value: _kVerResumen,
+          child: Row(
+            children: [
+              Icon(Icons.event_note_rounded, size: 16, color: ac.textSecondary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Ver resumen',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
         if (puedeAbrirConsulta) ...[
           PopupMenuItem<Object>(
             value: _kAbrirConsulta,
@@ -546,6 +571,10 @@ class _CitaBlock extends StatelessWidget {
       ],
     ).then((value) {
       if (!context.mounted) return;
+      if (value == _kVerResumen) {
+        mostrarResumenCita(context, cita);
+        return;
+      }
       if (value == _kAbrirConsulta && consulta != null) {
         // Abierta: se reanuda donde quedó. Finalizada: se abre en modo lectura
         // desde la misma pantalla, que ya distingue ambos casos por `finalizada`.
@@ -716,26 +745,39 @@ class _CitaBlock extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: () => _showStatusMenu(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [ac.cardShadow],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(height: 3, color: color),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
-                child: content,
-              ),
+    // El bloque de la agenda no da para más que el nombre y la hora. El resumen
+    // completo se asoma al pasar el cursor o al recibir el foco del teclado, y
+    // en táctil se llega por «Ver resumen» del menú (SD-146).
+    return ResumenCitaAccesible(
+      cita: cita,
+      child: Semantics(
+        button: true,
+        label:
+            'Cita de ${cita.persona.fullName} a las $timeRange. '
+            'Toca para ver el resumen y las acciones.',
+        child: GestureDetector(
+          onTap: () => _showStatusMenu(context),
+          onLongPress: () => mostrarResumenCita(context, cita),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [ac.cardShadow],
             ),
-          ],
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(height: 3, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
+                    child: content,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

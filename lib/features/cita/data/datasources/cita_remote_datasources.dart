@@ -1,7 +1,9 @@
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:salud_dental_clinic_management/features/cita/data/models/actividad_planificada_model.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
@@ -42,7 +44,7 @@ class CitaRemoteDataSource {
     return _assembleCitas(citasRes as List);
   }
 
- Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
+  Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
     if (rawCitas.isEmpty) return [];
 
     final personaIds = rawCitas
@@ -104,6 +106,15 @@ class CitaRemoteDataSource {
       }
     }
 
+    // 2b. Actividades planificadas de cada cita (SD-146). Se piden en un solo
+    // viaje para que la agenda pueda mostrar el resumen sin ir al servidor en
+    // cada hover. Es información accesoria: si falla, las citas se ven igual.
+    final citaIds = rawCitas
+        .map((c) => (c as Map<String, dynamic>)['id'] as String?)
+        .whereType<String>()
+        .toList();
+    final actividadesPorCita = await _fetchActividadesDeCitas(citaIds);
+
     final List<CitaModel> result = [];
 
     // 3. Ensamblar las citas combinando la información obtenida
@@ -111,10 +122,11 @@ class CitaRemoteDataSource {
       try {
         final json = Map<String, dynamic>.from(c as Map);
         final doctorId = json['doctor_id'] as String?;
+        json['actividades'] = actividadesPorCita[json['id']] ?? const [];
 
         // Obtenemos los datos del doctor desde el mapa construido con el RPC
         final dp = (doctorId != null ? doctorMaps[doctorId] : null) ?? {};
-        
+
         json['doctor'] = {
           'doctor_id': doctorId,
           'nombre': dp['nombre'] ?? '',
@@ -127,11 +139,9 @@ class CitaRemoteDataSource {
           'especialidad': dp['especialidad'] ?? '',
           'esta_disponible': dp['esta_disponible'] ?? true,
           'assistants': dp['assistants'] ?? <dynamic>[],
-          'contacto': dp['contacto'] ?? const {
-            'email': '',
-            'numero_telefono': '',
-            'direccion': '',
-          },
+          'contacto':
+              dp['contacto'] ??
+              const {'email': '', 'numero_telefono': '', 'direccion': ''},
         };
 
         final pac = pacientes[json['persona_id'] as String?] ?? {};
@@ -154,6 +164,57 @@ class CitaRemoteDataSource {
     return result;
   }
 
+  /// Resumen de las actividades de un lote de citas, agrupado por `cita_id`.
+  ///
+  /// Lee la vista `resumen_actividades_cita` y no las tablas del plan: el
+  /// asistente que gestiona la agenda no tiene permiso de lectura sobre
+  /// `items_plan_tratamiento` ni sobre el catálogo de tratamientos (SD-146).
+  Future<Map<String, List<Map<String, dynamic>>>> _fetchActividadesDeCitas(
+    List<String> citaIds,
+  ) async {
+    if (citaIds.isEmpty) return const {};
+    try {
+      final res = await supabase
+          .from('resumen_actividades_cita')
+          .select()
+          .inFilter('cita_id', citaIds);
+
+      final agrupadas = <String, List<Map<String, dynamic>>>{};
+      for (final row in res as List) {
+        final fila = Map<String, dynamic>.from(row as Map);
+        final citaId = fila['cita_id'] as String?;
+        if (citaId == null) continue;
+        agrupadas.putIfAbsent(citaId, () => []).add(fila);
+      }
+      return agrupadas;
+    } catch (e) {
+      AppLog.error('actividades planificadas de las citas', e);
+      return const {};
+    }
+  }
+
+  /// Actividades del plan de [pacienteId] que todavía pueden agendarse.
+  ///
+  /// A diferencia de las anteriores, un fallo aquí sí se propaga: el formulario
+  /// tiene que distinguir «este paciente no tiene actividades pendientes» de
+  /// «no se pudieron cargar», o el usuario agendaría a ciegas.
+  Future<List<ActividadPlanificada>> fetchActividadesAgendables(
+    String pacienteId,
+  ) async {
+    final res = await supabase
+        .from('actividades_agendables_paciente')
+        .select()
+        .eq('paciente_id', pacienteId)
+        .order('orden');
+
+    return [
+      for (final row in res as List)
+        ActividadPlanificadaModel.fromJson(
+          Map<String, dynamic>.from(row as Map),
+        ),
+    ];
+  }
+
   Future<void> addCita(CitaModel cita) async {
     final data = cita.toJson();
 
@@ -165,7 +226,74 @@ class CitaRemoteDataSource {
     data['created_at'] = now;
     data['updated_at'] = now;
 
-    await supabase.from('citas').insert(data);
+    final fila = await supabase
+        .from('citas')
+        .insert(data)
+        .select('id')
+        .single();
+    await _vincularActividades(fila['id'] as String, cita.actividades);
+  }
+
+  /// Reemplaza los vínculos de la cita por [actividades].
+  ///
+  /// Se hace en dos pasos (borrar los que sobran, insertar los que faltan) en
+  /// vez de borrar todo y reinsertar: así reprogramar una cita sin tocar sus
+  /// actividades no pierde el `created_at` del vínculo.
+  Future<void> _sincronizarActividades(
+    String citaId,
+    List<ActividadPlanificada> actividades,
+  ) async {
+    final deseados = {for (final a in actividades) a.itemPlanId};
+
+    final actuales = await supabase
+        .from('citas_items_plan')
+        .select('item_plan_id')
+        .eq('cita_id', citaId);
+    final existentes = {
+      for (final row in actuales as List)
+        (row as Map<String, dynamic>)['item_plan_id'] as String,
+    };
+
+    final sobran = existentes.difference(deseados);
+    if (sobran.isNotEmpty) {
+      await supabase
+          .from('citas_items_plan')
+          .delete()
+          .eq('cita_id', citaId)
+          .inFilter('item_plan_id', sobran.toList());
+    }
+
+    final faltan = deseados.difference(existentes);
+    if (faltan.isNotEmpty) {
+      await supabase.from('citas_items_plan').insert([
+        for (final itemPlanId in faltan)
+          {'cita_id': citaId, 'item_plan_id': itemPlanId},
+      ]);
+    }
+  }
+
+  /// Vincula las actividades de una cita recién creada.
+  ///
+  /// La cita ya existe cuando esto corre, así que un fallo aquí deja una cita
+  /// sin sus actividades. El mensaje lo dice explícitamente para que nadie la
+  /// vuelva a crear pensando que no se guardó: el trigger
+  /// `trg_validar_cita_item_plan` solo rechaza lo que el formulario no ofrece
+  /// (actividad de otro paciente, retirada o ya cerrada), así que llegar aquí es
+  /// un defecto o una caída de red.
+  Future<void> _vincularActividades(
+    String citaId,
+    List<ActividadPlanificada> actividades,
+  ) async {
+    if (actividades.isEmpty) return;
+    try {
+      await _sincronizarActividades(citaId, actividades);
+    } catch (e) {
+      AppLog.error('vincular actividades de la cita $citaId', e);
+      throw ServerFailure(
+        'La cita se guardó, pero no se pudieron vincular sus actividades del '
+        'plan: $e. Edítala para volver a seleccionarlas.',
+      );
+    }
   }
 
   Future<void> updateCita(CitaModel cita) async {
@@ -183,6 +311,7 @@ class CitaRemoteDataSource {
       'updated_at': DateTime.now().toIso8601String(),
     };
     await supabase.from('citas').update(data).eq('id', cita.id!);
+    await _sincronizarActividades(cita.id!, cita.actividades);
   }
 
   Future<void> deleteCita(String id) async {

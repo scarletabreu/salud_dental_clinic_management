@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/nueva_cita_dialog.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
@@ -276,6 +277,7 @@ class WeekTimelineView extends StatelessWidget {
       personaRepository: sl<PersonaRepository>(),
       doctorRepository: sl<DoctorRepository>(),
       pacienteRepository: sl<IPacienteRepository>(),
+      citaRepository: sl<CitaRepository>(),
       fechaInicial: fechaPrellenada,
     );
 

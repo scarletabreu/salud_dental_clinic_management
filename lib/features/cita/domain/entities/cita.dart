@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
@@ -15,6 +16,15 @@ class Cita {
   /// cuando el odontólogo la atiende desde esta cita, sin reemplazarlo.
   final String? motivo;
 
+  /// Actividades del plan de tratamiento que se piensan atender en esta sesión
+  /// (SD-146). La cita las referencia por id: no copia el plan como texto, así
+  /// que corregir el plan corrige lo que la agenda muestra.
+  ///
+  /// Vacía no significa "nada que hacer": una cita puede existir sin plan (una
+  /// primera evaluación, una emergencia). Es el [motivo] el que dice a qué vino
+  /// el paciente cuando no hay actividades.
+  final List<ActividadPlanificada> actividades;
+
   Cita({
     this.id,
     required this.doctor,
@@ -24,9 +34,17 @@ class Cita {
     required this.esEmergencia,
     required this.estado,
     this.motivo,
+    this.actividades = const [],
   });
 
   DateTime get fechaFin => date.add(Duration(minutes: duracionMinutos));
+
+  /// Lo que se piensa tratar, en una línea por actividad y en el orden del plan.
+  List<String> get resumenActividades {
+    final ordenadas = [...actividades]
+      ..sort((a, b) => a.orden.compareTo(b.orden));
+    return [for (final actividad in ordenadas) actividad.descripcion];
+  }
 
   Cita copyWith({
     String? id,
@@ -37,6 +55,7 @@ class Cita {
     bool? esEmergencia,
     EstadoCita? estado,
     String? motivo,
+    List<ActividadPlanificada>? actividades,
   }) {
     return Cita(
       id: id ?? this.id,
@@ -47,6 +66,7 @@ class Cita {
       esEmergencia: esEmergencia ?? this.esEmergencia,
       estado: estado ?? this.estado,
       motivo: motivo ?? this.motivo,
+      actividades: actividades ?? this.actividades,
     );
   }
 }

@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,10 +10,13 @@ import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/selector_actividades_plan.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -59,6 +61,11 @@ class NuevaCitaDialog extends StatefulWidget {
   /// atenderse, y perdía el género y el tipo que este formulario ya pide.
   final IPacienteRepository pacienteRepository;
 
+  /// Sirve las actividades del plan que la cita puede atender (SD-146). Llega
+  /// por parámetro como los demás repositorios: el diálogo no busca nada en el
+  /// service locator, y así la prueba puede sustituirlo.
+  final CitaRepository citaRepository;
+
   /// Momento con el que abre el diálogo cuando se llega desde una casilla de la
   /// agenda. Sin esto, tocar las 9:00 del miércoles abría un formulario vacío y
   /// obligaba a volver a elegir el día y la hora que ya se habían señalado.
@@ -68,6 +75,7 @@ class NuevaCitaDialog extends StatefulWidget {
     required this.personaRepository,
     required this.doctorRepository,
     required this.pacienteRepository,
+    required this.citaRepository,
     this.fechaInicial,
   });
 
@@ -76,6 +84,7 @@ class NuevaCitaDialog extends StatefulWidget {
     required PersonaRepository personaRepository,
     required DoctorRepository doctorRepository,
     required IPacienteRepository pacienteRepository,
+    required CitaRepository citaRepository,
     DateTime? fechaInicial,
   }) {
     return showDialog<void>(
@@ -87,6 +96,7 @@ class NuevaCitaDialog extends StatefulWidget {
           personaRepository: personaRepository,
           doctorRepository: doctorRepository,
           pacienteRepository: pacienteRepository,
+          citaRepository: citaRepository,
           fechaInicial: fechaInicial,
         ),
       ),
@@ -139,6 +149,10 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
   final _motivoCtrl = TextEditingController();
   bool _esEmergencia = false;
   bool _guardando = false;
+
+  /// Actividades del plan que esta cita va a atender (SD-146). Solo se pueden
+  /// elegir cuando el paciente ya existe: un registro nuevo no tiene plan.
+  List<ActividadPlanificada> _actividades = const [];
 
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fade;
@@ -222,6 +236,9 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       _doctorSeleccionado = null;
       _fecha = null;
       _hora = null;
+      // Las actividades son del paciente que se estaba agendando: volver atrás
+      // puede cambiarlo, y arrastrarlas vincularía el plan de otra persona.
+      _actividades = const [];
     });
   }
 
@@ -307,6 +324,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       esEmergencia: _esEmergencia,
       estado: EstadoCita.programada,
       motivo: motivo.isEmpty ? null : motivo,
+      actividades: _actividades,
     );
 
     if (!mounted) return;
@@ -1269,6 +1287,20 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
+          ),
+          const SizedBox(height: 16),
+
+          _SectionLabel(
+            icon: Icons.checklist_rounded,
+            label: 'Actividades del plan de tratamiento',
+          ),
+          const SizedBox(height: 8),
+          SelectorActividadesPlan(
+            pacienteId: _esNuevaPersona ? null : _personaSeleccionada?.id,
+            repository: widget.citaRepository,
+            seleccionadas: _actividades,
+            habilitado: !_guardando,
+            onChanged: (lista) => setState(() => _actividades = lista),
           ),
           const SizedBox(height: 10),
 

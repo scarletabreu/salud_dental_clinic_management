@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
@@ -179,6 +180,13 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   }) async {
     emit(const ConsultaGuardando());
     try {
+      // La consulta que nace de una cita se fecha con la hora agendada, no con
+      // la del clic (SD-160): si no, una cita de mañana atendida hoy aparecía
+      // en el día de hoy y la lista nunca cuadraba con la agenda. El momento
+      // real de apertura ya queda en `consultas.created_at`, que lo pone la BD.
+      final citaOrigen = await _resolverCitaDeOrigen(citaId);
+      final fechaConsulta = citaOrigen?.fechaHora ?? DateTime.now();
+
       final documentos = <DocumentoClinico>[];
       for (final adj in adjuntos) {
         final url = await _storage.subirDocumento(
@@ -202,7 +210,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         pacienteId: pacienteId,
         doctorId: doctorId,
         citaId: citaId,
-        fecha: DateTime.now(),
+        fecha: fechaConsulta,
         motivoConsulta: motivoConsulta,
         tempCondiciones: tempCondiciones,
         documentosClinicos: documentos,
@@ -212,7 +220,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
       final consultaId = await _crearConsulta(consultaInicial);
 
-      if (citaId != null) {
+      // Ya validado arriba que la transición es legal. Si la cita venía en
+      // `enConsulta` no se reescribe: el grafo no admite ese lazo.
+      if (citaId != null && citaOrigen?.estado != EstadoCita.enConsulta) {
         await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
       }
       final historial = await _cargarHistorial(
@@ -250,6 +260,34 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       AppLog.error('crear consulta', e);
       emit(ConsultaError(_mensajeError(e)));
     }
+  }
+
+  /// Cita de la que nace la consulta, ya validada. `null` para una atención sin
+  /// cita (walk-in), que se fecha con `now()`.
+  ///
+  /// Se resuelve y se comprueba *antes* de crear la consulta: si la cita no
+  /// existe o no puede pasar a `enConsulta`, el fallo ocurre sin haber dejado
+  /// una consulta huérfana que nadie reclame. Tampoco se cae a `now()` en
+  /// silencio: ese respaldo era justo lo que desfasaba la fecha (SD-160).
+  Future<ReferenciaCita?> _resolverCitaDeOrigen(String? citaId) async {
+    if (citaId == null) return null;
+
+    final referencia = await _citaRepository.getReferenciaCita(citaId);
+    if (referencia == null) {
+      throw Exception(
+        'La cita de origen ya no existe. Recarga la agenda antes de iniciar '
+        'la consulta.',
+      );
+    }
+    final estado = referencia.estado;
+    if (estado != EstadoCita.enConsulta &&
+        !estado.puedeTransicionarA(EstadoCita.enConsulta)) {
+      throw Exception(
+        'La cita está "${estado.label}" y no puede pasar a consulta. '
+        'Recarga la agenda para ver su estado actual.',
+      );
+    }
+    return referencia;
   }
 
   Future<_HistorialDental> _cargarHistorial(

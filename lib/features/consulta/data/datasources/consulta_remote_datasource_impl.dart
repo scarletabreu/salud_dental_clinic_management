@@ -508,6 +508,20 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchConsultasPorCitaIds(
+    List<String> citaIds,
+  ) async {
+    if (citaIds.isEmpty) return const [];
+    final response = await supabaseClient
+        .from('consultas')
+        .select('id, cita_id, finalizada')
+        .inFilter('cita_id', citaIds)
+        .isFilter('deleted_at', null);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(
     String pacienteId,
   ) async {

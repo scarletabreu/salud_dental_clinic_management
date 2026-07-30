@@ -4,11 +4,13 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 
 /// Valor centinela para iniciar el flujo clínico unificado.
 const _kEfectuarConsulta = 'efectuar_consulta';
+const _kAbrirConsulta = 'abrir_consulta';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -451,6 +453,13 @@ class _CitaBlock extends StatelessWidget {
         doctorId != null &&
         cita.id != null;
 
+    // Enlace hacia la consulta que esta cita ya originó (SD-160): sin él, desde
+    // la agenda no había forma de llegar al acto clínico que le corresponde.
+    final estado = cubit.state;
+    final consulta = estado is CitaCubitLoaded ? estado.consultaDe(cita) : null;
+    final puedeAbrirConsulta =
+        consulta != null && pacienteId != null && doctorId != null;
+
     showMenu<Object>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -461,6 +470,36 @@ class _CitaBlock extends StatelessWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       items: [
+        if (puedeAbrirConsulta) ...[
+          PopupMenuItem<Object>(
+            value: _kAbrirConsulta,
+            child: Row(
+              children: [
+                Icon(
+                  consulta.estaAbierta
+                      ? Icons.play_circle_outline_rounded
+                      : Icons.assignment_turned_in_outlined,
+                  size: 16,
+                  color: consulta.estaAbierta ? ac.amber : ac.indigo,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    consulta.estaAbierta
+                        ? 'Continuar consulta'
+                        : 'Ver consulta',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
         if (puedeEfectuar) ...[
           PopupMenuItem<Object>(
             value: _kEfectuarConsulta,
@@ -507,6 +546,24 @@ class _CitaBlock extends StatelessWidget {
       ],
     ).then((value) {
       if (!context.mounted) return;
+      if (value == _kAbrirConsulta && consulta != null) {
+        // Abierta: se reanuda donde quedó. Finalizada: se abre en modo lectura
+        // desde la misma pantalla, que ya distingue ambos casos por `finalizada`.
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id,
+                  pacienteId: pacienteId!,
+                  doctorId: doctorId!,
+                  consultaId: consulta.id,
+                  motivoCita: cita.motivo,
+                ),
+              ),
+            )
+            .then((_) => cubit.load());
+        return;
+      }
       if (value == _kEfectuarConsulta) {
         Navigator.of(context)
             .push(

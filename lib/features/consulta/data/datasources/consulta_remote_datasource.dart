@@ -41,6 +41,13 @@ abstract class ConsultaRemoteDatasource {
   );
   Future<Map<String, dynamic>?> fetchConsultaById(String id);
 
+  /// Filas `id, cita_id, finalizada` de las consultas de esas citas. Sirve
+  /// tanto para enlazar la agenda con su consulta como para saber si queda
+  /// alguna abierta (SD-160). Una lista vacía no consulta la red.
+  Future<List<Map<String, dynamic>>> fetchConsultasPorCitaIds(
+    List<String> citaIds,
+  );
+
   Future<List<Map<String, dynamic>>> fetchTratamientosAplicadosPorIds(
     List<String> ids,
   );

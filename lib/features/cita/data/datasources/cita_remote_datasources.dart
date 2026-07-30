@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:salud_dental_clinic_management/features/cita/data/models/cita_model.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
 class CitaRemoteDataSource {
@@ -210,6 +211,29 @@ class CitaRemoteDataSource {
       throw ServerFailure('La cita $id ya no existe o fue eliminada.');
     }
     return EstadoCita.fromDb(res['estado'] as String?);
+  }
+
+  /// Datos programados de la cita, sin ensamblar doctor ni paciente.
+  ///
+  /// La consulta que nace de una cita hereda de aquí su `fecha` (SD-160): el
+  /// día que cuenta es el agendado, no el del clic. Devuelve `null` si el id no
+  /// corresponde a ninguna cita viva, para que quien llame decida si eso es un
+  /// defecto o un caso legítimo.
+  Future<ReferenciaCita?> fetchReferenciaCita(String id) async {
+    final res = await supabase
+        .from('citas')
+        .select('id, fecha_hora, estado, doctor_id, motivo')
+        .eq('id', id)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    if (res == null) return null;
+    return ReferenciaCita(
+      id: res['id'] as String,
+      fechaHora: DateTime.parse(res['fecha_hora'] as String).toLocal(),
+      estado: EstadoCita.fromDb(res['estado'] as String?),
+      doctorId: res['doctor_id'] as String,
+      motivo: res['motivo'] as String?,
+    );
   }
 
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado) async {

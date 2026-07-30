@@ -2,19 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 
 class _Vacio {
   dynamic noSuchMethod(Invocation invocation) =>
@@ -25,46 +26,70 @@ class _StorageDoble extends _Vacio implements SupabaseStorageHelper {}
 
 class _CitaRepoDoble extends _Vacio implements CitaRepository {}
 
-class _ConsumibleRepoDoble extends _Vacio implements ConsumibleRepository {}
-
 class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
   _ConsultaRepoDoble({required this.consulta});
 
   final Consulta consulta;
 
   int guardados = 0;
+  int cierres = 0;
   int cierresFinancieros = 0;
   Odontograma? ultimoOdontograma;
-  ResultadoGuardadoOdontograma idsADevolver =
-      const ResultadoGuardadoOdontograma();
+  int? ultimaVersionEnviada;
+  final List<String> clavesCierre = [];
+  ResultadoBorradorConsulta idsADevolver = const ResultadoBorradorConsulta();
   bool falla = false;
+  Object? fallaGuardado;
+  Object? fallaCierre;
 
   @override
   Future<Consulta?> getDetalleConsulta(String id) async => consulta;
 
   @override
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  Future<ResultadoBorradorConsulta> guardarBorradorConsulta({
     required String consultaId,
-    required String? pacienteId,
+    int? version,
     required Odontograma odontograma,
-    required List recetas,
+    required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
     String? notas,
     Map<String, dynamic>? signosVitales,
-    bool? finalizada,
   }) async {
     guardados++;
     ultimoOdontograma = odontograma;
+    ultimaVersionEnviada = version;
+    final fallo = fallaGuardado;
+    if (fallo != null) throw fallo;
     if (falla) throw Exception('sin red');
     return idsADevolver;
   }
 
   @override
-  Future<String> finalizarConsulta({
+  Future<ResultadoCierreConsulta> cerrarConsulta({
     required String consultaId,
+    int? version,
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
+    String? notas,
+    Map<String, dynamic>? signosVitales,
+    required String idempotenciaKey,
     String? nota,
   }) async {
-    cierresFinancieros++;
-    return 'cuenta-1';
+    cierres++;
+    clavesCierre.add(idempotenciaKey);
+    final fallo = fallaCierre;
+    if (fallo != null) throw fallo;
+
+    // El servidor solo factura lo ejecutado: una evaluación sin tratamientos
+    // cierra sin pre-factura.
+    final factura = odontograma.dientes.any((d) => d.tratamientos.isNotEmpty);
+    if (factura) cierresFinancieros++;
+    return ResultadoCierreConsulta(
+      consultaId: consultaId,
+      cuentaId: factura ? 'cuenta-1' : null,
+      montoTotal: factura ? 2500 : 0,
+    );
   }
 }
 
@@ -82,11 +107,9 @@ Consulta _consultaEnCurso({bool finalizada = false}) => Consulta(
 
 ConsultaCubit _cubitCon(_ConsultaRepoDoble repo) => ConsultaCubit(
   CrearConsultaUseCase(repo),
-  FinalizarConsultaUseCase(repo),
   _StorageDoble(),
   _CitaRepoDoble(),
   repo,
-  DescontarStockPorConsumo(_ConsumibleRepoDoble()),
 );
 
 final _resina = Tratamiento(
@@ -167,8 +190,10 @@ void main() {
 
       await cubit.terminarAtencion();
 
+      expect(repo.cierres, 1, reason: 'el cierre es una sola operación');
       expect(repo.cierresFinancieros, 0);
-      expect(cubit.state, const ConsultaTerminada());
+      expect(cubit.state, isA<ConsultaTerminada>());
+      expect((cubit.state as ConsultaTerminada).cuentaId, isNull);
     });
 
     test('terminar con tratamientos realiza el cierre financiero', () async {
@@ -185,8 +210,9 @@ void main() {
 
       await cubit.terminarAtencion();
 
+      expect(repo.cierres, 1);
       expect(repo.cierresFinancieros, 1);
-      expect(cubit.state, const ConsultaTerminada(cuentaId: 'cuenta-1'));
+      expect((cubit.state as ConsultaTerminada).cuentaId, 'cuenta-1');
     });
 
     test('un cambio queda pendiente y se guarda solo', () async {
@@ -225,7 +251,8 @@ void main() {
 
     test('los ids que devuelve la BD se sellan sobre el estado', () async {
       final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
-        ..idsADevolver = const ResultadoGuardadoOdontograma(
+        ..idsADevolver = const ResultadoBorradorConsulta(
+          version: 7,
           tratamientosPorFdi: {
             16: ['ta-1'],
           },
@@ -296,6 +323,169 @@ void main() {
           repo.guardados,
           1,
           reason: 'un fallo permanente no debe generar reintentos infinitos',
+        );
+      },
+    );
+
+    test(
+      'la versión confirmada viaja en el siguiente guardado',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
+          ..idsADevolver = const ResultadoBorradorConsulta(version: 7);
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+        await cubit.guardarParcial();
+
+        cubit.aplicarTratamiento(diente, TipoSuperficie.mesial, _resina);
+        await cubit.guardarParcial();
+
+        // Sin esto, dos pestañas se sobrescriben en silencio: la segunda
+        // escritura siempre parecería estar al día.
+        expect(repo.ultimaVersionEnviada, 7);
+      },
+    );
+
+    test(
+      'un conflicto de versión se distingue de un fallo de red y explica qué hacer',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
+          ..fallaGuardado = const ConflictoVersionFailure();
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+        await cubit.guardarParcial();
+
+        final estado = cubit.state as ConsultaIniciada;
+        expect(estado.guardado, EstadoGuardado.conflicto);
+        expect(estado.detalleFallo, contains('Recarga'));
+        // El trabajo local no se descarta por un conflicto.
+        expect(
+          estado.consulta.odontograma!.dientes.single.tratamientos,
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
+      'reintentar un cierre fallido conserva la misma clave de idempotencia',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
+          ..fallaCierre = const NetworkFailure();
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+        await cubit.terminarConsulta();
+        expect(cubit.state, isA<ConsultaIniciada>());
+
+        repo.fallaCierre = null;
+        await cubit.terminarConsulta();
+
+        // Si la primera respuesta se perdió por red, el servidor tiene que
+        // reconocer el reintento como el mismo intento y no cobrar dos veces.
+        expect(repo.clavesCierre, hasLength(2));
+        expect(repo.clavesCierre.first, repo.clavesCierre.last);
+        expect((cubit.state as ConsultaTerminada).cuentaId, 'cuenta-1');
+      },
+    );
+
+    test('un cierre fallido explica que nada quedó a medias', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
+        ..fallaCierre = const StockInsuficienteFailure(
+          'Stock insuficiente de Gasas: quedan 1 y la consulta consume 3.',
+        );
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+      final esperado = expectLater(
+        cubit.stream,
+        emitsInOrder([
+          isA<ConsultaGuardando>(),
+          isA<ConsultaError>().having(
+            (e) => e.message,
+            'mensaje',
+            allOf(contains('Gasas'), contains('consume 3')),
+          ),
+          isA<ConsultaIniciada>(),
+        ]),
+      );
+      await cubit.terminarConsulta();
+      await esperado;
+
+      // El doctor vuelve a su consulta, que sigue abierta.
+      expect(cubit.state, isA<ConsultaIniciada>());
+    });
+
+    test('el cierre confirmado saca al doctor del workspace', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+      await cubit.terminarConsulta();
+
+      final terminada = cubit.state as ConsultaTerminada;
+      expect(terminada.consultaId, 'c-1');
+      expect(terminada.montoTotal, 2500);
+    });
+
+    test(
+      'guardar sobre una consulta ya cerrada saca del workspace, no reintenta',
+      () async {
+        final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso())
+          ..fallaGuardado = const ConsultaCerradaFailure();
+        final cubit = _cubitCon(repo);
+        addTearDown(cubit.close);
+        await cubit.reanudarConsulta(consultaId: 'c-1');
+        final diente = (cubit.state as ConsultaIniciada)
+            .consulta
+            .odontograma!
+            .dientes
+            .single;
+        cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+        await cubit.guardarParcial();
+
+        // Seguir editando un expediente cerrado es la ficción que este ticket
+        // elimina: la pantalla tiene que decirlo, no autoguardar en el vacío.
+        expect(cubit.state, isA<ConsultaError>());
+        expect(
+          (cubit.state as ConsultaError).message,
+          contains('ya fue finalizada'),
         );
       },
     );

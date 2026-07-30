@@ -28,6 +28,10 @@ enum EstadoGuardado {
 
   /// El último intento falló; los cambios siguen en memoria.
   fallido,
+
+  /// Otra sesión guardó primero: hay que recargar el estado confirmado antes
+  /// de volver a escribir. Los cambios locales siguen en memoria.
+  conflicto,
 }
 
 /// La consulta está activa en memoria. Contiene el odontograma, recetas, notas y signos vitales.
@@ -37,19 +41,28 @@ class ConsultaIniciada extends ConsultaState {
   /// Estado del autoguardado de [consulta].
   final EstadoGuardado guardado;
 
+  /// Qué falló en el último intento, cuando el motivo es accionable (conflicto
+  /// de versión, stock insuficiente, red). Nulo si no hay nada que explicar.
+  final String? detalleFallo;
+
   const ConsultaIniciada({
     required this.consulta,
     this.guardado = EstadoGuardado.alDia,
+    this.detalleFallo,
   });
 
-  ConsultaIniciada copyWith({Consulta? consulta, EstadoGuardado? guardado}) =>
-      ConsultaIniciada(
-        consulta: consulta ?? this.consulta,
-        guardado: guardado ?? this.guardado,
-      );
+  ConsultaIniciada copyWith({
+    Consulta? consulta,
+    EstadoGuardado? guardado,
+    String? detalleFallo,
+  }) => ConsultaIniciada(
+    consulta: consulta ?? this.consulta,
+    guardado: guardado ?? this.guardado,
+    detalleFallo: detalleFallo ?? this.detalleFallo,
+  );
 
   @override
-  List<Object?> get props => [consulta, guardado];
+  List<Object?> get props => [consulta, guardado, detalleFallo];
 }
 
 /// Guardando la consulta (parcial o finalización).
@@ -65,12 +78,18 @@ class ConsultaGuardando extends ConsultaState {
 /// La consulta se finalizó con éxito. Lleva el id de la cuenta (pre-factura)
 /// generada, para poder navegar hacia el detalle financiero.
 class ConsultaTerminada extends ConsultaState {
+  final String? consultaId;
   final String? cuentaId;
+  final double montoTotal;
 
-  const ConsultaTerminada({this.cuentaId});
+  const ConsultaTerminada({
+    this.consultaId,
+    this.cuentaId,
+    this.montoTotal = 0,
+  });
 
   @override
-  List<Object?> get props => [cuentaId];
+  List<Object?> get props => [consultaId, cuentaId, montoTotal];
 }
 
 /// Falló la operación u ocurrió un error.

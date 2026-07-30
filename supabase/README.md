@@ -148,9 +148,11 @@ así que no dejan datos, y abortan con `ERROR` si el contrato se rompe.
 | `tests/sd_135_plan_tratamiento_test.sql` | Separación evaluación / plan / ejecución (SD-135/SD-138): registrar hallazgos **no** crea tratamiento aplicado ni cuenta; una actividad todavía `propuesto` no se puede ejecutar; una ejecución aceptada completa su actividad planificada; el flujo unificado admite una intervención agregada durante la consulta sin justificación obligatoria y conserva su auditoría; `finalizar_consulta` cobra solo lo ejecutado e ignora lo planificado, y es idempotente. |
 | `tests/hfx_clin_000_identidad_admin_doctor_test.sql` | Identidad admin-doctor (HFX-CLIN-000): el alta de **admin** crea `usuarios` + `doctores` + `admins` con el UUID de Auth (antes `personas.id` era aleatorio y toda la RLS `id = auth.uid()` fallaba); la de **doctor** no crea fila de admin y la de **asistente** no otorga identidad clínica; un alta con campos obligatorios inválidos se revierte entera; la FK `admins.id → doctores.id` está activa; `perfil_actual()` devuelve el contrato de cada rol y nunca una contraseña; el admin aparece en `get_active_doctors()` y puede firmar su propia consulta; `anon` no ejecuta ninguna de las dos funciones. |
 | `tests/sd_146_cita_actividades_test.sql` | Vínculo cita ↔ actividades planificadas (SD-146): una cita puede cubrir varias actividades del plan de **su** paciente; `trg_validar_cita_item_plan` rechaza la actividad de otro paciente, la retirada del plan (`deleted_at`) y la ya rechazada/cancelada/completada; `resumen_actividades_cita` devuelve nombre del tratamiento y pieza FDI; `actividades_agendables_paciente` excluye lo rechazado y lo retirado; el **asistente** —que es quien agenda y no puede leer `items_plan_tratamiento`— sí lee las vistas y gestiona los vínculos; borrar la cita se lleva los suyos. |
+| `tests/hfx_clin_001_seguridad_rpc_rls_test.sql` | Matriz ofensiva de RPC y RLS (HFX-CLIN-001): `anon` sin grants ni identidad, funciones base fuera del alcance de `authenticated`, asistente sin escritura clínica, doctor sin acceso a lo ajeno y corrección administrativa auditada. |
+| `tests/hfx_clin_002_cierre_transaccional_test.sql` | Persistencia y cierre transaccional (HFX-CLIN-002): una cita no admite dos consultas vigentes; el borrador guarda, identifica y versiona en una operación; una versión obsoleta no escribe nada; un guardado fallido no borra la receta persistida; stock insuficiente revierte el cierre entero; el cierre confirma consulta, cita, stock, cuenta y receta a la vez; reintentarlo es idempotente; una consulta cerrada no se edita y su receta emitida solo se anula; una evaluación sin ejecución cierra sin cobrar; el doctor ajeno no guarda ni cierra; `anon` no alcanza ninguna de las dos RPC. |
 
 ```bash
-# Contra la base local levantada por el CLI: las cinco suites de una pasada
+# Contra la base local levantada por el CLI: todas las suites de una pasada
 supabase db reset
 PGURL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 for t in supabase/tests/*.sql; do psql "$PGURL" -v ON_ERROR_STOP=1 -f "$t"; done
@@ -183,8 +185,26 @@ supabase db reset
 ```
 
 > ✅ **Bootstrap desde cero.** Desde HFX-CLIN-000 el `supabase db reset` de arriba
-> deja la base lista para correr las cinco suites: verificado el 31 jul 2026 sobre
+> deja la base lista para correr todas las suites: verificado el 30 jul 2026 sobre
 > una base recién reconstruida.
+
+### Cierre clínico: concurrencia y contrato REST
+
+Dos comprobaciones de HFX-CLIN-002 no caben en una prueba SQL, porque una
+transacción no puede observarse a sí misma desde fuera:
+
+```bash
+supabase db reset
+./supabase/tests/hfx_clin_002_concurrencia.sh   # dos conexiones cerrando a la vez
+./supabase/tests/hfx_clin_002_contrato_rest.sh  # el payload de la app por PostgREST
+```
+
+La primera abre dos sesiones reales: la segunda espera el bloqueo y se encuentra
+el cierre ya hecho, de modo que solo hay una cuenta, un movimiento de stock y una
+cita completada. La segunda manda por REST el mismo payload que manda Flutter y
+comprueba contra la base que el hallazgo conservó su cara —el defecto
+`superficiecle` no lo detectaba ningún doble— y que reintentar el cierre no
+vuelve a descontar ni a facturar.
 
 ### Verificación manual equivalente
 

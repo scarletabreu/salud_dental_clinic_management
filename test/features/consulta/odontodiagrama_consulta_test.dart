@@ -7,12 +7,12 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/workspace_consulta.dart';
@@ -39,8 +39,6 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 
 const _consultaId = '33333333-3333-3333-3333-333333333333';
@@ -86,18 +84,18 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
   Future<Consulta?> getDetalleConsulta(String id) async => consulta;
 
   @override
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  Future<ResultadoBorradorConsulta> guardarBorradorConsulta({
     required String consultaId,
-    required String? pacienteId,
+    int? version,
     required Odontograma odontograma,
     required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
     String? notas,
     Map<String, dynamic>? signosVitales,
-    bool? finalizada,
   }) async {
     escrituras++;
     guardado = odontograma;
-    return const ResultadoGuardadoOdontograma();
+    return const ResultadoBorradorConsulta();
   }
 
   @override
@@ -114,9 +112,6 @@ class _Vacio {
 }
 
 class _CrearConsultaDoble extends _Vacio implements CrearConsultaUseCase {}
-
-class _FinalizarConsultaDoble extends _Vacio
-    implements FinalizarConsultaUseCase {}
 
 class _StorageDoble extends _Vacio implements SupabaseStorageHelper {}
 
@@ -182,9 +177,6 @@ class _PlanRepositorioDoble extends _Vacio
   ) async => _itemsEjecutablesDoble;
 }
 
-class _ConsumibleRepositorioDoble extends _Vacio
-    implements ConsumibleRepository {}
-
 class _PacienteCubitDoble extends Cubit<PacienteState>
     implements PacienteCubit {
   _PacienteCubitDoble() : super(PacienteLoading());
@@ -195,11 +187,9 @@ class _PacienteCubitDoble extends Cubit<PacienteState>
 
 ConsultaCubit _cubit(_ConsultaRepositorioEspia repo) => ConsultaCubit(
   _CrearConsultaDoble(),
-  _FinalizarConsultaDoble(),
   _StorageDoble(),
   _CitaRepositorioDoble(),
   repo,
-  DescontarStockPorConsumo(_ConsumibleRepositorioDoble()),
 );
 
 void main() {

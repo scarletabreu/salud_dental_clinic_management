@@ -42,6 +42,17 @@ Failure mapExceptionToFailure(Object error, {String? context}) {
     if (error.message == _cajaCerradaMessage) {
       return const ValidationFailure(_cajaCerradaMessage);
     }
+    // Códigos estables del cierre clínico transaccional (HFX-CLIN-002). Su
+    // mensaje ya viene redactado para el doctor y describe qué hacer, así que
+    // se propaga tal cual en vez de esconderlo tras un error genérico.
+    switch (error.code) {
+      case 'CL001':
+        return ConflictoVersionFailure(error.message);
+      case 'CL002':
+        return ConsultaCerradaFailure(error.message);
+      case 'CL003':
+        return StockInsuficienteFailure(error.message);
+    }
     return ServerFailure(_serverMessage(context, error.message));
   }
   if (error is StorageException) {

@@ -1,6 +1,12 @@
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 
-enum EstadoReceta { activa, anulada, reemplazada }
+/// Ciclo de vida de una receta (HFX-CLIN-002).
+///
+/// Mientras la consulta está abierta la receta es un [borrador] mutable. El
+/// cierre la [emitida] y desde ahí es un documento entregado al paciente: solo
+/// puede [anulada] o [reemplazada], nunca reescribirse. El estado histórico
+/// `activa` se lee como [emitida].
+enum EstadoReceta { borrador, emitida, anulada, reemplazada }
 
 class Receta {
   final String? id;
@@ -28,7 +34,7 @@ class Receta {
     required this.items,
     this.indicacionesGenerales,
     this.justificacionContraindicaciones,
-    this.estado = EstadoReceta.activa,
+    this.estado = EstadoReceta.borrador,
     this.motivoAnulacion,
     this.recetaReemplazadaId,
   });

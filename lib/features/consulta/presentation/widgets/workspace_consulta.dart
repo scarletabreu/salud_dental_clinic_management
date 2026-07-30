@@ -897,6 +897,11 @@ class _IndicadorGuardado extends StatelessWidget {
         Icons.cloud_off_rounded,
         'No se pudo guardar',
       ),
+      EstadoGuardado.conflicto => (
+        ac.red,
+        Icons.sync_problem_rounded,
+        'Cambió en otra sesión',
+      ),
     };
 
     return Tooltip(
@@ -908,6 +913,9 @@ class _IndicadorGuardado extends StatelessWidget {
         EstadoGuardado.guardando => 'Escribiendo los cambios en el servidor.',
         EstadoGuardado.fallido =>
           'Los cambios siguen aquí y se reintentará solo. No cierres la consulta.',
+        EstadoGuardado.conflicto =>
+          'Otra sesión guardó esta consulta primero. Recárgala para ver lo '
+              'confirmado antes de volver a guardar; tus cambios siguen aquí.',
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

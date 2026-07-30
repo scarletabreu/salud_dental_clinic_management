@@ -47,3 +47,29 @@ class CacheFailure extends Failure {
 class ValidationFailure extends Failure {
   const ValidationFailure([super.message = 'Los datos no son válidos.']);
 }
+
+/// Otro actor guardó la misma consulta primero (HFX-CLIN-002, `CL001`). No se
+/// escribió nada: el usuario debe recargar el estado confirmado y reintentar.
+class ConflictoVersionFailure extends Failure {
+  const ConflictoVersionFailure([
+    super.message =
+        'Otra sesión guardó esta consulta primero. Recarga para ver lo '
+            'confirmado antes de volver a guardar.',
+  ]);
+}
+
+/// La consulta ya está cerrada (`CL002`). Es un estado final, no un fallo
+/// recuperable: la UI debe salir del workspace en vez de reintentar.
+class ConsultaCerradaFailure extends Failure {
+  const ConsultaCerradaFailure([
+    super.message = 'Esta consulta ya fue finalizada y no admite cambios.',
+  ]);
+}
+
+/// No hay inventario suficiente para el consumo declarado (`CL003`). El cierre
+/// completo se revirtió: no se descontó stock ni se creó cuenta.
+class StockInsuficienteFailure extends Failure {
+  const StockInsuficienteFailure([
+    super.message = 'No hay stock suficiente para cerrar la consulta.',
+  ]);
+}

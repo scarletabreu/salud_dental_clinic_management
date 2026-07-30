@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/data/models/documento_clinico_model.dart';
@@ -22,6 +23,8 @@ class ConsultaModel extends Consulta {
     super.finalizada,
     super.tipoAtencion,
     super.tienePreFactura,
+    super.version,
+    super.insumosUtilizados,
   });
 
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
@@ -59,6 +62,16 @@ class ConsultaModel extends Consulta {
       tienePreFactura:
           (json['tiene_pre_factura'] ?? json['tienePreFactura'] ?? false)
               as bool,
+      version: (json['version'] as num?)?.toInt(),
+      insumosUtilizados: [
+        for (final fila in (json['consumos'] as List? ?? const []))
+          if (fila['consumible_id'] != null)
+            InsumoUtilizado(
+              consumibleId: fila['consumible_id'] as String,
+              nombre: (fila['nombre'] as String?) ?? 'Insumo',
+              cantidad: (fila['cantidad'] as num?)?.toInt() ?? 0,
+            ),
+      ],
     );
   }
 

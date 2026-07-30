@@ -9,16 +9,14 @@ import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/dientes_iniciales.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/entities/diagnosis.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/enums/severidad_diagnosis.dart';
@@ -27,7 +25,6 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/enums/tipo_documento.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
-import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -62,25 +59,27 @@ class DocumentoAdjunto {
 
 class ConsultaCubit extends Cubit<ConsultaState> {
   final CrearConsultaUseCase _crearConsulta;
-  final FinalizarConsultaUseCase _finalizarConsulta;
   final SupabaseStorageHelper _storage;
   final CitaRepository _citaRepository;
   final ConsultaRepository _consultaRepository;
-  final DescontarStockPorConsumo _descontarStockPorConsumo;
 
   ConsultaCubit(
     this._crearConsulta,
-    this._finalizarConsulta,
     this._storage,
     this._citaRepository,
     this._consultaRepository,
-    this._descontarStockPorConsumo,
   ) : super(const ConsultaInactiva());
 
   static const esperaAutoguardado = Duration(seconds: 3);
 
   Timer? _autoguardado;
   bool _guardando = false;
+
+  /// Identifica el intento lógico de cierre en curso. Se conserva mientras el
+  /// cierre no se confirme: si la respuesta se perdió por red, reintentar con
+  /// la misma clave devuelve el resultado existente en vez de descontar
+  /// inventario o facturar por segunda vez.
+  String? _claveCierre;
 
   @override
   Future<void> close() {
@@ -97,30 +96,66 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     _autoguardado = Timer(esperaAutoguardado, guardarParcial);
   }
 
+  /// Fija sobre el estado en memoria las identidades y la versión que el
+  /// servidor confirmó. Sin esto, el siguiente autoguardado volvería a insertar
+  /// lo mismo con otro id y la versión enviada nunca coincidiría.
   Consulta _sellarIds(
     Consulta vigente,
     Consulta enviada,
-    ResultadoGuardadoOdontograma idsPorFdi,
+    ResultadoBorradorConsulta confirmado,
   ) {
-    final odonto = vigente.odontograma;
-    if (odonto == null || idsPorFdi.isEmpty) return vigente;
+    final sellada = vigente.copyWith(version: confirmado.version);
+    final odonto = sellada.odontograma;
+    if (odonto == null || confirmado.sinIdentidades) {
+      return _sellarRecetas(sellada, enviada, confirmado.recetaIds);
+    }
 
     final enviadaPorFdi = {
       for (final d in enviada.odontograma?.dientes ?? const []) d.fdiCode: d,
     };
 
-    return vigente.copyWith(
-      odontograma: odonto.copyWith(
-        dientes: [
-          for (final diente in odonto.dientes)
-            _sellarDiente(
-              diente,
-              enviadaPorFdi[diente.fdiCode],
-              idsPorFdi.tratamientosPorFdi[diente.fdiCode],
-              idsPorFdi.diagnosticosPorFdi[diente.fdiCode],
-            ),
-        ],
+    return _sellarRecetas(
+      sellada.copyWith(
+        odontograma: odonto.copyWith(
+          dientes: [
+            for (final diente in odonto.dientes)
+              _sellarDiente(
+                diente,
+                enviadaPorFdi[diente.fdiCode],
+                confirmado.tratamientosPorFdi[diente.fdiCode],
+                confirmado.diagnosticosPorFdi[diente.fdiCode],
+              ),
+          ],
+        ),
       ),
+      enviada,
+      confirmado.recetaIds,
+    );
+  }
+
+  /// La receta guardada conserva su id: así el siguiente guardado la actualiza
+  /// en su sitio en vez de anularla y crear otra.
+  Consulta _sellarRecetas(
+    Consulta vigente,
+    Consulta enviada,
+    List<String> ids,
+  ) {
+    if (ids.isEmpty) return vigente;
+    final actuales = vigente.recetas;
+    if (actuales.length != enviada.recetas.length ||
+        actuales.length != ids.length) {
+      return vigente;
+    }
+    for (var i = 0; i < actuales.length; i++) {
+      if (!identical(actuales[i], enviada.recetas[i])) return vigente;
+    }
+    return vigente.copyWith(
+      recetas: [
+        for (var i = 0; i < actuales.length; i++)
+          actuales[i].id == null && ids[i].isNotEmpty
+              ? actuales[i].copyWith(id: ids[i])
+              : actuales[i],
+      ],
     );
   }
 
@@ -731,20 +766,21 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     _guardando = true;
     emit(actual.copyWith(guardado: EstadoGuardado.guardando));
     try {
-      final idsPorFdi = await _consultaRepository.guardarResultadoConsulta(
+      final confirmado = await _consultaRepository.guardarBorradorConsulta(
         consultaId: consultaId,
-        pacienteId: consulta.pacienteId,
+        version: consulta.version,
         odontograma: odontograma,
         recetas: consulta.recetas,
+        insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
-        finalizada: false,
+        signosVitales: consulta.signosVitales?.toJson(),
       );
       _guardando = false;
       if (isClosed) return;
 
       final vigente = state;
       if (vigente is! ConsultaIniciada) return;
-      final sellada = _sellarIds(vigente.consulta, consulta, idsPorFdi);
+      final sellada = _sellarIds(vigente.consulta, consulta, confirmado);
       final quedaPendiente = !identical(vigente.consulta, consulta);
       emit(
         ConsultaIniciada(
@@ -761,12 +797,29 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       _guardando = false;
       AppLog.error('guardado parcial', e);
       if (isClosed) return;
+      if (e is ConsultaCerradaFailure) {
+        // Seguir ofreciendo el workspace sería mentir: el expediente ya cerró.
+        emit(ConsultaError(e.message));
+        return;
+      }
       final vigente = state;
       if (vigente is! ConsultaIniciada) return;
-      emit(vigente.copyWith(guardado: EstadoGuardado.fallido));
+      emit(
+        vigente.copyWith(
+          guardado: e is ConflictoVersionFailure
+              ? EstadoGuardado.conflicto
+              : EstadoGuardado.fallido,
+          detalleFallo: _detalleFallo(e),
+        ),
+      );
     }
   }
 
+  /// Cierra la consulta como una sola operación del servidor.
+  ///
+  /// Antes esto eran cuatro llamadas seguidas —guardar, descontar stock,
+  /// finalizar, completar cita— y una interrupción entre dos de ellas dejaba
+  /// una consulta cerrada sin cuenta, o inventario descontado sin cierre.
   Future<void> terminarConsulta() async {
     if (state is! ConsultaIniciada) return;
 
@@ -785,37 +838,36 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
     _guardando = true;
 
+    // La clave sobrevive al fallo a propósito: reintentar el mismo cierre es
+    // el mismo intento lógico, no uno nuevo.
+    final clave = _claveCierre ??= _nuevaClaveCierre(consultaId);
+
     emit(ConsultaGuardando(consulta: consulta));
     try {
-      await _consultaRepository.guardarResultadoConsulta(
+      final cierre = await _consultaRepository.cerrarConsulta(
         consultaId: consultaId,
-        pacienteId: consulta.pacienteId,
+        version: consulta.version,
         odontograma: odontograma,
         recetas: consulta.recetas,
+        insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
-        finalizada: true,
+        signosVitales: consulta.signosVitales?.toJson(),
+        idempotenciaKey: clave,
       );
 
-      if (consulta.insumosUtilizados.isNotEmpty) {
-        await _descontarStockPorConsumo(consulta.insumosUtilizados);
-      }
-
-      final cuentaId = await _finalizarConsulta(consultaId: consultaId);
-
       _guardando = false;
-      emit(ConsultaTerminada(cuentaId: cuentaId));
+      _claveCierre = null;
+      emit(
+        ConsultaTerminada(
+          consultaId: consultaId,
+          cuentaId: cierre.cuentaId,
+          montoTotal: cierre.montoTotal,
+        ),
+      );
     } catch (e) {
       _guardando = false;
       AppLog.error('terminar consulta', e);
-      emit(
-        ConsultaError(
-          _mensajeError(
-            e,
-            fallback:
-                'No se pudo guardar el resultado de la consulta. Inténtalo de nuevo.',
-          ),
-        ),
-      );
+      emit(ConsultaError(_mensajeError(e, fallback: _falloCierre)));
       emit(ConsultaIniciada(consulta: consulta));
     }
   }
@@ -837,6 +889,8 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  /// Cierra una evaluación: mismo cierre transaccional, sin pre-factura. Una
+  /// evaluación sin ejecución no cobra nada, y el servidor es quien decide eso.
   Future<void> terminarEvaluacion() async {
     if (state is! ConsultaIniciada) return;
     final consulta = (state as ConsultaIniciada).consulta;
@@ -852,25 +906,29 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     _guardando = true;
+    final clave = _claveCierre ??= _nuevaClaveCierre(consultaId);
+
     emit(ConsultaGuardando(consulta: consulta));
     try {
-      await _consultaRepository.guardarResultadoConsulta(
+      final cierre = await _consultaRepository.cerrarConsulta(
         consultaId: consultaId,
-        pacienteId: consulta.pacienteId,
+        version: consulta.version,
         odontograma: odontograma,
         recetas: consulta.recetas,
+        insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
         signosVitales: consulta.signosVitales?.toJson(),
-        finalizada: true,
+        idempotenciaKey: clave,
       );
-      if (consulta.citaId != null) {
-        await _citaRepository.updateCitaEstado(
-          consulta.citaId!,
-          EstadoCita.completada,
-        );
-      }
       _guardando = false;
-      emit(const ConsultaTerminada());
+      _claveCierre = null;
+      emit(
+        ConsultaTerminada(
+          consultaId: consultaId,
+          cuentaId: cierre.cuentaId,
+          montoTotal: cierre.montoTotal,
+        ),
+      );
     } catch (e) {
       _guardando = false;
       AppLog.error('terminar evaluación', e);
@@ -883,12 +941,40 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
   }
 
+  static const _falloCierre =
+      'No se pudo cerrar la consulta. No se descontó inventario ni se generó '
+      'la pre-factura; la consulta sigue abierta.';
+
+  String _nuevaClaveCierre(String consultaId) =>
+      '$consultaId:${DateTime.now().microsecondsSinceEpoch}';
+
+  /// Explica qué falló sin exponer el payload: el doctor necesita saber qué
+  /// operación no pasó, no el detalle interno del servidor.
+  String? _detalleFallo(Object e) {
+    if (e is ConflictoVersionFailure ||
+        e is StockInsuficienteFailure ||
+        e is NetworkFailure) {
+      return e.toString();
+    }
+    return null;
+  }
+
   String _mensajeError(
     Object e, {
     String fallback = 'No se pudo registrar la consulta. Inténtalo de nuevo.',
   }) {
     if (e is NetworkFailure) {
       return 'Sin conexión. No se guardó la operación; verifica tu red e inténtalo de nuevo.';
+    }
+    // Estos fallos ya vienen redactados para el doctor y nombran la operación
+    // que no pasó (el insumo sin stock, la sesión que escribió primero).
+    // Reemplazarlos por un texto genérico es lo que hacía imposible saber qué
+    // corregir.
+    if (e is StockInsuficienteFailure ||
+        e is ConflictoVersionFailure ||
+        e is ConsultaCerradaFailure ||
+        e is ValidationFailure) {
+      return e.toString();
     }
     final raw = e.toString();
     if (raw.contains('paciente de prueba')) {

@@ -3,7 +3,6 @@ import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 
-/// Avatar privado: la app solicita una URL firmada efímera solo al mostrarla.
 class PacienteAvatar extends StatefulWidget {
   const PacienteAvatar({
     super.key,
@@ -17,8 +16,6 @@ class PacienteAvatar extends StatefulWidget {
   final double size;
   final Color? backgroundColor;
 
-  /// Ignora la foto guardada y muestra las iniciales; lo usa el formulario
-  /// cuando hay una eliminación pendiente de confirmar.
   final bool forzarIniciales;
 
   @override
@@ -26,7 +23,7 @@ class PacienteAvatar extends StatefulWidget {
 }
 
 class _PacienteAvatarState extends State<PacienteAvatar> {
-  late Future<String>? _url;
+  late Future<String?>? _url;
 
   @override
   void initState() {
@@ -45,7 +42,7 @@ class _PacienteAvatarState extends State<PacienteAvatar> {
     }
   }
 
-  Future<String>? _crearUrl() {
+  Future<String?>? _crearUrl() {
     if (widget.forzarIniciales) return null;
     final ruta = widget.paciente.fotoRuta;
     if (ruta == null || ruta.isEmpty) return null;
@@ -56,21 +53,29 @@ class _PacienteAvatarState extends State<PacienteAvatar> {
   Widget build(BuildContext context) {
     final url = _url;
     if (url == null) return _fallback();
-    return FutureBuilder<String>(
+
+    return FutureBuilder<String?>(
       future: url,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return _fallback(loading: true);
         }
-        if (snapshot.hasError || !snapshot.hasData) {
+
+        final fotoUrl = snapshot.data;
+
+        if (snapshot.hasError ||
+            !snapshot.hasData ||
+            fotoUrl == null ||
+            fotoUrl.isEmpty) {
           return Tooltip(
             message: 'Foto no disponible',
             child: _fallback(error: true),
           );
         }
+
         return ClipOval(
           child: Image.network(
-            snapshot.data!,
+            fotoUrl,
             key: ValueKey(
               '${widget.paciente.fotoRuta}:${widget.paciente.fotoActualizadaEn}',
             ),

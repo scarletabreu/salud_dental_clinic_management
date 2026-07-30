@@ -1,10 +1,8 @@
 import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Gestiona fotos de pacientes en Storage. Las rutas son estables para que al
-/// reemplazar una foto no se acumulen objetos huérfanos.
 class PacienteFotoStorage {
   PacienteFotoStorage(this._client);
 
@@ -14,16 +12,10 @@ class PacienteFotoStorage {
   static const maxOriginalBytes = 10 * 1024 * 1024;
   static const maxCompressedBytes = 2 * 1024 * 1024;
   static const ladoMaximo = 1024;
-
-  /// Vida de la URL firmada. Se renueva con margen para que una lista abierta
-  /// mucho tiempo no muestre imágenes rotas.
   static const duracionUrlFirmada = Duration(minutes: 30);
   static const _margenRenovacion = Duration(minutes: 2);
-
   final Map<String, _UrlFirmada> _cacheUrls = {};
 
-  /// Valida el original y lo deja listo para recortar: orientación EXIF
-  /// aplicada y decodificado una sola vez.
   img.Image decodificar(Uint8List original) {
     if (original.lengthInBytes > maxOriginalBytes) {
       throw const FormatoFotoInvalido(
@@ -43,8 +35,6 @@ class PacienteFotoStorage {
     return img.bakeOrientation(decoded);
   }
 
-  /// Reduce el lado mayor a [ladoMaximo] y codifica en JPEG, que es el único
-  /// mime aceptado por la restricción de la tabla.
   Uint8List comprimir(img.Image imagen) {
     final largestSide = imagen.width > imagen.height
         ? imagen.width
@@ -66,8 +56,6 @@ class PacienteFotoStorage {
     return bytes;
   }
 
-  /// Recorta [imagen] al cuadrado indicado, saneando el rectángulo contra los
-  /// bordes para que un gesto en el visor nunca produzca un recorte inválido.
   img.Image recortarCuadrado(
     img.Image imagen, {
     required int x,
@@ -87,7 +75,6 @@ class PacienteFotoStorage {
     );
   }
 
-  /// Camino directo sin recorte manual: valida, orienta y comprime.
   Uint8List preparar(Uint8List original) => comprimir(decodificar(original));
 
   Future<void> guardar({
@@ -135,25 +122,58 @@ class PacienteFotoStorage {
     _cacheUrls.remove(ruta);
   }
 
-  /// URL firmada con caché por ruta: un listado de pacientes reconstruye sus
-  /// filas constantemente y sin esto firmaba una URL por cada rebuild.
-  Future<String> urlFirmada(String ruta) {
+  Future<String?> urlFirmada(String ruta) {
+    if (ruta.trim().isEmpty) return Future.value(null);
+
     final vigente = _cacheUrls[ruta];
     if (vigente != null && !vigente.expirada) return vigente.url;
 
-    final pendiente = _client.storage
-        .from(bucket)
-        .createSignedUrl(ruta, duracionUrlFirmada.inSeconds);
+    final pendiente = _generarUrlConManejoError(ruta);
+
     _cacheUrls[ruta] = _UrlFirmada(
       url: pendiente,
       expiraEn: DateTime.now().add(duracionUrlFirmada - _margenRenovacion),
     );
-    // Un fallo no debe quedar cacheado: la siguiente lectura vuelve a firmar.
-    pendiente.catchError((Object error) {
-      _cacheUrls.remove(ruta);
-      throw error;
-    });
+
     return pendiente;
+  }
+
+  Future<String?> _generarUrlConManejoError(String ruta) async {
+    try {
+      final String rutaLimpia = _extraerRutaRelativa(ruta);
+
+      final url = await _client.storage
+          .from(bucket)
+          .createSignedUrl(rutaLimpia, duracionUrlFirmada.inSeconds);
+      return url;
+    } on StorageException catch (e) {
+      debugPrint(
+        '⚠️ Foto no encontrada o error en Storage ($ruta): ${e.message}',
+      );
+      _cacheUrls.remove(ruta);
+      return null;
+    } catch (e) {
+      debugPrint('⚠️ Error al obtener signed URL para ($ruta): $e');
+      _cacheUrls.remove(ruta);
+      return null;
+    }
+  }
+
+  String _extraerRutaRelativa(String ruta) {
+    var limpia = ruta.trim();
+    if (limpia.contains('/storage/v1/object/public/$bucket/')) {
+      limpia = limpia.split('/storage/v1/object/public/$bucket/').last;
+    } else if (limpia.contains('/storage/v1/object/sign/$bucket/')) {
+      limpia = limpia.split('/storage/v1/object/sign/$bucket/').last;
+    } else if (limpia.startsWith('http://') || limpia.startsWith('https://')) {
+      final uri = Uri.parse(limpia);
+      final segments = uri.pathSegments;
+      final bucketIndex = segments.indexOf(bucket);
+      if (bucketIndex != -1 && bucketIndex < segments.length - 1) {
+        limpia = segments.sublist(bucketIndex + 1).join('/');
+      }
+    }
+    return limpia;
   }
 
   void invalidarCache() => _cacheUrls.clear();
@@ -184,7 +204,7 @@ class PacienteFotoStorage {
 class _UrlFirmada {
   _UrlFirmada({required this.url, required this.expiraEn});
 
-  final Future<String> url;
+  final Future<String?> url;
   final DateTime expiraEn;
 
   bool get expirada => DateTime.now().isAfter(expiraEn);

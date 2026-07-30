@@ -90,15 +90,6 @@ bool _mismosEventos(List<MarcaClinicaPieza> a, List<MarcaClinicaPieza> b) {
   return true;
 }
 
-/// La línea de tiempo completa de una pieza: cada visita en la que se anotó
-/// algo sobre ella, de la más reciente a la más antigua.
-///
-/// Es acumulativa por definición. El odontograma de una consulta describe la
-/// boca *de ese día* y la Vista General del expediente se queda con la peor
-/// anotación de cada pieza; ninguno de los dos puede contar lo que pasó antes.
-/// Este historial se arma de los ejes clínicos —hallazgos, plan y ejecuciones—,
-/// que sí conservan una fila por cada cosa que ocurrió, de modo que consolidar
-/// la situación actual del paciente nunca borra un evento anterior (SD-144).
 class HistorialPieza {
   final int fdi;
   final List<VisitaPieza> visitas;
@@ -113,8 +104,6 @@ class HistorialPieza {
   Iterable<MarcaClinicaPieza> get eventos =>
       visitas.expand((visita) => visita.eventos);
 
-  /// Lo cobrado sobre la pieza en toda su historia. Solo suma ejecuciones vivas:
-  /// el estimado del plan no es un cargo y lo anulado dejó de serlo.
   double get totalEjecutado => eventos
       .where(
         (e) =>
@@ -128,14 +117,8 @@ class HistorialPieza {
       eventos.where((e) => e.procedencia == procedencia).length;
 }
 
-/// El historial de todas las piezas del paciente, listo para que cualquier
-/// odontograma del expediente responda al toque sin volver a la base.
 class HistorialPiezas {
   final Map<int, HistorialPieza> porFdi;
-
-  /// Nombre de cada doctor que aparece en el historial. Viaja con él porque la
-  /// línea de tiempo sin autoría no sirve para auditar, y resolverlo en cada
-  /// pantalla obligaba a repetir la carga del personal.
   final Map<String, String> nombrePorDoctorId;
 
   const HistorialPiezas({
@@ -146,19 +129,8 @@ class HistorialPiezas {
   static const vacio = HistorialPiezas();
 
   bool get estaVacio => porFdi.isEmpty;
-
-  /// El historial de la pieza [fdi], o `null` si nunca se le anotó nada.
   HistorialPieza? operator [](int fdi) => porFdi[fdi];
-
-  /// El nombre del doctor, o cadena vacía si no se pudo resolver: la ficha
-  /// prefiere omitir la autoría antes que mostrar un identificador.
   String nombreDoctor(String doctorId) => nombrePorDoctorId[doctorId] ?? '';
-
-  /// Arma la línea de tiempo de cada pieza a partir de los tres ejes clínicos.
-  ///
-  /// Los tres mapas vienen indexados por código FDI. [consultas] sitúa cada
-  /// evento en su visita; un evento cuya consulta no esté en el índice no se
-  /// pierde: se agrupa por su propio día.
   factory HistorialPiezas.consolidar({
     Map<int, List<DiagnosticoAplicado>> diagnosticos = const {},
     Map<int, List<TratamientoAplicado>> tratamientos = const {},

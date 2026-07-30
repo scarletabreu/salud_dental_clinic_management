@@ -9,17 +9,16 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/page
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
-import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/condiciones_medicas_card.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/planes_tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/presentation/widgets/generar_expediente_modal.dart';
-import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/pages/resumen_plan_page.dart';
 
 enum _VistaConsultas { cronologica, lista }
 
@@ -104,8 +103,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final puedeExportar = context.select(
       (AuthCubit cubit) => cubit.state.roles.puedeVerExpedientes,
     );
-    // AÑADIDO: el doctor no puede editar al paciente ni ver su información
-    // de contacto (cédula, teléfono, email, dirección).
     final esDoctor = context.select(
       (AuthCubit cubit) => cubit.state.rol == RolUsuario.doctor,
     );
@@ -118,7 +115,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
 
         final historialPiezas = (state is PacienteDetailLoaded)
             ? state.historialPiezas
-            : null;
+            : const <HistorialPieza>[];
 
         return Scaffold(
           backgroundColor: ac.bgPage,
@@ -174,7 +171,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                         paciente: paciente,
                         odontogramaActual: odontogramaActual,
                         consultasConOdontograma: consultasConOdontograma,
-                        historialPiezas: historialPiezas,
+                        historialPiezas: historialPiezas as HistorialPiezas?,
                       );
                     },
                   ),
@@ -187,7 +184,11 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildBody(PacienteState state, AppColors ac, {required bool esDoctor}) {
+  Widget _buildBody(
+    PacienteState state,
+    AppColors ac, {
+    required bool esDoctor,
+  }) {
     if (state is PacienteDetailLoading) {
       return Center(
         child: CircularProgressIndicator(
@@ -247,8 +248,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
           CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
-          // CAMBIO: para el doctor, se omite por completo la tarjeta de
-          // Contacto; la Información Clínica ocupa el ancho disponible.
           if (esDoctor)
             _buildInfoClinicaCard(p)
           else
@@ -318,7 +317,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  // CAMBIO: "Editar" solo si NO es doctor (admin/asistente).
                   if (!esDoctor)
                     OutlinedButton.icon(
                       onPressed: () {
@@ -388,12 +386,9 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           const SizedBox(height: 18),
-
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // El bucket de fotos es privado: PacienteAvatar pide la URL
-              // firmada en vez de construir una pública.
               PacienteAvatar(paciente: p, size: 72),
               const SizedBox(width: 16),
               Expanded(
@@ -415,8 +410,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        // CAMBIO: cédula oculta para doctor (dato de
-                        // identificación/contacto).
                         if (!esDoctor)
                           _MetaItem(
                             icon: Icons.badge_outlined,
@@ -852,7 +845,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           const SizedBox(height: 16),
-
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -897,7 +889,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ],
           ),
           const SizedBox(height: 20),
-
           if (sorted.isEmpty) ...[
             const SizedBox(height: 24),
             Center(
@@ -1242,7 +1233,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
               const SizedBox(height: 20),
               Divider(color: ac.divider),
               const SizedBox(height: 16),
-
               if (docNombre != null) ...[
                 Text(
                   'PROFESIONAL RESPONSABLE',
@@ -1264,7 +1254,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               Text(
                 'NOTAS CLÍNICAS Y OBSERVACIONES',
                 style: TextStyle(
@@ -1295,7 +1284,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               if (c.recetas.isNotEmpty) ...[
                 Text(
                   'RECETAS Y FÁRMACOS PRESCRITOS (${c.recetas.length})',

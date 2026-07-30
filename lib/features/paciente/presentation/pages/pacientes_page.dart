@@ -1,16 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
-import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
-import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
 class PacientesPage extends StatefulWidget {
   const PacientesPage({super.key});
@@ -35,6 +41,43 @@ class _PacientesPageState extends State<PacientesPage> {
     _debounce = Timer(const Duration(milliseconds: 400), () {
       if (mounted) context.read<PacienteCubit>().search(_searchController.text);
     });
+  }
+
+  Future<void> _openNuevoPaciente() async {
+    final cubit = context.read<PacienteCubit>();
+
+    final nuevoPaciente = Paciente(
+      nombre: '',
+      apellido: '',
+      birthDate: DateTime.now(),
+      govID: '',
+      contactos: const [],
+      estatus: EstatusPersona.activo,
+      genero: Genero.masculino,
+      record: Record(
+        pacienteId: '',
+        tipoSangre: TipoSangre.oPositivo,
+        condiciones: const [],
+        cirugiasPrevias: const [],
+        historialFamiliar: '',
+        cantHijos: 0,
+      ),
+      trabajo: '',
+      referencia: '',
+      citas: const [],
+      tipoPaciente: TipoPaciente.emergencia,
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: PacienteFormPage(paciente: nuevoPaciente),
+        ),
+      ),
+    );
+    if (mounted) cubit.load();
   }
 
   Future<void> _openForm(Paciente paciente) async {
@@ -91,75 +134,105 @@ class _PacientesPageState extends State<PacientesPage> {
 
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
+
+    final authState = context.watch<AuthCubit>().state;
+    final esAdmin = authState.rol == RolUsuario.admin;
+    final esAsistente = authState.rol == RolUsuario.asistente;
+    final puedeCrear = esAdmin || esAsistente;
+
     return Padding(
       padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 14,
-                runSpacing: 4,
-                children: [
-                  Text(
-                    'Pacientes',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                      letterSpacing: -0.6,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 14,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Pacientes',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                                letterSpacing: -0.6,
+                              ),
+                        ),
+                        if (state is PacienteLoaded)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ac.primaryGreen.withValues(alpha: 0.07),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${state.todos.length}',
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: ac.primaryGreen,
+                                      ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.people_alt_rounded,
+                                  color: ac.primaryGreen,
+                                  size: 13,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Listado completo de pacientes registrados en el sistema.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (puedeCrear) ...[
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: _openNuevoPaciente,
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                  label: const Text('Nuevo Paciente'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ac.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  if (state is PacienteLoaded)
-                    Builder(
-                      builder: (context) {
-                        final ac = context.appColors;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ac.primaryGreen.withValues(alpha: 0.07),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${state.todos.length}',
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: ac.primaryGreen,
-                                    ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.people_alt_rounded,
-                                color: ac.primaryGreen,
-                                size: 13,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
+                ),
+              ],
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Listado completo de pacientes registrados en el sistema.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-            ),
           ),
           const SizedBox(height: 20),
           TextField(
@@ -190,7 +263,7 @@ class _PacientesPageState extends State<PacientesPage> {
                     )
                   : null,
               filled: true,
-              fillColor: context.appColors.searchFill,
+              fillColor: ac.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -204,10 +277,7 @@ class _PacientesPageState extends State<PacientesPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: context.appColors.primaryGreen,
-                  width: 1.2,
-                ),
+                borderSide: BorderSide(color: ac.primaryGreen, width: 1.2),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -253,14 +323,11 @@ class _PacientesPageState extends State<PacientesPage> {
     if (state is PacienteLoaded) {
       final compact = MediaQuery.sizeOf(context).width < 600;
 
-      // AÑADIDO: rol resuelto una sola vez para toda la lista.
       final authState = context.watch<AuthCubit>().state;
       final esDoctor = authState.rol == RolUsuario.doctor;
 
       return Column(
         children: [
-          // CAMBIO: cabecera de tabla condicionada al rol (sin
-          // cédula/teléfono para doctor).
           if (!compact) _buildTableHeader(context, esDoctor: esDoctor),
           if (state.filtrados.isEmpty)
             Expanded(
@@ -310,7 +377,6 @@ class _PacientesPageState extends State<PacientesPage> {
     return const SizedBox.shrink();
   }
 
-  // CAMBIO: cabecera condicionada por rol.
   Widget _buildTableHeader(BuildContext context, {required bool esDoctor}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(48, 8, 48, 12),
@@ -442,14 +508,13 @@ class _PacienteRowState extends State<_PacienteRow> {
     final p = widget.paciente;
     final ac = context.appColors;
 
-    // AÑADIDO: resolución de permisos por fila.
     final authState = context.watch<AuthCubit>().state;
     final esAdmin = authState.rol == RolUsuario.admin;
     final esAsistente = authState.rol == RolUsuario.asistente;
     final esDoctor = authState.rol == RolUsuario.doctor;
     final puedeVerExpediente = esAdmin || esDoctor;
-    final puedeGestionar = esAdmin || esAsistente; // editar / eliminar
-    final puedeVerContacto = !esDoctor; // cédula, teléfono, email, dirección
+    final puedeGestionar = esAdmin || esAsistente;
+    final puedeVerContacto = !esDoctor;
 
     final fondoTarjeta = _expanded
         ? ac.primaryGreen.withValues(alpha: 0.04)
@@ -459,9 +524,6 @@ class _PacienteRowState extends State<_PacienteRow> {
         : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
-
-    // CAMBIO: un doctor no puede expandir el detalle de contacto en línea
-    // (no tiene nada que ver ahí); su única acción es entrar al expediente.
     final permiteExpandir = !esDoctor;
 
     return AnimatedContainer(
@@ -527,7 +589,6 @@ class _PacienteRowState extends State<_PacienteRow> {
                             ],
                           ),
                         ),
-                        // CAMBIO: cédula/teléfono ocultos para doctor.
                         if (puedeVerContacto) ...[
                           Expanded(
                             flex: 2,
@@ -574,7 +635,6 @@ class _PacienteRowState extends State<_PacienteRow> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // CAMBIO: "ver expediente" solo admin/doctor.
                               if (puedeVerExpediente)
                                 _ActionIcon(
                                   icon: Icons.visibility_outlined,
@@ -582,7 +642,6 @@ class _PacienteRowState extends State<_PacienteRow> {
                                   color: ac.primaryGreen,
                                   onTap: widget.onVerDetalle,
                                 ),
-                              // CAMBIO: editar/eliminar solo admin/asistente.
                               if (puedeGestionar) ...[
                                 const SizedBox(width: 6),
                                 _ActionIcon(
@@ -618,7 +677,6 @@ class _PacienteRowState extends State<_PacienteRow> {
     );
   }
 
-  // CAMBIO: recibe los flags de permiso para condicionar campos y acciones.
   Widget _buildCompactRow(
     BuildContext context,
     Paciente p,
@@ -666,7 +724,6 @@ class _PacienteRowState extends State<_PacienteRow> {
           ],
         ),
         const SizedBox(height: 12),
-        // CAMBIO: cédula/teléfono ocultos para doctor; edad siempre visible.
         Wrap(
           spacing: 16,
           runSpacing: 6,
@@ -789,7 +846,7 @@ class _PacienteRowState extends State<_PacienteRow> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '¿Está seguro de que desea eliminar a ${paciente.fullName}?',
+              '¿Está seguro de que deseas eliminar a ${paciente.fullName}?',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),

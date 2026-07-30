@@ -1,5 +1,3 @@
-import 'dart:js_interop';
-import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,7 +19,10 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/recorte_foto_dialog.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
-import 'package:web/web.dart' as web;
+
+// Importación condicional del helper web si se ejecuta en navegador
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/camera_web_helper.dart'
+    if (dart.library.io) 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/camera_web_stub.dart';
 
 enum PacienteFormModo { editar, completarRegistro }
 
@@ -85,14 +86,6 @@ class _ContactoEntry {
     email.dispose();
     direccion.dispose();
   }
-
-  String get resumen {
-    final tel = telefono.text.trim();
-    final mail = email.text.trim();
-    if (tel.isNotEmpty) return tel;
-    if (mail.isNotEmpty) return mail;
-    return 'Nuevo contacto';
-  }
 }
 
 class PacienteFormPage extends StatefulWidget {
@@ -135,11 +128,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   bool _cargandoCondiciones = true;
   bool _guardandoCondiciones = false;
   bool _isProcessingSave = false;
-
-  // Variables para la selección de foto
-  XFile? _fotoFile;
-  Uint8List? _fotoBytesWeb;
-  bool _fotoEliminada = false;
 
   Uint8List? _fotoPendiente;
   bool _eliminarFotoPendiente = false;
@@ -186,108 +174,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
               .toList();
 
     _cargarCondiciones();
-  }
-
-  Future<Uint8List?> _mostrarDialogoCamaraWeb(BuildContext context) async {
-    final ac = context.appColors;
-    final viewType = 'web-camera-view-${DateTime.now().millisecondsSinceEpoch}';
-
-    web.HTMLVideoElement videoElement = web.HTMLVideoElement()
-      ..autoplay = true
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..style.objectFit = 'cover';
-
-    ui_web.platformViewRegistry.registerViewFactory(
-      viewType,
-      (int viewId) => videoElement,
-    );
-
-    web.MediaStream? stream;
-
-    try {
-      final mediaDevices = web.window.navigator.mediaDevices;
-      final constraints = web.MediaStreamConstraints(
-        video: true.toJS,
-        audio: false.toJS,
-      );
-
-      final mediaStreamPromise = mediaDevices.getUserMedia(constraints);
-      stream = await mediaStreamPromise.toDart;
-      videoElement.srcObject = stream;
-    } catch (e) {
-      if (!context.mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: ac.red,
-          content: const Text(
-            'No se pudo acceder a la cámara. Por favor permite el acceso en los permisos del navegador.',
-          ),
-        ),
-      );
-      return null;
-    }
-
-    Uint8List? fotoCapturadaBytes;
-
-    if (!context.mounted) return null;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: ac.cardBg,
-          title: Text(
-            'Capturar fotografía',
-            style: TextStyle(color: ac.textPrimary, fontSize: 16),
-          ),
-          content: SizedBox(
-            width: 400,
-            height: 300,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: HtmlElementView(viewType: viewType),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                stream?.getTracks().toDart.forEach((track) {
-                  (track as web.MediaStreamTrack).stop();
-                });
-                Navigator.pop(dialogCtx);
-              },
-              child: Text('Cancelar', style: TextStyle(color: ac.textMuted)),
-            ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: ac.primaryGreen),
-              icon: const Icon(Icons.camera_rounded, size: 18),
-              label: const Text('Tirar foto'),
-              onPressed: () {
-                final canvas = web.HTMLCanvasElement()
-                  ..width = videoElement.videoWidth
-                  ..height = videoElement.videoHeight;
-
-                final ctx = canvas.context2D;
-                ctx.drawImage(videoElement, 0, 0);
-
-                final dataUrl = canvas.toDataURL('image/jpeg', 0.85.toJS);
-                fotoCapturadaBytes = Uri.parse(dataUrl).data?.contentAsBytes();
-
-                stream?.getTracks().toDart.forEach((track) {
-                  (track as web.MediaStreamTrack).stop();
-                });
-
-                Navigator.pop(dialogCtx);
-              },
-            ),
-          ],
-        );
-      },
-    );
-
-    return fotoCapturadaBytes;
   }
 
   Future<void> _cargarCondiciones() async {
@@ -532,18 +418,11 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     ImageSource? source = ImageSource.gallery;
     if (_soportaCamara) {
       if (kIsWeb) {
-        final Uint8List? fotoCapturada = await _mostrarDialogoCamaraWeb(
-          context,
-        );
+        final Uint8List? fotoCapturada = await mostrarDialogoCamaraWeb(context);
         if (fotoCapturada != null) {
           setState(() {
-            _fotoBytesWeb = fotoCapturada;
-            _fotoFile = XFile.fromData(
-              fotoCapturada,
-              name: 'foto_paciente.jpg',
-            );
-            _fotoEliminada = false;
             _fotoPendiente = fotoCapturada;
+            _eliminarFotoPendiente = false;
           });
         }
         return;
@@ -606,9 +485,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       if (optimizada == null) return;
       if (mounted) {
         setState(() {
-          _fotoFile = selected;
-          _fotoBytesWeb = bytes;
-          _fotoEliminada = false;
           _fotoPendiente = optimizada;
           _eliminarFotoPendiente = false;
         });
@@ -766,9 +642,6 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                             ? null
                             : () => setState(() {
                                 _fotoPendiente = null;
-                                _fotoFile = null;
-                                _fotoBytesWeb = null;
-                                _fotoEliminada = true;
                                 _eliminarFotoPendiente =
                                     widget.paciente.fotoRuta != null;
                               }),

@@ -68,10 +68,15 @@ List<ShellDestination> _destinos(_Registro registro, int cuantos) => [
 
 /// Envoltorio que permite cambiar el destino seleccionado como lo hace el shell.
 class _Anfitrion extends StatefulWidget {
-  const _Anfitrion({required this.destinos, this.maxRetenidas = 4});
+  const _Anfitrion({required this.destinos, this.maxRetenidas});
 
   final List<ShellDestination> destinos;
-  final int maxRetenidas;
+
+  /// Sin valor se deja el tope *por defecto* de [LazyDestinationStack]. Importa
+  /// que aquí no haya un 4 propio: si el anfitrión repitiera el valor de
+  /// producción, la prueba que fija el tope en 4 seguiría verde aunque alguien
+  /// cambiara el default del widget.
+  final int? maxRetenidas;
 
   @override
   State<_Anfitrion> createState() => _AnfitrionState();
@@ -84,15 +89,23 @@ class _AnfitrionState extends State<_Anfitrion> {
   void irA(int destino) => setState(() => indice = destino);
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    home: Scaffold(
-      body: LazyDestinationStack(
-        destinations: widget.destinos,
-        selectedIndex: indice,
-        maxRetenidas: widget.maxRetenidas,
+  Widget build(BuildContext context) {
+    final tope = widget.maxRetenidas;
+    return MaterialApp(
+      home: Scaffold(
+        body: tope == null
+            ? LazyDestinationStack(
+                destinations: widget.destinos,
+                selectedIndex: indice,
+              )
+            : LazyDestinationStack(
+                destinations: widget.destinos,
+                selectedIndex: indice,
+                maxRetenidas: tope,
+              ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Future<void> _irA(WidgetTester tester, int indice) async {
@@ -173,6 +186,43 @@ void main() {
         expect(registro.destrucciones.containsKey('P1'), isFalse);
       },
     );
+
+    // Equivalente automatizado de la comprobación manual que pedía SD-154 en la
+    // pestaña *Memory* de DevTools: recorrer cinco pantallas, volver, y ver que
+    // el número de pantallas vivas se estabiliza en 4. Se hace aquí y no a mano
+    // porque el tope es una propiedad del código, no del dispositivo: lo que el
+    // teléfono añadiría es ruido, no información. Con el default explícito, esta
+    // prueba es la que sostiene la fila «Pantallas vivas a la vez ≤ 4» de
+    // PERFORMANCE.md §1.
+    testWidgets('con el tope por defecto, cinco pantallas se estabilizan en 4', (
+      tester,
+    ) async {
+      final registro = _Registro();
+      await tester.pumpWidget(_Anfitrion(destinos: _destinos(registro, 12)));
+
+      for (var destino = 1; destino <= 4; destino++) {
+        await _irA(tester, destino);
+      }
+
+      expect(
+        registro.vivas,
+        4,
+        reason: 'cinco pantallas visitadas no pueden dejar cinco vivas',
+      );
+      expect(registro.destrucciones['P0'], 1, reason: 'P0 debía desalojarse');
+
+      // Volver sobre lo ya visitado no debe hacer crecer el número de vivas:
+      // es el ida y vuelta de una jornada real.
+      await _irA(tester, 3);
+      await _irA(tester, 2);
+      await _irA(tester, 4);
+
+      expect(
+        registro.vivas,
+        4,
+        reason: 'el descarte dejó de funcionar al navegar de vuelta',
+      );
+    });
 
     testWidgets('una pantalla desalojada se reconstruye al volver a pedirla', (
       tester,

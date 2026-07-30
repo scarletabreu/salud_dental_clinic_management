@@ -26,6 +26,7 @@ desde el primer día y dejaría de leerse.
 | APK `arm64-v8a` (lo que se descarga) | 23264 KiB ✅ | ≤ 25500 | ≤ 20000 | `tool/perf/medir_artefactos.sh apk-abi` |
 | Primer pintado web, CPU 4x | 3608 ms ✅ | ≤ 4500 ms | ≤ 2500 ms | `tool/perf/medir_web_cpu_limitada.ts` |
 | Primer frame (perfil, Android gama baja) | sin medir ⚠️ | — | ≤ 2500 ms | `tool/perf/medir_arranque.sh` |
+| Primer frame (perfil, Windows de recepción) | sin medir ⚠️ | — | ≤ 2500 ms | `tool/perf/medir_arranque.sh` |
 | Animaciones en bucle sin motivo | 0 ✅ | **0** | 0 | `test/features/inicio/inicio_responsive_test.dart` |
 | Pantallas construidas al arrancar | 1 ✅ | **1** | 1 | `test/shell/lazy_destination_stack_test.dart` |
 | Pantallas vivas a la vez | 4 ✅ | ≤ 4 | ≤ 4 | idem |
@@ -40,9 +41,20 @@ desde el primer día y dejaría de leerse.
 > navegador descarga de verdad (§4): 1095 KiB con brotli.
 >
 > **Qué falta por medir.** De los tres entornos del ticket, el navegador con
-> CPU limitada ya está cubierto y automatizado (§3). Faltan el Android de gama
-> baja y el Windows, que necesitan el hardware delante: el script y el
-> procedimiento están listos, falta ejecutarlos y anotar el número.
+> CPU limitada ya está cubierto y automatizado (§3). Siguen sin medir el
+> Android de gama baja y el Windows de recepción, que necesitan el hardware
+> delante. **SD-154 no pudo cerrarlos**: en el entorno de desarrollo no hay
+> ningún Android conectado (`adb devices` vacío, `flutter devices` solo ofrece
+> Linux de escritorio y Chromium) ni acceso a un Windows. Lo que sí hizo SD-154
+> fue ejecutar el script por primera vez y arreglar lo que estaba roto (§3), de
+> modo que la próxima persona que tenga el hardware delante obtenga un número
+> válido en vez de uno inventado.
+>
+> **No rellenar estas dos filas con la máquina de desarrollo.** El primer frame
+> en el portátil de desarrollo mide 161 ms; el presupuesto es 2500 ms. Copiar
+> ese número aquí daría dos filas verdes y ninguna información: es hardware que
+> ningún usuario de la clínica tiene. Una fila «sin medir» es honesta; una fila
+> medida en el sitio equivocado es peor que no tenerla.
 >
 > **Al reducir un artefacto, baja también su trinquete** en
 > `tool/perf/medir_artefactos.sh`. Un trinquete que no se aprieta deja de
@@ -71,9 +83,10 @@ repintado, reutilización de catálogos, ausencia de logs. Son *proxies
 deterministas* de la lentitud: no miden milisegundos, miden la causa —cuánto
 trabajo se hace de más—, y por eso no parpadean.
 
-**Necesita un dispositivo** (`medir_arranque.sh` + DevTools): arranque, frames
-lentos y memoria. Dependen del hardware; medirlos en el portátil del
-desarrollador no dice nada sobre el teléfono de la recepción.
+**Necesita un dispositivo** (`medir_arranque.sh` + DevTools): arranque y frames
+lentos. Dependen del hardware; medirlos en el portátil del desarrollador no dice
+nada sobre el teléfono de la recepción. El tope de pantallas vivas se sacó de
+aquí en SD-154 y vive en la suite (§3): no dependía del hardware.
 
 Dos reglas para no medir humo:
 
@@ -102,11 +115,45 @@ Sale con código 1 si algún artefacto pasa su techo.
 ```bash
 flutter devices                  # localiza el dispositivo
 tool/perf/medir_arranque.sh <id>
+
+REPETICIONES_ARRANQUE=7 tool/perf/medir_arranque.sh <id>      # más muestras
+PRESUPUESTO_ARRANQUE_MS=3200 tool/perf/medir_arranque.sh <id> # otro techo
 ```
 
 Usa `--profile --trace-startup` y lee
 `timeToFirstFrameRasterizedMicros` de `build/start_up_info.json`: el instante
 en que el usuario ve algo dibujado, no en el que arrancó el proceso.
+
+Ejecuta **6 veces**: descarta la primera —que incluye trabajo de instalación
+que el usuario no repite— y reporta la **mediana** de las otras cinco. No es
+ceremonia: en SD-154, en la misma máquina y sin cambiar nada, la primera medida
+dio 409 ms y las siguientes 119-209 ms. Con una sola ejecución, el número de
+referencia lo fija el ruido.
+
+Al terminar imprime el trinquete sugerido (mediana + 15 %). **El trinquete se
+pone sobre lo medido, nunca sobre la meta**: si el arranque real queda muy por
+encima de los 2500 ms, no se baja la meta —se abre el ticket de carga diferida
+y se deja constancia de la distancia.
+
+Anota siempre **modelo, RAM y versión de sistema** junto al número. El script
+los obtiene por `adb` cuando el dispositivo es un Android; en escritorio avisa
+de que hay que anotarlos a mano. Un arranque sin el hardware al lado no
+significa nada: 2500 ms es excelente en un gama baja y malo en un buque
+insignia. Y el dispositivo debe ser el **peor caso real** de la clínica, no un
+tope de gama.
+
+**Dos trampas que el script ya corta** (ambas encontradas en SD-154 al
+ejecutarlo por primera vez; hasta entonces solo se había revisado su lógica de
+parseo):
+
+- **Sin `--dart-define-from-file` no se mide la app.** El arranque aborta con
+  «Falta APP_ENVIRONMENT», pero el motor pinta la pantalla de error igual de
+  rápido y el trazado reporta un primer frame de 125 ms. El script pasaba el
+  presupuesto midiendo un cartel de error. Ahora exige `dart_define.json` y
+  aborta si detecta un fallo de bootstrap en la salida.
+- **Un `start_up_info.json` viejo se cuela.** El archivo se borra antes de cada
+  ejecución, no una sola vez al principio: si una ejecución falla, la medida
+  anterior pasaría por nueva.
 
 ### Frames lentos y memoria
 
@@ -122,9 +169,30 @@ y en DevTools:
   comprobar que el número de pantallas vivas no crece sin parar. El shell
   retiene 4 como máximo (§5).
 
+  Esta comprobación **ya no hace falta a mano**: la cubre
+  `test/shell/lazy_destination_stack_test.dart` («con el tope por defecto, cinco
+  pantallas se estabilizan en 4»), que recorre cinco destinos, vuelve sobre lo
+  visitado y exige que queden 4 vivas. Se automatizó en SD-154 porque el tope es
+  una propiedad del código y no del dispositivo: lo que el teléfono añade es
+  ruido, no información. Antes ninguna prueba fijaba el tope *por defecto* —las
+  que había pasaban 3 y 2 explícitos—, así que subir el default a 6 dejaba la
+  suite verde y la fila «Pantallas vivas a la vez ≤ 4» sin protección real.
+
 Los flujos que hay que recorrer, por ser los más caros: **inicio** (gráfico),
 **odontograma de una consulta** (32-52 piezas dibujadas a mano) y **listado de
 pacientes** con varios cientos de filas.
+
+Para cada flujo se anota una línea por frame que pase de 16 ms: flujo, gesto que
+lo provocó, duración y widget culpable. Ese registro es el punto de partida del
+siguiente trabajo de rendimiento; sin el widget culpable, un frame lento es un
+dato que no se puede accionar.
+
+> **Pendiente.** SD-154 no pudo levantar este registro: DevTools en `--profile`
+> necesita el dispositivo delante y en el entorno de desarrollo no había ninguno
+> de los dos objetivos (ni Android por `adb`, ni Windows). Queda como lo único
+> del ticket que sigue abierto junto con las dos filas «sin medir» de §1, y se
+> hace en la misma sesión con el hardware: primero `medir_arranque.sh`, después
+> los tres flujos con la app ya instalada.
 
 ### Navegador con CPU limitada — automatizado
 

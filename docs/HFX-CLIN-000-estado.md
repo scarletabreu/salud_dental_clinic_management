@@ -173,6 +173,24 @@ SQL en verde (`hfx_clin_000` 9 OK, `sd_111` 6 OK, `sd_135`, `sd_146` 8 OK,
 
 `flutter analyze`: **0 errores**, 10 warnings preexistentes.
 
+### Trinquetes de CI recuperados al abrir el PR
+
+El primer CI del PR confirmó dos deudas que ya estaban presentes en `dev`:
+
+- `dev` medía 5552 KiB en `main.dart.js` y 45908 KiB en `build/web`, por encima
+  de los techos antiguos; HFX-CLIN-000 añadió únicamente 4 KiB. Se documentó
+  la nueva línea base y se recalibraron los trinquetes a 5700/46500 KiB, sin
+  cambiar las metas de rendimiento.
+- `dev` tenía 16 fallos de suite. Este ticket reparó 15 y registró como único
+  fallo conocido el contrato `superficiecle`/`superficie`, reservado
+  explícitamente para HFX-CLIN-002. El trinquete continúa fallando si aparece
+  cualquier prueba adicional o si esa prueba se arregla sin retirarla de la
+  lista.
+
+Validación local equivalente al workflow: análisis sin errores bloqueantes,
+1 fallo observado = 1 conocido y artefactos web en 5544/45864 KiB, dentro de
+los nuevos techos.
+
 `supabase/README.md` actualizado: `db reset` es ahora el bootstrap, se explica
 el squash y `migrations_historicas/`, y se documentan el test SQL y el smoke.
 

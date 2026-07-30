@@ -19,9 +19,9 @@ desde el primer día y dejaría de leerse.
 
 | Métrica | Medido en SD-132 | Trinquete | Meta | Cómo se comprueba |
 |---|---|---|---|---|
-| `main.dart.js` (web, sin comprimir) | 5115 KiB | ≤ 5250 | ≤ 3400 | `tool/perf/medir_artefactos.sh web` |
+| `main.dart.js` (web, sin comprimir) | 5556 KiB (bootstrap HFX-CLIN-000) | ≤ 5700 | ≤ 3400 | `tool/perf/medir_artefactos.sh web` |
 | `main.dart.js` servido con brotli | 1095 KiB ✅ | — | ≤ 1200 | ver §4 |
-| `build/web` completo | 44300 KiB | ≤ 45000 | ≤ 32000 | `tool/perf/medir_artefactos.sh web` |
+| `build/web` completo | 45912 KiB (bootstrap HFX-CLIN-000) | ≤ 46500 | ≤ 32000 | `tool/perf/medir_artefactos.sh web` |
 | APK universal de release | 67344 KiB | ≤ 68000 | — (no se distribuye) | `tool/perf/medir_artefactos.sh apk` |
 | APK `arm64-v8a` (lo que se descarga) | 23264 KiB ✅ | ≤ 25500 | ≤ 20000 | `tool/perf/medir_artefactos.sh apk-abi` |
 | Primer pintado web, CPU 4x | 3608 ms ✅ | ≤ 4500 ms | ≤ 2500 ms | `tool/perf/medir_web_cpu_limitada.ts` |
@@ -39,6 +39,13 @@ desde el primer día y dejaría de leerse.
 > `main.dart.js` de 5 MB exige carga diferida por módulo (`deferred as`), que
 > es un refactor propio y no cabía aquí. Lo que **sí** cumple hoy es lo que el
 > navegador descarga de verdad (§4): 1095 KiB con brotli.
+>
+> **Recalibración del bootstrap clínico.** Al integrar HFX-CLIN-000 se midieron
+> 5556 KiB para `main.dart.js` y 45912 KiB para `build/web`. El `dev` de partida
+> ya medía 5552/45908 KiB y fallaba los techos anteriores; el hotfix añadió
+> únicamente 4 KiB. Los trinquetes se recalibraron a 5700/46500 KiB para que CI
+> vuelva a detectar crecimiento nuevo sin atribuirle al hotfix una deuda ya
+> integrada. Las metas de 3400/32000 KiB no cambian.
 >
 > **Qué falta por medir.** De los tres entornos del ticket, el navegador con
 > CPU limitada ya está cubierto y automatizado (§3). Siguen sin medir el

@@ -11,6 +11,14 @@ import 'package:flutter/foundation.dart';
 /// Por eso los mensajes se pasan como *callback* y no como `String` ya
 /// formado: sin `kDebugMode` no se evalúa nada.
 abstract final class AppLog {
+  static final _uuid = RegExp(
+    r'\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b',
+    caseSensitive: false,
+  );
+
+  static String _contextoSeguro(String contexto) =>
+      contexto.replaceAll(_uuid, '<uuid>');
+
   /// Traza de desarrollo. Desaparece por completo en release.
   static void debug(String Function() mensaje) {
     if (kDebugMode) debugPrint(mensaje());
@@ -21,8 +29,7 @@ abstract final class AppLog {
   /// notar viaja por `Failure`, no por la consola.
   static void error(String contexto, Object error, [StackTrace? stack]) {
     if (kDebugMode) {
-      debugPrint('[$contexto] $error');
-      if (stack != null) debugPrint('$stack');
+      debugPrint('[${_contextoSeguro(contexto)}] error=${error.runtimeType}');
     }
   }
 }

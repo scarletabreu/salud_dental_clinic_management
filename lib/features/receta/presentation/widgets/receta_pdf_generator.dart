@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -44,8 +44,8 @@ class RecetaPdfGenerator {
       try {
         final logoData = await rootBundle.load(logoAssetPath);
         finalLogo = pw.MemoryImage(logoData.buffer.asUint8List());
-      } catch (e) {
-        debugPrint('⚠️ Error cargando logo desde $logoAssetPath: $e');
+      } catch (e, stackTrace) {
+        AppLog.error('cargar logo de receta', e, stackTrace);
       }
     }
 

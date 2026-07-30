@@ -13,7 +13,6 @@ class DoctorModel extends Doctor {
     required super.govID,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required super.specialty,
     required super.assistants,
     super.isAvailable = true,
@@ -36,7 +35,6 @@ class DoctorModel extends Doctor {
 
       estatus: _calcularEstatus(usuarioData['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
-      passwordHash: usuarioData['password_hash'] as String? ?? '',
 
       specialty: json['especialidad'] as String? ?? '',
       isAvailable: json['esta_disponible'] as bool? ?? true,
@@ -49,8 +47,7 @@ class DoctorModel extends Doctor {
     );
   }
 
-   factory DoctorModel.fromJsonFn(Map<String, dynamic> json) {
-
+  factory DoctorModel.fromJsonFn(Map<String, dynamic> json) {
     return DoctorModel(
       id: json['doctor_id'] as String?,
 
@@ -63,12 +60,11 @@ class DoctorModel extends Doctor {
       contactos: [],
       estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: json['username'] as String? ?? '',
-      passwordHash: json['password_hash'] as String? ?? '',
 
       specialty: json['especialidad'] as String? ?? '',
       isAvailable: json['esta_disponible'] as bool? ?? true,
 
-      assistants: []
+      assistants: [],
     );
   }
 

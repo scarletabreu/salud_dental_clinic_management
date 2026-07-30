@@ -85,7 +85,6 @@ List<Usuario> _usuarios() => [
     ],
     estatus: EstatusPersona.activo,
     username: 'bsantana',
-    passwordHash: 'x',
     specialty: 'Endodoncia y rehabilitación oral',
     assistants: const [],
   ),

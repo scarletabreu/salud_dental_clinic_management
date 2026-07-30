@@ -31,41 +31,44 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// reales; los dobles sustituyen únicamente red y almacenamiento.
 void main() {
   group('la consulta hereda la fecha de su cita', () {
-    test('una cita futura fija la fecha de la consulta, no el día del clic', () async {
-      final agendada = DateTime(2026, 8, 14, 15, 30);
-      final crear = _CrearConsultaEspia();
-      final cubit = _consultaCubit(
-        crear: crear,
-        citas: _CitaRepoFalso(
-          referencias: {
-            'cita-1': ReferenciaCita(
-              id: 'cita-1',
-              fechaHora: agendada,
-              estado: EstadoCita.enEspera,
-              doctorId: 'doctor-1',
-            ),
-          },
-        ),
-      );
+    test(
+      'una cita futura fija la fecha de la consulta, no el día del clic',
+      () async {
+        final agendada = DateTime(2026, 8, 14, 15, 30);
+        final crear = _CrearConsultaEspia();
+        final cubit = _consultaCubit(
+          crear: crear,
+          citas: _CitaRepoFalso(
+            referencias: {
+              'cita-1': ReferenciaCita(
+                id: 'cita-1',
+                fechaHora: agendada,
+                estado: EstadoCita.enEspera,
+                doctorId: 'doctor-1',
+              ),
+            },
+          ),
+        );
 
-      await cubit.iniciar(
-        pacienteId: _pacienteId,
-        doctorId: 'doctor-1',
-        citaId: 'cita-1',
-        motivoConsulta: 'control',
-        tempCondiciones: const [],
-        adjuntos: const [],
-      );
+        await cubit.iniciar(
+          pacienteId: _pacienteId,
+          doctorId: 'doctor-1',
+          citaId: 'cita-1',
+          motivoConsulta: 'control',
+          tempCondiciones: const [],
+          adjuntos: const [],
+        );
 
-      expect(
-        crear.recibida?.fecha,
-        agendada,
-        reason:
-            'la consulta abierta desde una cita de agosto tiene que quedar en '
-            'el día y la hora agendados, no en el momento de abrirla',
-      );
-      await cubit.close();
-    });
+        expect(
+          crear.recibida?.fecha,
+          agendada,
+          reason:
+              'la consulta abierta desde una cita de agosto tiene que quedar en '
+              'el día y la hora agendados, no en el momento de abrirla',
+        );
+        await cubit.close();
+      },
+    );
 
     test('sin cita (walk-in) la fecha es el momento de la atención', () async {
       final crear = _CrearConsultaEspia();
@@ -98,10 +101,7 @@ void main() {
           ),
         },
       );
-      final cubit = _consultaCubit(
-        crear: _CrearConsultaEspia(),
-        citas: citas,
-      );
+      final cubit = _consultaCubit(crear: _CrearConsultaEspia(), citas: citas);
 
       await cubit.iniciar(
         pacienteId: _pacienteId,
@@ -161,29 +161,32 @@ void main() {
   });
 
   group('no se cancela una cita con su consulta abierta', () {
-    test('cancelar con consulta abierta falla con mensaje accionable', () async {
-      final datasource = _CitaDatasourceFalso(EstadoCita.enConsulta);
-      final repo = CitaRepositoryImpl(
-        remoteDataSource: datasource,
-        consultaAbiertaLookup: _LookupFalso(const {
-          'cita-1': ConsultaDeCita(id: 'c-1', finalizada: false),
-        }),
-      );
+    test(
+      'cancelar con consulta abierta falla con mensaje accionable',
+      () async {
+        final datasource = _CitaDatasourceFalso(EstadoCita.enConsulta);
+        final repo = CitaRepositoryImpl(
+          remoteDataSource: datasource,
+          consultaAbiertaLookup: _LookupFalso(const {
+            'cita-1': ConsultaDeCita(id: 'c-1', finalizada: false),
+          }),
+        );
 
-      await expectLater(
-        repo.updateCitaEstado('cita-1', EstadoCita.cancelada),
-        throwsA(isA<CancelacionConConsultaAbierta>()),
-      );
-      expect(
-        datasource.estadoEscrito,
-        isNull,
-        reason: 'la cancelación no debe llegar a la base',
-      );
-      expect(
-        const CancelacionConConsultaAbierta().toString(),
-        contains('Finaliza o elimina la consulta'),
-      );
-    });
+        await expectLater(
+          repo.updateCitaEstado('cita-1', EstadoCita.cancelada),
+          throwsA(isA<CancelacionConConsultaAbierta>()),
+        );
+        expect(
+          datasource.estadoEscrito,
+          isNull,
+          reason: 'la cancelación no debe llegar a la base',
+        );
+        expect(
+          const CancelacionConConsultaAbierta().toString(),
+          contains('Finaliza o elimina la consulta'),
+        );
+      },
+    );
 
     test('con la consulta ya finalizada la cancelación procede', () async {
       final datasource = _CitaDatasourceFalso(EstadoCita.enConsulta);
@@ -326,7 +329,6 @@ Cita _citaDe(String id, String doctorId) => Cita(
     contactos: const [],
     estatus: EstatusPersona.activo,
     username: 'ada',
-    passwordHash: 'x',
     specialty: 'general',
     assistants: const [],
   ),

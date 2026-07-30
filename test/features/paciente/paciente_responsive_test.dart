@@ -183,7 +183,6 @@ AuthState _authState({bool asistente = false}) => AuthState(
           contactos: const [],
           estatus: EstatusPersona.activo,
           username: 'asistente',
-          passwordHash: '',
           shift: 'matutino',
         )
       : Admin(
@@ -195,7 +194,6 @@ AuthState _authState({bool asistente = false}) => AuthState(
           contactos: const [],
           estatus: EstatusPersona.activo,
           username: 'admin',
-          passwordHash: '',
           specialty: 'General',
           assistants: const [],
           departamento: 'Clinica',

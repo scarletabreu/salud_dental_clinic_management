@@ -6,7 +6,6 @@ class UsuarioModel extends Usuario {
   UsuarioModel({
     super.id,
     required super.username,
-    required super.passwordHash,
     required super.nombre,
     required super.apellido,
     required super.birthDate,
@@ -24,7 +23,6 @@ class UsuarioModel extends Usuario {
     return UsuarioModel(
       id: json['id'],
       username: json['username'],
-      passwordHash: json['passwordHash'],
       nombre: json['nombre'],
       apellido: json['apellido'],
       birthDate: DateTime.parse(json['birthDate']),
@@ -50,10 +48,7 @@ class UsuarioModel extends Usuario {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = {
-      'username': username,
-      'passwordHash': passwordHash,
-    };
+    final Map<String, dynamic> data = {'username': username};
 
     if (id != null && id!.contains('-') && id!.length == 36) {
       data['id'] = id;

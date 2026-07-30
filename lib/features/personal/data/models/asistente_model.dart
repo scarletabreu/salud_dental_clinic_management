@@ -12,7 +12,6 @@ class AsistenteModel extends Asistente {
     required super.govID,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required super.shift,
   });
 
@@ -34,7 +33,6 @@ class AsistenteModel extends Asistente {
 
       estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
-      passwordHash: usuarioData['password_hash'] as String? ?? '',
 
       shift: json['turno'] as String? ?? '',
     );

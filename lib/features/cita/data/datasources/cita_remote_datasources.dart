@@ -135,7 +135,6 @@ class CitaRemoteDataSource {
           'cedula': dp['cedula'] ?? '',
           'estatus': dp['estatus'] ?? 'activo',
           'username': dp['username'] ?? '',
-          'password_hash': dp['password_hash'] ?? '',
           'especialidad': dp['especialidad'] ?? '',
           'esta_disponible': dp['esta_disponible'] ?? true,
           'assistants': dp['assistants'] ?? <dynamic>[],

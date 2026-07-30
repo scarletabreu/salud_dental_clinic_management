@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -74,15 +75,14 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
   @override
   void initState() {
     super.initState();
-    final authState = context.read<AuthCubit>().state;
-    final usuario = authState.usuario;
-    if (authState.rol == RolUsuario.doctor &&
-        usuario is Doctor &&
-        usuario.id != null) {
-      _consultasListCubit.cargar(restringidoADoctorId: usuario.id);
-    } else {
-      _consultasListCubit.cargar();
-    }
+    // Quien gestiona la agenda completa ve todas las consultas; quien sólo
+    // ejerce ve las suyas. El administrador entra por la primera vía sin dejar
+    // de ser clínico.
+    final restringidoA = context
+        .read<AuthCubit>()
+        .state
+        .doctorIdParaFiltrarAgenda;
+    _consultasListCubit.cargar(restringidoADoctorId: restringidoA);
   }
 
   @override
@@ -478,10 +478,9 @@ class _CitasDelDiaDestinationState extends State<_CitasDelDiaDestination> {
     final authState = context.read<AuthCubit>().state;
     final usuario = authState.usuario;
 
-    if (authState.rol == RolUsuario.doctor &&
-        usuario is Doctor &&
-        usuario.id != null) {
-      _citaCubit.load(restringidoADoctorId: usuario.id);
+    final restringidoA = authState.doctorIdParaFiltrarAgenda;
+    if (restringidoA != null) {
+      _citaCubit.load(restringidoADoctorId: restringidoA);
       return;
     }
 

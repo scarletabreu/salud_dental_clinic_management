@@ -136,7 +136,7 @@ class InicioPage extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // ── Siguiente paciente ────────────────────────────────────
-                  if (loaded.isDoctor || loaded.isAdmin) ...[
+                  if (loaded.puedeEjercerClinica) ...[
                     SiguientePacienteCard(
                       cita: siguientePaciente,
                       onCambiarEstado: siguientePaciente?.id != null

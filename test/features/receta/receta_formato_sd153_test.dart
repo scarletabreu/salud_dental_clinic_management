@@ -12,6 +12,11 @@ import 'package:salud_dental_clinic_management/features/receta/data/models/recet
 /// Como el parseo ocurre dentro del guard del repositorio, una sola fila así
 /// dejaba el listado entero de consultas en «Error al obtener las consultas»,
 /// sin detalle. Las filas de aquí son las tres que había en la instancia.
+///
+/// HFX-CLIN-000 actualizó las aserciones al contrato vigente de `Receta`
+/// —cabecera con `codigoReceta`, `fechaEmision` e `items`— sin cambiar lo que
+/// comprueba cada caso. El único dato que dejó de tener representación es
+/// `notas` del formato antiguo: la entidad de SD-153 no lo modela.
 void main() {
   group('RecetaModel.fromJson', () {
     test('formato SD-153: columnas antiguas en NULL no revientan', () {
@@ -40,10 +45,11 @@ void main() {
       });
 
       // El código de receta es el identificador que el doctor reconoce.
-      expect(receta.title, 'RX-2026-00014');
-      expect(receta.dosis, '');
-      expect(receta.medicinaId, '');
-      expect(receta.createdAt.year, 2026);
+      expect(receta.codigoReceta, 'RX-2026-00014');
+      expect(receta.items, hasLength(1));
+      expect(receta.items.single.dosis, '500mg');
+      expect(receta.items.single.medicamentoId, isNull);
+      expect(receta.fechaEmision.year, 2026);
     });
 
     test('formato antiguo se sigue leyendo igual', () {
@@ -59,30 +65,31 @@ void main() {
         'created_at': '2026-06-11T19:52:21.568714+00:00',
       });
 
-      expect(receta.title, 'Amoxicilina 500mg');
-      expect(receta.dosis, '500mg');
-      expect(receta.frecuencia, 'Cada 8 horas');
-      expect(receta.indicaciones, 'Con alimentos');
-      expect(receta.duracion, '7 días');
-      expect(receta.notas, 'Suspender si hay rash');
+      // La fila antigua se lee como una receta de una sola medicina.
+      expect(receta.items, hasLength(1));
+      final item = receta.items.single;
+      expect(item.nombreMedicamento, 'Amoxicilina 500mg');
+      expect(item.dosis, '500mg');
+      expect(item.frecuencia, 'Cada 8 horas');
+      expect(item.indicacionesEspecificas, 'Con alimentos');
+      expect(item.duracion, '7 días');
+      // Sin `codigo_receta`, el código se deriva del id para que la pantalla
+      // nunca muestre una receta sin identificador.
+      expect(receta.codigoReceta, 'RX-3363469B');
     });
 
-    test('sin titulo ni codigo_receta el título queda vacío, no lanza', () {
+    test('sin titulo ni codigo_receta la receta queda vacía, no lanza', () {
       final receta = RecetaModel.fromJson({
         'id': 'e72f7832-e915-4337-9322-63b11c811530',
         'created_at': '2026-07-27T04:46:56.919002+00:00',
       });
 
-      expect(receta.title, '');
-      expect(receta.duracion, '');
+      expect(receta.items, isEmpty);
+      expect(receta.codigoReceta, 'RX-E72F7832');
     });
 
-    test('created_at ausente o ilegible no aborta el parseo', () {
-      expect(RecetaModel.fromJson({'id': 'x'}).createdAt, isA<DateTime>());
-      expect(
-        RecetaModel.fromJson({'id': 'x', 'created_at': 'no-es-fecha'}).createdAt,
-        isA<DateTime>(),
-      );
+    test('fecha de emisión ausente no aborta el parseo', () {
+      expect(RecetaModel.fromJson({'id': 'x'}).fechaEmision, isA<DateTime>());
     });
   });
 
@@ -112,7 +119,7 @@ void main() {
     });
 
     expect(consulta.recetas, hasLength(1));
-    expect(consulta.recetas.single.title, 'RX-2026-00014');
+    expect(consulta.recetas.single.codigoReceta, 'RX-2026-00014');
     expect(consulta.tieneRecetas, isTrue);
   });
 }

@@ -39,6 +39,7 @@ Widget _mobileShell(
         primaryDestinations: _destinations(ids.take(4).toList()),
         selectedIndex: 0,
         onDestinationSelected: onSelect,
+        onNavigateTo: (_) {},
       ),
     ),
   );

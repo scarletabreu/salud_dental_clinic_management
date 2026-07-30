@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
@@ -63,12 +64,13 @@ class DashboardCubit extends Cubit<DashboardState> {
       _doctorId = doctorId;
       _doctorName = doctorName;
 
-      final isAdmin = roles.contains(RolUsuario.admin);
-      final isDoctor = roles.contains(RolUsuario.doctor);
-      final isSecretaria = roles.contains(RolUsuario.asistente);
-      final tieneAccesoOperativo = isAdmin || isSecretaria;
+      final esClinico = roles.puedeEjercerClinica;
+      final gestionaAgendaCompleta = roles.puedeGestionarAgendaCompleta;
+      final tieneAccesoOperativo = roles.puedeGestionarCaja;
 
-      final citas = (isDoctor && doctorId != null)
+      // Quien gestiona la agenda completa la ve entera; el clínico que no la
+      // gestiona ve la suya.
+      final citas = (esClinico && !gestionaAgendaCompleta && doctorId != null)
           ? await _citaRepository.getCitasByDoctor(doctorId)
           : await _citaRepository.getCitas();
 
@@ -78,7 +80,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         (list) => list.length,
       );
 
-      final medicinas = (isAdmin || isDoctor)
+      final medicinas = roles.puedeGestionarCatalogosClinicos
           ? await _medicinaRepository.getCatalogoMedicinas()
           : <dynamic>[];
 

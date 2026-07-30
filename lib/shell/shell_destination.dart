@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
 enum ShellDestinationId {
@@ -53,16 +54,21 @@ class ShellDestinationAccess {
           RolUsuario.doctor,
           RolUsuario.asistente,
         ]);
+      // «Administrar personal» es capacidad sólo del admin, pero hoy el doctor
+      // entra a Perfiles para gestionar sus asistentes. Estrechar ese acceso
+      // cambia comportamiento y se decide en HFX-CLIN-001, con su prueba de
+      // autorización; aquí sólo se deja de comparar roles a mano.
       case ShellDestinationId.perfiles:
+        return roles.puedeEjercerClinica;
       case ShellDestinationId.equipos:
       case ShellDestinationId.inventario:
       case ShellDestinationId.medicinas:
       case ShellDestinationId.tratamientos:
       case ShellDestinationId.procedimientos:
       case ShellDestinationId.diagnosticos:
-        return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
+        return roles.puedeGestionarCatalogosClinicos;
       case ShellDestinationId.consultas:
-        return _hasAnyRole(roles, const [RolUsuario.admin, RolUsuario.doctor]);
+        return roles.puedeEjercerClinica;
       case ShellDestinationId.pacientes:
       case ShellDestinationId.citasDelDia:
       case ShellDestinationId.cuentasPorCobrar:
@@ -72,10 +78,7 @@ class ShellDestinationAccess {
           RolUsuario.asistente,
         ]);
       case ShellDestinationId.caja:
-        return _hasAnyRole(roles, const [
-          RolUsuario.admin,
-          RolUsuario.asistente,
-        ]);
+        return roles.puedeGestionarCaja;
       case ShellDestinationId.inicio:
         return true;
     }

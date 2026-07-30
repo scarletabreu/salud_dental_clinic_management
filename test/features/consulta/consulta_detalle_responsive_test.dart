@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consulta_detalle_page.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 class _ConsultaDetalleCubitDoble extends Cubit<ConsultaDetalleState>
@@ -42,13 +43,21 @@ Consulta _consulta() => Consulta(
   ),
   recetas: [
     Receta(
-      title: 'Amoxicilina con ácido clavulánico',
-      createdAt: DateTime(2026, 7, 21),
-      medicinaId: 'med-1',
-      dosis: '875/125 mg',
-      frecuencia: 'Cada 12 horas',
-      duracion: '7 días',
-      indicaciones: 'Tomar con alimentos para reducir molestias gástricas',
+      codigoReceta: 'RX-2026-00002',
+      consultaId: 'consulta-1',
+      pacienteId: 'paciente-1',
+      fechaEmision: DateTime(2026, 7, 21),
+      items: const [
+        ItemReceta(
+          nombreMedicamento: 'Amoxicilina con ácido clavulánico',
+          medicamentoId: 'med-1',
+          dosis: '875/125 mg',
+          frecuencia: 'Cada 12 horas',
+          duracion: '7 días',
+          indicacionesEspecificas:
+              'Tomar con alimentos para reducir molestias gástricas',
+        ),
+      ],
     ),
   ],
 );

@@ -196,6 +196,8 @@ AuthState _authState({bool asistente = false}) => AuthState(
           estatus: EstatusPersona.activo,
           username: 'admin',
           passwordHash: '',
+          specialty: 'General',
+          assistants: const [],
           departamento: 'Clinica',
         ),
 );

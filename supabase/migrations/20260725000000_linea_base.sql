@@ -1,3 +1,19 @@
+-- ============================================================================
+--  Línea base del esquema `public` (HFX-CLIN-000).
+--
+--  Sustituye a `supabase/migrations_historicas/*`, que quedaron archivadas: la
+--  suma de aquellos archivos ya no reconstruía la base (la primera migración
+--  asumía tablas que ninguna creaba, y tres de ellas abortaban con
+--  «already exists»). Este archivo es el dump del esquema resultante de
+--  aplicarlas todas en orden sobre la instancia validada, así que
+--  `supabase db reset` vuelve a ser el camino de arranque.
+--
+--  Los objetos que viven fuera de `public` —buckets de Storage, políticas
+--  sobre `storage.objects`, la publicación de realtime y el trigger de
+--  `auth.users`— no los recoge un dump de esquema y viajan en las migraciones
+--  siguientes.
+-- ============================================================================
+
 
 
 
@@ -945,128 +961,68 @@ $$;
 ALTER FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_active_doctors"() RETURNS TABLE("doctor_id" "uuid", "especialidad" "text", "esta_disponible" boolean, "username" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "deleted_at" timestamp with time zone, "es_admin" boolean)
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select d.id,
-         d.especialidad,
-         d.esta_disponible,
-         u.username,
-         p.nombre,
-         p.apellido,
-         p.fecha_nacimiento,
-         p.cedula,
-         u.deleted_at,
-         (a.id is not null) as es_admin
-    from public.doctores d
-    join public.usuarios u on u.id = d.id
-    join public.personas p on p.id = d.id
-    left join public.admins a on a.id = d.id and a.deleted_at is null
-   where d.deleted_at is null
-     and u.deleted_at is null
-     and p.deleted_at is null;
-$$;
-
-
-ALTER FUNCTION "public"."get_active_doctors"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."get_active_doctors"() IS 'HFX-CLIN-000: doctores activos, administradores incluidos. Ya no devuelve password_hash: era PII que acababa impresa en la consola del navegador.';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 declare
-  v_persona_id  uuid;
+  v_persona_id uuid;
   v_contacto_id uuid;
-  v_meta        jsonb := new.raw_user_meta_data;
-  v_rol         text  := v_meta ->> 'rol';
-  v_telefono    text  := nullif(trim(v_meta ->> 'telefono'), '');
-  v_nombre      text  := nullif(trim(v_meta ->> 'nombre'), '');
-  v_apellido    text  := nullif(trim(v_meta ->> 'apellido'), '');
-  v_cedula      text  := nullif(trim(v_meta ->> 'cedula'), '');
-  v_username    text  := nullif(trim(v_meta ->> 'username'), '');
+  v_meta jsonb := new.raw_user_meta_data;
+  v_rol text := v_meta ->> 'rol';
+  v_telefono text := v_meta ->> 'telefono';
 begin
   if v_rol is null or v_rol not in ('doctor', 'admin', 'asistente') then
-    raise exception
-      'El rol proporcionado ("%") es inválido o no fue enviado en la metadata.',
-      coalesce(v_rol, 'NULL')
-      using errcode = 'P0001';
+    raise exception 'El rol proporcionado ("%") es inválido o no fue enviado en la metadata.', coalesce(v_rol, 'NULL');
   end if;
 
-  -- Validar antes de escribir: si falta un dato obligatorio, el alta no debe
-  -- dejar media persona creada ni un usuario de Auth sin perfil. `personas`
-  -- exige nombre, apellido, fecha de nacimiento y cédula, y `usuarios` exige
-  -- username; sin este bloque el fallo llegaba como un error de constraint.
-  if v_nombre is null
-     or v_apellido is null
-     or v_username is null
-     or v_cedula is null
-     or nullif(v_meta ->> 'fecha_nacimiento', '') is null
-  then
-    raise exception
-      'Faltan datos obligatorios para crear el usuario: nombre, apellido, fecha_nacimiento, cedula y username.'
-      using errcode = 'P0001',
-            hint = 'Los envía admin-crear-usuario dentro de user_metadata.';
-  end if;
-
-  if v_rol = 'asistente' and nullif(trim(v_meta ->> 'turno'), '') is null then
-    raise exception 'Un asistente necesita turno.' using errcode = 'P0001';
-  end if;
-
-  -- El UUID de Auth manda: es el mismo en persona, usuario y perfil, y es el
-  -- que compara `auth.uid()` en RLS y en las RPC clínicas.
   insert into public.personas (
-    id, nombre, apellido, fecha_nacimiento, cedula, estatus
+    nombre, 
+    apellido, 
+    fecha_nacimiento, 
+    cedula, 
+    estatus
   ) values (
-    new.id,
-    v_nombre,
-    v_apellido,
+    v_meta ->> 'nombre',
+    v_meta ->> 'apellido',
     nullif(v_meta ->> 'fecha_nacimiento', '')::date,
-    v_cedula,
+    v_meta ->> 'cedula',
     coalesce(v_meta ->> 'estatus', 'activo')::estatus_persona
   )
   returning id into v_persona_id;
 
-  if v_telefono is not null then
+  if v_telefono is not null and v_telefono != '' then
     insert into public.contactos (numero_telefono)
     values (v_telefono)
     returning id into v_contacto_id;
 
     insert into public.persona_contactos (
-      persona_id, tipo_contacto, contacto_id, es_principal
+      persona_id, 
+      tipo_contacto, 
+      contacto_id,
+      es_principal
     ) values (
-      v_persona_id, 'telefono', v_contacto_id, true
-    );
-  end if;
-
-  insert into public.usuarios (id, username)
-  values (v_persona_id, v_username);
-
-  -- Doctor y admin comparten identidad clínica; el admin sólo añade la fila
-  -- administrativa encima.
-  if v_rol in ('doctor', 'admin') then
-    insert into public.doctores (id, especialidad, esta_disponible)
-    values (
       v_persona_id,
-      coalesce(nullif(trim(v_meta ->> 'especialidad'), ''), 'General'),
+      'telefono',
+      v_contacto_id,
       true
     );
   end if;
 
-  if v_rol = 'admin' then
+  insert into public.usuarios (id, username)
+  values (v_persona_id, v_meta ->> 'username');
+
+  if v_rol = 'doctor' then
+    insert into public.doctores (id, especialidad, esta_disponible)
+    values (v_persona_id, coalesce(v_meta ->> 'especialidad', 'General'), true);
+    
+  elsif v_rol = 'admin' then
     insert into public.admins (id, departamento)
-    values (
-      v_persona_id,
-      coalesce(nullif(trim(v_meta ->> 'departamento'), ''), 'Administración')
-    );
+    values (v_persona_id, coalesce(v_meta ->> 'departamento', 'Administración'));
+    
   elsif v_rol = 'asistente' then
     insert into public.asistentes (id, turno)
-    values (v_persona_id, trim(v_meta ->> 'turno'));
+    values (v_persona_id, coalesce(v_meta ->> 'turno', 'Matutino'));
   end if;
 
   return new;
@@ -1075,10 +1031,6 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."handle_new_user"() IS 'HFX-CLIN-000: aprovisiona persona, usuario y perfil con el UUID de Auth. El admin recibe además fila en `doctores`, porque ejerce clínica.';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."limpiar_diagnosticos_superficie"() RETURNS "trigger"
@@ -1174,57 +1126,6 @@ $$;
 
 
 ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."perfil_actual"() RETURNS TABLE("id" "uuid", "rol" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "estatus" "text", "username" "text", "telefono" "text", "email" "text", "direccion" "text", "especialidad" "text", "esta_disponible" boolean, "departamento" "text", "turno" "text")
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select
-    u.id,
-    case
-      when a.id is not null then 'admin'
-      when d.id is not null then 'doctor'
-      when s.id is not null then 'asistente'
-    end                                       as rol,
-    p.nombre,
-    p.apellido,
-    p.fecha_nacimiento,
-    p.cedula,
-    p.estatus::text,
-    u.username,
-    c.numero_telefono                         as telefono,
-    c.email,
-    c.direccion,
-    d.especialidad,
-    d.esta_disponible,
-    a.departamento,
-    s.turno
-  from public.usuarios u
-  join public.personas p on p.id = u.id
-  left join public.doctores   d on d.id = u.id and d.deleted_at is null
-  left join public.admins     a on a.id = u.id and a.deleted_at is null
-  left join public.asistentes s on s.id = u.id and s.deleted_at is null
-  left join lateral (
-    select ct.numero_telefono, ct.email, ct.direccion
-      from public.persona_contactos pc
-      join public.contactos ct on ct.id = pc.contacto_id
-     where pc.persona_id = p.id
-     order by pc.es_principal desc nulls last
-     limit 1
-  ) c on true
- where u.id = auth.uid()
-   and u.deleted_at is null
-   and p.deleted_at is null
-   and (a.id is not null or d.id is not null or s.id is not null);
-$$;
-
-
-ALTER FUNCTION "public"."perfil_actual"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."perfil_actual"() IS 'HFX-CLIN-000: perfil de la sesión actual. Nunca devuelve password_hash y no admite consultar el perfil de otro usuario.';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() RETURNS "trigger"
@@ -2627,39 +2528,22 @@ ALTER TABLE "public"."procedimientos" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."recetas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "consulta_id" "uuid" NOT NULL,
-    "medicina_id" "uuid",
-    "titulo" "text",
-    "dosis" "text",
-    "frecuencia" "text",
-    "indicaciones" "text",
-    "duracion" "text",
+    "medicina_id" "uuid" NOT NULL,
+    "titulo" "text" NOT NULL,
+    "dosis" "text" NOT NULL,
+    "frecuencia" "text" NOT NULL,
+    "indicaciones" "text" NOT NULL,
+    "duracion" "text" NOT NULL,
     "notas" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone,
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "title" "text",
-    "paciente_id" "uuid",
-    "doctor_id" "uuid",
-    "fecha_emision" timestamp with time zone DEFAULT "now"(),
-    "indicaciones_generales" "text",
-    "justificacion_contraindicaciones" "text",
-    "estado" "text" DEFAULT 'activa'::"text",
-    "motivo_anulacion" "text",
-    "receta_reemplazada_id" "uuid",
-    "items_receta" "jsonb" DEFAULT '[]'::"jsonb",
-    CONSTRAINT "recetas_estado_check" CHECK (("estado" = ANY (ARRAY['activa'::"text", 'anulada'::"text", 'reemplazada'::"text"])))
+    "paciente_id" "uuid"
 );
 
 
 ALTER TABLE "public"."recetas" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."recetas"."estado" IS 'activa | anulada | reemplazada. Una receta corregida apunta a la anterior con receta_reemplazada_id en vez de editarla.';
-
-
-
-COMMENT ON COLUMN "public"."recetas"."items_receta" IS 'SD-153: medicinas de la receta. Cada elemento lleva nombre, presentación, dosis, vía, frecuencia, duración, cantidad e indicaciones específicas.';
-
 
 
 CREATE TABLE IF NOT EXISTS "public"."record_condicion" (
@@ -3170,10 +3054,6 @@ CREATE INDEX "idx_recetas_consulta" ON "public"."recetas" USING "btree" ("consul
 
 
 
-CREATE INDEX "idx_recetas_paciente" ON "public"."recetas" USING "btree" ("paciente_id") WHERE ("deleted_at" IS NULL);
-
-
-
 CREATE INDEX "idx_suplidor_contacto_ref" ON "public"."suplidores_contactos" USING "btree" ("suplidor_id");
 
 
@@ -3287,15 +3167,6 @@ CREATE OR REPLACE TRIGGER "trg_validar_cita_item_plan" BEFORE INSERT OR UPDATE O
 
 
 CREATE OR REPLACE TRIGGER "update_dientes_modtime" BEFORE UPDATE ON "public"."dientes" FOR EACH ROW EXECUTE FUNCTION "public"."update_modified_column"();
-
-
-
-ALTER TABLE ONLY "public"."admins"
-    ADD CONSTRAINT "admins_id_doctores_fkey" FOREIGN KEY ("id") REFERENCES "public"."doctores"("id") ON UPDATE CASCADE ON DELETE CASCADE;
-
-
-
-COMMENT ON CONSTRAINT "admins_id_doctores_fkey" ON "public"."admins" IS 'HFX-CLIN-000: un administrador es un doctor con capacidades añadidas. Sin esta FK el login por PostgREST no puede resolver su perfil.';
 
 
 
@@ -3625,22 +3496,12 @@ ALTER TABLE ONLY "public"."recetas"
 
 
 ALTER TABLE ONLY "public"."recetas"
-    ADD CONSTRAINT "recetas_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id") ON DELETE RESTRICT;
-
-
-
-ALTER TABLE ONLY "public"."recetas"
     ADD CONSTRAINT "recetas_medicina_id_fkey" FOREIGN KEY ("medicina_id") REFERENCES "public"."medicinas"("id") ON DELETE RESTRICT;
 
 
 
 ALTER TABLE ONLY "public"."recetas"
     ADD CONSTRAINT "recetas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id");
-
-
-
-ALTER TABLE ONLY "public"."recetas"
-    ADD CONSTRAINT "recetas_receta_reemplazada_id_fkey" FOREIGN KEY ("receta_reemplazada_id") REFERENCES "public"."recetas"("id") ON DELETE RESTRICT;
 
 
 
@@ -4805,12 +4666,6 @@ GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cu
 
 
 
-REVOKE ALL ON FUNCTION "public"."get_active_doctors"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
@@ -4832,12 +4687,6 @@ GRANT ALL ON FUNCTION "public"."manejar_cita_cancelada"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."perfil_actual"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "service_role";
 
 
 
@@ -4975,7 +4824,6 @@ GRANT ALL ON TABLE "public"."tratamientos" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."actividades_agendables_paciente" TO "anon";
 GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "authenticated";
 GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "service_role";
 
@@ -5011,7 +4859,6 @@ GRANT ALL ON TABLE "public"."citas" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."citas_items_plan" TO "anon";
 GRANT ALL ON TABLE "public"."citas_items_plan" TO "authenticated";
 GRANT ALL ON TABLE "public"."citas_items_plan" TO "service_role";
 
@@ -5209,7 +5056,6 @@ GRANT ALL ON TABLE "public"."records" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."resumen_actividades_cita" TO "anon";
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "authenticated";
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "service_role";
 
@@ -5306,3 +5152,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 
+
+-- El dump deja `search_path` vacío para el resto de la sesión y las
+-- migraciones posteriores corren en la misma conexión.
+SELECT pg_catalog.set_config('search_path', 'public, extensions', false);

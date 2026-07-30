@@ -30,6 +30,15 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     return supabase.auth.signInWithPassword(email: email, password: password);
   }
 
+  /// La RPC recibe `auth.uid()` implícitamente: no hay forma de pedir el
+  /// perfil de otro usuario, y la respuesta no contiene ninguna contraseña.
+  @override
+  Future<Map<String, dynamic>?> getPerfilActual() async {
+    final filas = await supabase.rpc('perfil_actual') as List?;
+    if (filas == null || filas.isEmpty) return null;
+    return Map<String, dynamic>.from(filas.first as Map);
+  }
+
   @override
   Future<Map<String, dynamic>?> getPerfilPorTabla({
     required String tabla,

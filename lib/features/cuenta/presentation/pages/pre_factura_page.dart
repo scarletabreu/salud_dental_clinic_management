@@ -4,8 +4,8 @@ import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
@@ -1505,10 +1505,9 @@ IconData _iconoMetodo(pago_enums.MetodoPago metodo) {
 }
 
 void _mostrarDialogoAjuste(BuildContext context, Cuenta cuenta) {
-  final autorizado = context.read<AuthCubit>().state.hasAnyRole([
-    RolUsuario.admin,
-    RolUsuario.doctor,
-  ]);
+  // Ajustar una cuenta toca el resultado clínico facturado: lo hace quien
+  // ejerce, no quien sólo opera la agenda.
+  final autorizado = context.read<AuthCubit>().state.puedeEjercerClinica;
 
   if (!autorizado) {
     _mostrarNoAutorizado(context);

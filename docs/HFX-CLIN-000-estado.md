@@ -1,7 +1,8 @@
 # HFX-CLIN-000 · Estado de la implementación
 
 > Rama: `hotfix-admin-clinical-identity` (base: `dev` en `c4f2e1c`).
-> Última actualización: 30 jul 2026. **Ticket en curso, no terminado.**
+> Última actualización: 30 jul 2026. **Alcance del ticket completo**; queda
+> abierta la decisión sobre la instancia remota (ver «Riesgos abiertos»).
 
 Plan de referencia:
 `~/Documents/Salud Dental Clinic/CORE-CLINICO-HOTFIX-PLAN.md`, primer ticket.
@@ -114,24 +115,66 @@ completo; y borra el usuario de Auth si quedara sin perfil.
 
 ---
 
-## Lo que falta para cerrar el ticket
+### Suite Flutter recuperada
 
-1. **Correr la suite completa (`flutter test`) y dejarla verde.** Es lo que
-   estaba en marcha al pausar; nunca llegó a terminar en esta rama. La línea
-   base de `dev` ya venía roja (ver memoria `dev-suite-roja-baseline`), así que
-   hay que separar los fallos preexistentes de los que introduzca el ticket.
-   Sospechosos directos del cambio: `responsive_listados_test.dart` (fallaba ya
-   antes), y todo lo que construya perfiles o toque el shell.
-2. **Pruebas Dart que aún pide el plan §6** y no están escritas:
-   aprovisionamiento por rol y login por rol contra el mapper
-   (`PerfilActualMapper.desdeFila`), y admin incluido en el catálogo de doctores
-   desde `DoctorRemoteDatasourceImpl`.
-3. **Smoke test web** de login + agenda con los tres roles (criterio explícito
-   del plan). No ejecutado.
-4. **Actualizar `supabase/README.md`**: sigue diciendo que `db reset` no sirve
-   para bootstrapear y que hay que cargar `schema.sql` a mano. Ya no es cierto.
-   Añadir también la tabla del nuevo test SQL.
-5. **Revisar el diff completo** y hacer el commit atómico definitivo.
+`flutter test` completo: **663 pruebas, 1 fallo**. Antes de esta tanda había 22.
+
+Ninguno de los 21 corregidos era una regresión del ticket: se comprobó
+ejecutando las mismas suites sobre `c4f2e1c` en un worktree aparte. Tres suites
+ni siquiera compilaban en la base, así que sus fallos reales estaban tapados.
+
+| Suite | Qué pasaba | Qué se hizo |
+|---|---|---|
+| `consulta_detalle_responsive_test` (6) | la página resuelve también `sl<PacienteCubit>()` y el harness no lo registraba | doble de `PacienteCubit` |
+| `responsive_listados_test` (6) | `_ConsultaCard` lee `AuthCubit` para decidir si ofrece continuar; el test no lo proveía | `AuthCubit` doble con la sesión del doctor |
+| `responsive_shell_test` (5) | describía la navegación móvil anterior (claves `mobile-navigation-*`, texto «Más») y una política de roles más estrecha de la que `dev` ya tenía | reescritas contra el diseño vigente (FAB «Más módulos», `onNavigateTo`) y contra la política real |
+| `paciente_responsive_test` (2) | «Nuevo Paciente» desbordaba la cabecera 21 px a 320 px | el botón baja a su propia fila en layout compacto |
+| `pre_factura_responsive_test` (1) | insignia de estado y etiquetas de KPI desbordaban con texto ×2 | `Wrap` en la cabecera, `Flexible`/`Expanded` en las etiquetas |
+| `odontodiagrama_impresion_test` (1) | el botón pasó a llamarse «Imprimir Odontodiagrama» | expectativa actualizada |
+
+**El fallo que queda es de otro ticket**: `guardado_clinico_test` ·
+«un diagnóstico conserva pieza, cara, fecha y origen» falla porque el payload
+manda `superficiecle` en vez de `superficie`. Falla igual en `c4f2e1c`, y el
+plan lo asigna explícitamente a HFX-CLIN-002 §1, con su prueba de contra­to
+contra PostgREST real. No se tocó aquí para no diluir el límite entre tickets.
+
+### Pruebas Dart nuevas del §6
+
+- `test/features/auth/perfil_actual_mapper_test.dart` — 7 casos: el admin nace
+  `Admin` **y** `Doctor`, el doctor sin datos administrativos, el asistente sin
+  identidad clínica, una fila sin rol no produce sesión, ningún rol trae
+  contraseña, el contacto no se fabrica si falta y el estatus se conserva.
+- `test/features/personal/doctor_catalogo_test.dart` — 3 casos sobre
+  `DoctorRemoteDatasourceImpl`: el admin aparece en el catálogo agendable y
+  marcado como tal, no llegan contraseñas, y una baja llega como inactiva.
+  Para poder probarlo sin red, el datasource recibe una costura opcional
+  `getActiveDoctorsRpc`, igual que `ConsultaRemoteDatasourceImpl`.
+
+### Smoke de login y agenda por rol
+
+`supabase/tests/hfx_clin_000_smoke_login_agenda.sh`, **verde**. Recorre contra
+el stack local el mismo camino del navegador: alta por Auth (que dispara
+`handle_new_user`), login de los tres roles, `perfil_actual()`,
+`get_active_doctors()` y lectura de `citas`; comprueba que el admin sale
+agendable, que ninguna respuesta trae `password_hash` y que `anon` no ejecuta
+nada. Crea sus usuarios con sufijo aleatorio y los borra al salir.
+
+> **Limitación.** No es un recorrido por la UI real. `dart_define.json` apunta a
+> la instancia **remota**, así que levantar Flutter Web tal cual habría hablado
+> con producción, y el repo no tiene `integration_test` ni driver para guiar el
+> navegador (el plan sitúa el E2E web en HFX-CLIN-006). Lo que se verificó es
+> toda la capa que la UI consume; el clic sigue siendo manual.
+
+### Base de datos, revalidada de cero
+
+`supabase db reset` limpio, y sobre esa base reconstruida las **cinco** suites
+SQL en verde (`hfx_clin_000` 9 OK, `sd_111` 6 OK, `sd_135`, `sd_146` 8 OK,
+`sd_169`). Cero admins sin fila en `doctores`.
+
+`flutter analyze`: **0 errores**, 10 warnings preexistentes.
+
+`supabase/README.md` actualizado: `db reset` es ahora el bootstrap, se explica
+el squash y `migrations_historicas/`, y se documentan el test SQL y el smoke.
 
 ## Riesgos abiertos, a decidir con el dueño
 
@@ -161,9 +204,10 @@ completo; y borra el usuario de Auth si quedara sin perfil.
 git checkout hotfix-admin-clinical-identity
 supabase start
 supabase db reset                       # reconstruye entera, ya sin parches
-flutter analyze                         # debe dar 0 errores
-flutter test                            # <- punto 1 de "lo que falta"
+flutter analyze                         # 0 errores
+flutter test                            # 663 pruebas, 1 fallo (HFX-CLIN-002)
 
 PGURL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 for t in supabase/tests/*.sql; do psql "$PGURL" -v ON_ERROR_STOP=1 -f "$t"; done
+./supabase/tests/hfx_clin_000_smoke_login_agenda.sh
 ```

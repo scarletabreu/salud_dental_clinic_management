@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_state.dart';
@@ -38,6 +40,19 @@ class _CuentasCubitDoble extends Cubit<CuentasPorCobrarState>
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
+
+/// La tarjeta de consulta compara el UUID de la sesión con el doctor de la
+/// consulta para decidir si ofrece continuarla, así que estas páginas no se
+/// construyen sin un `AuthCubit` encima.
+class _AuthCubitDoble extends Cubit<AuthState> implements AuthCubit {
+  _AuthCubitDoble(super.initialState);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+AuthState _sesionDelDoctor() =>
+    AuthState(isAuthenticated: true, usuario: _doctor());
 
 Doctor _doctor() => Doctor(
   id: 'doc-1',
@@ -123,8 +138,12 @@ Widget _app(Widget pagina, {double textScale = 1}) => MaterialApp(
     ).copyWith(textScaler: TextScaler.linear(textScale)),
     child: inner!,
   ),
-  // En la app estas páginas viven dentro del Scaffold del shell.
-  home: Scaffold(body: pagina),
+  // En la app estas páginas viven dentro del Scaffold del shell, y por debajo
+  // del `AuthCubit` que provee la sesión.
+  home: BlocProvider<AuthCubit>(
+    create: (_) => _AuthCubitDoble(_sesionDelDoctor()),
+    child: Scaffold(body: pagina),
+  ),
 );
 
 void _viewport(WidgetTester tester, Size tamano) {

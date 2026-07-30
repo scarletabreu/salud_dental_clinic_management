@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
@@ -23,6 +24,7 @@ Widget _mobileShell(
   List<ShellDestinationId> ids,
   ValueChanged<int> onSelect, {
   double textScale = 1,
+  ValueChanged<ShellDestinationId>? onNavigateTo,
 }) {
   return MaterialApp(
     theme: AppTheme.light,
@@ -39,11 +41,24 @@ Widget _mobileShell(
         primaryDestinations: _destinations(ids.take(4).toList()),
         selectedIndex: 0,
         onDestinationSelected: onSelect,
-        onNavigateTo: (_) {},
+        onNavigateTo: onNavigateTo ?? (_) {},
       ),
     ),
   );
 }
+
+/// Opacidad del panel de módulos secundarios: 0 cerrado, 1 abierto.
+double _opacidadDelMenu(WidgetTester tester) => tester
+    .widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.text(ShellDestinationId.perfiles.name),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    )
+    .opacity
+    .value;
 
 void main() {
   final sizes = <double, ShellLayout>{
@@ -79,24 +94,26 @@ void main() {
     });
   }
 
-  testWidgets('mobile exposes every administrator module through Más', (
+  testWidgets('mobile exposes every secondary module through «Más módulos»', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    var selected = -1;
+    final navegados = <ShellDestinationId>[];
 
-    await tester.pumpWidget(_mobileShell(_ids, (index) => selected = index));
-    expect(
-      find.byKey(const ValueKey('mobile-navigation-inicio')),
-      findsOneWidget,
+    await tester.pumpWidget(
+      _mobileShell(_ids, (_) {}, onNavigateTo: navegados.add),
     );
-    expect(find.byKey(const ValueKey('mobile-navigation-Más')), findsOneWidget);
-    expect(find.text('perfiles'), findsNothing);
 
-    await tester.tap(find.text('Más'));
+    // Los cuatro primarios viven en la barra; el resto está montado pero
+    // invisible hasta abrir el menú.
+    expect(_opacidadDelMenu(tester), 0);
+
+    await tester.tap(find.bySemanticsLabel('Más módulos'));
     await tester.pumpAndSettle();
+    expect(_opacidadDelMenu(tester), 1);
+
     for (final id in _ids.skip(4)) {
       await tester.scrollUntilVisible(
         find.text(id.name),
@@ -106,9 +123,14 @@ void main() {
       expect(find.text(id.name), findsOneWidget);
     }
 
-    await tester.tap(find.text('configuracion'));
+    await tester.scrollUntilVisible(
+      find.text(ShellDestinationId.configuracion.name),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text(ShellDestinationId.configuracion.name));
     await tester.pumpAndSettle();
-    expect(selected, _ids.indexOf(ShellDestinationId.configuracion));
+    expect(navegados, [ShellDestinationId.configuracion]);
     expect(tester.takeException(), isNull);
   });
 
@@ -120,7 +142,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(_mobileShell(_ids, (_) {}, textScale: 2));
-    expect(find.text('Más'), findsOneWidget);
+    expect(find.bySemanticsLabel('Más módulos'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -129,14 +151,18 @@ void main() {
   ) async {
     await tester.pumpWidget(_mobileShell(_ids, (_) {}));
 
+    final verde = AppTheme.light.extension<AppColors>()!.primaryGreen;
     final itemDecorations = tester
         .widgetList<Container>(find.byType(Container))
         .map((container) => container.decoration)
         .whereType<BoxDecoration>();
 
+    // La barra no es un `NavigationBar` de serie: es una píldora redondeada
+    // con el verde de la marca, igual que el rail de escritorio.
     expect(
       itemDecorations.any(
-        (decoration) => decoration.borderRadius == BorderRadius.circular(12),
+        (decoration) =>
+            decoration.color == verde && decoration.borderRadius != null,
       ),
       isTrue,
     );
@@ -157,6 +183,10 @@ void main() {
         .toList();
 
     expect(admin, _ids);
+    // El doctor ve todo menos Caja: gestionar caja es capacidad de admin y
+    // asistente. Perfiles, Equipos e Inventario siguen abiertos al doctor
+    // —así estaba antes de HFX-CLIN-000, que sólo sustituyó la comparación de
+    // roles por capacidades— y estrechar ese acceso se decide en HFX-CLIN-001.
     expect(doctor, [
       ShellDestinationId.inicio,
       ShellDestinationId.citasDelDia,
@@ -164,9 +194,19 @@ void main() {
       ShellDestinationId.pacientes,
       ShellDestinationId.cuentasPorCobrar,
       ShellDestinationId.tratamientos,
+      ShellDestinationId.procedimientos,
+      ShellDestinationId.diagnosticos,
       ShellDestinationId.medicinas,
+      ShellDestinationId.inventario,
+      ShellDestinationId.perfiles,
+      ShellDestinationId.equipos,
       ShellDestinationId.configuracion,
     ]);
+    expect(
+      doctor,
+      isNot(contains(ShellDestinationId.caja)),
+      reason: 'gestionar caja no es capacidad clínica',
+    );
     expect(assistant, [
       ShellDestinationId.inicio,
       ShellDestinationId.citasDelDia,
@@ -261,7 +301,12 @@ void main() {
         ShellDestinationId.pacientes,
       ],
       [ShellDestinationId.cuentasPorCobrar],
-      [ShellDestinationId.tratamientos, ShellDestinationId.medicinas],
+      [
+        ShellDestinationId.tratamientos,
+        ShellDestinationId.medicinas,
+        ShellDestinationId.inventario,
+      ],
+      [ShellDestinationId.perfiles, ShellDestinationId.equipos],
     ]);
     expect(visibleFor(RolUsuario.asistente), [
       [

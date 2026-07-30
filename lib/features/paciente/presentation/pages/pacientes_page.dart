@@ -131,12 +131,31 @@ class _PacientesPageState extends State<PacientesPage> {
     );
   }
 
+  Widget _botonNuevoPaciente(BuildContext context) {
+    final ac = context.appColors;
+
+    return FilledButton.icon(
+      onPressed: _openNuevoPaciente,
+      icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+      label: const Text('Nuevo Paciente'),
+      style: FilledButton.styleFrom(
+        backgroundColor: ac.primaryGreen,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
 
     final authState = context.watch<AuthCubit>().state;
     final puedeCrear = authState.puedeGestionarAgendaCompleta;
+    // A 320 px el botón no cabe al lado del título: se baja a una fila propia
+    // en vez de desbordar la cabecera.
+    final accionEnLineaAparte = context.isCompactLayout;
 
     return Padding(
       padding: context.pageInsets(top: 28, bottom: 12),
@@ -210,27 +229,19 @@ class _PacientesPageState extends State<PacientesPage> {
                 ),
               ),
 
-              if (puedeCrear) ...[
+              if (puedeCrear && !accionEnLineaAparte) ...[
                 const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: _openNuevoPaciente,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Nuevo Paciente'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+                _botonNuevoPaciente(context),
               ],
             ],
           ),
+          if (puedeCrear && accionEnLineaAparte) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: _botonNuevoPaciente(context),
+            ),
+          ],
           const SizedBox(height: 20),
           TextField(
             controller: _searchController,

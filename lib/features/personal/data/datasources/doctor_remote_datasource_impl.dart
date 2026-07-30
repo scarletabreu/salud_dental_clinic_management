@@ -2,16 +2,24 @@ import 'package:salud_dental_clinic_management/features/personal/data/datasource
 import 'package:salud_dental_clinic_management/features/personal/data/models/doctor_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+typedef GetActiveDoctorsRpc = Future<dynamic> Function();
+
 class DoctorRemoteDatasourceImpl implements DoctorRemoteDatasource {
   final SupabaseClient supabaseClient;
+  final GetActiveDoctorsRpc _getActiveDoctorsRpc;
 
-  DoctorRemoteDatasourceImpl({required this.supabaseClient});
+  DoctorRemoteDatasourceImpl({
+    required this.supabaseClient,
+    GetActiveDoctorsRpc? getActiveDoctorsRpc,
+  }) : _getActiveDoctorsRpc =
+           getActiveDoctorsRpc ??
+           (() => supabaseClient.rpc('get_active_doctors'));
 
   /// Catálogo de doctores agendables, administradores incluidos: desde
   /// HFX-CLIN-000 un admin tiene fila en `doctores`, que es lo que lee la RPC.
   @override
   Future<List<DoctorModel>> fetchActiveDoctores() async {
-    final response = await supabaseClient.rpc('get_active_doctors');
+    final response = await _getActiveDoctorsRpc();
 
     return (response as List)
         .map((json) => DoctorModel.fromJsonFn(json as Map<String, dynamic>))

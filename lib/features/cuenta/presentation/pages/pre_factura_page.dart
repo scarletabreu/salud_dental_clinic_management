@@ -294,24 +294,26 @@ class _HeaderEstado extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                // Wrap y no Row: con el texto ampliado la insignia de estado
+                // no cabe al lado del nombre y debe bajar de línea.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: Text(
-                        paciente != null
-                            ? paciente!.fullName
-                            : 'Consulta #$consultaCorta',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: ac.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
+                    Text(
+                      paciente != null
+                          ? paciente!.fullName
+                          : 'Consulta #$consultaCorta',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: ac.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -330,12 +332,16 @@ class _HeaderEstado extends StatelessWidget {
                         children: [
                           Icon(icon, size: 13, color: color),
                           const SizedBox(width: 4),
-                          Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: color,
+                          Flexible(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
                             ),
                           ),
                         ],
@@ -462,13 +468,17 @@ class _KpiCard extends StatelessWidget {
             children: [
               Icon(icono, size: 15, color: color),
               const SizedBox(width: 6),
-              Text(
-                etiqueta,
-                style: TextStyle(
-                  color: ac.textMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Text(
+                  etiqueta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ac.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
@@ -895,7 +905,11 @@ class _Acciones extends StatelessWidget {
   final Cuenta cuenta;
   final List<Cuota> cuotas;
   final String? pacienteId;
-  const _Acciones({required this.cuenta, required this.cuotas, required this.pacienteId});
+  const _Acciones({
+    required this.cuenta,
+    required this.cuotas,
+    required this.pacienteId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -988,25 +1002,25 @@ class _Acciones extends StatelessWidget {
           ],
         ),
         if (pacienteId != null) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ResumenPlanPage.porPaciente(pacienteId!),
-                    ),
-                  ),
-                  icon: const Icon(Icons.fact_check_outlined, size: 18),
-                  label: const Text('Ver plan de tratamiento completo'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: ac.primaryGreen,
-                    side: BorderSide(color: ac.primaryGreen.withValues(alpha: 0.4)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ResumenPlanPage.porPaciente(pacienteId!),
                 ),
               ),
-            ],
+              icon: const Icon(Icons.fact_check_outlined, size: 18),
+              label: const Text('Ver plan de tratamiento completo'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ac.primaryGreen,
+                side: BorderSide(color: ac.primaryGreen.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

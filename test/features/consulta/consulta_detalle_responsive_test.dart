@@ -7,6 +7,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consulta_detalle_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
@@ -16,6 +18,19 @@ class _ConsultaDetalleCubitDoble extends Cubit<ConsultaDetalleState>
 
   @override
   Future<void> cargar(Consulta consulta) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// La página resuelve también el paciente por `sl<PacienteCubit>()`; sin este
+/// doble el detalle ni siquiera llega a construirse en la prueba.
+class _PacienteCubitDoble extends Cubit<PacienteState>
+    implements PacienteCubit {
+  _PacienteCubitDoble() : super(const PacienteLoading());
+
+  @override
+  Future<void> loadById(String id) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -74,6 +89,11 @@ Widget _app({double textScale = 1}) {
     ),
   );
 
+  if (sl.isRegistered<PacienteCubit>()) {
+    sl.unregister<PacienteCubit>();
+  }
+  sl.registerFactory<PacienteCubit>(_PacienteCubitDoble.new);
+
   return MaterialApp(
     theme: AppTheme.light,
     builder: (context, inner) => MediaQuery(
@@ -108,6 +128,9 @@ void main() {
   tearDown(() {
     if (sl.isRegistered<ConsultaDetalleCubit>()) {
       sl.unregister<ConsultaDetalleCubit>();
+    }
+    if (sl.isRegistered<PacienteCubit>()) {
+      sl.unregister<PacienteCubit>();
     }
   });
 

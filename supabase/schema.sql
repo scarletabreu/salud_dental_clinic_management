@@ -473,22 +473,57 @@ ALTER FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_
 
 CREATE OR REPLACE FUNCTION "public"."cancelar_citas_paciente_inactivo"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
     AS $$
-BEGIN
-    -- Validamos el cambio a inactivo
-    IF (NEW.estatus = 'inactivo') THEN
-        UPDATE public.citas 
-        SET estado = 'cancelada' 
-        WHERE paciente_id = NEW.id 
-          AND fecha_hora > now() 
-          AND estado = 'pendiente';
-    END IF;
-    RETURN NEW;
-END;
+begin
+  -- Solo la TRANSICIÓN a inactivo cancela. La app manda `estatus` en cada
+  -- update de persona, así que sin esta comprobación un simple cambio de
+  -- teléfono en un paciente ya inactivo volvería a barrer su agenda.
+  if new.estatus = 'inactivo'::estatus_persona
+     and old.estatus is distinct from new.estatus
+  then
+    update citas
+       set estado     = 'cancelada'::estado_cita,
+           updated_at = now()
+     where persona_id = new.id
+       and deleted_at is null
+       and fecha_hora > now()
+       -- Estados vivos y anteriores a la atención. `en_consulta` queda fuera a
+       -- propósito: si al paciente lo están atendiendo ahora mismo, un cambio
+       -- administrativo no le cierra la cita por debajo. Los terminales
+       -- (completada, cancelada, no_asistio, no_asistida) tampoco se tocan.
+       and estado in (
+             'programada'::estado_cita,
+             'confirmada'::estado_cita,
+             'en_espera'::estado_cita
+           )
+       -- Regla de SD-160: no existe cita cancelada con consulta abierta. Sin
+       -- este filtro chocaríamos contra
+       -- `tr_bloquear_cancelacion_con_consulta_abierta`, cuyo P0001 volvería a
+       -- abortar la desactivación del paciente: cambiaríamos un fallo
+       -- permanente por uno intermitente y mucho peor de diagnosticar.
+       --
+       -- Decisión: esas citas se dejan VIVAS, no se silencian ni se marcan.
+       -- Su consulta está en curso; la cierra el flujo clínico, que es quien
+       -- sabe qué se hizo. Desactivar al paciente no puede reescribir un acto
+       -- clínico en marcha.
+       and not exists (
+             select 1
+             from consultas c
+             where c.cita_id = citas.id
+               and c.deleted_at is null
+               and c.finalizada is not true
+           );
+  end if;
+  return new;
+end;
 $$;
 
 
 ALTER FUNCTION "public"."cancelar_citas_paciente_inactivo"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() IS 'SD-169: al pasar una persona a inactivo, cancela sus citas futuras todavía vivas (programada, confirmada, en_espera). Excluye en_consulta y las citas con consulta abierta, que se dejan activas para que las cierre el flujo clínico (regla de SD-160).';
 
 
 CREATE OR REPLACE FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") RETURNS "uuid"

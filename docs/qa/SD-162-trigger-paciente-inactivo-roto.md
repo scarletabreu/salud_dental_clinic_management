@@ -3,6 +3,14 @@
 Detectado el 29 jul 2026 al cerrar SD-160. Verificado contra la instancia real
 (`xcuvywvltttephakzmwu`), no solo contra `supabase/schema.sql`.
 
+> **Resuelto en SD-169** (30 jul 2026). La función se reescribió versionada en
+> `supabase/migrations/20260730120000_sd_169_reparar_trigger_paciente_inactivo.sql`,
+> `supabase/schema.sql` quedó alineado y el camino completo lo cubre
+> `supabase/tests/sd_169_paciente_inactivo_test.sql`.
+> **Pendiente de aplicar en la instancia**: la migración todavía no se ha
+> ejecutado en `xcuvywvltttephakzmwu`, así que ahí desactivar un paciente sigue
+> fallando con `42703`.
+
 ## Lo que hay
 
 La función `public.cancelar_citas_paciente_inactivo()`, colgada del trigger

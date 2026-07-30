@@ -7,9 +7,10 @@ Detectado el 29 jul 2026 al cerrar SD-160. Verificado contra la instancia real
 > `supabase/migrations/20260730120000_sd_169_reparar_trigger_paciente_inactivo.sql`,
 > `supabase/schema.sql` quedó alineado y el camino completo lo cubre
 > `supabase/tests/sd_169_paciente_inactivo_test.sql`.
-> **Pendiente de aplicar en la instancia**: la migración todavía no se ha
-> ejecutado en `xcuvywvltttephakzmwu`, así que ahí desactivar un paciente sigue
-> fallando con `42703`.
+> **Aplicada en la instancia** `xcuvywvltttephakzmwu` el 30 jul 2026
+> (`schema_migrations` → `sd_169_reparar_trigger_paciente_inactivo`). El
+> escenario completo se reprodujo ahí dentro de una transacción revertida: las
+> nueve comprobaciones pasan y no quedó rastro.
 
 ## Lo que hay
 

@@ -7,6 +7,9 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consulta_detalle_page.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 class _ConsultaDetalleCubitDoble extends Cubit<ConsultaDetalleState>
@@ -15,6 +18,19 @@ class _ConsultaDetalleCubitDoble extends Cubit<ConsultaDetalleState>
 
   @override
   Future<void> cargar(Consulta consulta) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// La página resuelve también el paciente por `sl<PacienteCubit>()`; sin este
+/// doble el detalle ni siquiera llega a construirse en la prueba.
+class _PacienteCubitDoble extends Cubit<PacienteState>
+    implements PacienteCubit {
+  _PacienteCubitDoble() : super(const PacienteLoading());
+
+  @override
+  Future<void> loadById(String id) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -42,13 +58,21 @@ Consulta _consulta() => Consulta(
   ),
   recetas: [
     Receta(
-      title: 'Amoxicilina con ácido clavulánico',
-      createdAt: DateTime(2026, 7, 21),
-      medicinaId: 'med-1',
-      dosis: '875/125 mg',
-      frecuencia: 'Cada 12 horas',
-      duracion: '7 días',
-      indicaciones: 'Tomar con alimentos para reducir molestias gástricas',
+      codigoReceta: 'RX-2026-00002',
+      consultaId: 'consulta-1',
+      pacienteId: 'paciente-1',
+      fechaEmision: DateTime(2026, 7, 21),
+      items: const [
+        ItemReceta(
+          nombreMedicamento: 'Amoxicilina con ácido clavulánico',
+          medicamentoId: 'med-1',
+          dosis: '875/125 mg',
+          frecuencia: 'Cada 12 horas',
+          duracion: '7 días',
+          indicacionesEspecificas:
+              'Tomar con alimentos para reducir molestias gástricas',
+        ),
+      ],
     ),
   ],
 );
@@ -64,6 +88,11 @@ Widget _app({double textScale = 1}) {
       ),
     ),
   );
+
+  if (sl.isRegistered<PacienteCubit>()) {
+    sl.unregister<PacienteCubit>();
+  }
+  sl.registerFactory<PacienteCubit>(_PacienteCubitDoble.new);
 
   return MaterialApp(
     theme: AppTheme.light,
@@ -99,6 +128,9 @@ void main() {
   tearDown(() {
     if (sl.isRegistered<ConsultaDetalleCubit>()) {
       sl.unregister<ConsultaDetalleCubit>();
+    }
+    if (sl.isRegistered<PacienteCubit>()) {
+      sl.unregister<PacienteCubit>();
     }
   });
 

@@ -10,30 +10,6 @@ class DoctorRepositoryImpl implements DoctorRepository {
   DoctorRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<void> createDoctor(String userId) {
-    return runGuarded(
-      () => remoteDataSource.createDoctor(userId),
-      context: 'crear el doctor',
-    );
-  }
-
-  @override
-  Future<void> deleteDoctor(String userId) {
-    return runGuarded(
-      () => remoteDataSource.deactivateDoctor(userId),
-      context: 'desactivar el doctor',
-    );
-  }
-
-  @override
-  Future<void> updateDoctor(String userId, String newUserId) {
-    return runGuarded(
-      () => remoteDataSource.updateDoctor(userId, newUserId),
-      context: 'actualizar el doctor',
-    );
-  }
-
-  @override
   Future<List<Doctor>> getDoctores() {
     return runGuarded(
       () => remoteDataSource.fetchActiveDoctores(),

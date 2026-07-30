@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -14,7 +14,6 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
-import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
@@ -132,14 +131,31 @@ class _PacientesPageState extends State<PacientesPage> {
     );
   }
 
+  Widget _botonNuevoPaciente(BuildContext context) {
+    final ac = context.appColors;
+
+    return FilledButton.icon(
+      onPressed: _openNuevoPaciente,
+      icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+      label: const Text('Nuevo Paciente'),
+      style: FilledButton.styleFrom(
+        backgroundColor: ac.primaryGreen,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
     final ac = context.appColors;
 
     final authState = context.watch<AuthCubit>().state;
-    final esAdmin = authState.rol == RolUsuario.admin;
-    final esAsistente = authState.rol == RolUsuario.asistente;
-    final puedeCrear = esAdmin || esAsistente;
+    final puedeCrear = authState.puedeGestionarAgendaCompleta;
+    // A 320 px el botón no cabe al lado del título: se baja a una fila propia
+    // en vez de desbordar la cabecera.
+    final accionEnLineaAparte = context.isCompactLayout;
 
     return Padding(
       padding: context.pageInsets(top: 28, bottom: 12),
@@ -213,27 +229,19 @@ class _PacientesPageState extends State<PacientesPage> {
                 ),
               ),
 
-              if (puedeCrear) ...[
+              if (puedeCrear && !accionEnLineaAparte) ...[
                 const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: _openNuevoPaciente,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Nuevo Paciente'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+                _botonNuevoPaciente(context),
               ],
             ],
           ),
+          if (puedeCrear && accionEnLineaAparte) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: _botonNuevoPaciente(context),
+            ),
+          ],
           const SizedBox(height: 20),
           TextField(
             controller: _searchController,
@@ -324,11 +332,11 @@ class _PacientesPageState extends State<PacientesPage> {
       final compact = MediaQuery.sizeOf(context).width < 600;
 
       final authState = context.watch<AuthCubit>().state;
-      final esDoctor = authState.rol == RolUsuario.doctor;
+      final verContacto = authState.puedeVerDatosDeContactoPaciente;
 
       return Column(
         children: [
-          if (!compact) _buildTableHeader(context, esDoctor: esDoctor),
+          if (!compact) _buildTableHeader(context, verContacto: verContacto),
           if (state.filtrados.isEmpty)
             Expanded(
               child: Center(
@@ -377,13 +385,13 @@ class _PacientesPageState extends State<PacientesPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildTableHeader(BuildContext context, {required bool esDoctor}) {
+  Widget _buildTableHeader(BuildContext context, {required bool verContacto}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(48, 8, 48, 12),
       child: Row(
         children: [
           const Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
-          if (!esDoctor) ...[
+          if (verContacto) ...[
             const Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
             const Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
           ],
@@ -508,13 +516,12 @@ class _PacienteRowState extends State<_PacienteRow> {
     final p = widget.paciente;
     final ac = context.appColors;
 
+    // Por capacidad, no por rol: el administrador ejerce clínica, así que ve
+    // el expediente, y además gestiona la ficha administrativa del paciente.
     final authState = context.watch<AuthCubit>().state;
-    final esAdmin = authState.rol == RolUsuario.admin;
-    final esAsistente = authState.rol == RolUsuario.asistente;
-    final esDoctor = authState.rol == RolUsuario.doctor;
-    final puedeVerExpediente = esAdmin || esDoctor;
-    final puedeGestionar = esAdmin || esAsistente;
-    final puedeVerContacto = !esDoctor;
+    final puedeVerExpediente = authState.puedeVerExpedientes;
+    final puedeGestionar = authState.puedeGestionarAgendaCompleta;
+    final puedeVerContacto = authState.puedeVerDatosDeContactoPaciente;
 
     final fondoTarjeta = _expanded
         ? ac.primaryGreen.withValues(alpha: 0.04)
@@ -524,7 +531,7 @@ class _PacienteRowState extends State<_PacienteRow> {
         : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
     final compact = MediaQuery.sizeOf(context).width < 600;
-    final permiteExpandir = !esDoctor;
+    final permiteExpandir = puedeVerContacto;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),

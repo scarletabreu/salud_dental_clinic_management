@@ -43,7 +43,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Imprimir'), findsOneWidget);
+    expect(find.text('Imprimir Odontodiagrama'), findsOneWidget);
 
     final lienzo = tester.renderObject<RenderRepaintBoundary>(
       find

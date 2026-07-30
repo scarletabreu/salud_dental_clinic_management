@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
@@ -65,8 +66,9 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
 
   bool get _isEditing => widget.usuario != null;
 
-  bool get _requiereSpecialty =>
-      _rolUsuario == RolUsuario.doctor || _rolUsuario == RolUsuario.admin;
+  // Doctor y admin comparten identidad clínica: los dos nacen con fila en
+  // `doctores`, así que los dos necesitan especialidad.
+  bool get _requiereSpecialty => _rolUsuario.tiene(Capacidad.ejercerClinica);
   bool get _requiereDepartamento => _rolUsuario == RolUsuario.admin;
   bool get _requiereTurno => _rolUsuario == RolUsuario.asistente;
   bool get _puedeAsignarAsistentes => _requiereSpecialty;

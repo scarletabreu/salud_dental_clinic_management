@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/domain/repositories/persona_repository.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -110,12 +110,11 @@ class MisCitasDelDiaPage extends StatelessWidget {
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
 
-          // AÑADIDO: crear citas es exclusivo de asistente/admin.
+          // Crear citas es de quien gestiona la agenda completa.
           final authState = context.watch<AuthCubit>().state;
-          final puedeCrearCitas =
-              authState.rol == RolUsuario.asistente ||
-              authState.rol == RolUsuario.admin;
-          if (!puedeCrearCitas) return const SizedBox.shrink();
+          if (!authState.puedeGestionarAgendaCompleta) {
+            return const SizedBox.shrink();
+          }
 
           Future<void> abrirNuevaCita() async {
             await NuevaCitaDialog.show(
@@ -1119,17 +1118,14 @@ class _CitaCard extends StatelessWidget {
     final hour = cita.date.hour.toString().padLeft(2, '0');
     final min = cita.date.minute.toString().padLeft(2, '0');
 
-    // AÑADIDO: resolución de permisos por rol para esta tarjeta puntual.
+    // Permisos de esta tarjeta puntual, por capacidad y no por nombre de rol:
+    // el administrador también ejerce, así que atiende las citas asignadas a
+    // su propio UUID sin dejar de gestionar la agenda de los demás.
     final authState = context.watch<AuthCubit>().state;
-    final usuario = authState.usuario;
-    final esAdmin = authState.rol == RolUsuario.admin;
-    final esAsistente = authState.rol == RolUsuario.asistente;
-    final esDoctorDeEstaCita =
-        authState.rol == RolUsuario.doctor && usuario?.id == cita.doctor.id;
 
-    // Crear/editar/cancelar/cambiar estado: solo asistente o admin.
-    final puedeGestionar = esAsistente || esAdmin;
-    final puedeEfectuarConsulta = esDoctorDeEstaCita;
+    // Crear/editar/cancelar/cambiar estado: quien gestiona la agenda completa.
+    final puedeGestionar = authState.puedeGestionarAgendaCompleta;
+    final puedeEfectuarConsulta = authState.puedeAtenderCitaDe(cita.doctor.id);
 
     return ResumenCitaAccesible(
       cita: cita,

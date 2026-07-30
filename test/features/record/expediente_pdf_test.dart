@@ -22,6 +22,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
+import 'package:salud_dental_clinic_management/features/receta/domain/entities/item_receta.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/expediente_print_options.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
@@ -104,13 +105,21 @@ Paciente _pacienteCompleto({List<Consulta>? consultas}) {
           recetas: [
             Receta(
               id: 'receta-1',
-              title: 'Amoxicilina',
-              createdAt: DateTime(2026, 7, 21),
-              medicinaId: 'medicina-1',
-              dosis: '500 mg',
-              frecuencia: 'Cada 8 horas',
-              indicaciones: 'Tomar con alimentos',
-              duracion: '7 dias',
+              codigoReceta: 'RX-2026-00001',
+              consultaId: 'consulta-12345678',
+              pacienteId: _pacienteId,
+              doctorId: 'doctor-1',
+              fechaEmision: DateTime(2026, 7, 21),
+              items: const [
+                ItemReceta(
+                  nombreMedicamento: 'Amoxicilina',
+                  medicamentoId: 'medicina-1',
+                  dosis: '500 mg',
+                  frecuencia: 'Cada 8 horas',
+                  duracion: '7 dias',
+                  indicacionesEspecificas: 'Tomar con alimentos',
+                ),
+              ],
             ),
           ],
           documentosClinicos: [

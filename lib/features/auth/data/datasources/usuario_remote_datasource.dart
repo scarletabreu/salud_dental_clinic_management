@@ -15,6 +15,9 @@ abstract class UsuarioRemoteDataSource {
     required String selectColumns,
   });
 
+  /// Perfil de la sesión actual vía la RPC `perfil_actual()`.
+  Future<Map<String, dynamic>?> getPerfilActual();
+
   Future<Map<String, dynamic>?> getPerfilPorTabla({
     required String tabla,
     required String uuid,

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/inicio/domain/entities/alerta_operativa.dart';
@@ -74,11 +75,10 @@ class DashboardLoaded extends DashboardState {
     this.alertas = const [],
   });
 
-  bool get isAdmin => roles.contains(RolUsuario.admin);
-  bool get isDoctor => roles.contains(RolUsuario.doctor);
-  bool get isSecretaria => roles.contains(RolUsuario.asistente);
-
-  bool get tieneAccesoOperativo => isAdmin || isSecretaria;
+  /// Qué puede hacer quien mira el dashboard, no cómo se llama su rol: el
+  /// administrador ejerce clínica y además lleva la operación.
+  bool get puedeEjercerClinica => roles.puedeEjercerClinica;
+  bool get tieneAccesoOperativo => roles.puedeGestionarCaja;
 
   // Totales derivados incluyendo canceladas
   int get citasSemanaTotal =>

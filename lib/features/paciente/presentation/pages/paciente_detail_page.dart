@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
@@ -101,10 +101,12 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final puedeExportar = context.select(
-      (AuthCubit cubit) => cubit.state.roles.puedeVerExpedientes,
+      (AuthCubit cubit) => cubit.state.puedeVerExpedientes,
     );
-    final esDoctor = context.select(
-      (AuthCubit cubit) => cubit.state.rol == RolUsuario.doctor,
+    // El doctor trabaja con el expediente clínico; la ficha administrativa y
+    // los datos de contacto son de quien gestiona al paciente (SD-149).
+    final soloClinico = context.select(
+      (AuthCubit cubit) => !cubit.state.puedeVerDatosDeContactoPaciente,
     );
 
     return BlocBuilder<PacienteCubit, PacienteState>(
@@ -178,7 +180,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 ),
             ],
           ),
-          body: _buildBody(state, ac, esDoctor: esDoctor),
+          body: _buildBody(state, ac, soloClinico: soloClinico),
         );
       },
     );
@@ -187,7 +189,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
   Widget _buildBody(
     PacienteState state,
     AppColors ac, {
-    required bool esDoctor,
+    required bool soloClinico,
   }) {
     if (state is PacienteDetailLoading) {
       return Center(
@@ -207,7 +209,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
         state.paciente,
         historialNoDisponible: state.historialNoDisponible,
         historialPiezas: state.historialPiezas,
-        esDoctor: esDoctor,
+        soloClinico: soloClinico,
       );
     }
 
@@ -218,7 +220,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     Paciente p, {
     bool historialNoDisponible = false,
     HistorialPiezas historialPiezas = HistorialPiezas.vacio,
-    required bool esDoctor,
+    required bool soloClinico,
   }) {
     final sortedConsultas = [...p.record.consultas]
       ..sort(
@@ -232,7 +234,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildIdentityCard(p, esDoctor: esDoctor),
+          _buildIdentityCard(p, soloClinico: soloClinico),
           const SizedBox(height: 16),
           _buildAlertasMedicas(p.record),
           ResumenFinancieroPaciente(
@@ -248,7 +250,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
           ),
           const SizedBox(height: 16),
           CondicionesMedicasCard(pacienteId: p.id ?? widget.pacienteId),
-          if (esDoctor)
+          if (soloClinico)
             _buildInfoClinicaCard(p)
           else
             LayoutBuilder(
@@ -288,7 +290,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     );
   }
 
-  Widget _buildIdentityCard(Paciente p, {required bool esDoctor}) {
+  Widget _buildIdentityCard(Paciente p, {required bool soloClinico}) {
     final ac = context.appColors;
 
     return Container(
@@ -317,7 +319,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (!esDoctor)
+                  if (!soloClinico)
                     OutlinedButton.icon(
                       onPressed: () {
                         final pacienteCubit = context.read<PacienteCubit>();
@@ -410,7 +412,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (!esDoctor)
+                        if (!soloClinico)
                           _MetaItem(
                             icon: Icons.badge_outlined,
                             text: 'Cédula: ${p.govID}',

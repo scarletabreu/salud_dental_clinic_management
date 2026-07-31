@@ -64,7 +64,7 @@ tool/produccion/ensayo_migracion.sh copia/
 
 ### Estado del ensayo
 
-Con el adaptador y simulando la decisión de las cédulas:
+Con el adaptador y la corrección de cédulas, sin simulaciones:
 
 - Las 11 migraciones aplican limpias sobre los datos reales.
 - Las 13 suites SQL pasan contra la réplica ya migrada.
@@ -74,30 +74,35 @@ Con el adaptador y simulando la decisión de las cédulas:
 
 ---
 
-## Lo que falta: las cédulas repetidas
+## Las cédulas repetidas: resueltas
 
-Son **personas distintas compartiendo cédula**, no fichas duplicadas de la misma
-persona. La cédula se compara normalizada, así que `402-1832135-0` y
-`40218321350` colisionan.
+Eran **personas distintas compartiendo cédula**, no fichas duplicadas de la
+misma persona. La cédula se compara normalizada, así que `402-1832135-0` y
+`40218321350` colisionaban.
 
-| Cédula | Nombre | Nacimiento | Citas | Consultas | Cuentas |
-|---|---|---|---|---|---|
-| 402-1832135-0 | Jake Abreu | 2023-08-17 | 0 | 0 | 0 |
-| 40218321350 | Leonardo Abreu | 2000-01-01 | 0 | 0 | 0 |
-| 402-1838236-0 | Alberto Garcia | 2006-01-01 | 15 | 5 | 2 |
-| 40218382360 | ELias De la cruz | 2005-01-01 | 47 | 28 | 16 |
+Decisión del dueño de los datos (31 jul 2026): son datos de prueba, pero **no se
+borra ninguna ficha**. Se corrige la cédula equivocada de una de cada par y se le
+asigna una nueva válida, en `supabase/produccion/02_resolver_cedulas_repetidas.sql`.
 
-El segundo par es el delicado: **ambas fichas tienen historia clínica y cuentas
-reales**. Nada de esto se puede resolver automáticamente sin arriesgar el
-expediente de alguien, así que queda para el dueño de los datos.
+| Persona | Cédula anterior | Cédula nueva | Citas | Consultas |
+|---|---|---|---|---|
+| Alberto Garcia | 402-1838236-0 | **402-9000001-3** | 15 | 5 |
+| ELias De la cruz | 40218382360 | *(sin cambio)* | 47 | 28 |
+| Leonardo Abreu | 40218321350 | **402-9000002-1** | 0 | 0 |
+| Jake Abreu | 402-1832135-0 | *(sin cambio)* | 0 | 0 |
 
-Opciones, sin recomendación técnica porque la respuesta es clínica:
+En el primer par, la cédula equivocada era la de Alberto. En el segundo ninguna
+ficha tiene actividad, así que el criterio fue cuál mueve menos: Jake está
+registrado como paciente y Leonardo sólo existe como usuario.
 
-- Corregir la cédula equivocada en una de cada par. Es lo que sugieren los
-  nombres y fechas de nacimiento distintos.
-- Unificar las fichas, si resultan ser la misma persona. Implica decidir qué
-  pasa con citas, consultas y cuentas de la ficha que se retire.
-- Retirar la ficha sobrante, viable sólo en el primer par: las dos están vacías.
+Las cédulas nuevas se generaron con el mismo algoritmo que valida la aplicación
+(`isValidCedula`: módulo 10 de la JCE) y se comprobó que no chocan con ninguna
+existente.
+
+**No se tocó ninguna otra cédula.** Producción tiene varias inválidas
+—`666-6666666-6`, `99999999999999`, `121-1212121-1`, `00120000000`— pero son
+únicas y no bloquean nada. Corregirlas sería reescribir datos sin que nadie lo
+haya pedido; queda anotado por si algún día interesa.
 
 ---
 
@@ -111,8 +116,9 @@ npx supabase db dump --linked --data-only -f copia/02_datos.sql
 # 2 · Repetir el ensayo con esa copia, ya sin parche de simulación.
 tool/produccion/ensayo_migracion.sh copia/
 
-# 3 · Sólo si el ensayo sale verde: adaptador contra producción.
+# 3 · Sólo si el ensayo sale verde: adaptador y corrección de datos.
 psql "$URL_PRODUCCION" -v ON_ERROR_STOP=1 -f supabase/produccion/01_adaptar_a_linea_base.sql
+psql "$URL_PRODUCCION" -v ON_ERROR_STOP=1 -f supabase/produccion/02_resolver_cedulas_repetidas.sql
 
 # 4 · Declarar aplicadas las dos de la línea base, que producción ya tiene.
 npx supabase migration repair --status applied 20260725000000 20260725000100

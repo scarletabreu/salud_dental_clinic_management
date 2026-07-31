@@ -1,4 +1,4 @@
-NOTICE:  drop cascades to 214 other objects
+NOTICE:  drop cascades to 135 other objects
 DETAIL:  drop cascades to type alcance
 drop cascades to type categoria_condicion
 drop cascades to type categoria_diagnosis
@@ -29,29 +29,29 @@ drop cascades to type tipo_sangre
 drop cascades to type tipo_superficie
 drop cascades to type tipo_suplidor
 drop cascades to function actualizar_stock_por_compra()
-drop cascades to function hfx_base_ajustar_stock_consumible(uuid,integer,text)
+drop cascades to function ajustar_stock_consumible(uuid,integer,text)
 drop cascades to function bloquear_cancelacion_con_consulta_abierta()
 drop cascades to function cancelar_citas_paciente_inactivo()
-drop cascades to function hfx_base_crear_consulta_completa(uuid,uuid,uuid,timestamp with time zone,text,jsonb,jsonb,jsonb)
+drop cascades to function crear_consulta_completa(uuid,uuid,uuid,timestamp with time zone,text,jsonb,jsonb,jsonb)
 drop cascades to function crear_consulta_completa(uuid,uuid,uuid,timestamp with time zone,text,jsonb,jsonb,jsonb,tipo_atencion_clinica)
 drop cascades to function debe_ocultar_contacto_paciente(uuid)
 drop cascades to function es_admin()
 drop cascades to function es_asistente()
 drop cascades to function es_doctor()
 drop cascades to function es_doctor_no_admin()
-drop cascades to function hfx_base_finalizar_consulta(uuid,text,text)
+drop cascades to function finalizar_consulta(uuid,text,text)
 drop cascades to function fn_aplicar_movimiento_stock()
 drop cascades to function fn_auditoria_log()
 drop cascades to function fn_autoasignar_doctor_paciente()
 drop cascades to function fn_cascade_deleted_at_doctor()
 drop cascades to function fn_cascade_deleted_at_usuario()
 drop cascades to function generar_codigo_receta()
-drop cascades to function hfx_base_generar_plan_cuotas(uuid,jsonb)
+drop cascades to function generar_plan_cuotas(uuid,jsonb)
+drop cascades to function get_active_doctors()
 drop cascades to function handle_new_user()
-drop cascades to trigger on_auth_user_created on table auth.users
 drop cascades to function limpiar_diagnosticos_superficie()
 drop cascades to function manejar_cita_cancelada()
-drop cascades to function hfx_base_marcar_cuotas_vencidas(uuid)
+drop cascades to function marcar_cuotas_vencidas(uuid)
 drop cascades to function marcar_item_plan_ejecutado()
 drop cascades to function puede_ver_consulta(uuid)
 drop cascades to function puede_ver_cuenta(uuid)
@@ -62,15 +62,16 @@ drop cascades to function puede_ver_paciente(uuid)
 drop cascades to function puede_ver_plan(uuid)
 drop cascades to function puede_ver_receta(uuid)
 drop cascades to function realinear_consulta_al_reprogramar_cita()
-drop cascades to function hfx_base_recibir_compra(uuid,uuid)
-drop cascades to function hfx_base_registrar_mantenimiento_equipo(uuid,uuid,numeric,timestamp with time zone,text)
-drop cascades to function hfx_base_registrar_pago(uuid,numeric,text,uuid)
+drop cascades to function recibir_compra(uuid,uuid)
+drop cascades to function registrar_mantenimiento_equipo(uuid,uuid,numeric,timestamp with time zone,text)
+drop cascades to function registrar_pago(uuid,numeric,text,uuid)
 drop cascades to function registrar_pago_en_caja()
 drop cascades to function sync_disponibilidad_doctor()
 drop cascades to function update_modified_column()
 drop cascades to function update_timestamp()
 drop cascades to function validar_caja_abierta()
 drop cascades to function validar_cita_item_plan()
+drop cascades to function validar_disponibilidad_doctor_simple()
 drop cascades to function validar_doctor_activo()
 drop cascades to function validar_fecha_nacimiento()
 drop cascades to function validar_monto_cuotas()
@@ -98,5 +99,4 @@ drop cascades to table contactos
 drop cascades to table persona_contactos
 drop cascades to view contactos_seguro
 drop cascades to table contraindicaciones
-drop cascades to table cuentas
-and 114 other objects (see server log for list)
+and 35 other objects (see server log for list)

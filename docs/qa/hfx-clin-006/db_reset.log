@@ -59,6 +59,10 @@ NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.cat
 NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
 Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
 Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
 Seeding data from supabase/seed.sql...
 NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
 NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
@@ -67,7 +71,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mdev[39m.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -130,6 +134,10 @@ NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.cat
 NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
 Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
 Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
 Seeding data from supabase/seed.sql...
 NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
 NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
@@ -138,7 +146,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mdev[39m.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -201,6 +209,10 @@ NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.cat
 NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
 Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
 Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
 Seeding data from supabase/seed.sql...
 NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
 NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
@@ -209,7 +221,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mdev[39m.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -272,6 +284,10 @@ NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.cat
 NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
 Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
 Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
 Seeding data from supabase/seed.sql...
 NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
 NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
@@ -280,7 +296,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mdev[39m.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -343,6 +359,10 @@ NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.cat
 NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
 Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
 Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
 Seeding data from supabase/seed.sql...
 NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
 NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
@@ -351,5 +371,5 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mdev[39m.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
 {"target":"local","version":"","message":"Reset local database."}

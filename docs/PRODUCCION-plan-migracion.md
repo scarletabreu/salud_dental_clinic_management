@@ -1,6 +1,6 @@
-# Plan de migración de producción
+# Migración de producción · EJECUTADA
 
-Fecha del ensayo: 2026-07-31.
+Fecha del ensayo y de la ejecución: 2026-07-31.
 Instancia: `xcuvywvltttephakzmwu` («Salud Dental»).
 
 Producción no tiene el núcleo clínico. De las 21 RPC que invoca la aplicación,
@@ -106,7 +106,7 @@ haya pedido; queda anotado por si algún día interesa.
 
 ---
 
-## Procedimiento propuesto, cuando las cédulas estén resueltas
+## Procedimiento ejecutado
 
 ```bash
 # 1 · Copia fresca, inmediatamente antes. Es la red de seguridad.
@@ -142,3 +142,42 @@ momento, y una clínica en funcionamiento cambia entre un ensayo y el siguiente.
 La copia del paso 1 permite restaurar. Conviene decidir **antes** de empezar en
 qué ventana horaria se hace: durante los pasos 3 a 5 la base queda en un estado
 intermedio y la clínica no debería estar usándola.
+
+---
+
+## Ejecución (31 jul 2026)
+
+Copia previa: `backups/salud_dental/20260731-190728-premigracion` (esquema,
+datos y el registro de migraciones remoto antes de tocarlo).
+
+`db push` se negó al primer intento: el registro remoto tenía 30 entradas
+anteriores al squash que el repositorio no conoce. Se marcaron como
+`reverted` —operación de metadatos: no revierte nada del esquema— y el
+registro quedó reconciliado. Es la deuda que dejó HFX-CLIN-000.
+
+Resultado: las 11 migraciones aplicadas, y los recuentos idénticos a la copia
+previa (15 personas, 10 pacientes, 3 doctores, 82 citas, 47 consultas, 26
+cuentas, 23 pagos, 10 recetas, 17 tratamientos). Las 13 RPC que faltaban
+existen.
+
+### Lo que apareció al verificar: dos tablas sin RLS
+
+El gate estructural de la certificación comprueba que ninguna tabla de `public`
+quede sin RLS o sin políticas, pero **lo hace contra la base local**. Una tabla
+que sólo existe en producción le es invisible, y había dos.
+
+`auditoria_log` —creada a mano en el Studio, no está en el repositorio— tenía
+RLS desactivado y `authenticated` con `select`. Guarda `to_jsonb(OLD)` y
+`to_jsonb(NEW)` de cada fila auditada: 271 registros con imágenes completas de
+citas, consultas, cuentas y pagos, legibles por cualquier sesión de la
+aplicación. `items_receta`, tabla legada que la aplicación ya no consulta,
+tenía RLS activado sin ninguna política.
+
+Ambas cerradas en `20260808090000_hfx_clin_009_rls_tablas_derivadas.sql`, sin
+borrar una sola fila. La migración lleva dentro su propia comprobación, para
+que la verificación viaje con el esquema en lugar de depender de un gate que
+mira otra base.
+
+**Conviene recordarlo:** un gate que audita la base local no dice nada sobre la
+deriva de producción. Verificar la instancia remota después de migrar no es
+ceremonia; fue lo que destapó la fuga.

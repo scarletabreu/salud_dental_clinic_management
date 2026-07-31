@@ -1,0 +1,1 @@
+psql:supabase/migrations/20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql:22: NOTICE:  function public.perfil_actual() does not exist, skipping

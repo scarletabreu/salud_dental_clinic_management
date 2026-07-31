@@ -67,7 +67,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mhotfix[39m.
+Finished [36msupabase db reset[39m on branch [36mdev[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -138,7 +138,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mhotfix[39m.
+Finished [36msupabase db reset[39m on branch [36mdev[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -209,7 +209,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mhotfix[39m.
+Finished [36msupabase db reset[39m on branch [36mdev[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -280,7 +280,7 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mhotfix[39m.
+Finished [36msupabase db reset[39m on branch [36mdev[39m.
 {"target":"local","version":"","message":"Reset local database."}
 Resetting local database...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
@@ -351,5 +351,5 @@ NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuar
 Restarting containers...
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
 WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
-Finished [36msupabase db reset[39m on branch [36mhotfix[39m.
+Finished [36msupabase db reset[39m on branch [36mdev[39m.
 {"target":"local","version":"","message":"Reset local database."}

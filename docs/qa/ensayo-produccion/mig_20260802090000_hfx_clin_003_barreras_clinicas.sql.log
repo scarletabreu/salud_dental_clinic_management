@@ -1,0 +1,11 @@
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:109: NOTICE:  policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:156: NOTICE:  trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:212: NOTICE:  policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:322: NOTICE:  policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:361: NOTICE:  policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:478: NOTICE:  trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:485: NOTICE:  trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:507: NOTICE:  trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:552: NOTICE:  trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:589: NOTICE:  policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+psql:supabase/migrations/20260802090000_hfx_clin_003_barreras_clinicas.sql:628: NOTICE:  trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping

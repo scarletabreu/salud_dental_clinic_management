@@ -1,0 +1,2 @@
+psql:supabase/migrations/20260805090000_hfx_clin_006_reglas_clinicas_editables.sql:50: NOTICE:  policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+psql:supabase/migrations/20260805090000_hfx_clin_006_reglas_clinicas_editables.sql:314: NOTICE:  policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping

@@ -1,0 +1,9 @@
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "doctor_id" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "fecha_emision" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "indicaciones_generales" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "justificacion_contraindicaciones" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "estado" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "motivo_anulacion" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "receta_reemplazada_id" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:24: NOTICE:  column "items_receta" of relation "recetas" already exists, skipping
+psql:supabase/migrations/20260731090200_hfx_clin_000_recetas_formato_sd153.sql:58: NOTICE:  constraint "recetas_estado_check" of relation "recetas" does not exist, skipping

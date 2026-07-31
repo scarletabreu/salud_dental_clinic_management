@@ -1,0 +1,3 @@
+psql:supabase/migrations/20260801090000_hfx_clin_002_persistencia_transaccional.sql:145: NOTICE:  policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+psql:supabase/migrations/20260801090000_hfx_clin_002_persistencia_transaccional.sql:255: NOTICE:  trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+psql:supabase/migrations/20260801090000_hfx_clin_002_persistencia_transaccional.sql:279: NOTICE:  policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping

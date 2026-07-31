@@ -378,10 +378,10 @@ ROLLBACK
 ── supabase/tests/sd_169_paciente_inactivo_test.sql
 BEGIN
 SET
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: d48b879f-1567-424d-8ddb-5da1c7befcf4. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: d48b879f-1567-424d-8ddb-5da1c7befcf4. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: d48b879f-1567-424d-8ddb-5da1c7befcf4. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: d48b879f-1567-424d-8ddb-5da1c7befcf4. El horario ha sido liberado.
 psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  SD-169 OK · baja del paciente: 3 citas canceladas; en_consulta, consulta abierta, pasada, terminal y ajena intactas
 DO
 ROLLBACK

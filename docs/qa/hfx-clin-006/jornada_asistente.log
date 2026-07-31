@@ -1,4 +1,5 @@
 psql:/home/decruce/dev/projects/salud_dental_clinic_management/supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+··· Kong sirve una instancia de Auth que ya no existe; se reinicia.
 
 ── 1 · Alta de paciente en una sola operación
 OK   · da de alta al paciente completo en una sola operación

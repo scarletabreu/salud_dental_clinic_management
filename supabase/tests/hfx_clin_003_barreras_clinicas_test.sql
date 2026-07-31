@@ -7,6 +7,19 @@ begin;
 set local role postgres;
 
 -- ---------------------------------------------------------------------------
+-- 0.a · Se parte de un motor sin umbrales aprobados
+-- ---------------------------------------------------------------------------
+-- Esta prueba trata sobre *cómo* una regla entra en vigor: comprueba que sin
+-- aprobación el motor calla y que aprobar una no aprueba las demás. Desde
+-- HFX-CLIN-006 la instalación trae los umbrales ya aprobados por el dueño
+-- clínico, de modo que sin este paso el escenario arrancaría con las barreras
+-- puestas y no podría demostrar nada. Se retiran aquí, dentro de la
+-- transacción que al final se revierte: la instalación real no se toca.
+update public.reglas_clinicas
+   set estado = 'pendiente_aprobacion'
+ where estado = 'aprobada';
+
+-- ---------------------------------------------------------------------------
 -- 0 · Escenario: una doctora, una paciente embarazada, catálogo mínimo.
 -- ---------------------------------------------------------------------------
 do $$
@@ -180,30 +193,47 @@ do $$
 declare
   v_consulta uuid := current_setting('hfx003.consulta')::uuid;
   v_alertas  jsonb;
+  v_propia   jsonb;
 begin
-  -- Con los umbrales pendientes de aprobación, el motor no inventa nada.
+  -- La comprobación se hace con una regla propia y no con las que trae la
+  -- instalación: desde HFX-CLIN-006 los umbrales de fábrica están aprobados y
+  -- disparan sobre estos mismos signos, así que contar el total no diría nada
+  -- sobre si el motor respeta el estado de aprobación.
+  insert into public.reglas_clinicas (
+    codigo, version, nombre, categoria, tipo, accion, severidad, estado
+  ) values (
+    'HFX003_PRUEBA_PULSO', 1, 'Pulso fuera de rango (prueba)',
+    'signo_vital', 'valor_critico', 'documentar', 'critica',
+    'pendiente_aprobacion'
+  );
+
+  -- Sin aprobar y sin parámetros, el motor no inventa nada.
   v_alertas := public.hfx_clin_003_evaluar_alertas(v_consulta);
-  if jsonb_array_length(v_alertas) <> 0 then
+  if v_alertas @> '[{"regla":"HFX003_PRUEBA_PULSO"}]'::jsonb then
     raise exception 'una regla sin aprobar produjo alertas: %', v_alertas;
   end if;
 
-  -- El dueño clínico aprueba un umbral: a partir de ahí el dato no pasa callado.
+  -- El dueño clínico aprueba el umbral: a partir de ahí el dato no pasa callado.
   update public.reglas_clinicas
      set parametros = jsonb_build_object('codigo', 'pulso', 'min', 50, 'max', 100),
          estado = 'aprobada',
          aprobada_en = now(),
          fuente = 'Aprobación de prueba HFX-CLIN-003'
-   where codigo = 'SV_PULSO_CRITICO' and version = 1;
+   where codigo = 'HFX003_PRUEBA_PULSO' and version = 1;
 
   v_alertas := public.hfx_clin_003_evaluar_alertas(v_consulta);
-  if jsonb_array_length(v_alertas) <> 1 then
+  select value into v_propia
+    from jsonb_array_elements(v_alertas)
+   where value ->> 'regla' = 'HFX003_PRUEBA_PULSO';
+
+  if v_propia is null then
     raise exception 'la regla aprobada no produjo su alerta: %', v_alertas;
   end if;
-  if (v_alertas -> 0 -> 'disparador' ->> 'valor')::numeric <> 108 then
-    raise exception 'la alerta no dice qué dato la disparó: %', v_alertas;
+  if (v_propia -> 'disparador' ->> 'valor')::numeric <> 108 then
+    raise exception 'la alerta no dice qué dato la disparó: %', v_propia;
   end if;
-  if v_alertas -> 0 ->> 'accion' <> 'documentar' then
-    raise exception 'la alerta perdió la acción que exige: %', v_alertas;
+  if v_propia ->> 'accion' <> 'documentar' then
+    raise exception 'la alerta perdió la acción que exige: %', v_propia;
   end if;
 
   raise notice 'OK 3 · sin aprobación no hay umbral; con aprobación la alerta nombra el dato';

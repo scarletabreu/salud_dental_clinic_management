@@ -145,6 +145,13 @@ import '../../features/auditoria/data/datasources/auditoria_remote_datasource.da
 import '../../features/auditoria/data/datasources/auditoria_remote_datasource_impl.dart';
 import '../../features/auditoria/data/repositories/auditoria_repository_impl.dart';
 import '../../features/auditoria/domain/repositories/auditoria_repository.dart';
+
+// Módulo Reglas clínicas (HFX-CLIN-006)
+import '../../features/regla_clinica/data/datasources/regla_clinica_remote_datasource.dart';
+import '../../features/regla_clinica/data/datasources/regla_clinica_remote_datasource_impl.dart';
+import '../../features/regla_clinica/data/repositories/regla_clinica_repository_impl.dart';
+import '../../features/regla_clinica/domain/repositories/regla_clinica_repository.dart';
+import '../../features/regla_clinica/presentation/cubit/reglas_clinicas_cubit.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource_impl.dart';
 import '../../features/evaluacion_clinica/data/repositories/evaluacion_clinica_repository_impl.dart';
@@ -279,6 +286,9 @@ Future<void> init() async {
   sl.registerLazySingleton<AuditoriaRemoteDatasource>(
     () => AuditoriaRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<ReglaClinicaRemoteDatasource>(
+    () => ReglaClinicaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<PlanTratamientoRemoteDatasource>(
     () => PlanTratamientoRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -377,6 +387,10 @@ Future<void> init() async {
   sl.registerLazySingleton<AuditoriaRepository>(
     () => AuditoriaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<ReglaClinicaRepository>(
+    () => ReglaClinicaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<ReglasClinicasCubit>(() => ReglasClinicasCubit(sl()));
   sl.registerLazySingleton<PlanTratamientoRepository>(
     () => PlanTratamientoRepositoryImpl(remoteDataSource: sl()),
   );

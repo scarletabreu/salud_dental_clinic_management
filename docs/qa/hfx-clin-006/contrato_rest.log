@@ -1,0 +1,8 @@
+OK   · el borrador se guarda por REST y devuelve versión e identidades
+OK   · el diagnóstico guardado coincide con lo visible: pieza, cara y origen
+OK   · una versión obsoleta recibe un conflicto accionable, no un guardado silencioso
+OK   · el cierre por REST deja consulta, cita, cuenta y stock coherentes
+OK   · reintentar el mismo cierre no descuenta ni factura otra vez
+OK   · una consulta finalizada no se edita como borrador ni por REST
+
+SMOKE HFX-CLIN-002 COMPLETO · contrato de guardado y cierre por PostgREST.

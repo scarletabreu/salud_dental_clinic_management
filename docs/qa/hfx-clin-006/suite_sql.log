@@ -1,0 +1,353 @@
+── supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql
+BEGIN
+SET
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:204: NOTICE:  OK 1 · el alta de admin crea usuarios + doctores + admins con el UUID de Auth
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:204: NOTICE:  OK 2 · el alta de doctor crea usuarios + doctores y nada más
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:204: NOTICE:  OK 3 · el alta de asistente no otorga identidad clínica
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:204: NOTICE:  OK 4 · un alta inválida se revierte entera, sin usuario huérfano
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:204: NOTICE:  OK 5 · la FK admins.id -> doctores.id impide el admin huérfano
+DO
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:235: NOTICE:  OK 6a · perfil_actual() y get_active_doctors() existen y no exponen contraseñas
+DO
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:298: NOTICE:  OK 6b · perfil_actual() resuelve cada rol desde la sesión y nada sin ella
+DO
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:347: NOTICE:  OK 7 · el admin aparece en el catálogo, recibe cita y firma su consulta
+DO
+psql:supabase/tests/hfx_clin_000_identidad_admin_doctor_test.sql:370: NOTICE:  OK 8 · anon no ejecuta el perfil ni el catálogo; authenticated sí
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql
+BEGIN
+SET
+DO
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:116: NOTICE:  OK 1 · grants mínimos, triggers/base privados y hash ilegible
+DO
+SET
+SET
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:132: NOTICE:  OK 2 · anon sin token no tiene identidad ni grants de mutación
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "10000000-0000-4000-8000-000000000004", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:163: NOTICE:  OK 3 · asistente no escribe consulta ni receta
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "10000000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:214: NOTICE:  OK 4 · doctor solo escribe lo propio y no suplanta autoría
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "10000000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:265: NOTICE:  OK 5 · corrección admin conserva autor y deja antes/después
+DO
+SET
+UPDATE 1
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "10000000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_001_seguridad_rpc_rls_test.sql:292: NOTICE:  OK 6 · un perfil inactivo pierde capacidad aunque conserve token
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_002_cierre_transaccional_test.sql
+BEGIN
+SET
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:103: NOTICE:  OK 1 · una cita solo tiene una consulta vigente
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "30000000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:210: NOTICE:  OK 2 · el borrador guarda, identifica y versiona en una operación
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:236: NOTICE:  OK 3 · el conflicto de versión no escribe nada
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:271: NOTICE:  OK 4 · un guardado fallido no borra la receta persistida
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:316: NOTICE:  OK 5 · stock insuficiente revierte todo el cierre
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:370: NOTICE:  OK 6 · el cierre confirma consulta, cita, stock, cuenta y receta
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:399: NOTICE:  OK 7 · reintentar el cierre es idempotente
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:426: NOTICE:  OK 8 · el cierre es inmutable para el borrador y para su receta
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:477: NOTICE:  OK 8b · una receta emitida solo se anula o se reemplaza
+DO
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:503: NOTICE:  OK 8c · una evaluación sin ejecución cierra sin cobrar
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "30000000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:532: NOTICE:  OK 9 · la autoría clínica no se transfiere por conocer el UUID
+DO
+SET
+psql:supabase/tests/hfx_clin_002_cierre_transaccional_test.sql:554: NOTICE:  OK 10 · el contrato de grants de HFX-CLIN-001 se mantiene
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_003_barreras_clinicas_test.sql
+BEGIN
+SET
+UPDATE 11
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:151: NOTICE:  OK 1 · valores y relaciones imposibles se rechazan en la base
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:187: NOTICE:  OK 2 · la medición guarda valor, unidad, momento, actor y origen
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:241: NOTICE:  OK 3 · sin aprobación no hay umbral; con aprobación la alerta nombra el dato
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:286: NOTICE:  OK 4 · la alerta exige acción documentada y bloquea el cierre hasta resolverla
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:335: NOTICE:  OK 5 · la condición descubierta hoy contraindica sin bypass posible
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:376: NOTICE:  OK 6 · el riesgo relativo exige justificación por medicamento y la conserva
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:446: NOTICE:  OK 7 · duplicidad, cantidad incoherente y renglón incompleto se detienen
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:505: NOTICE:  OK 8 · el alcance del catálogo manda, y lo global tiene su propia vía
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:584: NOTICE:  OK 9 · el consentimiento guarda evidencia, versión y precios, y caduca al cambiar el plan
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:621: NOTICE:  OK 10 · el cierre incorpora lo confirmado y emite la receta validada
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:681: NOTICE:  OK 11 · el escenario de hipertensión, diabetes y pediatría queda montado
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:759: NOTICE:  OK 12 · hipertensión y diabetes alertan por separado y detienen el cierre
+DO
+psql:supabase/tests/hfx_clin_003_barreras_clinicas_test.sql:835: NOTICE:  OK 13 · sin peso no hay dosificación pediátrica, y con peso la barrera se retira
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_004_agenda_pacientes_test.sql
+BEGIN
+SET
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:86: NOTICE:  OK 1 · el solapamiento se rechaza, lo consecutivo y lo de otro doctor se acepta
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:116: NOTICE:  OK 2 · la duración es obligatoria, positiva y con respaldo de 30 minutos
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:154: NOTICE:  Cita cancelada para la persona id: 50000000-0000-4000-8000-000000000010. El horario ha sido liberado.
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:154: NOTICE:  OK 3 · cancelación libera el hueco y el cambio de doctor se revalida
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:188: NOTICE:  OK 4 · la urgencia se registra en espera y queda fuera de la exclusión
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:216: NOTICE:  OK 5 · el grafo de estados de la cita lo impone PostgreSQL
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50000000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:256: NOTICE:  OK 6 · iniciar es idempotente: crea una vez y después reanuda
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50000000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:276: NOTICE:  OK 7 · la cita solo la atiende el doctor asignado
+DO
+SET
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:302: NOTICE:  OK 8 · la cita atendida devuelve su consulta cerrada en vez de abrir otra
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:346: NOTICE:  OK 9 · ni una cita cancelada ni una sin llegada abren consulta
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50000000-0000-4000-8000-000000000003", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:384: NOTICE:  OK 10a · una asistente puede dar de alta al paciente completo
+DO
+SET
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:443: NOTICE:  OK 10 · el alta es una transacción única y su fallo no deja huérfanos
+DO
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:491: NOTICE:  OK 11 · la actualización es transaccional y respeta la versión
+DO
+SET
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50000000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:541: NOTICE:  OK 12 · el doctor registra la llegada de su cita y repetirlo es inocuo
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50000000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_004_agenda_pacientes_test.sql:561: NOTICE:  OK 13 · la llegada ajena queda fuera del alcance del doctor
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_005_auditoria_test.sql
+BEGIN
+SET
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50500000-0000-4000-8000-000000000003", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:108: NOTICE:  OK 1 · la cita y la llegada se auditan sin consulta que las ancle
+DO
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:145: NOTICE:  OK 2 · reprogramar se distingue del cambio de estado y no inventa autor
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50500000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:222: NOTICE:  OK 3 · diagnóstico y tratamiento se auditan desde la tabla, no desde la RPC
+DO
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:254: NOTICE:  OK 4 · cada guardado confirmado deja exactamente un evento
+DO
+SET
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:306: NOTICE:  OK 5 · la receta audita emisión y anulación, y el borrador no
+DO
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:353: NOTICE:  OK 6 · plan y consentimiento se leen junto al resto de la consulta
+DO
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:382: NOTICE:  OK 7 · la corrección se ve y conserva al autor original
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50500000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:437: NOTICE:  OK 8 · la línea de tiempo es completa, cronológica y legible
+DO
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50500000-0000-4000-8000-000000000002", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:464: NOTICE:  OK 9 · la línea de tiempo respeta la visibilidad de la consulta
+DO
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:491: NOTICE:  OK 10 · anon no lee ni escribe la auditoría por ninguna vía
+DO
+psql:supabase/tests/hfx_clin_005_auditoria_test.sql:510: NOTICE:  OK 11 · la auditoría sólo la escriben los triggers
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_006_reglas_editables_test.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:80: NOTICE:  OK 1 · las once reglas están en vigor y con umbral
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:112: NOTICE:  OK 2 · todos los umbrales apuntan a un signo del catálogo
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:139: NOTICE:  OK 3 · el catálogo se lee pero no se escribe desde el cliente
+DO
+SET
+ actuar_como 
+-------------
+ 
+(1 row)
+
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:174: NOTICE:  OK 4 · publicar crea una versión nueva y retira la anterior
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:196: NOTICE:  OK 5 · cada código tiene una sola versión en vigor
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:220: NOTICE:  OK 6 · reenviar el formulario sin cambios no versiona
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:257: NOTICE:  OK 7 · la edición queda firmada con el umbral anterior y el nuevo
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:270: NOTICE:  OK 7b · sólo las RPC escriben la auditoría de reglas
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:318: NOTICE:  OK 8 · la base rechaza los umbrales que no vigilarían nada
+DO
+ actuar_como 
+-------------
+ 
+(1 row)
+
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:338: NOTICE:  OK 9 · el admin edita reglas porque también ejerce clínica
+DO
+ actuar_como 
+-------------
+ 
+(1 row)
+
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:362: NOTICE:  OK 10 · la asistente no decide umbrales clínicos
+DO
+ actuar_como 
+-------------
+ 
+(1 row)
+
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:397: NOTICE:  OK 11 · retirar exige motivo y conserva el histórico
+DO
+SET
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:460: NOTICE:  OK 12 · el motor obedece al umbral publicado y sella su versión
+DO
+psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:482: NOTICE:  OK 13 · anon no alcanza las reglas clínicas por ninguna vía
+DO
+ROLLBACK
+── supabase/tests/sd_111_trigger_caja_test.sql
+BEGIN
+SET
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (3) sin caja abierta el pago se rechaza: No hay una caja abierta para hoy. Abre la caja antes de registrar el pago.
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (4) la caja de ayer no habilita el cobro de hoy.
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (1) el pago completado generó un ingreso de 1500.75 en la caja de hoy.
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (2) el pago pendiente no movió la caja.
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (5) sólo `pagos_registrar_ingreso_caja` alimenta la caja.
+psql:supabase/tests/sd_111_trigger_caja_test.sql:257: NOTICE:  OK (tz) la caja se resuelve en la zona horaria de la clínica.
+DO
+ROLLBACK
+── supabase/tests/sd_135_plan_tratamiento_test.sql
+BEGIN
+SET
+psql:supabase/tests/sd_135_plan_tratamiento_test.sql:265: NOTICE:  SD-135 OK · evaluación 3 hallazgos → plan 2 actividades → 2 ejecuciones → cuenta 5000.00
+DO
+ROLLBACK
+── supabase/tests/sd_146_cita_actividades_test.sql
+BEGIN
+SET
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 1 · una cita vincula varias actividades de su paciente.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 2 · la actividad de otro paciente se rechaza.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 3 · una actividad retirada del plan no se puede agendar.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 4 · una actividad rechazada no se puede agendar.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 5 · resumen_actividades_cita devuelve el resumen completo.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 6 · actividades_agendables_paciente excluye lo rechazado y lo retirado.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 7 · el asistente puede leer el resumen y gestionar los vínculos.
+psql:supabase/tests/sd_146_cita_actividades_test.sql:245: NOTICE:  OK 8 · borrar la cita se lleva sus vínculos.
+DO
+ROLLBACK
+── supabase/tests/sd_169_paciente_inactivo_test.sql
+BEGIN
+SET
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  SD-169 OK · baja del paciente: 3 citas canceladas; en_consulta, consulta abierta, pasada, terminal y ajena intactas
+DO
+ROLLBACK

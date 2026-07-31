@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/regla_clinica/presentation/cubit/reglas_clinicas_cubit.dart';
+import 'package:salud_dental_clinic_management/features/regla_clinica/presentation/widgets/seccion_reglas_clinicas.dart';
 
 class ConfiguracionPage extends StatelessWidget {
   const ConfiguracionPage({super.key});
@@ -11,6 +16,11 @@ class ConfiguracionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Mover un umbral clínico es una decisión médica: la sección sólo existe
+    // para quien ejerce. El servidor lo vuelve a comprobar en la RPC; esto es
+    // para no ofrecer lo que después se va a rechazar.
+    final puedeEditarReglas = context.watch<AuthCubit>().state.puedeEjercerClinica;
+
     return ColoredBox(
       color: colorScheme.surfaceContainerLowest,
       child: BlocBuilder<SettingsCubit, SettingsState>(
@@ -18,9 +28,17 @@ class ConfiguracionPage extends StatelessWidget {
           return ListView(
             padding: context.pageInsets(top: 28, bottom: 40),
             children: [
-              _PageHeader(totalSections: 3),
+              _PageHeader(totalSections: puedeEditarReglas ? 4 : 3),
 
               const SizedBox(height: 28),
+
+              if (puedeEditarReglas) ...[
+                BlocProvider(
+                  create: (_) => sl<ReglasClinicasCubit>()..cargar(),
+                  child: const SeccionReglasClinicas(),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // ── Interfaz y Apariencia ──────────────────────────────────────
               _SectionCard(

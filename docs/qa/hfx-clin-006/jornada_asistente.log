@@ -1,0 +1,36 @@
+psql:/home/decruce/dev/projects/salud_dental_clinic_management/supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+
+── 1 · Alta de paciente en una sola operación
+OK   · da de alta al paciente completo en una sola operación
+OK   · el contacto queda normalizado, no como lo tecleó recepción
+
+── 2 · Agenda: reservar, reprogramar y cancelar
+OK   · agenda una cita nueva
+OK   · la base rechaza una cita que se solapa con otra del mismo doctor
+OK   · reprograma la cita y su hora de fin se recalcula sola
+OK   · cancela una cita y la cancelación queda registrada
+
+── 3 · Llegada y handoff al doctor
+OK   · registra la llegada y deja la cita lista para el doctor
+OK   · el doctor recoge el handoff y la cita pasa a en consulta
+
+── 4 · Encamina una urgencia sin atenderla
+OK   · registra una urgencia y se la asigna a un doctor
+
+── 5 · No escribe clínica: ni propia ni ajena
+OK   · no puede abrir una consulta ni siquiera de la urgencia que encaminó
+OK   · no puede escribir en la consulta que atiende el doctor
+OK   · no puede cerrar una consulta
+
+── 6 · No lee el expediente clínico
+OK   · no lee consultas ni recetas
+
+── 7 · Caja: lo suyo sí lo hace
+OK   · registra un movimiento de caja, que es su trabajo
+
+── 8 · No administra al personal
+OK   · no puede modificar el perfil profesional de un doctor
+
+════════════════════════════════════════════════════════════
+JORNADA ASISTENTE · 15 comprobaciones superadas.
+════════════════════════════════════════════════════════════

@@ -81,8 +81,11 @@ IDS=$(psql "$PGURL" -qtA -v ON_ERROR_STOP=1 <<SQL
 insert into public.personas (id, nombre, apellido, fecha_nacimiento, cedula)
 values ('$PACIENTE_ID', 'Rita', 'REST', date '1992-02-02', 'HFX002-PR-$SUFIJO');
 insert into public.pacientes (id, genero) values ('$PACIENTE_ID', 'femenino');
-insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos)
-values ('$PACIENTE_ID', '$DOCTOR_ID', now() + interval '1 day', 30);
+-- La cita nace ya en consulta: desde HFX-CLIN-004 el grafo de estados sólo
+-- deja llegar al estado completada desde ahí, y esta prueba monta la consulta
+-- a mano en vez de recorrer llegada e inicio.
+insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+values ('$PACIENTE_ID', '$DOCTOR_ID', now() + interval '1 day', 30, 'en_consulta');
 with c as (
   insert into public.consultas (paciente_id, doctor_id, cita_id, fecha)
   select '$PACIENTE_ID', '$DOCTOR_ID', id, now() from public.citas
@@ -93,8 +96,12 @@ with c as (
 ), d as (
   insert into public.dientes (odontograma_id, fdi_code) select id, 16 from o returning id
 ), t as (
+  -- Alcance puntual y no de pieza completa: la prueba comprueba que la
+  -- superficie viaja íntegra en el payload, y desde HFX-CLIN-003 un tratamiento
+  -- de pieza completa que llega con superficie se rechaza (CL012). Con el
+  -- alcance anterior fallaba por el catálogo, no por el contrato que vigila.
   insert into public.tratamientos (nombre, costo, alcance)
-  values ('Resina REST $SUFIJO', 1500, 'diente') returning id
+  values ('Resina REST $SUFIJO', 1500, 'puntual') returning id
 ), g as (
   insert into public.diagnosticos (nombre, alcance, categoria)
   values ('Caries REST $SUFIJO', 'puntual', 'caries') returning id
@@ -137,7 +144,14 @@ BORRADOR=$(rpc guardar_borrador_consulta "$(jq -nc \
           origen: "diagnosticado_hoy", notas: "Lesión profunda"
         }]
       }],
-      recetas: [{ items_receta: [{ nombre_medicamento: "Ibuprofeno" }] }],
+      # Renglón completo: desde HFX-CLIN-003 el cierre valida la receta en
+      # estricto y una línea con sólo el nombre del medicamento se rechaza
+      # (CL008). El borrador sí la admitiría, y ahí estaba la trampa.
+      recetas: [{ items_receta: [{
+        nombre_medicamento: "Ibuprofeno", dosis_cantidad: 1,
+        dosis_unidad: "tableta", via_administracion: "oral",
+        frecuencia_horas: 8, duracion_dias: 3, cantidad_total: 9
+      }] }],
       insumos: [{ consumible_id: $cons, nombre: "Gasas", cantidad: 3 }]
     }
   }')")

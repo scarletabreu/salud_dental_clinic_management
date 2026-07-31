@@ -1,0 +1,45 @@
+psql:/home/decruce/dev/projects/salud_dental_clinic_management/supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+
+── 1 · Doble clic en «Iniciar consulta»
+OK   · el doble clic deja una sola consulta
+
+── 2 · Dos pestañas guardando sobre la misma consulta
+OK   · la pestaña con versión vieja se rechaza y no pisa lo guardado
+
+── 3 · Dos usuarios sobre la misma consulta
+OK   · otro clínico no escribe en la consulta ajena aunque pueda verla
+
+── 4 · Red caída durante el guardado
+OK   · el corte de red no deja un guardado a medias (versión 3, 2 signos)
+OK   · reintentar tras el corte deja exactamente un juego de datos
+
+── 5 · Receta inválida
+OK   · una receta incoherente impide el cierre y la consulta sigue abierta
+OK   · corregir el renglón desbloquea el cierre
+
+── 6 · Stock insuficiente
+OK   · el stock insuficiente detiene el cierre sin tocar inventario ni cuentas
+
+── 7 · Doble cierre: el reintento no cobra dos veces
+OK   · dos cierres simultáneos producen una sola factura y un solo descuento
+OK   · reintentar el cierre con la misma clave devuelve el resultado, no otro cobro
+
+── 8 · Refrescar después de cerrar
+OK   · una consulta cerrada no admite más cambios
+
+── 9 · Consulta ya existente para la misma cita
+OK   · reabrir una cita ya atendida no crea una consulta nueva
+
+── 10 · Sesión expirada
+OK   · la sesión caducada se rechaza con 401 y no escribe nada
+
+── 11 · Corrección administrativa sobre lo ya cerrado
+OK   · la corrección administrativa exige motivo y queda firmada
+OK   · sólo dirección corrige lo ya cerrado
+
+── 12 · Nada quedó descuadrado
+OK   · cuentas, inventario y consultas cerradas quedan cuadrados
+
+════════════════════════════════════════════════════════════
+ESCENARIOS DE FALLO · 16 comprobaciones superadas.
+════════════════════════════════════════════════════════════

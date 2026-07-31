@@ -1,0 +1,43 @@
+psql:/home/decruce/dev/projects/salud_dental_clinic_management/supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+
+── 1 · Ve su agenda y no la de los demás
+OK   · ve sus 6 citas y ninguna ajena
+
+── 2 · Primera consulta: cierra sin tratamiento
+OK   · cierra una consulta sin tratamiento ni pre-factura obligatoria
+
+── 3 · Reanudación: reabrir no duplica
+OK   · reabrir la consulta la reanuda en lugar de duplicarla
+
+── 4 · Signos críticos con condición: la alerta bloquea el cierre
+OK   · los signos alterados con embarazo levantan la alerta (COMB_EMBARAZO_SIGNOS)
+OK   · una alerta pendiente impide cerrar la consulta
+OK   · documentar la decisión clínica desbloquea el cierre y queda por escrito
+
+── 5 · Contraindicación absoluta: no se receta ni con justificación
+OK   · la contraindicación absoluta bloquea la receta aunque se justifique
+
+── 6 · Alternativa segura y cierre con tratamiento e insumos
+OK   · cierra con tratamiento (RD$ 12000.00) e inventario descontado
+
+── 7 · Riesgo relativo: pasa sólo con justificación propia
+OK   · el riesgo relativo exige justificación por medicamento, no una nota global
+
+── 8 · Condición descubierta hoy: pasa al expediente al cerrar
+OK   · lo descubierto en consulta se incorpora al expediente en el cierre
+
+── 9 · Signos críticos aislados en el paciente diabético
+OK   · cuatro reglas aprobadas disparan a la vez (COMB_DIABETES_SIGNOS,SV_PRESION_CRITICA,SV_PULSO_CRITICO,SV_SATURACION_CRITICA)
+
+── 10 · Emergencia sin cita, atendida por la propia doctora
+OK   · la urgencia se registra y se atiende aunque la agenda esté llena
+
+── 11 · Paciente pediátrico: el peso es obligatorio en la consulta
+OK   · la regla pediátrica exige el peso y se apaga al registrarlo
+
+── 12 · No firma por otro doctor
+OK   · no puede atender ni firmar la cita de otro doctor
+
+════════════════════════════════════════════════════════════
+JORNADA DOCTOR · 14 comprobaciones superadas.
+════════════════════════════════════════════════════════════

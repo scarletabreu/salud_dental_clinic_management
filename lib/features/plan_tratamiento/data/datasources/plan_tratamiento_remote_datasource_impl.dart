@@ -147,4 +147,27 @@ class PlanTratamientoRemoteDatasourceImpl
         .order('orden');
     return List<Map<String, dynamic>>.from(filas as List);
   }
+
+  @override
+  Future<Map<String, dynamic>> registrarConsentimiento({
+    required String planId,
+    required String decision,
+    required String persona,
+    required String metodo,
+    String relacion = 'titular',
+    String? motivo,
+  }) async {
+    final respuesta = await supabaseClient.rpc(
+      'registrar_consentimiento_plan',
+      params: {
+        'p_plan_id': planId,
+        'p_decision': decision,
+        'p_persona': persona,
+        'p_metodo': metodo,
+        'p_relacion': relacion,
+        'p_motivo': motivo,
+      },
+    );
+    return Map<String, dynamic>.from(respuesta as Map);
+  }
 }

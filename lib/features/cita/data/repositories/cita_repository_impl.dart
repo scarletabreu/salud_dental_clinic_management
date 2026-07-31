@@ -55,6 +55,30 @@ class CitaRepositoryImpl implements CitaRepository {
   }
 
   @override
+  Future<void> registrarLlegada(String citaId) {
+    return runGuarded(
+      () => remoteDataSource.registrarLlegada(citaId),
+      context: 'registrar la llegada del paciente',
+    );
+  }
+
+  @override
+  Future<String> registrarEmergencia({
+    required String pacienteId,
+    required String doctorId,
+    String? motivo,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.registrarEmergencia(
+        pacienteId: pacienteId,
+        doctorId: doctorId,
+        motivo: motivo,
+      ),
+      context: 'registrar la emergencia',
+    );
+  }
+
+  @override
   Future<List<Cita>> getCitasByPaciente(String pacienteId) {
     return runGuarded(
       () => remoteDataSource.fetchCitasByPaciente(pacienteId),

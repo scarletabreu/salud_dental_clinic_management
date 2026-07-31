@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/data/datasources/contraindicacion_remote_datasource.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -96,10 +96,6 @@ class ContraindicacionRemoteDatasourceImpl
         payload.remove('id');
         payload['created_at'] = DateTime.now().toIso8601String();
 
-        if (kDebugMode) {
-          print('🚀 Registrando nueva contraindicación (INSERT): $payload');
-        }
-
         final response = await supabaseClient
             .from('contraindicaciones')
             .insert(payload)
@@ -108,12 +104,6 @@ class ContraindicacionRemoteDatasourceImpl
 
         return Map<String, dynamic>.from(response);
       } else {
-        if (kDebugMode) {
-          print(
-            '🚀 Actualizando contraindicación existente (UPSERT): $payload',
-          );
-        }
-
         final response = await supabaseClient
             .from('contraindicaciones')
             .upsert(payload)
@@ -123,10 +113,7 @@ class ContraindicacionRemoteDatasourceImpl
         return Map<String, dynamic>.from(response);
       }
     } catch (e, stackTrace) {
-      if (kDebugMode) {
-        print('❌ ERROR EN REGISTRAR CONTRAINDICACION: $e');
-        print(stackTrace);
-      }
+      AppLog.error('guardar contraindicación', e, stackTrace);
       rethrow;
     }
   }

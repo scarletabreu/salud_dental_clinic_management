@@ -19,6 +19,10 @@ class PlanTratamiento {
   /// Profesional responsable del plan.
   final String doctorId;
   final EstadoPlanTratamiento estado;
+
+  /// Sube cada vez que cambian las actividades o los precios. El consentimiento
+  /// se guarda contra esta versión: si cambia, deja de valer (HFX-CLIN-003).
+  final int version;
   final String? notas;
 
   final DateTime fechaPropuesta;
@@ -35,6 +39,7 @@ class PlanTratamiento {
     this.consultaOrigenId,
     required this.doctorId,
     this.estado = EstadoPlanTratamiento.borrador,
+    this.version = 1,
     this.notas,
     required this.fechaPropuesta,
     this.fechaAceptacion,
@@ -86,6 +91,7 @@ class PlanTratamiento {
     String? consultaOrigenId,
     String? doctorId,
     EstadoPlanTratamiento? estado,
+    int? version,
     String? notas,
     DateTime? fechaPropuesta,
     DateTime? fechaAceptacion,
@@ -100,6 +106,7 @@ class PlanTratamiento {
       consultaOrigenId: consultaOrigenId ?? this.consultaOrigenId,
       doctorId: doctorId ?? this.doctorId,
       estado: estado ?? this.estado,
+      version: version ?? this.version,
       notas: notas ?? this.notas,
       fechaPropuesta: fechaPropuesta ?? this.fechaPropuesta,
       fechaAceptacion: fechaAceptacion ?? this.fechaAceptacion,

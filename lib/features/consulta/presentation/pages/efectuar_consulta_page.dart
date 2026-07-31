@@ -44,6 +44,14 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   bool _hasInitialTriggered = false;
   bool _hasLoadedParaConsulta = false;
   bool? _registroIncompleto;
+
+  /// Último fallo clínico sin resolver. Vive en la pantalla y no en un
+  /// snackbar: desaparece cuando el usuario lo descarta o cuando una operación
+  /// posterior confirma, nunca por un temporizador.
+  String? _fallo;
+
+  /// La consulta ya está cerrada en el servidor. No se sigue editando.
+  String? _consultaCerrada;
   Paciente?
   _pacienteParaForm; // <-- NUEVO: copia local, inmune a emits del cubit
   late final PacienteCubit _pacienteCubit;
@@ -164,45 +172,53 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                     enWorkspace: _enWorkspace,
                     showPacienteAction: !panelInline,
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (panelInline) _buildPanel(ac),
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 280),
-                            switchInCurve: Curves.easeOut,
-                            switchOutCurve: Curves.easeIn,
-                            transitionBuilder: (child, animation) =>
-                                FadeTransition(
-                                  opacity: animation,
-                                  child: SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0.03, 0),
-                                      end: Offset.zero,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                ),
-                            child: _enWorkspace
-                                ? WorkspaceConsulta(
-                                    key: const ValueKey('workspace'),
-                                    citaId: widget.citaId,
-                                  )
-                                : FormularioEvaluacion(
-                                    key: const ValueKey('formulario'),
-                                    pacienteId: widget.pacienteId,
-                                    doctorId: widget.doctorId,
-                                    citaId: widget.citaId,
-                                    motivoCita: widget.motivoCita,
-                                  ),
-                          ),
-                        ),
-                      ],
+                  if (_fallo case final mensaje?)
+                    _BannerFallo(
+                      mensaje: mensaje,
+                      onDescartar: () => setState(() => _fallo = null),
                     ),
-                  ),
+                  const SizedBox(height: 12),
+                  if (_consultaCerrada case final mensaje?)
+                    Expanded(child: _PanelConsultaCerrada(mensaje: mensaje))
+                  else
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (panelInline) _buildPanel(ac),
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 280),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0.03, 0),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
+                              child: _enWorkspace
+                                  ? WorkspaceConsulta(
+                                      key: const ValueKey('workspace'),
+                                      citaId: widget.citaId,
+                                    )
+                                  : FormularioEvaluacion(
+                                      key: const ValueKey('formulario'),
+                                      pacienteId: widget.pacienteId,
+                                      doctorId: widget.doctorId,
+                                      citaId: widget.citaId,
+                                      motivoCita: widget.motivoCita,
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -269,16 +285,124 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
       } else {
         Navigator.of(context).pop(true);
       }
+    } else if (state is ConsultaCerradaEnServidor) {
+      // No hay borrador que rescatar ni reintento posible: la pantalla deja de
+      // ofrecer edición en vez de mostrar un aviso sobre un workspace muerto.
+      setState(() => _consultaCerrada = state.mensaje);
     } else if (state is ConsultaError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.message),
-          backgroundColor: context.appColors.red,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      // El fallo se queda arriba de la pantalla hasta que el usuario lo
+      // descarte o una operación posterior salga bien. Un snackbar de tres
+      // segundos escondía el motivo por el que no se guardó una consulta.
+      setState(() => _fallo = state.message);
+    } else if (state is ConsultaIniciada && _fallo != null) {
+      setState(() => _fallo = null);
     }
+  }
+}
+
+/// Fallo clínico que espera una decisión. No se cierra solo.
+class _BannerFallo extends StatelessWidget {
+  const _BannerFallo({required this.mensaje, required this.onDescartar});
+
+  final String mensaje;
+  final VoidCallback onDescartar;
+
+  static const clave = ValueKey('banner-fallo-consulta');
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: clave,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: ac.red.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ac.red.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 18, color: ac.red),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                mensaje,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: ac.textPrimary,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(onPressed: onDescartar, child: const Text('Entendido')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// La consulta cerró: aquí ya no se edita nada.
+class _PanelConsultaCerrada extends StatelessWidget {
+  const _PanelConsultaCerrada({required this.mensaje});
+
+  final String mensaje;
+
+  static const clave = ValueKey('panel-consulta-cerrada');
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+
+    return Center(
+      key: clave,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline_rounded, size: 40, color: ac.textMuted),
+              const SizedBox(height: 14),
+              Text(
+                'Esta consulta ya está finalizada',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: ac.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                mensaje,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: ac.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).pop(true),
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('Volver'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

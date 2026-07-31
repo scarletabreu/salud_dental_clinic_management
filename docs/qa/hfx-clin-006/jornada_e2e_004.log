@@ -1,0 +1,7 @@
+OK   · recepción da de alta al paciente completo en una sola operación
+OK   · sin llegada registrada no se abre la consulta
+OK   · paciente nuevo → cita → llegada → consulta, y reintentar reanuda
+OK   · walk-in del doctor: registra la urgencia, queda marcada y la atiende
+OK   · walk-in del admin: el administrador ejerce como doctor en lo suyo
+OK   · la asistente encamina la urgencia pero no escribe clínica
+SMOKE HFX-CLIN-004 COMPLETO · jornada de admin-doctor, doctor y asistente.

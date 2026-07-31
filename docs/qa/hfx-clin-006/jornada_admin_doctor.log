@@ -1,0 +1,36 @@
+psql:/home/decruce/dev/projects/salud_dental_clinic_management/supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+
+── 1 · Inicia sesión y su identidad clínica está completa
+OK   · el administrador es doctor en todas las capas
+
+── 2 · Ve la agenda completa y también la suya
+OK   · ve la agenda completa (7 citas) y tiene 1 propia(s)
+
+── 3 · Abre su consulta
+OK   · sin llegada registrada no se abre la consulta
+OK   · abre su consulta (e050a225-9adb-40f0-9c4c-0f84cfa3952a)
+
+── 4 · La autoría clínica es suya, no de un doctor genérico
+OK   · la consulta queda firmada por el administrador que la atiende
+
+── 5 · Signos vitales, diagnóstico y tratamiento
+OK   · guarda signos vitales normales, hallazgo y tratamiento sin alertas
+
+── 6 · Emite una receta segura
+OK   · emite una receta sin conflictos
+
+── 7 · Cierra la consulta y aparece la pre-factura
+OK   · cierra, factura RD$ 2500.00 y descuenta el insumo consumido
+
+── 8 · La cita queda completada y la receta emitida
+OK   · la cita queda completada y la receta emitida
+
+── 9 · Vuelve a sus funciones administrativas
+OK   · conserva caja, compras y personal después de ejercer
+
+── 10 · La jornada queda auditada de principio a fin
+OK   · la línea de tiempo recoge llegada, apertura, receta y cierre
+
+════════════════════════════════════════════════════════════
+JORNADA ADMIN-DOCTOR · 11 comprobaciones superadas.
+════════════════════════════════════════════════════════════

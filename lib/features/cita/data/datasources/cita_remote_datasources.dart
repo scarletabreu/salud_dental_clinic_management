@@ -135,7 +135,6 @@ class CitaRemoteDataSource {
           'cedula': dp['cedula'] ?? '',
           'estatus': dp['estatus'] ?? 'activo',
           'username': dp['username'] ?? '',
-          'password_hash': dp['password_hash'] ?? '',
           'especialidad': dp['especialidad'] ?? '',
           'esta_disponible': dp['esta_disponible'] ?? true,
           'assistants': dp['assistants'] ?? <dynamic>[],
@@ -294,6 +293,29 @@ class CitaRemoteDataSource {
         'plan: $e. Edítala para volver a seleccionarlas.',
       );
     }
+  }
+
+  /// `registrar_llegada_cita`: la base valida quién puede marcarla y no falla
+  /// si ya estaba marcada.
+  Future<void> registrarLlegada(String citaId) async {
+    await supabase.rpc('registrar_llegada_cita', params: {'p_cita_id': citaId});
+  }
+
+  /// `registrar_cita_emergencia`: devuelve el id de la cita de urgencia creada.
+  Future<String> registrarEmergencia({
+    required String pacienteId,
+    required String doctorId,
+    String? motivo,
+  }) async {
+    final respuesta = await supabase.rpc(
+      'registrar_cita_emergencia',
+      params: {
+        'p_paciente_id': pacienteId,
+        'p_doctor_id': doctorId,
+        'p_motivo': motivo,
+      },
+    );
+    return (respuesta as Map)['cita_id'] as String;
   }
 
   Future<void> updateCita(CitaModel cita) async {

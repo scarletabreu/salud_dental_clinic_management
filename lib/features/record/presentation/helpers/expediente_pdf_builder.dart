@@ -777,7 +777,7 @@ class ExpedientePdfBuilder {
                     pw.SizedBox(height: 4),
                     _buildLeyendaItem(PdfColors.grey400, 'Evaluado'),
                     pw.SizedBox(height: 3),
-                    _buildLeyendaItem(PdfColors.blueGrey800, 'Ejecutado'),
+                    _buildLeyendaItem(PdfColors.blueGrey800, 'Ejecutado hoy'),
                   ],
                 ),
               ),

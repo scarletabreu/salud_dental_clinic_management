@@ -34,7 +34,6 @@ Doctor _doctor() => Doctor(
   contactos: const [],
   estatus: EstatusPersona.activo,
   username: 'bsantana',
-  passwordHash: 'x',
   specialty: 'Endodoncia',
   assistants: const [],
 );

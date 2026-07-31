@@ -27,6 +27,7 @@ class PacienteModel extends Paciente {
     super.fotoMimeType,
     super.fotoTamanoBytes,
     super.fotoActualizadaEn,
+    super.version,
   });
 
   PacienteModel copyWithModel({
@@ -49,6 +50,7 @@ class PacienteModel extends Paciente {
     String? fotoMimeType,
     int? fotoTamanoBytes,
     DateTime? fotoActualizadaEn,
+    int? version,
   }) {
     return PacienteModel(
       id: id ?? this.id,
@@ -70,6 +72,7 @@ class PacienteModel extends Paciente {
       fotoMimeType: fotoMimeType ?? this.fotoMimeType,
       fotoTamanoBytes: fotoTamanoBytes ?? this.fotoTamanoBytes,
       fotoActualizadaEn: fotoActualizadaEn ?? this.fotoActualizadaEn,
+      version: version ?? this.version,
     );
   }
 
@@ -114,6 +117,7 @@ class PacienteModel extends Paciente {
           : DateTime.tryParse(
               json['foto_actualizada_en'] as String,
             )?.toLocal(),
+      version: parseInt(json['version']),
       record: json['record'] != null
           ? RecordModel.fromJson(json['record'] as Map<String, dynamic>)
           : RecordModel.empty(),
@@ -189,6 +193,7 @@ class PacienteModel extends Paciente {
       fotoMimeType: paciente.fotoMimeType,
       fotoTamanoBytes: paciente.fotoTamanoBytes,
       fotoActualizadaEn: paciente.fotoActualizadaEn,
+      version: paciente.version,
     );
   }
 }

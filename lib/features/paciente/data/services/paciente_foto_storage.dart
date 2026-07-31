@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:image/image.dart' as img;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -146,14 +147,12 @@ class PacienteFotoStorage {
           .from(bucket)
           .createSignedUrl(rutaLimpia, duracionUrlFirmada.inSeconds);
       return url;
-    } on StorageException catch (e) {
-      debugPrint(
-        '⚠️ Foto no encontrada o error en Storage ($ruta): ${e.message}',
-      );
+    } on StorageException catch (e, stackTrace) {
+      AppLog.error('obtener foto de paciente', e, stackTrace);
       _cacheUrls.remove(ruta);
       return null;
-    } catch (e) {
-      debugPrint('⚠️ Error al obtener signed URL para ($ruta): $e');
+    } catch (e, stackTrace) {
+      AppLog.error('obtener URL firmada de foto', e, stackTrace);
       _cacheUrls.remove(ruta);
       return null;
     }

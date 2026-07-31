@@ -2,6 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/conflicto.dart';
 
+/// Contraindicación absoluta: se informa y se cierra. No hay botón para
+/// continuar porque no existe forma de continuar (HFX-CLIN-003): el servidor
+/// rechaza la operación con `CL010` aunque alguien fabrique la petición.
+Future<void> mostrarBloqueoAbsoluto(
+  BuildContext context,
+  String nombre,
+  List<Conflicto> conflictos,
+) {
+  final c = context.appColors;
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.dangerous_rounded, color: c.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text('"$nombre" está contraindicado')),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'La contraindicación es absoluta para una condición registrada '
+              'de este paciente. No puede indicarse, ni con justificación.',
+              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            ...conflictos.map(
+              (conflicto) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ConflictoTile(conflicto: conflicto),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          style: FilledButton.styleFrom(backgroundColor: c.red),
+          child: const Text('Entendido'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<String?> mostrarContraindicacionDialog(
   BuildContext context,
   String tratamientoNombre,
@@ -10,7 +61,15 @@ Future<String?> mostrarContraindicacionDialog(
   if (conflictos.isEmpty) return Future.value(null);
 
   final c = context.appColors;
-  final tieneAbsoluta = conflictos.any((conf) => conf.severidad == SeveridadConflicto.absoluta);
+  final tieneAbsoluta = conflictos.any(
+    (conf) => conf.severidad == SeveridadConflicto.absoluta,
+  );
+  if (tieneAbsoluta) {
+    // Sin salida posible: se informa y se devuelve `null`, que quien llama ya
+    // interpreta como "no se aplica".
+    return mostrarBloqueoAbsoluto(context, tratamientoNombre, conflictos)
+        .then((_) => null);
+  }
   final controller = TextEditingController();
   final formKey = GlobalKey<FormState>();
 

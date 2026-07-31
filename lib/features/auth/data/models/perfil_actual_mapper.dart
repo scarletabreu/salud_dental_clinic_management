@@ -44,7 +44,6 @@ class PerfilActualMapper {
           estatus: estatus,
           username: username,
           // La contraseña no viaja al cliente: la RPC no la devuelve.
-          passwordHash: '',
           assistants: const [],
           specialty: fila['especialidad'] as String? ?? '',
           isAvailable: fila['esta_disponible'] as bool? ?? true,
@@ -60,7 +59,6 @@ class PerfilActualMapper {
           contactos: contactos,
           estatus: estatus,
           username: username,
-          passwordHash: '',
           assistants: const [],
           specialty: fila['especialidad'] as String? ?? '',
           isAvailable: fila['esta_disponible'] as bool? ?? true,
@@ -75,7 +73,6 @@ class PerfilActualMapper {
           contactos: contactos,
           estatus: estatus,
           username: username,
-          passwordHash: '',
           shift: fila['turno'] as String? ?? '',
         );
       default:

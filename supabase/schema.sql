@@ -433,50 +433,16 @@ ALTER FUNCTION "public"."actualizar_stock_por_compra"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-declare
-  v_stock_anterior integer;
 begin
-  if p_nuevo_stock < 0 then
-    raise exception 'El stock no puede ser negativo.' using errcode = '22023';
+  if not public.es_contexto_interno()
+     and (auth.uid() is null or not public.es_admin()) then
+    raise exception 'Capacidad administrativa requerida.' using errcode = '42501';
   end if;
-
-  if p_motivo not in ('merma', 'correccion', 'usoInterno') then
-    raise exception 'El motivo del ajuste no es válido.' using errcode = '22023';
-  end if;
-
-  select stock_actual
-    into v_stock_anterior
-    from public.consumibles
-   where id = p_consumible_id
-     and activo = true
-   for update;
-
-  if not found then
-    raise exception 'No se encontró un consumible activo para ajustar.' using errcode = 'P0002';
-  end if;
-
-  update public.consumibles
-     set stock_actual = p_nuevo_stock,
-         estado = case
-           when p_nuevo_stock <= 0 then 'agotado'
-           when p_nuevo_stock <= stock_minimo then 'bajoStock'
-           else 'disponible'
-         end,
-         updated_at = now()
-   where id = p_consumible_id;
-
-  insert into public.movimientos_stock_consumible (
-    consumible_id, stock_anterior, stock_nuevo, diferencia, motivo, creado_por
-  ) values (
-    p_consumible_id,
-    v_stock_anterior,
-    p_nuevo_stock,
-    p_nuevo_stock - v_stock_anterior,
-    p_motivo,
-    auth.uid()
+  perform public.hfx_base_ajustar_stock_consumible(
+    p_consumible_id, p_nuevo_stock, p_motivo
   );
 end;
 $$;
@@ -573,84 +539,264 @@ COMMENT ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() IS 'SD-169: al
 
 
 
-CREATE OR REPLACE FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."cerrar_consulta"("p_consulta_id" "uuid", "p_version" integer DEFAULT NULL::integer, "p_payload" "jsonb" DEFAULT '{}'::"jsonb", "p_idempotencia_key" "text" DEFAULT NULL::"text", "p_metodo_pago" "text" DEFAULT 'contado'::"text", "p_nota" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
     AS $$
 declare
-  v_consulta_id    uuid;
-  v_odontograma_id uuid;
-  v_diente_id      uuid;
-  v_diente         jsonb;
-  v_superficie     jsonb;
-  v_doc            jsonb;
+  v_actor_id    uuid;
+  v_version     integer;
+  v_finalizada  boolean;
+  v_cita_id     uuid;
+  v_cierre_key  text;
+  v_consumo     record;
+  v_stock       integer;
+  v_nombre      text;
+  v_cuenta_id   uuid;
+  v_recetas     integer := 0;
+  v_facturables integer := 0;
 begin
-  -- 1. Consulta
-  insert into consultas (
-    paciente_id, doctor_id, cita_id, fecha,
-    motivo_consulta, temp_condiciones, created_at, updated_at
-  )
-  values (
-    p_paciente_id, p_doctor_id, p_cita_id, p_fecha,
-    p_motivo_consulta,
-    -- temp_condiciones es text[]: convertimos el array jsonb de strings a text[].
-    coalesce(
-      (select array_agg(val)
-         from jsonb_array_elements_text(coalesce(p_temp_condiciones, '[]'::jsonb)) as t(val)),
-      '{}'::text[]
-    ),
-    now(), now()
-  )
-  returning id into v_consulta_id;
+  v_actor_id := public.hfx_clin_002_actor_clinico(p_consulta_id);
 
-  -- 2. Odontograma (1:1 con la consulta)
-  insert into odontogramas (consulta_id, created_at, updated_at)
-  values (v_consulta_id, now(), now())
-  returning id into v_odontograma_id;
+  select version, coalesce(finalizada, false), cita_id, cierre_key
+    into v_version, v_finalizada, v_cita_id, v_cierre_key
+    from consultas
+   where id = p_consulta_id and deleted_at is null
+     for update;
 
-  -- 3. Dientes + superficies
-  for v_diente in select * from jsonb_array_elements(p_dientes)
-  loop
-    insert into dientes (
-      odontograma_id, fdi_code, created_at, updated_at
-    )
-    values (
-      v_odontograma_id, (v_diente ->> 'fdi_code')::int, now(), now()
-    )
-    returning id into v_diente_id;
+  -- Idempotencia: el mismo intento lógico devuelve el resultado existente.
+  if v_finalizada then
+    if p_idempotencia_key is null
+       or v_cierre_key is null
+       or v_cierre_key = p_idempotencia_key then
+      return public.hfx_clin_002_resultado_cierre(p_consulta_id);
+    end if;
 
-    for v_superficie in select * from jsonb_array_elements(v_diente -> 'superficies')
-    loop
-      insert into superficies (
-        diente_id, tipo_superficie, tratamientos_ids, created_at, updated_at
-      )
-      values (
-        -- el enum tipo_superficie es minúscula; la app envía 'Mesial', etc.
-        v_diente_id, lower(v_superficie #>> '{}')::tipo_superficie,
-        '{}'::uuid[], now(), now()
-      );
-    end loop;
-  end loop;
-
-  -- 4. Documentos clínicos (radiografías ya subidas a Storage)
-  if p_documentos is not null then
-    for v_doc in select * from jsonb_array_elements(p_documentos)
-    loop
-      insert into documentos_clinicos (
-        paciente_id, consulta_id, descripcion, tipo_documento,
-        url_archivo, created_at, updated_at
-      )
-      values (
-        p_paciente_id,
-        v_consulta_id,
-        v_doc ->> 'descripcion',
-        (v_doc ->> 'tipo_documento')::tipo_documento,
-        v_doc ->> 'url_archivo',
-        now(), now()
-      );
-    end loop;
+    raise exception 'La consulta % ya fue finalizada por otro cierre.', p_consulta_id
+      using errcode = 'CL002';
   end if;
 
-  return v_consulta_id;
+  if p_version is not null and p_version <> v_version then
+    raise exception 'La consulta cambió en otra sesión (versión % ≠ %). Recarga antes de cerrar.',
+      p_version, v_version
+      using errcode = 'CL001';
+  end if;
+
+  -- La cita se bloquea junto con la consulta: el cierre las mueve a la vez.
+  if v_cita_id is not null then
+    perform 1 from citas where id = v_cita_id for update;
+  end if;
+
+  -- 8.1 Último borrador dentro de la misma transacción del cierre.
+  perform public.hfx_clin_002_aplicar_borrador(p_consulta_id, v_actor_id, p_payload);
+
+  -- 8.2 Consumo de inventario: verificar antes de mover, y mover una sola vez.
+  for v_consumo in
+    select cc.consumible_id, cc.cantidad, cc.nombre
+      from consumos_consulta cc
+     where cc.consulta_id = p_consulta_id and cc.deleted_at is null
+     order by cc.consumible_id
+  loop
+    select c.stock_actual, c.nombre into v_stock, v_nombre
+      from consumibles c
+     where c.id = v_consumo.consumible_id and c.deleted_at is null
+       for update;
+
+    if v_stock is null then
+      raise exception 'El consumible % ya no está disponible en el inventario.',
+        coalesce(v_consumo.nombre, v_consumo.consumible_id::text)
+        using errcode = 'CL004';
+    end if;
+
+    if v_stock < v_consumo.cantidad then
+      raise exception 'Stock insuficiente de %: quedan % y la consulta consume %.',
+        coalesce(v_nombre, v_consumo.nombre, v_consumo.consumible_id::text),
+        v_stock, v_consumo.cantidad
+        using errcode = 'CL003';
+    end if;
+
+    insert into movimientos_stock_consumible (
+      consumible_id, diferencia, motivo, creado_por, consulta_id,
+      stock_anterior, stock_nuevo
+    ) values (
+      v_consumo.consumible_id, -v_consumo.cantidad, 'consumoClinico',
+      v_actor_id, p_consulta_id, 0, 0
+    )
+    on conflict (consulta_id, consumible_id) where consulta_id is not null
+    do nothing;
+  end loop;
+
+  -- 8.3 Emisión de las recetas que quedaron en borrador con contenido.
+  update recetas
+     set estado = 'emitida',
+         emitida_at = now(),
+         fecha_emision = coalesce(fecha_emision, now()),
+         version = version + 1,
+         updated_at = now()
+   where consulta_id = p_consulta_id
+     and deleted_at is null
+     and estado = 'borrador'
+     and jsonb_array_length(coalesce(items_receta, '[]'::jsonb)) > 0;
+  get diagnostics v_recetas = row_count;
+
+  -- Un borrador vacío no se emite: no es un documento clínico.
+  update recetas
+     set deleted_at = now(), updated_at = now()
+   where consulta_id = p_consulta_id
+     and deleted_at is null
+     and estado = 'borrador';
+
+  -- 8.4 Cuenta, ítems de lo ejecutado y cierre de la cita.
+  --
+  -- Una evaluación sin ejecución no genera pre-factura: cobrar cero es ruido
+  -- administrativo, y el plan propuesto o aceptado no factura por sí mismo.
+  select count(*) into v_facturables
+    from tratamientos_aplicados
+   where consulta_id = p_consulta_id
+     and deleted_at is null
+     and coalesce(estado, 'aplicado') <> 'indicado';
+
+  if v_facturables > 0 then
+    v_cuenta_id := public.hfx_base_finalizar_consulta(p_consulta_id, p_metodo_pago, p_nota);
+  elsif v_cita_id is not null then
+    -- `hfx_base_finalizar_consulta` es quien cierra la cita; si no se invoca,
+    -- el cierre igual tiene que dejarla completada.
+    update citas
+       set estado = 'completada'::estado_cita, updated_at = now()
+     where id = v_cita_id
+       and estado <> 'completada'::estado_cita
+       and estado <> 'cancelada'::estado_cita;
+  end if;
+
+  -- 8.5 Cierre clínico.
+  update consultas
+     set finalizada = true,
+         finalizada_at = now(),
+         cerrada_por = v_actor_id,
+         cierre_key = p_idempotencia_key,
+         version = version + 1,
+         updated_at = now()
+   where id = p_consulta_id;
+
+  insert into auditoria_clinica (consulta_id, evento, actor_id, rol, metadata)
+  values (
+    p_consulta_id,
+    'consulta_cerrada',
+    v_actor_id,
+    case when public.es_admin() then 'admin' else 'doctor' end,
+    jsonb_build_object(
+      'cuenta_id', v_cuenta_id,
+      'recetas_emitidas', v_recetas,
+      'idempotencia_key', p_idempotencia_key
+    )
+  );
+
+  return public.hfx_clin_002_resultado_cierre(p_consulta_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."cerrar_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb", "p_idempotencia_key" "text", "p_metodo_pago" "text", "p_nota" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."corregir_consulta_ajena"("p_consulta_id" "uuid", "p_cambios" "jsonb", "p_motivo" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_consulta public.consultas%rowtype;
+  v_antes jsonb;
+  v_despues jsonb;
+begin
+  if auth.uid() is null or not public.es_admin() then
+    raise exception 'Capacidad administrativa requerida.' using errcode = '42501';
+  end if;
+  if length(btrim(coalesce(p_motivo, ''))) < 10 then
+    raise exception 'La corrección requiere un motivo de al menos 10 caracteres.'
+      using errcode = '22023';
+  end if;
+  if p_cambios - array['motivo_consulta', 'notas'] <> '{}'::jsonb then
+    raise exception 'La corrección contiene campos no autorizados.'
+      using errcode = '22023';
+  end if;
+
+  select * into v_consulta from public.consultas
+   where id = p_consulta_id and deleted_at is null for update;
+  if not found then
+    raise exception 'La consulta no existe.' using errcode = 'P0002';
+  end if;
+  if v_consulta.doctor_id = auth.uid() then
+    raise exception 'La consulta propia se corrige por el flujo clínico normal.'
+      using errcode = '22023';
+  end if;
+
+  v_antes := jsonb_build_object(
+    'motivo_consulta', v_consulta.motivo_consulta, 'notas', v_consulta.notas
+  );
+  update public.consultas
+     set motivo_consulta = case when p_cambios ? 'motivo_consulta'
+                            then p_cambios->>'motivo_consulta'
+                            else motivo_consulta end,
+         notas = case when p_cambios ? 'notas'
+                 then p_cambios->>'notas' else notas end,
+         updated_at = now()
+   where id = p_consulta_id;
+  select jsonb_build_object(
+    'motivo_consulta', motivo_consulta, 'notas', notas
+  ) into v_despues from public.consultas where id = p_consulta_id;
+
+  insert into public.auditoria_correcciones_clinicas (
+    consulta_id, autor_original_id, corregido_por, motivo,
+    datos_anteriores, datos_nuevos
+  ) values (
+    p_consulta_id, v_consulta.doctor_id, auth.uid(), btrim(p_motivo),
+    v_antes, v_despues
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."corregir_consulta_ajena"("p_consulta_id" "uuid", "p_cambios" "jsonb", "p_motivo" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_cita public.citas%rowtype;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null or not public.es_doctor()) then
+    raise exception 'Sesión clínica activa requerida.' using errcode = '42501';
+  end if;
+  if not public.es_contexto_interno()
+     and p_doctor_id is distinct from auth.uid() then
+    raise exception 'No puede firmar una consulta como otro doctor.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_cita
+    from public.citas
+   where id = p_cita_id and deleted_at is null
+   for update;
+  if not found then
+    raise exception 'La cita no existe o fue eliminada.' using errcode = 'P0002';
+  end if;
+  if v_cita.doctor_id is distinct from p_doctor_id
+     or v_cita.persona_id is distinct from p_paciente_id then
+    raise exception 'La cita no pertenece al doctor y paciente indicados.'
+      using errcode = '42501';
+  end if;
+  if v_cita.estado::text in ('cancelada', 'completada') then
+    raise exception 'El estado de la cita no permite iniciar una consulta.'
+      using errcode = '55000';
+  end if;
+
+  return public.hfx_base_crear_consulta_completa(
+    p_paciente_id, p_doctor_id, p_cita_id, p_fecha, p_motivo_consulta,
+    p_temp_condiciones, p_dientes, p_documentos
+  );
 end;
 $$;
 
@@ -693,11 +839,12 @@ CREATE OR REPLACE FUNCTION "public"."es_admin"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-    SELECT EXISTS (
-        SELECT 1
-        FROM admins
-        WHERE id = auth.uid()
-    );
+  select auth.uid() is not null and exists (
+    select 1
+      from public.usuarios u
+      join public.admins a on a.id = u.id and a.deleted_at is null
+     where u.id = auth.uid() and u.deleted_at is null
+  );
 $$;
 
 
@@ -708,26 +855,40 @@ CREATE OR REPLACE FUNCTION "public"."es_asistente"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-    SELECT EXISTS (
-        SELECT 1
-        FROM asistentes
-        WHERE id = auth.uid()
-    );
+  select auth.uid() is not null and exists (
+    select 1
+      from public.usuarios u
+      join public.asistentes a on a.id = u.id and a.deleted_at is null
+     where u.id = auth.uid() and u.deleted_at is null
+  );
 $$;
 
 
 ALTER FUNCTION "public"."es_asistente"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."es_contexto_interno"() RETURNS boolean
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select session_user in ('postgres', 'service_role')
+     and current_setting('role', true) in ('none', 'postgres', 'service_role');
+$$;
+
+
+ALTER FUNCTION "public"."es_contexto_interno"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."es_doctor"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-    SELECT EXISTS (
-        SELECT 1
-        FROM doctores
-        WHERE id = auth.uid()
-    );
+  select auth.uid() is not null and exists (
+    select 1
+      from public.usuarios u
+      join public.doctores d on d.id = u.id and d.deleted_at is null
+     where u.id = auth.uid() and u.deleted_at is null
+  );
 $$;
 
 
@@ -738,72 +899,18 @@ CREATE OR REPLACE FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid",
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-declare
-  v_paciente_id uuid;
-  v_cita_id     uuid;
-  v_cuenta_id   uuid;
-  v_monto_total numeric(12,2);
-  v_metodo_pago modo_pago;
 begin
-  -- El método llega como texto desde la app; la columna es el enum `modo_pago`.
-  begin
-    v_metodo_pago := lower(btrim(coalesce(p_metodo_pago, 'contado')))::modo_pago;
-  exception when invalid_text_representation then
-    raise exception 'Método de pago inválido: %. Valores admitidos: contado, credito.',
-      p_metodo_pago using errcode = '22023';
-  end;
-
-  select paciente_id, cita_id into v_paciente_id, v_cita_id
-  from consultas where id = p_consulta_id and deleted_at is null;
-  if v_paciente_id is null then
-    raise exception 'La consulta % no existe o fue eliminada.', p_consulta_id;
+  if not public.es_contexto_interno()
+     and (
+       auth.uid() is null
+       or not public.puede_editar_consulta_propia(p_consulta_id)
+     ) then
+    raise exception 'Solo el autor clínico activo puede finalizar la consulta.'
+      using errcode = '42501';
   end if;
-
-  -- Cierre clínico ANTES de cualquier retorno: finalizar una consulta cierra su
-  -- cita, y eso debe valer también cuando la pre-factura ya existía. El estado
-  -- terminal se respeta (no se reabre una cita cancelada a mano).
-  if v_cita_id is not null then
-    update citas
-       set estado     = 'completada'::estado_cita,
-           updated_at = now()
-     where id = v_cita_id
-       and estado <> 'completada'::estado_cita
-       and estado <> 'cancelada'::estado_cita;
-  end if;
-
-  -- Idempotencia: reintentar finalizar no duplica la pre-factura.
-  select id into v_cuenta_id from cuentas
-  where consulta_id = p_consulta_id and deleted_at is null limit 1;
-  if v_cuenta_id is not null then return v_cuenta_id; end if;
-
-  -- Solo procedimientos ejecutados. Las actividades del plan (propuestas,
-  -- aceptadas o pendientes) y los hallazgos de la evaluación no facturan.
-  select coalesce(sum(precio_aplicado), 0) into v_monto_total
-  from tratamientos_aplicados
-  where consulta_id = p_consulta_id
-    and deleted_at is null
-    and coalesce(estado, 'aplicado') <> 'indicado';
-
-  insert into cuentas (
-    paciente_id, consulta_id, estado, monto_total, metodo_pago,
-    fecha_creacion, nota, created_at, updated_at
-  ) values (
-    v_paciente_id, p_consulta_id, 'abierta', v_monto_total, v_metodo_pago,
-    now(), p_nota, now(), now()
-  ) returning id into v_cuenta_id;
-
-  insert into items_cuenta (
-    cuenta_id, descripcion, precio_unitario, cantidad, created_at, updated_at
-  )
-  select v_cuenta_id, coalesce(t.nombre, 'Tratamiento'),
-         coalesce(ta.precio_aplicado, 0), 1, now(), now()
-  from tratamientos_aplicados ta
-  left join tratamientos t on t.id = ta.tratamiento_id
-  where ta.consulta_id = p_consulta_id
-    and ta.deleted_at is null
-    and coalesce(ta.estado, 'aplicado') <> 'indicado';
-
-  return v_cuenta_id;
+  return public.hfx_base_finalizar_consulta(
+    p_consulta_id, p_metodo_pago, p_nota
+  );
 end;
 $$;
 
@@ -848,96 +955,15 @@ CREATE OR REPLACE FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-declare
-  v_total numeric(15,2);
-  v_pagado numeric(15,2);
-  v_saldo numeric(15,2);
-  v_suma_cuotas numeric(15,2);
-  v_num_cuotas integer;
 begin
-  if p_cuotas is null or jsonb_typeof(p_cuotas) <> 'array' then
-    raise exception 'El plan de cuotas no tiene un formato válido.';
+  if not public.es_contexto_interno()
+     and (
+       auth.uid() is null
+       or not (public.es_admin() or public.es_asistente())
+     ) then
+    raise exception 'Capacidad de caja requerida.' using errcode = '42501';
   end if;
-
-  v_num_cuotas := jsonb_array_length(p_cuotas);
-  if v_num_cuotas < 2 or v_num_cuotas > 36 then
-    raise exception 'El plan debe tener entre 2 y 36 cuotas.';
-  end if;
-
-  select monto_total
-    into v_total
-    from public.cuentas
-   where id = p_cuenta_id
-     and deleted_at is null
-   for update;
-
-  if not found then
-    raise exception 'No se encontró la cuenta solicitada.';
-  end if;
-
-  if exists (
-    select 1
-      from public.cuotas
-     where cuenta_id = p_cuenta_id
-       and deleted_at is null
-  ) then
-    raise exception 'La cuenta ya tiene un plan de cuotas.';
-  end if;
-
-  select coalesce(sum(monto), 0)
-    into v_pagado
-    from public.pagos
-   where cuenta_id = p_cuenta_id
-     and estado = 'completado'
-     and deleted_at is null;
-
-  v_saldo := round(v_total - v_pagado, 2);
-  if v_saldo <= 0 then
-    raise exception 'Esta cuenta ya está saldada.';
-  end if;
-
-  select coalesce(sum((item->>'monto')::numeric), 0)
-    into v_suma_cuotas
-    from jsonb_array_elements(p_cuotas) item;
-
-  if abs(v_suma_cuotas - v_saldo) > 0.01 then
-    raise exception 'La suma de las cuotas (%) debe coincidir con el saldo pendiente (%).',
-      v_suma_cuotas, v_saldo;
-  end if;
-
-  if exists (
-    select 1
-      from jsonb_array_elements(p_cuotas) item
-     where (item->>'monto')::numeric <= 0
-        or (item->>'fecha_vencimiento')::date < current_date
-  ) then
-    raise exception 'Todas las cuotas deben tener monto positivo y fecha vigente.';
-  end if;
-
-  insert into public.cuotas (
-    cuenta_id,
-    monto,
-    monto_pagado,
-    fecha_vencimiento,
-    estado,
-    created_at,
-    updated_at
-  )
-  select
-    p_cuenta_id,
-    (item->>'monto')::numeric,
-    0,
-    (item->>'fecha_vencimiento')::date,
-    'pendiente',
-    now(),
-    now()
-  from jsonb_array_elements(p_cuotas) item;
-
-  update public.cuentas
-     set metodo_pago = 'credito',
-         estado = 'pendiente',
-         updated_at = now()
-   where id = p_cuenta_id;
+  perform public.hfx_base_generar_plan_cuotas(p_cuenta_id, p_cuotas);
 end;
 $$;
 
@@ -974,6 +1000,57 @@ ALTER FUNCTION "public"."get_active_doctors"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."get_active_doctors"() IS 'HFX-CLIN-000: doctores activos, administradores incluidos. Ya no devuelve password_hash: era PII que acababa impresa en la consola del navegador.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" "uuid", "p_version" integer DEFAULT NULL::integer, "p_payload" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_actor_id  uuid;
+  v_version   integer;
+  v_finalizada boolean;
+  v_resultado jsonb;
+  v_actualizado timestamptz;
+begin
+  v_actor_id := public.hfx_clin_002_actor_clinico(p_consulta_id);
+
+  -- Serializa los guardados concurrentes de la misma consulta.
+  select version, coalesce(finalizada, false)
+    into v_version, v_finalizada
+    from consultas
+   where id = p_consulta_id and deleted_at is null
+     for update;
+
+  if v_finalizada then
+    raise exception 'La consulta % ya fue finalizada y no admite cambios de borrador.', p_consulta_id
+      using errcode = 'CL002';
+  end if;
+
+  if p_version is not null and p_version <> v_version then
+    raise exception 'La consulta cambió en otra sesión (versión % ≠ %). Recarga antes de guardar.',
+      p_version, v_version
+      using errcode = 'CL001';
+  end if;
+
+  v_resultado := public.hfx_clin_002_aplicar_borrador(p_consulta_id, v_actor_id, p_payload);
+
+  update consultas
+     set version = version + 1, updated_at = now()
+   where id = p_consulta_id
+  returning version, updated_at into v_version, v_actualizado;
+
+  return v_resultado || jsonb_build_object(
+    'consulta_id', p_consulta_id,
+    'version', v_version,
+    'actualizado_en', v_actualizado,
+    'finalizada', false
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -1081,37 +1158,318 @@ COMMENT ON FUNCTION "public"."handle_new_user"() IS 'HFX-CLIN-000: aprovisiona p
 
 
 
-CREATE OR REPLACE FUNCTION "public"."limpiar_diagnosticos_superficie"() RETURNS "trigger"
+CREATE OR REPLACE FUNCTION "public"."hfx_base_ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") RETURNS "void"
     LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
     AS $$
-BEGIN
-    UPDATE superficies 
-    SET diagnostico_aplicado_id = NULL 
-    WHERE diagnostico_aplicado_id = OLD.id;
-    RETURN OLD;
-END;
+declare
+  v_stock_anterior integer;
+begin
+  if p_nuevo_stock < 0 then
+    raise exception 'El stock no puede ser negativo.' using errcode = '22023';
+  end if;
+  if p_motivo not in ('merma', 'correccion', 'usoInterno') then
+    raise exception 'El motivo del ajuste no es válido.' using errcode = '22023';
+  end if;
+
+  select stock_actual into v_stock_anterior
+    from public.consumibles
+   where id = p_consumible_id and activo = true and deleted_at is null
+   for update;
+  if not found then
+    raise exception 'No se encontró un consumible activo para ajustar.'
+      using errcode = 'P0002';
+  end if;
+
+  -- El trigger de movimientos aplica la diferencia bajo lock. Actualizar el
+  -- stock aquí también lo aplicaba dos veces y rompía el CHECK de auditoría.
+  insert into public.movimientos_stock_consumible (
+    consumible_id, stock_anterior, stock_nuevo, diferencia, motivo, creado_por
+  ) values (
+    p_consumible_id, v_stock_anterior, p_nuevo_stock,
+    p_nuevo_stock - v_stock_anterior, p_motivo, auth.uid()
+  );
+
+  update public.consumibles
+     set estado = case
+           when stock_actual <= 0
+             then 'agotado'::public.estado_consumible
+           when stock_actual <= stock_minimo
+             then 'bajo_stock'::public.estado_consumible
+           else 'disponible'::public.estado_consumible
+         end
+   where id = p_consumible_id;
+end;
 $$;
 
 
-ALTER FUNCTION "public"."limpiar_diagnosticos_superficie"() OWNER TO "postgres";
+ALTER FUNCTION "public"."hfx_base_ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."manejar_cita_cancelada"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-    IF (NEW.estado = 'cancelada') THEN
-        -- Aquí podrías insertar una notificación para el doctor
-        RAISE NOTICE 'Cita cancelada para la persona id: %. El horario ha sido liberado.', NEW.persona_id;
-    
-    END IF;
-    RETURN NEW;
-END;$$;
+CREATE OR REPLACE FUNCTION "public"."hfx_base_crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+declare
+  v_consulta_id    uuid;
+  v_odontograma_id uuid;
+  v_diente_id      uuid;
+  v_diente         jsonb;
+  v_superficie     jsonb;
+  v_doc            jsonb;
+begin
+  -- 1. Consulta
+  insert into consultas (
+    paciente_id, doctor_id, cita_id, fecha,
+    motivo_consulta, temp_condiciones, created_at, updated_at
+  )
+  values (
+    p_paciente_id, p_doctor_id, p_cita_id, p_fecha,
+    p_motivo_consulta,
+    -- temp_condiciones es text[]: convertimos el array jsonb de strings a text[].
+    coalesce(
+      (select array_agg(val)
+         from jsonb_array_elements_text(coalesce(p_temp_condiciones, '[]'::jsonb)) as t(val)),
+      '{}'::text[]
+    ),
+    now(), now()
+  )
+  returning id into v_consulta_id;
+
+  -- 2. Odontograma (1:1 con la consulta)
+  insert into odontogramas (consulta_id, created_at, updated_at)
+  values (v_consulta_id, now(), now())
+  returning id into v_odontograma_id;
+
+  -- 3. Dientes + superficies
+  for v_diente in select * from jsonb_array_elements(p_dientes)
+  loop
+    insert into dientes (
+      odontograma_id, fdi_code, created_at, updated_at
+    )
+    values (
+      v_odontograma_id, (v_diente ->> 'fdi_code')::int, now(), now()
+    )
+    returning id into v_diente_id;
+
+    for v_superficie in select * from jsonb_array_elements(v_diente -> 'superficies')
+    loop
+      insert into superficies (
+        diente_id, tipo_superficie, tratamientos_ids, created_at, updated_at
+      )
+      values (
+        -- el enum tipo_superficie es minúscula; la app envía 'Mesial', etc.
+        v_diente_id, lower(v_superficie #>> '{}')::tipo_superficie,
+        '{}'::uuid[], now(), now()
+      );
+    end loop;
+  end loop;
+
+  -- 4. Documentos clínicos (radiografías ya subidas a Storage)
+  if p_documentos is not null then
+    for v_doc in select * from jsonb_array_elements(p_documentos)
+    loop
+      insert into documentos_clinicos (
+        paciente_id, consulta_id, descripcion, tipo_documento,
+        url_archivo, created_at, updated_at
+      )
+      values (
+        p_paciente_id,
+        v_consulta_id,
+        v_doc ->> 'descripcion',
+        (v_doc ->> 'tipo_documento')::tipo_documento,
+        v_doc ->> 'url_archivo',
+        now(), now()
+      );
+    end loop;
+  end if;
+
+  return v_consulta_id;
+end;
+$$;
 
 
-ALTER FUNCTION "public"."manejar_cita_cancelada"() OWNER TO "postgres";
+ALTER FUNCTION "public"."hfx_base_crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."hfx_base_finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text" DEFAULT 'contado'::"text", "p_nota" "text" DEFAULT NULL::"text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_paciente_id uuid;
+  v_cita_id     uuid;
+  v_cuenta_id   uuid;
+  v_monto_total numeric(12,2);
+  v_metodo_pago modo_pago;
+begin
+  -- El método llega como texto desde la app; la columna es el enum `modo_pago`.
+  begin
+    v_metodo_pago := lower(btrim(coalesce(p_metodo_pago, 'contado')))::modo_pago;
+  exception when invalid_text_representation then
+    raise exception 'Método de pago inválido: %. Valores admitidos: contado, credito.',
+      p_metodo_pago using errcode = '22023';
+  end;
+
+  select paciente_id, cita_id into v_paciente_id, v_cita_id
+  from consultas where id = p_consulta_id and deleted_at is null;
+  if v_paciente_id is null then
+    raise exception 'La consulta % no existe o fue eliminada.', p_consulta_id;
+  end if;
+
+  -- Cierre clínico ANTES de cualquier retorno: finalizar una consulta cierra su
+  -- cita, y eso debe valer también cuando la pre-factura ya existía. El estado
+  -- terminal se respeta (no se reabre una cita cancelada a mano).
+  if v_cita_id is not null then
+    update citas
+       set estado     = 'completada'::estado_cita,
+           updated_at = now()
+     where id = v_cita_id
+       and estado <> 'completada'::estado_cita
+       and estado <> 'cancelada'::estado_cita;
+  end if;
+
+  -- Idempotencia: reintentar finalizar no duplica la pre-factura.
+  select id into v_cuenta_id from cuentas
+  where consulta_id = p_consulta_id and deleted_at is null limit 1;
+  if v_cuenta_id is not null then return v_cuenta_id; end if;
+
+  -- Solo procedimientos ejecutados. Las actividades del plan (propuestas,
+  -- aceptadas o pendientes) y los hallazgos de la evaluación no facturan.
+  select coalesce(sum(precio_aplicado), 0) into v_monto_total
+  from tratamientos_aplicados
+  where consulta_id = p_consulta_id
+    and deleted_at is null
+    and coalesce(estado, 'aplicado') <> 'indicado';
+
+  insert into cuentas (
+    paciente_id, consulta_id, estado, monto_total, metodo_pago,
+    fecha_creacion, nota, created_at, updated_at
+  ) values (
+    v_paciente_id, p_consulta_id, 'abierta', v_monto_total, v_metodo_pago,
+    now(), p_nota, now(), now()
+  ) returning id into v_cuenta_id;
+
+  insert into items_cuenta (
+    cuenta_id, descripcion, precio_unitario, cantidad, created_at, updated_at
+  )
+  select v_cuenta_id, coalesce(t.nombre, 'Tratamiento'),
+         coalesce(ta.precio_aplicado, 0), 1, now(), now()
+  from tratamientos_aplicados ta
+  left join tratamientos t on t.id = ta.tratamiento_id
+  where ta.consulta_id = p_consulta_id
+    and ta.deleted_at is null
+    and coalesce(ta.estado, 'aplicado') <> 'indicado';
+
+  return v_cuenta_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_base_finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_base_generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_total numeric(15,2);
+  v_pagado numeric(15,2);
+  v_saldo numeric(15,2);
+  v_suma_cuotas numeric(15,2);
+  v_num_cuotas integer;
+begin
+  if p_cuotas is null or jsonb_typeof(p_cuotas) <> 'array' then
+    raise exception 'El plan de cuotas no tiene un formato válido.';
+  end if;
+
+  v_num_cuotas := jsonb_array_length(p_cuotas);
+  if v_num_cuotas < 2 or v_num_cuotas > 36 then
+    raise exception 'El plan debe tener entre 2 y 36 cuotas.';
+  end if;
+
+  select monto_total
+    into v_total
+    from public.cuentas
+   where id = p_cuenta_id
+     and deleted_at is null
+   for update;
+
+  if not found then
+    raise exception 'No se encontró la cuenta solicitada.';
+  end if;
+
+  if exists (
+    select 1
+      from public.cuotas
+     where cuenta_id = p_cuenta_id
+       and deleted_at is null
+  ) then
+    raise exception 'La cuenta ya tiene un plan de cuotas.';
+  end if;
+
+  select coalesce(sum(monto), 0)
+    into v_pagado
+    from public.pagos
+   where cuenta_id = p_cuenta_id
+     and estado = 'completado'
+     and deleted_at is null;
+
+  v_saldo := round(v_total - v_pagado, 2);
+  if v_saldo <= 0 then
+    raise exception 'Esta cuenta ya está saldada.';
+  end if;
+
+  select coalesce(sum((item->>'monto')::numeric), 0)
+    into v_suma_cuotas
+    from jsonb_array_elements(p_cuotas) item;
+
+  if abs(v_suma_cuotas - v_saldo) > 0.01 then
+    raise exception 'La suma de las cuotas (%) debe coincidir con el saldo pendiente (%).',
+      v_suma_cuotas, v_saldo;
+  end if;
+
+  if exists (
+    select 1
+      from jsonb_array_elements(p_cuotas) item
+     where (item->>'monto')::numeric <= 0
+        or (item->>'fecha_vencimiento')::date < current_date
+  ) then
+    raise exception 'Todas las cuotas deben tener monto positivo y fecha vigente.';
+  end if;
+
+  insert into public.cuotas (
+    cuenta_id,
+    monto,
+    monto_pagado,
+    fecha_vencimiento,
+    estado,
+    created_at,
+    updated_at
+  )
+  select
+    p_cuenta_id,
+    (item->>'monto')::numeric,
+    0,
+    (item->>'fecha_vencimiento')::date,
+    'pendiente',
+    now(),
+    now()
+  from jsonb_array_elements(p_cuotas) item;
+
+  update public.cuentas
+     set metodo_pago = 'credito',
+         estado = 'pendiente',
+         updated_at = now()
+   where id = p_cuenta_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_base_generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_base_marcar_cuotas_vencidas"("p_cuenta_id" "uuid") RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -1125,134 +1483,10 @@ CREATE OR REPLACE FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid
 $$;
 
 
-ALTER FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."hfx_base_marcar_cuotas_vencidas"("p_cuenta_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."marcar_item_plan_ejecutado"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
-    AS $$
-begin
-  if new.item_plan_id is null then
-    return new;
-  end if;
-
-  if new.deleted_at is not null then
-    if not exists (
-      select 1
-      from public.tratamientos_aplicados otra
-      where otra.item_plan_id = new.item_plan_id
-        and otra.id <> new.id
-        and otra.deleted_at is null
-    ) then
-      update public.items_plan_tratamiento
-         set estado = 'pendiente',
-             fecha_completado = null,
-             updated_at = now()
-       where id = new.item_plan_id
-         and deleted_at is null;
-    end if;
-    return new;
-  end if;
-
-  update public.items_plan_tratamiento
-     set estado = case
-           when new.estado = 'en_proceso' then 'en_proceso'::public.estado_item_plan
-           else 'completado'::public.estado_item_plan
-         end,
-         fecha_inicio = coalesce(fecha_inicio, new.fecha_ejecucion, now()),
-         fecha_completado = case
-           when new.estado = 'en_proceso' then fecha_completado
-           else coalesce(fecha_completado, new.fecha_ejecucion, now())
-         end,
-         updated_at = now()
-   where id = new.item_plan_id
-     and deleted_at is null;
-  return new;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."perfil_actual"() RETURNS TABLE("id" "uuid", "rol" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "estatus" "text", "username" "text", "telefono" "text", "email" "text", "direccion" "text", "especialidad" "text", "esta_disponible" boolean, "departamento" "text", "turno" "text")
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-  select
-    u.id,
-    case
-      when a.id is not null then 'admin'
-      when d.id is not null then 'doctor'
-      when s.id is not null then 'asistente'
-    end                                       as rol,
-    p.nombre,
-    p.apellido,
-    p.fecha_nacimiento,
-    p.cedula,
-    p.estatus::text,
-    u.username,
-    c.numero_telefono                         as telefono,
-    c.email,
-    c.direccion,
-    d.especialidad,
-    d.esta_disponible,
-    a.departamento,
-    s.turno
-  from public.usuarios u
-  join public.personas p on p.id = u.id
-  left join public.doctores   d on d.id = u.id and d.deleted_at is null
-  left join public.admins     a on a.id = u.id and a.deleted_at is null
-  left join public.asistentes s on s.id = u.id and s.deleted_at is null
-  left join lateral (
-    select ct.numero_telefono, ct.email, ct.direccion
-      from public.persona_contactos pc
-      join public.contactos ct on ct.id = pc.contacto_id
-     where pc.persona_id = p.id
-     order by pc.es_principal desc nulls last
-     limit 1
-  ) c on true
- where u.id = auth.uid()
-   and u.deleted_at is null
-   and p.deleted_at is null
-   and (a.id is not null or d.id is not null or s.id is not null);
-$$;
-
-
-ALTER FUNCTION "public"."perfil_actual"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."perfil_actual"() IS 'HFX-CLIN-000: perfil de la sesión actual. Nunca devuelve password_hash y no admite consultar el perfil de otro usuario.';
-
-
-
-CREATE OR REPLACE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public'
-    AS $$
-begin
-  if new.fecha_hora is distinct from old.fecha_hora then
-    update consultas
-       set fecha      = new.fecha_hora,
-           updated_at = now()
-     where cita_id = new.id
-       and deleted_at is null
-       and finalizada is not true;
-  end if;
-  return new;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() IS 'SD-160: al mover una cita, su consulta abierta hereda la nueva fecha.';
-
-
-
-CREATE OR REPLACE FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."hfx_base_recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -1344,10 +1578,10 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."hfx_base_recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."hfx_base_registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
     AS $$
@@ -1393,10 +1627,10 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."hfx_base_registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."hfx_base_registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
@@ -1512,6 +1746,829 @@ begin
   end if;
 
   return v_pago_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_base_registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_002_actor_clinico"("p_consulta_id" "uuid") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_doctor_id uuid;
+  v_finalizada boolean;
+begin
+  select doctor_id, coalesce(finalizada, false)
+    into v_doctor_id, v_finalizada
+    from consultas
+   where id = p_consulta_id and deleted_at is null;
+
+  if v_doctor_id is null then
+    raise exception 'La consulta % no existe o fue eliminada.', p_consulta_id
+      using errcode = 'CL004';
+  end if;
+
+  if public.es_contexto_interno() then
+    return v_doctor_id;
+  end if;
+
+  if auth.uid() is null then
+    raise exception 'Se requiere una sesión activa para operar sobre la consulta.'
+      using errcode = '42501';
+  end if;
+
+  -- Un admin tiene identidad clínica, pero más permisos no le permiten firmar
+  -- por otro doctor: la autoría del expediente no se transfiere.
+  if v_doctor_id <> auth.uid() or not public.es_doctor() then
+    raise exception 'Solo el autor clínico activo puede modificar esta consulta.'
+      using errcode = '42501';
+  end if;
+
+  return v_doctor_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_002_actor_clinico"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_002_aplicar_borrador"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_paciente_id      uuid;
+  v_odontograma_id   uuid;
+  v_consulta_update  boolean := false;
+  v_diente           jsonb;
+  v_fila             jsonb;
+  v_diente_id        uuid;
+  v_fdi              integer;
+  v_ids              uuid[];
+  v_ids_tratamiento  uuid[];
+  v_id               uuid;
+  v_conservados      uuid[];
+  v_lista            jsonb;
+  v_dientes_out      jsonb := '[]'::jsonb;
+  v_recetas_out      jsonb := '[]'::jsonb;
+  v_insumos_out      jsonb := '[]'::jsonb;
+  v_version          integer;
+  v_estado           text;
+begin
+  p_payload := coalesce(p_payload, '{}'::jsonb);
+
+  select paciente_id into v_paciente_id from consultas where id = p_consulta_id;
+
+  -- Una colección enviada como `null` o con otra forma se trata como vacía en
+  -- lugar de reventar a mitad del guardado.
+  if jsonb_exists(p_payload, 'dientes')
+     and jsonb_typeof(p_payload -> 'dientes') <> 'array' then
+    p_payload := p_payload - 'dientes';
+  end if;
+  if jsonb_exists(p_payload, 'recetas')
+     and jsonb_typeof(p_payload -> 'recetas') <> 'array' then
+    p_payload := p_payload - 'recetas';
+  end if;
+  if jsonb_exists(p_payload, 'insumos')
+     and jsonb_typeof(p_payload -> 'insumos') <> 'array' then
+    p_payload := p_payload - 'insumos';
+  end if;
+  if jsonb_exists(p_payload, 'documentos')
+     and jsonb_typeof(p_payload -> 'documentos') <> 'array' then
+    p_payload := p_payload - 'documentos';
+  end if;
+  if jsonb_exists(p_payload, 'temp_condiciones')
+     and jsonb_typeof(p_payload -> 'temp_condiciones') <> 'array' then
+    p_payload := p_payload - 'temp_condiciones';
+  end if;
+
+  -- 6.1 Cabecera de la consulta.
+  if jsonb_exists(p_payload, 'motivo_consulta') then
+    update consultas set motivo_consulta = p_payload ->> 'motivo_consulta'
+     where id = p_consulta_id;
+    v_consulta_update := true;
+  end if;
+
+  if jsonb_exists(p_payload, 'notas') then
+    update consultas set notas = p_payload ->> 'notas' where id = p_consulta_id;
+    v_consulta_update := true;
+  end if;
+
+  if jsonb_exists(p_payload, 'signos_vitales') then
+    update consultas
+       set signos_vitales = case
+             when jsonb_typeof(p_payload -> 'signos_vitales') = 'null' then null
+             else p_payload -> 'signos_vitales'
+           end
+     where id = p_consulta_id;
+    v_consulta_update := true;
+  end if;
+
+  if jsonb_exists(p_payload, 'temp_condiciones') then
+    update consultas
+       set temp_condiciones = coalesce(
+             (select array_agg(val)
+                from jsonb_array_elements_text(p_payload -> 'temp_condiciones') as t(val)),
+             '{}'::text[])
+     where id = p_consulta_id;
+    v_consulta_update := true;
+  end if;
+
+  -- 6.2 Odontograma: evaluación y piezas.
+  select id into v_odontograma_id
+    from odontogramas
+   where consulta_id = p_consulta_id and deleted_at is null
+   limit 1;
+
+  if jsonb_exists(p_payload, 'evaluacion_clinica') and v_odontograma_id is not null then
+    update odontogramas
+       set evaluacion_clinica = p_payload -> 'evaluacion_clinica',
+           updated_at = now()
+     where id = v_odontograma_id;
+  end if;
+
+  if jsonb_exists(p_payload, 'dientes') then
+    if v_odontograma_id is null then
+      if jsonb_array_length(p_payload -> 'dientes') > 0 then
+        raise exception 'La consulta % no tiene odontograma; no se puede guardar el hallazgo dental.', p_consulta_id
+          using errcode = 'CL004';
+      end if;
+    else
+      for v_diente in select value from jsonb_array_elements(p_payload -> 'dientes')
+      loop
+        v_fdi := (v_diente ->> 'fdi_code')::integer;
+
+        select id into v_diente_id
+          from dientes
+         where odontograma_id = v_odontograma_id and fdi_code = v_fdi
+         limit 1;
+
+        if v_diente_id is null then
+          raise exception 'La pieza % no pertenece al odontograma de la consulta %.', v_fdi, p_consulta_id
+            using errcode = 'CL004';
+        end if;
+
+        -- Tratamientos ejecutados de la pieza.
+        v_conservados := coalesce((
+          select array_agg((f ->> 'id')::uuid)
+            from jsonb_array_elements(coalesce(v_diente -> 'tratamientos', '[]'::jsonb)) as f
+           where f ->> 'id' is not null), '{}'::uuid[]);
+
+        update tratamientos_aplicados
+           set deleted_at = now(), updated_at = now()
+         where consulta_id = p_consulta_id
+           and diente_id = v_diente_id
+           and deleted_at is null
+           and not (id = any (v_conservados));
+
+        v_ids := '{}'::uuid[];
+        for v_fila in select value from jsonb_array_elements(coalesce(v_diente -> 'tratamientos', '[]'::jsonb))
+        loop
+          v_id := nullif(v_fila ->> 'id', '')::uuid;
+
+          if v_id is null then
+            insert into tratamientos_aplicados (
+              tratamiento_id, diente_id, consulta_id, es_continuo, esta_terminado,
+              superficie, precio_aplicado, notas, estado, item_plan_id,
+              justificacion_no_planificada, doctor_ejecuta_id, fecha_ejecucion,
+              created_at, updated_at
+            ) values (
+              (v_fila ->> 'tratamiento_id')::uuid,
+              v_diente_id,
+              p_consulta_id,
+              coalesce((v_fila ->> 'es_continuo')::boolean, false),
+              coalesce((v_fila ->> 'esta_terminado')::boolean, false),
+              nullif(v_fila ->> 'superficie', '')::tipo_superficie,
+              nullif(v_fila ->> 'precio_aplicado', '')::numeric,
+              v_fila ->> 'notas',
+              coalesce(nullif(v_fila ->> 'estado', ''), 'aplicado'),
+              nullif(v_fila ->> 'item_plan_id', '')::uuid,
+              v_fila ->> 'justificacion_no_planificada',
+              coalesce(nullif(v_fila ->> 'doctor_ejecuta_id', '')::uuid, p_actor_id),
+              coalesce(nullif(v_fila ->> 'fecha_ejecucion', '')::timestamptz, now()),
+              now(), now()
+            ) returning id into v_id;
+          else
+            update tratamientos_aplicados
+               set tratamiento_id = (v_fila ->> 'tratamiento_id')::uuid,
+                   es_continuo = coalesce((v_fila ->> 'es_continuo')::boolean, false),
+                   esta_terminado = coalesce((v_fila ->> 'esta_terminado')::boolean, false),
+                   superficie = nullif(v_fila ->> 'superficie', '')::tipo_superficie,
+                   precio_aplicado = nullif(v_fila ->> 'precio_aplicado', '')::numeric,
+                   notas = v_fila ->> 'notas',
+                   estado = coalesce(nullif(v_fila ->> 'estado', ''), estado),
+                   item_plan_id = nullif(v_fila ->> 'item_plan_id', '')::uuid,
+                   justificacion_no_planificada = v_fila ->> 'justificacion_no_planificada',
+                   doctor_ejecuta_id = coalesce(
+                     nullif(v_fila ->> 'doctor_ejecuta_id', '')::uuid, doctor_ejecuta_id, p_actor_id),
+                   fecha_ejecucion = coalesce(
+                     nullif(v_fila ->> 'fecha_ejecucion', '')::timestamptz, fecha_ejecucion),
+                   diente_id = v_diente_id,
+                   deleted_at = null,
+                   updated_at = now()
+             where id = v_id and consulta_id = p_consulta_id;
+
+            if not found then
+              raise exception 'El tratamiento % no pertenece a la consulta %.', v_id, p_consulta_id
+                using errcode = 'CL004';
+            end if;
+          end if;
+
+          v_ids := v_ids || v_id;
+        end loop;
+
+        v_ids_tratamiento := v_ids;
+
+        -- Hallazgos de la pieza.
+        v_conservados := coalesce((
+          select array_agg((f ->> 'id')::uuid)
+            from jsonb_array_elements(coalesce(v_diente -> 'diagnosticos', '[]'::jsonb)) as f
+           where f ->> 'id' is not null), '{}'::uuid[]);
+
+        update diagnosticos_aplicados
+           set deleted_at = now(), updated_at = now()
+         where consulta_id = p_consulta_id
+           and diente_id = v_diente_id
+           and deleted_at is null
+           and not (id = any (v_conservados));
+
+        v_ids := '{}'::uuid[];
+        for v_fila in select value from jsonb_array_elements(coalesce(v_diente -> 'diagnosticos', '[]'::jsonb))
+        loop
+          v_id := nullif(v_fila ->> 'id', '')::uuid;
+
+          if v_id is null then
+            insert into diagnosticos_aplicados (
+              diagnosis_id, severidad, fecha_aplicacion, notas, consulta_id,
+              diente_id, superficie, origen, created_at, updated_at
+            ) values (
+              (v_fila ->> 'diagnosis_id')::uuid,
+              (v_fila ->> 'severidad')::severidad_diagnosis,
+              coalesce(nullif(v_fila ->> 'fecha_aplicacion', '')::timestamptz, now()),
+              v_fila ->> 'notas',
+              p_consulta_id,
+              v_diente_id,
+              nullif(v_fila ->> 'superficie', '')::tipo_superficie,
+              coalesce(nullif(v_fila ->> 'origen', ''), 'preexistente'),
+              now(), now()
+            ) returning id into v_id;
+          else
+            -- `evaluacion_id` lo asigna el flujo de evaluación (SD-135): el
+            -- borrador no debe desvincular un hallazgo de su evaluación.
+            update diagnosticos_aplicados
+               set diagnosis_id = (v_fila ->> 'diagnosis_id')::uuid,
+                   severidad = (v_fila ->> 'severidad')::severidad_diagnosis,
+                   fecha_aplicacion = coalesce(
+                     nullif(v_fila ->> 'fecha_aplicacion', '')::timestamptz, fecha_aplicacion),
+                   notas = v_fila ->> 'notas',
+                   superficie = nullif(v_fila ->> 'superficie', '')::tipo_superficie,
+                   origen = coalesce(nullif(v_fila ->> 'origen', ''), origen),
+                   diente_id = v_diente_id,
+                   deleted_at = null,
+                   updated_at = now()
+             where id = v_id and consulta_id = p_consulta_id;
+
+            if not found then
+              raise exception 'El hallazgo % no pertenece a la consulta %.', v_id, p_consulta_id
+                using errcode = 'CL004';
+            end if;
+          end if;
+
+          v_ids := v_ids || v_id;
+        end loop;
+
+        v_dientes_out := v_dientes_out || jsonb_build_object(
+          'fdi_code', v_fdi,
+          'tratamientos', to_jsonb(v_ids_tratamiento),
+          'diagnosticos', to_jsonb(v_ids)
+        );
+
+        update dientes
+           set tratamientos_aplicados_ids = v_ids_tratamiento,
+               esta_ausente = coalesce((v_diente ->> 'esta_ausente')::boolean, false),
+               observaciones = v_diente ->> 'observaciones',
+               updated_at = now()
+         where id = v_diente_id;
+      end loop;
+    end if;
+  end if;
+
+  -- 6.3 Recetas en borrador. Una emitida no se toca aquí.
+  if jsonb_exists(p_payload, 'recetas') then
+    v_conservados := coalesce((
+      select array_agg((f ->> 'id')::uuid)
+        from jsonb_array_elements(p_payload -> 'recetas') as f
+       where f ->> 'id' is not null), '{}'::uuid[]);
+
+    update recetas
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and deleted_at is null
+       and estado = 'borrador'
+       and not (id = any (v_conservados));
+
+    for v_fila in select value from jsonb_array_elements(p_payload -> 'recetas')
+    loop
+      v_id := nullif(v_fila ->> 'id', '')::uuid;
+
+      if v_id is null then
+        insert into recetas (
+          consulta_id, paciente_id, doctor_id, fecha_emision,
+          indicaciones_generales, justificacion_contraindicaciones,
+          items_receta, estado, version, created_at, updated_at
+        ) values (
+          p_consulta_id,
+          coalesce(nullif(v_fila ->> 'paciente_id', '')::uuid, v_paciente_id),
+          coalesce(nullif(v_fila ->> 'doctor_id', '')::uuid, p_actor_id),
+          coalesce(nullif(v_fila ->> 'fecha_emision', '')::timestamptz, now()),
+          v_fila ->> 'indicaciones_generales',
+          v_fila ->> 'justificacion_contraindicaciones',
+          coalesce(v_fila -> 'items_receta', '[]'::jsonb),
+          'borrador', 1, now(), now()
+        ) returning id, version into v_id, v_version;
+      else
+        select estado, version into v_estado, v_version
+          from recetas
+         where id = v_id and consulta_id = p_consulta_id and deleted_at is null;
+
+        if v_estado is null then
+          raise exception 'La receta % no pertenece a la consulta %.', v_id, p_consulta_id
+            using errcode = 'CL004';
+        end if;
+
+        if v_estado = 'borrador' then
+          if jsonb_exists(v_fila, 'version')
+             and nullif(v_fila ->> 'version', '') is not null
+             and (v_fila ->> 'version')::integer <> v_version then
+            raise exception 'La receta % cambió en otra pestaña (versión % ≠ %).',
+              v_id, v_fila ->> 'version', v_version
+              using errcode = 'CL001';
+          end if;
+
+          update recetas
+             set indicaciones_generales = v_fila ->> 'indicaciones_generales',
+                 justificacion_contraindicaciones = v_fila ->> 'justificacion_contraindicaciones',
+                 items_receta = coalesce(v_fila -> 'items_receta', '[]'::jsonb),
+                 doctor_id = coalesce(nullif(v_fila ->> 'doctor_id', '')::uuid, doctor_id, p_actor_id),
+                 version = version + 1,
+                 updated_at = now()
+           where id = v_id
+          returning version into v_version;
+        end if;
+      end if;
+
+      v_recetas_out := v_recetas_out || jsonb_build_object(
+        'id', v_id, 'version', v_version
+      );
+    end loop;
+  end if;
+
+  -- 6.4 Insumos declarados. Aquí solo se registra la intención; el stock se
+  -- mueve únicamente en el cierre.
+  if jsonb_exists(p_payload, 'insumos') then
+    update consumos_consulta
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and deleted_at is null
+       and not (consumible_id = any (coalesce((
+             select array_agg((f ->> 'consumible_id')::uuid)
+               from jsonb_array_elements(p_payload -> 'insumos') as f
+              where nullif(f ->> 'consumible_id', '') is not null
+               and coalesce((f ->> 'cantidad')::integer, 0) > 0
+           ), '{}'::uuid[])));
+
+    -- El formulario permite repetir un consumible; se agrega antes de guardar.
+    for v_fila in
+      select jsonb_build_object(
+               'consumible_id', consumible_id,
+               'nombre', max(nombre),
+               'cantidad', sum(cantidad))
+        from (
+          select (f ->> 'consumible_id')::uuid as consumible_id,
+                 f ->> 'nombre' as nombre,
+                 coalesce((f ->> 'cantidad')::integer, 0) as cantidad
+            from jsonb_array_elements(p_payload -> 'insumos') as f
+           where nullif(f ->> 'consumible_id', '') is not null
+        ) i
+       where cantidad > 0
+       group by consumible_id
+    loop
+      insert into consumos_consulta (consulta_id, consumible_id, nombre, cantidad)
+      values (
+        p_consulta_id,
+        (v_fila ->> 'consumible_id')::uuid,
+        v_fila ->> 'nombre',
+        (v_fila ->> 'cantidad')::integer
+      )
+      on conflict (consulta_id, consumible_id) where deleted_at is null
+      do update set cantidad = excluded.cantidad,
+                    nombre = coalesce(excluded.nombre, consumos_consulta.nombre),
+                    updated_at = now();
+
+      v_insumos_out := v_insumos_out || v_fila;
+    end loop;
+  end if;
+
+  -- 6.5 Documentos ya subidos a Storage.
+  if jsonb_exists(p_payload, 'documentos') then
+    for v_fila in select value from jsonb_array_elements(p_payload -> 'documentos')
+    loop
+      if nullif(v_fila ->> 'id', '') is null then
+        insert into documentos_clinicos (
+          paciente_id, consulta_id, descripcion, tipo_documento, url_archivo,
+          created_at, updated_at
+        ) values (
+          v_paciente_id,
+          p_consulta_id,
+          v_fila ->> 'descripcion',
+          (v_fila ->> 'tipo_documento')::tipo_documento,
+          v_fila ->> 'url_archivo',
+          coalesce(nullif(v_fila ->> 'fecha_creacion', '')::timestamptz, now()),
+          now()
+        );
+      end if;
+    end loop;
+  end if;
+
+  if v_consulta_update then
+    update consultas set updated_at = now() where id = p_consulta_id;
+  end if;
+
+  return jsonb_build_object(
+    'dientes', v_dientes_out,
+    'recetas', v_recetas_out,
+    'insumos', v_insumos_out
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_002_aplicar_borrador"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_002_proteger_receta_emitida"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if tg_op = 'DELETE' then
+    if old.estado <> 'borrador' and not public.es_contexto_interno() then
+      raise exception 'La receta % ya fue emitida: anúlala o reemplázala, no la borres.', old.id
+        using errcode = 'CL005';
+    end if;
+    return old;
+  end if;
+
+  if old.estado = 'borrador' or public.es_contexto_interno() then
+    return new;
+  end if;
+
+  -- Transiciones permitidas sobre una receta emitida.
+  if new.estado in ('anulada', 'reemplazada') and old.estado = 'emitida' then
+    return new;
+  end if;
+
+  if new.estado is distinct from old.estado then
+    raise exception 'Transición de estado no permitida para la receta %: % → %.',
+      old.id, old.estado, new.estado
+      using errcode = 'CL005';
+  end if;
+
+  if new.items_receta is distinct from old.items_receta
+     or new.medicina_id is distinct from old.medicina_id
+     or new.titulo is distinct from old.titulo
+     or new.title is distinct from old.title
+     or new.dosis is distinct from old.dosis
+     or new.frecuencia is distinct from old.frecuencia
+     or new.duracion is distinct from old.duracion
+     or new.indicaciones is distinct from old.indicaciones
+     or new.indicaciones_generales is distinct from old.indicaciones_generales
+     or new.notas is distinct from old.notas
+     or new.paciente_id is distinct from old.paciente_id
+     or new.doctor_id is distinct from old.doctor_id
+     or new.consulta_id is distinct from old.consulta_id
+     or (new.deleted_at is not null and old.deleted_at is null) then
+    raise exception 'La receta % ya fue emitida y no admite cambios de contenido.', old.id
+      using errcode = 'CL005';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_002_proteger_receta_emitida"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select jsonb_build_object(
+    'consulta_id', c.id,
+    'version', c.version,
+    'finalizada', true,
+    'finalizada_en', c.finalizada_at,
+    'cita_id', c.cita_id,
+    'cita_estado', (select ci.estado::text from citas ci where ci.id = c.cita_id),
+    'cuenta_id', cu.id,
+    'monto_total', coalesce(cu.monto_total, 0),
+    'items_cuenta', (
+      select coalesce(count(*), 0) from items_cuenta ic where ic.cuenta_id = cu.id
+    ),
+    'movimientos', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'consumible_id', m.consumible_id,
+               'cantidad', abs(m.diferencia),
+               'stock_nuevo', m.stock_nuevo))
+        from movimientos_stock_consumible m
+       where m.consulta_id = c.id), '[]'::jsonb),
+    'recetas_emitidas', coalesce((
+      select jsonb_agg(jsonb_build_object('id', r.id, 'version', r.version))
+        from recetas r
+       where r.consulta_id = c.id and r.deleted_at is null and r.estado = 'emitida'
+    ), '[]'::jsonb)
+  )
+    from consultas c
+    left join cuentas cu on cu.consulta_id = c.id and cu.deleted_at is null
+   where c.id = p_consulta_id;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."limpiar_diagnosticos_superficie"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    UPDATE superficies 
+    SET diagnostico_aplicado_id = NULL 
+    WHERE diagnostico_aplicado_id = OLD.id;
+    RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."limpiar_diagnosticos_superficie"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."manejar_cita_cancelada"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$BEGIN
+    IF (NEW.estado = 'cancelada') THEN
+        -- Aquí podrías insertar una notificación para el doctor
+        RAISE NOTICE 'Cita cancelada para la persona id: %. El horario ha sido liberado.', NEW.persona_id;
+    
+    END IF;
+    RETURN NEW;
+END;$$;
+
+
+ALTER FUNCTION "public"."manejar_cita_cancelada"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if not public.es_contexto_interno()
+     and (
+       auth.uid() is null
+       or not (public.es_admin() or public.es_asistente())
+     ) then
+    raise exception 'Capacidad de caja requerida.' using errcode = '42501';
+  end if;
+  perform public.hfx_base_marcar_cuotas_vencidas(p_cuenta_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."marcar_item_plan_ejecutado"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.item_plan_id is null then
+    return new;
+  end if;
+
+  if new.deleted_at is not null then
+    if not exists (
+      select 1
+      from public.tratamientos_aplicados otra
+      where otra.item_plan_id = new.item_plan_id
+        and otra.id <> new.id
+        and otra.deleted_at is null
+    ) then
+      update public.items_plan_tratamiento
+         set estado = 'pendiente',
+             fecha_completado = null,
+             updated_at = now()
+       where id = new.item_plan_id
+         and deleted_at is null;
+    end if;
+    return new;
+  end if;
+
+  update public.items_plan_tratamiento
+     set estado = case
+           when new.estado = 'en_proceso' then 'en_proceso'::public.estado_item_plan
+           else 'completado'::public.estado_item_plan
+         end,
+         fecha_inicio = coalesce(fecha_inicio, new.fecha_ejecucion, now()),
+         fecha_completado = case
+           when new.estado = 'en_proceso' then fecha_completado
+           else coalesce(fecha_completado, new.fecha_ejecucion, now())
+         end,
+         updated_at = now()
+   where id = new.item_plan_id
+     and deleted_at is null;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."marcar_item_plan_ejecutado"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."perfil_actual"() RETURNS TABLE("id" "uuid", "rol" "text", "nombre" "text", "apellido" "text", "fecha_nacimiento" "date", "cedula" "text", "estatus" "text", "username" "text", "telefono" "text", "email" "text", "direccion" "text", "especialidad" "text", "esta_disponible" boolean, "departamento" "text", "turno" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select
+    u.id,
+    case
+      when a.id is not null then 'admin'
+      when d.id is not null then 'doctor'
+      when s.id is not null then 'asistente'
+    end                                       as rol,
+    p.nombre,
+    p.apellido,
+    p.fecha_nacimiento,
+    p.cedula,
+    p.estatus::text,
+    u.username,
+    c.numero_telefono                         as telefono,
+    c.email,
+    c.direccion,
+    d.especialidad,
+    d.esta_disponible,
+    a.departamento,
+    s.turno
+  from public.usuarios u
+  join public.personas p on p.id = u.id
+  left join public.doctores   d on d.id = u.id and d.deleted_at is null
+  left join public.admins     a on a.id = u.id and a.deleted_at is null
+  left join public.asistentes s on s.id = u.id and s.deleted_at is null
+  left join lateral (
+    select ct.numero_telefono, ct.email, ct.direccion
+      from public.persona_contactos pc
+      join public.contactos ct on ct.id = pc.contacto_id
+     where pc.persona_id = p.id
+     order by pc.es_principal desc nulls last
+     limit 1
+  ) c on true
+ where u.id = auth.uid()
+   and u.deleted_at is null
+   and p.deleted_at is null
+   and (a.id is not null or d.id is not null or s.id is not null);
+$$;
+
+
+ALTER FUNCTION "public"."perfil_actual"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."perfil_actual"() IS 'HFX-CLIN-000: perfil de la sesión actual. Nunca devuelve password_hash y no admite consultar el perfil de otro usuario.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select exists (
+    select 1 from public.consultas c
+     where c.id = p_consulta_id
+       and c.deleted_at is null
+       and c.doctor_id = auth.uid()
+       and coalesce(c.finalizada, false) = false
+       and public.es_doctor()
+  );
+$$;
+
+
+ALTER FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select public.es_admin() or exists (
+    select 1 from public.consultas c
+     where c.id = p_consulta_id
+       and c.deleted_at is null
+       and c.doctor_id = auth.uid()
+       and public.es_doctor()
+  );
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.fecha_hora is distinct from old.fecha_hora then
+    update consultas
+       set fecha      = new.fecha_hora,
+           updated_at = now()
+     where cita_id = new.id
+       and deleted_at is null
+       and finalizada is not true;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() IS 'SD-160: al mover una cita, su consulta abierta hereda la nueva fecha.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if not public.es_contexto_interno()
+     and (
+       auth.uid() is null
+       or not (public.es_admin() or public.es_asistente())
+     ) then
+    raise exception 'Capacidad de compras requerida.' using errcode = '42501';
+  end if;
+  if not public.es_contexto_interno()
+     and p_usuario_id is distinct from auth.uid() then
+    raise exception 'El actor de la compra no coincide con la sesión.'
+      using errcode = '42501';
+  end if;
+  perform public.hfx_base_recibir_compra(p_compra_id, p_usuario_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null or not public.es_admin()) then
+    raise exception 'Capacidad administrativa requerida.' using errcode = '42501';
+  end if;
+  return public.hfx_base_registrar_mantenimiento_equipo(
+    p_equipo_id, p_suplidor_id, p_costo, p_fecha_mantenimiento, p_descripcion
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if not public.es_contexto_interno()
+     and (
+       auth.uid() is null
+       or not (public.es_admin() or public.es_asistente())
+     ) then
+    raise exception 'Capacidad de caja requerida.' using errcode = '42501';
+  end if;
+  return public.hfx_base_registrar_pago(
+    p_cuenta_id, p_monto, p_metodo_pago, p_cuota_id
+  );
 end;
 $$;
 
@@ -2052,6 +3109,58 @@ CREATE TABLE IF NOT EXISTS "public"."asistentes" (
 ALTER TABLE "public"."asistentes" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."auditoria_clinica" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "evento" "text" NOT NULL,
+    "actor_id" "uuid",
+    "rol" "text",
+    "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."auditoria_clinica" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."auditoria_correcciones_clinicas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "autor_original_id" "uuid" NOT NULL,
+    "corregido_por" "uuid" NOT NULL,
+    "motivo" "text" NOT NULL,
+    "datos_anteriores" "jsonb" NOT NULL,
+    "datos_nuevos" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "auditoria_correcciones_clinicas_motivo_check" CHECK (("length"("btrim"("motivo")) >= 10))
+);
+
+
+ALTER TABLE "public"."auditoria_correcciones_clinicas" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."auditoria_correcciones_clinicas" IS 'HFX-CLIN-001: correcciones administrativas que conservan autoría clínica.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."auditoria_operaciones_admin" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "actor_id" "uuid" NOT NULL,
+    "operacion" "text" NOT NULL,
+    "recurso_tipo" "text" NOT NULL,
+    "recurso_id" "uuid",
+    "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."auditoria_operaciones_admin" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."auditoria_operaciones_admin" IS 'HFX-CLIN-001: operaciones administrativas sin contraseñas ni payloads sensibles.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."cajas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "fecha" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -2172,7 +3281,11 @@ CREATE TABLE IF NOT EXISTS "public"."consultas" (
     "notas" "text",
     "signos_vitales" "jsonb",
     "finalizada" boolean DEFAULT false,
-    "tipo_atencion" "public"."tipo_atencion_clinica" DEFAULT 'consulta'::"public"."tipo_atencion_clinica" NOT NULL
+    "tipo_atencion" "public"."tipo_atencion_clinica" DEFAULT 'consulta'::"public"."tipo_atencion_clinica" NOT NULL,
+    "version" integer DEFAULT 1 NOT NULL,
+    "finalizada_at" timestamp with time zone,
+    "cerrada_por" "uuid",
+    "cierre_key" "text"
 );
 
 
@@ -2184,6 +3297,14 @@ COMMENT ON COLUMN "public"."consultas"."finalizada" IS 'Has the consult ended?';
 
 
 COMMENT ON COLUMN "public"."consultas"."tipo_atencion" IS 'Evaluación = documenta hallazgos y plan; consulta = registra ejecución clínica.';
+
+
+
+COMMENT ON COLUMN "public"."consultas"."version" IS 'Versión optimista del borrador clínico. La incrementa cada guardado servidor.';
+
+
+
+COMMENT ON COLUMN "public"."consultas"."cierre_key" IS 'Clave de idempotencia del intento de cierre que efectivamente cerró la consulta.';
 
 
 
@@ -2236,6 +3357,22 @@ CREATE TABLE IF NOT EXISTS "public"."consumibles_compras" (
 
 
 ALTER TABLE "public"."consumibles_compras" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."consumos_consulta" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "consumible_id" "uuid" NOT NULL,
+    "nombre" "text",
+    "cantidad" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone,
+    CONSTRAINT "consumos_consulta_cantidad_check" CHECK (("cantidad" > 0))
+);
+
+
+ALTER TABLE "public"."consumos_consulta" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."contactos" (
@@ -2491,8 +3628,9 @@ CREATE TABLE IF NOT EXISTS "public"."movimientos_stock_consumible" (
     "motivo" "text" NOT NULL,
     "creado_por" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "consulta_id" "uuid",
     CONSTRAINT "movimientos_stock_consumible_diferencia_check" CHECK (("diferencia" = ("stock_nuevo" - "stock_anterior"))),
-    CONSTRAINT "movimientos_stock_consumible_motivo_check" CHECK (("motivo" = ANY (ARRAY['merma'::"text", 'correccion'::"text", 'usoInterno'::"text"]))),
+    CONSTRAINT "movimientos_stock_consumible_motivo_check" CHECK (("motivo" = ANY (ARRAY['merma'::"text", 'correccion'::"text", 'usoInterno'::"text", 'consumoClinico'::"text"]))),
     CONSTRAINT "movimientos_stock_consumible_stock_anterior_check" CHECK (("stock_anterior" >= 0)),
     CONSTRAINT "movimientos_stock_consumible_stock_nuevo_check" CHECK (("stock_nuevo" >= 0))
 );
@@ -2643,11 +3781,13 @@ CREATE TABLE IF NOT EXISTS "public"."recetas" (
     "fecha_emision" timestamp with time zone DEFAULT "now"(),
     "indicaciones_generales" "text",
     "justificacion_contraindicaciones" "text",
-    "estado" "text" DEFAULT 'activa'::"text",
+    "estado" "text" DEFAULT 'borrador'::"text",
     "motivo_anulacion" "text",
     "receta_reemplazada_id" "uuid",
     "items_receta" "jsonb" DEFAULT '[]'::"jsonb",
-    CONSTRAINT "recetas_estado_check" CHECK (("estado" = ANY (ARRAY['activa'::"text", 'anulada'::"text", 'reemplazada'::"text"])))
+    "version" integer DEFAULT 1 NOT NULL,
+    "emitida_at" timestamp with time zone,
+    CONSTRAINT "recetas_estado_check" CHECK (("estado" = ANY (ARRAY['borrador'::"text", 'emitida'::"text", 'anulada'::"text", 'reemplazada'::"text"])))
 );
 
 
@@ -2659,6 +3799,10 @@ COMMENT ON COLUMN "public"."recetas"."estado" IS 'activa | anulada | reemplazada
 
 
 COMMENT ON COLUMN "public"."recetas"."items_receta" IS 'SD-153: medicinas de la receta. Cada elemento lleva nombre, presentación, dosis, vía, frecuencia, duración, cantidad e indicaciones específicas.';
+
+
+
+COMMENT ON COLUMN "public"."recetas"."version" IS 'Versión de la receta. Permite detectar ediciones concurrentes del borrador.';
 
 
 
@@ -2822,6 +3966,21 @@ ALTER TABLE ONLY "public"."asistentes"
 
 
 
+ALTER TABLE ONLY "public"."auditoria_clinica"
+    ADD CONSTRAINT "auditoria_clinica_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
+    ADD CONSTRAINT "auditoria_correcciones_clinicas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_operaciones_admin"
+    ADD CONSTRAINT "auditoria_operaciones_admin_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."cajas_diarias"
     ADD CONSTRAINT "caja_diaria_pkey" PRIMARY KEY ("id");
 
@@ -2869,6 +4028,11 @@ ALTER TABLE ONLY "public"."consumibles_compras"
 
 ALTER TABLE ONLY "public"."consumibles"
     ADD CONSTRAINT "consumibles_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."consumos_consulta"
+    ADD CONSTRAINT "consumos_consulta_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3082,11 +4246,31 @@ ALTER TABLE ONLY "public"."usuarios"
 
 
 
+CREATE INDEX "auditoria_clinica_consulta_idx" ON "public"."auditoria_clinica" USING "btree" ("consulta_id", "created_at" DESC);
+
+
+
 CREATE UNIQUE INDEX "cajas_una_abierta_idx" ON "public"."cajas" USING "btree" ("cerrada") WHERE ("cerrada" = false);
 
 
 
+CREATE UNIQUE INDEX "consultas_cita_vigente_uk" ON "public"."consultas" USING "btree" ("cita_id") WHERE (("cita_id" IS NOT NULL) AND ("deleted_at" IS NULL) AND ("finalizada" IS NOT TRUE));
+
+
+
 CREATE UNIQUE INDEX "consumibles_nombre_activo_unico_idx" ON "public"."consumibles" USING "btree" ("lower"("btrim"("nombre"))) WHERE "activo";
+
+
+
+CREATE INDEX "consumos_consulta_consulta_idx" ON "public"."consumos_consulta" USING "btree" ("consulta_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE UNIQUE INDEX "consumos_consulta_vigente_uk" ON "public"."consumos_consulta" USING "btree" ("consulta_id", "consumible_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE UNIQUE INDEX "cuentas_consulta_vigente_uk" ON "public"."cuentas" USING "btree" ("consulta_id") WHERE ("deleted_at" IS NULL);
 
 
 
@@ -3198,7 +4382,15 @@ CREATE INDEX "movimientos_caja_fecha_idx" ON "public"."movimientos_caja" USING "
 
 
 
+CREATE INDEX "movimientos_stock_consulta_idx" ON "public"."movimientos_stock_consumible" USING "btree" ("consulta_id") WHERE ("consulta_id" IS NOT NULL);
+
+
+
 CREATE INDEX "movimientos_stock_consumible_consumible_fecha_idx" ON "public"."movimientos_stock_consumible" USING "btree" ("consumible_id", "created_at" DESC);
+
+
+
+CREATE UNIQUE INDEX "movimientos_stock_consumo_clinico_uk" ON "public"."movimientos_stock_consumible" USING "btree" ("consulta_id", "consumible_id") WHERE ("consulta_id" IS NOT NULL);
 
 
 
@@ -3278,6 +4470,10 @@ CREATE OR REPLACE TRIGGER "trg_marcar_item_plan_ejecutado" AFTER INSERT OR UPDAT
 
 
 
+CREATE OR REPLACE TRIGGER "trg_proteger_receta_emitida" BEFORE DELETE OR UPDATE ON "public"."recetas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_002_proteger_receta_emitida"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_sync_disponibilidad_doctor" AFTER INSERT OR DELETE OR UPDATE ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."sync_disponibilidad_doctor"();
 
 
@@ -3306,6 +4502,31 @@ ALTER TABLE ONLY "public"."admins"
 
 ALTER TABLE ONLY "public"."asistentes"
     ADD CONSTRAINT "asistentes_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."usuarios"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."auditoria_clinica"
+    ADD CONSTRAINT "auditoria_clinica_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
+    ADD CONSTRAINT "auditoria_correcciones_clinicas_autor_original_id_fkey" FOREIGN KEY ("autor_original_id") REFERENCES "public"."doctores"("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
+    ADD CONSTRAINT "auditoria_correcciones_clinicas_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
+    ADD CONSTRAINT "auditoria_correcciones_clinicas_corregido_por_fkey" FOREIGN KEY ("corregido_por") REFERENCES "public"."admins"("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_operaciones_admin"
+    ADD CONSTRAINT "auditoria_operaciones_admin_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "public"."admins"("id");
 
 
 
@@ -3350,6 +4571,11 @@ ALTER TABLE ONLY "public"."citas"
 
 
 ALTER TABLE ONLY "public"."consultas"
+    ADD CONSTRAINT "consultas_cerrada_por_fkey" FOREIGN KEY ("cerrada_por") REFERENCES "public"."doctores"("id");
+
+
+
+ALTER TABLE ONLY "public"."consultas"
     ADD CONSTRAINT "consultas_cita_id_fkey" FOREIGN KEY ("cita_id") REFERENCES "public"."citas"("id") ON DELETE SET NULL;
 
 
@@ -3381,6 +4607,16 @@ ALTER TABLE ONLY "public"."consumibles_compras"
 
 ALTER TABLE ONLY "public"."consumibles"
     ADD CONSTRAINT "consumibles_suplidor_id_fkey" FOREIGN KEY ("suplidor_id") REFERENCES "public"."suplidores"("id");
+
+
+
+ALTER TABLE ONLY "public"."consumos_consulta"
+    ADD CONSTRAINT "consumos_consulta_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."consumos_consulta"
+    ADD CONSTRAINT "consumos_consulta_consumible_id_fkey" FOREIGN KEY ("consumible_id") REFERENCES "public"."consumibles"("id") ON DELETE RESTRICT;
 
 
 
@@ -3546,6 +4782,11 @@ ALTER TABLE ONLY "public"."items_plan_tratamiento"
 
 ALTER TABLE ONLY "public"."movimientos_caja"
     ADD CONSTRAINT "movimientos_caja_caja_diaria_id_fkey" FOREIGN KEY ("caja_diaria_id") REFERENCES "public"."cajas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."movimientos_stock_consumible"
+    ADD CONSTRAINT "movimientos_stock_consumible_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id");
 
 
 
@@ -3752,6 +4993,27 @@ CREATE POLICY "asistentes_update" ON "public"."asistentes" FOR UPDATE TO "authen
 
 
 
+ALTER TABLE "public"."auditoria_clinica" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "auditoria_clinica_select" ON "public"."auditoria_clinica" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
+
+
+
+ALTER TABLE "public"."auditoria_correcciones_clinicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "auditoria_correcciones_select_admin" ON "public"."auditoria_correcciones_clinicas" FOR SELECT TO "authenticated" USING ("public"."es_admin"());
+
+
+
+ALTER TABLE "public"."auditoria_operaciones_admin" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "auditoria_operaciones_select_admin" ON "public"."auditoria_operaciones_admin" FOR SELECT TO "authenticated" USING ("public"."es_admin"());
+
+
+
 CREATE POLICY "authenticated_adjust_stock_consumible" ON "public"."movimientos_stock_consumible" FOR INSERT TO "authenticated" WITH CHECK (true);
 
 
@@ -3809,34 +5071,36 @@ CREATE POLICY "cajas_diarias_update" ON "public"."cajas_diarias" FOR UPDATE TO "
 ALTER TABLE "public"."citas" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "citas_delete" ON "public"."citas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
+CREATE POLICY "citas_delete" ON "public"."citas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
 
 
 
-CREATE POLICY "citas_insert" ON "public"."citas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
+CREATE POLICY "citas_insert" ON "public"."citas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
 
 
 
 ALTER TABLE "public"."citas_items_plan" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "citas_items_plan_delete" ON "public"."citas_items_plan" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "citas_items_plan_delete" ON "public"."citas_items_plan" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"()));
 
 
 
-CREATE POLICY "citas_items_plan_insert" ON "public"."citas_items_plan" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "citas_items_plan_insert" ON "public"."citas_items_plan" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
 
 
 
-CREATE POLICY "citas_items_plan_select" ON "public"."citas_items_plan" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "citas_items_plan_select" ON "public"."citas_items_plan" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."citas" "c"
+  WHERE (("c"."id" = "citas_items_plan"."cita_id") AND ("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("c"."doctor_id" = "auth"."uid"())))))));
 
 
 
-CREATE POLICY "citas_select" ON "public"."citas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "citas_select" ON "public"."citas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
 
 
 
-CREATE POLICY "citas_update" ON "public"."citas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
+CREATE POLICY "citas_update" ON "public"."citas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())))) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
 
 
 
@@ -3878,19 +5142,15 @@ CREATE POLICY "condiciones_update" ON "public"."condiciones" FOR UPDATE TO "auth
 
 
 
-CREATE POLICY "consulta_delete" ON "public"."consultas" FOR DELETE TO "authenticated" USING ("public"."es_admin"());
+CREATE POLICY "consulta_insert" ON "public"."consultas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())));
 
 
 
-CREATE POLICY "consulta_insert" ON "public"."consultas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "consulta_select" ON "public"."consultas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR ("doctor_id" = "auth"."uid"())));
 
 
 
-CREATE POLICY "consulta_select" ON "public"."consultas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
-
-
-
-CREATE POLICY "consulta_update" ON "public"."consultas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "consulta_update" ON "public"."consultas" FOR UPDATE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("id")) WITH CHECK (("doctor_id" = "auth"."uid"()));
 
 
 
@@ -3932,6 +5192,13 @@ CREATE POLICY "consumibles_select" ON "public"."consumibles" FOR SELECT TO "auth
 
 
 CREATE POLICY "consumibles_update" ON "public"."consumibles" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
+
+
+
+ALTER TABLE "public"."consumos_consulta" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "consumos_consulta_select" ON "public"."consumos_consulta" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
@@ -4013,19 +5280,19 @@ ALTER TABLE "public"."diagnosticos" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."diagnosticos_aplicados" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "diagnosticos_aplicados_delete" ON "public"."diagnosticos_aplicados" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_aplicados_delete" ON "public"."diagnosticos_aplicados" FOR DELETE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "diagnosticos_aplicados_insert" ON "public"."diagnosticos_aplicados" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_aplicados_insert" ON "public"."diagnosticos_aplicados" FOR INSERT TO "authenticated" WITH CHECK ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "diagnosticos_aplicados_select" ON "public"."diagnosticos_aplicados" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_aplicados_select" ON "public"."diagnosticos_aplicados" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
-CREATE POLICY "diagnosticos_aplicados_update" ON "public"."diagnosticos_aplicados" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_aplicados_update" ON "public"."diagnosticos_aplicados" FOR UPDATE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id")) WITH CHECK ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
@@ -4105,19 +5372,19 @@ CREATE POLICY "doctores_update" ON "public"."doctores" FOR UPDATE TO "authentica
 ALTER TABLE "public"."documentos_clinicos" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "documentos_clinicos_delete" ON "public"."documentos_clinicos" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "documentos_clinicos_delete" ON "public"."documentos_clinicos" FOR DELETE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "documentos_clinicos_insert" ON "public"."documentos_clinicos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "documentos_clinicos_insert" ON "public"."documentos_clinicos" FOR INSERT TO "authenticated" WITH CHECK ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "documentos_clinicos_select" ON "public"."documentos_clinicos" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "documentos_clinicos_select" ON "public"."documentos_clinicos" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
-CREATE POLICY "documentos_clinicos_update" ON "public"."documentos_clinicos" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "documentos_clinicos_update" ON "public"."documentos_clinicos" FOR UPDATE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id")) WITH CHECK ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
@@ -4392,19 +5659,19 @@ CREATE POLICY "procedimientos_update" ON "public"."procedimientos" FOR UPDATE TO
 ALTER TABLE "public"."recetas" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "recetas_delete" ON "public"."recetas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "recetas_delete" ON "public"."recetas" FOR DELETE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "recetas_insert" ON "public"."recetas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "recetas_insert" ON "public"."recetas" FOR INSERT TO "authenticated" WITH CHECK (("public"."puede_editar_consulta_propia"("consulta_id") AND (NOT ("doctor_id" IS DISTINCT FROM "auth"."uid"()))));
 
 
 
-CREATE POLICY "recetas_select" ON "public"."recetas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "recetas_select" ON "public"."recetas" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
-CREATE POLICY "recetas_update" ON "public"."recetas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "recetas_update" ON "public"."recetas" FOR UPDATE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id")) WITH CHECK (("public"."puede_editar_consulta_propia"("consulta_id") AND (NOT ("doctor_id" IS DISTINCT FROM "auth"."uid"()))));
 
 
 
@@ -4509,19 +5776,19 @@ ALTER TABLE "public"."tratamientos" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."tratamientos_aplicados" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "tratamientos_aplicados_delete" ON "public"."tratamientos_aplicados" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_aplicados_delete" ON "public"."tratamientos_aplicados" FOR DELETE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id"));
 
 
 
-CREATE POLICY "tratamientos_aplicados_insert" ON "public"."tratamientos_aplicados" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_aplicados_insert" ON "public"."tratamientos_aplicados" FOR INSERT TO "authenticated" WITH CHECK (("public"."puede_editar_consulta_propia"("consulta_id") AND (NOT ("doctor_ejecuta_id" IS DISTINCT FROM "auth"."uid"()))));
 
 
 
-CREATE POLICY "tratamientos_aplicados_select" ON "public"."tratamientos_aplicados" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_aplicados_select" ON "public"."tratamientos_aplicados" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
-CREATE POLICY "tratamientos_aplicados_update" ON "public"."tratamientos_aplicados" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_aplicados_update" ON "public"."tratamientos_aplicados" FOR UPDATE TO "authenticated" USING ("public"."puede_editar_consulta_propia"("consulta_id")) WITH CHECK (("public"."puede_editar_consulta_propia"("consulta_id") AND (NOT ("doctor_ejecuta_id" IS DISTINCT FROM "auth"."uid"()))));
 
 
 
@@ -4735,203 +6002,286 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."actualizar_stock_por_compra"() TO "anon";
-GRANT ALL ON FUNCTION "public"."actualizar_stock_por_compra"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."actualizar_stock_por_compra"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."actualizar_stock_por_compra"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "anon";
-GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "anon";
-GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "anon";
-GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."cerrar_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb", "p_idempotencia_key" "text", "p_metodo_pago" "text", "p_nota" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cerrar_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb", "p_idempotencia_key" "text", "p_metodo_pago" "text", "p_nota" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."cerrar_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb", "p_idempotencia_key" "text", "p_metodo_pago" "text", "p_nota" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."corregir_consulta_ajena"("p_consulta_id" "uuid", "p_cambios" "jsonb", "p_motivo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."corregir_consulta_ajena"("p_consulta_id" "uuid", "p_cambios" "jsonb", "p_motivo" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."corregir_consulta_ajena"("p_consulta_id" "uuid", "p_cambios" "jsonb", "p_motivo" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "authenticated";
 
 
 
+REVOKE ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."es_admin"() TO "anon";
-GRANT ALL ON FUNCTION "public"."es_admin"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."es_admin"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."es_admin"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."es_admin"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."es_asistente"() TO "anon";
-GRANT ALL ON FUNCTION "public"."es_asistente"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."es_asistente"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."es_asistente"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."es_asistente"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."es_doctor"() TO "anon";
-GRANT ALL ON FUNCTION "public"."es_doctor"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."es_contexto_interno"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."es_contexto_interno"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."es_doctor"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."es_doctor"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."es_doctor"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() TO "anon";
-GRANT ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") TO "anon";
-GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") TO "authenticated";
 
 
 
 REVOKE ALL ON FUNCTION "public"."get_active_doctors"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_active_doctors"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" "uuid", "p_version" integer, "p_payload" "jsonb") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() TO "anon";
-GRANT ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."hfx_base_ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_marcar_cuotas_vencidas"("p_cuenta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_base_registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_base_registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_002_actor_clinico"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_002_actor_clinico"("p_consulta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_002_aplicar_borrador"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_002_aplicar_borrador"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_002_proteger_receta_emitida"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_002_proteger_receta_emitida"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."manejar_cita_cancelada"() TO "anon";
-GRANT ALL ON FUNCTION "public"."manejar_cita_cancelada"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."manejar_cita_cancelada"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."manejar_cita_cancelada"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."marcar_cuotas_vencidas"("p_cuenta_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."marcar_item_plan_ejecutado"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."marcar_item_plan_ejecutado"() TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."perfil_actual"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "anon";
-GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."registrar_pago_en_caja"() TO "anon";
-GRANT ALL ON FUNCTION "public"."registrar_pago_en_caja"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."registrar_pago_en_caja"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."registrar_pago_en_caja"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() TO "anon";
-GRANT ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."update_modified_column"() TO "anon";
-GRANT ALL ON FUNCTION "public"."update_modified_column"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."update_modified_column"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."update_modified_column"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."update_timestamp"() TO "anon";
-GRANT ALL ON FUNCTION "public"."update_timestamp"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."update_timestamp"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."update_timestamp"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_caja_abierta"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_cita_item_plan"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_doctor_activo"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_doctor_activo"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_doctor_activo"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_doctor_activo"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_fecha_nacimiento"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_fecha_nacimiento"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_fecha_nacimiento"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_fecha_nacimiento"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_monto_cuotas"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_monto_cuotas"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_monto_cuotas"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_monto_cuotas"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."validar_monto_pago"() TO "anon";
-GRANT ALL ON FUNCTION "public"."validar_monto_pago"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."validar_monto_pago"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_monto_pago"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "anon";
-GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "service_role";
 
 
@@ -4951,297 +6301,292 @@ GRANT ALL ON FUNCTION "public"."verificar_item_plan_ejecutable"() TO "service_ro
 
 
 
-GRANT ALL ON TABLE "public"."dientes" TO "anon";
 GRANT ALL ON TABLE "public"."dientes" TO "authenticated";
 GRANT ALL ON TABLE "public"."dientes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "anon";
 GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "authenticated";
 GRANT ALL ON TABLE "public"."items_plan_tratamiento" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."planes_tratamiento" TO "anon";
 GRANT ALL ON TABLE "public"."planes_tratamiento" TO "authenticated";
 GRANT ALL ON TABLE "public"."planes_tratamiento" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."tratamientos" TO "anon";
 GRANT ALL ON TABLE "public"."tratamientos" TO "authenticated";
 GRANT ALL ON TABLE "public"."tratamientos" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."actividades_agendables_paciente" TO "anon";
 GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "authenticated";
 GRANT ALL ON TABLE "public"."actividades_agendables_paciente" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."admins" TO "anon";
 GRANT ALL ON TABLE "public"."admins" TO "authenticated";
 GRANT ALL ON TABLE "public"."admins" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."asistentes" TO "anon";
 GRANT ALL ON TABLE "public"."asistentes" TO "authenticated";
 GRANT ALL ON TABLE "public"."asistentes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."cajas" TO "anon";
+GRANT ALL ON TABLE "public"."auditoria_clinica" TO "authenticated";
+GRANT ALL ON TABLE "public"."auditoria_clinica" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."auditoria_correcciones_clinicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."auditoria_correcciones_clinicas" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."auditoria_operaciones_admin" TO "authenticated";
+GRANT ALL ON TABLE "public"."auditoria_operaciones_admin" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."cajas" TO "authenticated";
 GRANT ALL ON TABLE "public"."cajas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."cajas_diarias" TO "anon";
 GRANT ALL ON TABLE "public"."cajas_diarias" TO "authenticated";
 GRANT ALL ON TABLE "public"."cajas_diarias" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."citas" TO "anon";
 GRANT ALL ON TABLE "public"."citas" TO "authenticated";
 GRANT ALL ON TABLE "public"."citas" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."citas_items_plan" TO "anon";
 GRANT ALL ON TABLE "public"."citas_items_plan" TO "authenticated";
 GRANT ALL ON TABLE "public"."citas_items_plan" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."compras" TO "anon";
 GRANT ALL ON TABLE "public"."compras" TO "authenticated";
 GRANT ALL ON TABLE "public"."compras" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."condiciones" TO "anon";
 GRANT ALL ON TABLE "public"."condiciones" TO "authenticated";
 GRANT ALL ON TABLE "public"."condiciones" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consultas" TO "anon";
 GRANT ALL ON TABLE "public"."consultas" TO "authenticated";
 GRANT ALL ON TABLE "public"."consultas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consulta_resumen" TO "anon";
 GRANT ALL ON TABLE "public"."consulta_resumen" TO "authenticated";
 GRANT ALL ON TABLE "public"."consulta_resumen" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumibles" TO "anon";
 GRANT ALL ON TABLE "public"."consumibles" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumibles" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumibles_compras" TO "anon";
 GRANT ALL ON TABLE "public"."consumibles_compras" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumibles_compras" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."contactos" TO "anon";
+GRANT ALL ON TABLE "public"."consumos_consulta" TO "authenticated";
+GRANT ALL ON TABLE "public"."consumos_consulta" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."contactos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."contraindicaciones" TO "anon";
 GRANT ALL ON TABLE "public"."contraindicaciones" TO "authenticated";
 GRANT ALL ON TABLE "public"."contraindicaciones" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."cuentas" TO "anon";
 GRANT ALL ON TABLE "public"."cuentas" TO "authenticated";
 GRANT ALL ON TABLE "public"."cuentas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."cuotas" TO "anon";
 GRANT ALL ON TABLE "public"."cuotas" TO "authenticated";
 GRANT ALL ON TABLE "public"."cuotas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."diagnosticos" TO "anon";
 GRANT ALL ON TABLE "public"."diagnosticos" TO "authenticated";
 GRANT ALL ON TABLE "public"."diagnosticos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."diagnosticos_aplicados" TO "anon";
 GRANT ALL ON TABLE "public"."diagnosticos_aplicados" TO "authenticated";
 GRANT ALL ON TABLE "public"."diagnosticos_aplicados" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."doctor_asistentes" TO "anon";
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "authenticated";
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."doctores" TO "anon";
 GRANT ALL ON TABLE "public"."doctores" TO "authenticated";
 GRANT ALL ON TABLE "public"."doctores" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."documentos_clinicos" TO "anon";
 GRANT ALL ON TABLE "public"."documentos_clinicos" TO "authenticated";
 GRANT ALL ON TABLE "public"."documentos_clinicos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."equipos" TO "anon";
 GRANT ALL ON TABLE "public"."equipos" TO "authenticated";
 GRANT ALL ON TABLE "public"."equipos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."equipos_mantenimientos" TO "anon";
 GRANT ALL ON TABLE "public"."equipos_mantenimientos" TO "authenticated";
 GRANT ALL ON TABLE "public"."equipos_mantenimientos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "anon";
 GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "authenticated";
 GRANT ALL ON TABLE "public"."evaluaciones_clinicas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."items_cuenta" TO "anon";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "authenticated";
 GRANT ALL ON TABLE "public"."items_cuenta" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."medicinas" TO "anon";
 GRANT ALL ON TABLE "public"."medicinas" TO "authenticated";
 GRANT ALL ON TABLE "public"."medicinas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."movimientos_caja" TO "anon";
 GRANT ALL ON TABLE "public"."movimientos_caja" TO "authenticated";
 GRANT ALL ON TABLE "public"."movimientos_caja" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."movimientos_stock_consumible" TO "anon";
 GRANT ALL ON TABLE "public"."movimientos_stock_consumible" TO "authenticated";
 GRANT ALL ON TABLE "public"."movimientos_stock_consumible" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."odontogramas" TO "anon";
 GRANT ALL ON TABLE "public"."odontogramas" TO "authenticated";
 GRANT ALL ON TABLE "public"."odontogramas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."ordenes_medicas" TO "anon";
 GRANT ALL ON TABLE "public"."ordenes_medicas" TO "authenticated";
 GRANT ALL ON TABLE "public"."ordenes_medicas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."pacientes" TO "anon";
 GRANT ALL ON TABLE "public"."pacientes" TO "authenticated";
 GRANT ALL ON TABLE "public"."pacientes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."pagos" TO "anon";
 GRANT ALL ON TABLE "public"."pagos" TO "authenticated";
 GRANT ALL ON TABLE "public"."pagos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."persona_contactos" TO "anon";
 GRANT ALL ON TABLE "public"."persona_contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."persona_contactos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."personas" TO "anon";
 GRANT ALL ON TABLE "public"."personas" TO "authenticated";
 GRANT ALL ON TABLE "public"."personas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."procedimientos" TO "anon";
 GRANT ALL ON TABLE "public"."procedimientos" TO "authenticated";
 GRANT ALL ON TABLE "public"."procedimientos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."recetas" TO "anon";
 GRANT ALL ON TABLE "public"."recetas" TO "authenticated";
 GRANT ALL ON TABLE "public"."recetas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."record_condicion" TO "anon";
 GRANT ALL ON TABLE "public"."record_condicion" TO "authenticated";
 GRANT ALL ON TABLE "public"."record_condicion" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."records" TO "anon";
 GRANT ALL ON TABLE "public"."records" TO "authenticated";
 GRANT ALL ON TABLE "public"."records" TO "service_role";
 
 
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."resumen_actividades_cita" TO "anon";
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "authenticated";
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."superficies" TO "anon";
 GRANT ALL ON TABLE "public"."superficies" TO "authenticated";
 GRANT ALL ON TABLE "public"."superficies" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."suplidores" TO "anon";
 GRANT ALL ON TABLE "public"."suplidores" TO "authenticated";
 GRANT ALL ON TABLE "public"."suplidores" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."suplidores_contactos" TO "anon";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "anon";
 GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "authenticated";
 GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."usuarios" TO "anon";
-GRANT ALL ON TABLE "public"."usuarios" TO "authenticated";
+GRANT INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."usuarios" TO "authenticated";
 GRANT ALL ON TABLE "public"."usuarios" TO "service_role";
+
+
+
+GRANT SELECT("id") ON TABLE "public"."usuarios" TO "authenticated";
+
+
+
+GRANT SELECT("username") ON TABLE "public"."usuarios" TO "authenticated";
+
+
+
+GRANT SELECT("last_login") ON TABLE "public"."usuarios" TO "authenticated";
+
+
+
+GRANT SELECT("created_at") ON TABLE "public"."usuarios" TO "authenticated";
+
+
+
+GRANT SELECT("deleted_at") ON TABLE "public"."usuarios" TO "authenticated";
+
+
+
+GRANT SELECT("updated_at") ON TABLE "public"."usuarios" TO "authenticated";
 
 
 
@@ -5252,7 +6597,6 @@ GRANT ALL ON TABLE "public"."usuarios" TO "service_role";
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
 
@@ -5262,8 +6606,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
 
 
@@ -5272,7 +6614,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 

@@ -23,6 +23,9 @@ class InsumoUtilizado {
 
   Map<String, dynamic> toJson() => {
     'consumible_id': consumibleId,
+    // El nombre viaja para que un error de stock del servidor pueda decir de
+    // qué insumo habla sin resolver el catálogo.
+    'nombre': nombre,
     'cantidad': cantidad,
   };
 }

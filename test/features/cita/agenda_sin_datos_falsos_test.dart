@@ -60,7 +60,6 @@ Doctor _doctor() => Doctor(
   contactos: const [],
   estatus: EstatusPersona.activo,
   username: 'bsantana',
-  passwordHash: 'x',
   specialty: 'Endodoncia',
   assistants: const [],
 );
@@ -105,15 +104,18 @@ void main() {
       await expectLater(repo.getCitas(), throwsA(isA<NetworkFailure>()));
     });
 
-    test('fallo del servidor (RLS, tabla mal nombrada) -> ServerFailure', () async {
-      final repo = CitaRepositoryImpl(
-        remoteDataSource: _DataSourceDoble(
-          errorAlLeer: StateError('relation "citas" does not exist'),
-        ),
-      );
+    test(
+      'fallo del servidor (RLS, tabla mal nombrada) -> ServerFailure',
+      () async {
+        final repo = CitaRepositoryImpl(
+          remoteDataSource: _DataSourceDoble(
+            errorAlLeer: StateError('relation "citas" does not exist'),
+          ),
+        );
 
-      await expectLater(repo.getCitas(), throwsA(isA<ServerFailure>()));
-    });
+        await expectLater(repo.getCitas(), throwsA(isA<ServerFailure>()));
+      },
+    );
 
     test('la lista devuelta es exactamente la de la base', () async {
       final cita = _cita();
@@ -133,25 +135,30 @@ void main() {
       final repo = CitaRepositoryImpl(remoteDataSource: ds);
 
       await expectLater(
-        repo.updateCitaEstado('33333333-3333-3333-3333-333333333333',
-            EstadoCita.enConsulta),
+        repo.updateCitaEstado(
+          '33333333-3333-3333-3333-333333333333',
+          EstadoCita.enConsulta,
+        ),
         throwsA(isA<TransicionEstadoInvalida>()),
       );
       expect(ds.estadosEscritos, isEmpty);
     });
 
-    test('un id que no existe falla en vez de saltarse la validación', () async {
-      final ds = _DataSourceDoble(
-        errorAlLeerEstado: const ServerFailure('La cita t01 ya no existe.'),
-      );
-      final repo = CitaRepositoryImpl(remoteDataSource: ds);
+    test(
+      'un id que no existe falla en vez de saltarse la validación',
+      () async {
+        final ds = _DataSourceDoble(
+          errorAlLeerEstado: const ServerFailure('La cita t01 ya no existe.'),
+        );
+        final repo = CitaRepositoryImpl(remoteDataSource: ds);
 
-      await expectLater(
-        repo.updateCitaEstado('t01', EstadoCita.confirmada),
-        throwsA(isA<ServerFailure>()),
-      );
-      expect(ds.estadosEscritos, isEmpty);
-    });
+        await expectLater(
+          repo.updateCitaEstado('t01', EstadoCita.confirmada),
+          throwsA(isA<ServerFailure>()),
+        );
+        expect(ds.estadosEscritos, isEmpty);
+      },
+    );
 
     test('una transición legal sí se escribe', () async {
       final ds = _DataSourceDoble(estadoActual: EstadoCita.programada);

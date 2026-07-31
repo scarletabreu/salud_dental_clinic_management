@@ -14,7 +14,6 @@ class Asistente extends Usuario {
     required super.contactos,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required this.shift,
   });
 
@@ -31,7 +30,6 @@ class Asistente extends Usuario {
       contactos: contactos,
       estatus: estatus ?? this.estatus,
       username: username,
-      passwordHash: passwordHash,
       shift: shift ?? this.shift,
     );
   }

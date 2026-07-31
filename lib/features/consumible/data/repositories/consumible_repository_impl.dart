@@ -81,20 +81,6 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
   }
 
   @override
-  Future<void> descontarPorConsumo({
-    required String consumibleId,
-    required int cantidad,
-  }) {
-    if (cantidad <= 0) {
-      throw ArgumentError.value(cantidad, 'cantidad', 'Debe ser positiva');
-    }
-    return runGuarded(() async {
-      await remoteDataSource.registrarConsumoClinico(consumibleId, cantidad);
-      _cache.invalidar(_clave);
-    }, context: 'descontar stock por consumo');
-  }
-
-  @override
   Future<void> eliminarConsumible(String id) {
     return runGuarded(() async {
       await remoteDataSource.deleteConsumible(id);

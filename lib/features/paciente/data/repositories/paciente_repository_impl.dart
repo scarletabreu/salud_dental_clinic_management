@@ -39,7 +39,10 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   @override
   Future<Either<Failure, void>> updatePaciente(Paciente paciente) {
     return guard(
-      () => remoteDataSource.updatePaciente(PacienteModel.fromEntity(paciente)),
+      () => remoteDataSource.updatePaciente(
+        PacienteModel.fromEntity(paciente),
+        version: paciente.version,
+      ),
       context: 'actualizar el paciente',
     );
   }

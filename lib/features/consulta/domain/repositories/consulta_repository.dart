@@ -1,7 +1,12 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
@@ -22,24 +27,65 @@ abstract class ConsultaRepository {
 
   Future<String> crearConsultaCompleta(Consulta consulta);
 
-  /// Genera la pre-factura de la consulta (cuenta ABIERTA + ítems) y marca la
-  /// cita como completada. Devuelve el id de la cuenta creada.
-  Future<String> finalizarConsulta({required String consultaId, String? nota});
+  /// Abre —o recupera— la consulta de una cita.
+  ///
+  /// La identidad, la fecha y el estado los resuelve la base a partir de la
+  /// cita: el cliente ya no propone paciente ni doctor, así que no puede
+  /// desalinearlos. Reintentar es seguro; el resultado dice si la consulta se
+  /// creó, se reanudó o ya estaba cerrada.
+  Future<InicioConsulta> iniciarConsultaDeCita(Consulta consulta);
 
-  /// Persiste el odontograma, las recetas y las notas de la consulta.
+  /// Guarda el borrador clínico completo en una sola transacción: odontograma,
+  /// recetas, insumos declarados, notas y signos vitales.
   ///
   /// Devuelve, por código FDI, los ids de los tratamientos aplicados en el
   /// mismo orden en que se enviaron: sellarlos sobre el estado en memoria es
   /// lo que permite que el siguiente guardado actualice esas filas en vez de
-  /// crear duplicados.
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  /// crear duplicados. [version] detecta que otra sesión escribió primero.
+  ///
+  /// Lanza `ConflictoVersionFailure` si la versión quedó obsoleta y
+  /// `ConsultaCerradaFailure` si la consulta ya se finalizó. En ambos casos no
+  /// se escribió nada.
+  Future<ResultadoBorradorConsulta> guardarBorradorConsulta({
     required String consultaId,
-    required String? pacienteId,
+    int? version,
     required Odontograma odontograma,
     required List<Receta> recetas,
+    List<InsumoUtilizado> insumos,
     String? notas,
-    Map<String, dynamic>? signosVitales,
-    bool? finalizada,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas,
+    List<TratamientoAplicado> tratamientosGenerales,
+    List<DiagnosticoAplicado> diagnosticosGenerales,
+  });
+
+  /// Cierra la consulta como una sola operación: guarda el borrador final,
+  /// descuenta inventario, emite las recetas, genera la pre-factura y completa
+  /// la cita. O queda todo confirmado, o no cambia nada.
+  ///
+  /// [idempotenciaKey] identifica el intento lógico: repetir el mismo cierre
+  /// devuelve el resultado existente sin volver a descontar ni facturar.
+  Future<ResultadoCierreConsulta> cerrarConsulta({
+    required String consultaId,
+    int? version,
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    List<InsumoUtilizado> insumos,
+    String? notas,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas,
+    List<TratamientoAplicado> tratamientosGenerales,
+    List<DiagnosticoAplicado> diagnosticosGenerales,
+    required String idempotenciaKey,
+    String? nota,
+  });
+
+  /// Deja constancia de la decisión clínica sobre una alerta (HFX-CLIN-003).
+  /// `documentada` exige justificación; sin ella el cierre sigue bloqueado.
+  Future<void> resolverAlerta({
+    required String alertaId,
+    required bool documentada,
+    String? justificacion,
   });
   Future<Map<String, TratamientoAplicadoDetalle>>
   getDetalleTratamientosAplicados(List<String> ids);

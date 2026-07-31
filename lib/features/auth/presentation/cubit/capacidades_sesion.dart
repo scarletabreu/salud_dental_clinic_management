@@ -32,6 +32,18 @@ extension CapacidadesDeSesion on AuthState {
     return actorId == doctorAsignadoId;
   }
 
+  /// Quién puede dar por presente al paciente de *esta* cita.
+  ///
+  /// Recepción y administración la marcan para cualquiera; el doctor, solo en
+  /// las suyas. Antes no la marcaba nadie más que recepción, así que el doctor
+  /// que trabajaba solo se quedaba sin poder iniciar su propia consulta.
+  bool puedeRegistrarLlegadaDe(String? doctorAsignadoId) {
+    if (!puedeRegistrarLlegada) return false;
+    if (puedeGestionarAgendaCompleta) return true;
+    final actorId = usuario?.id;
+    return actorId != null && actorId == doctorAsignadoId;
+  }
+
   /// Qué agenda ve el actor: la completa, o sólo la suya.
   ///
   /// Devuelve `null` cuando no hay restricción por doctor (agenda completa),

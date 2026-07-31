@@ -23,7 +23,6 @@ import 'package:salud_dental_clinic_management/features/consulta/data/repositori
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/eliminar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/finalizar_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consultas_list_cubit.dart';
@@ -50,7 +49,6 @@ import 'package:salud_dental_clinic_management/features/consumible/domain/usecas
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/guardar_consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/obtener_articulos_bajo_minimo.dart';
 import 'package:salud_dental_clinic_management/features/consumible/presentation/cubit/inventario_cubit.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/descontar_stock_por_consumo.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remore_datasource.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/data/datasources/procedimiento_remote_datasource_impl.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/data/repositories/procedimiento_repository_impl.dart';
@@ -143,6 +141,17 @@ import '../../features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import '../../features/diagnostico_aplicado/data/datasources/diagnostico_aplicado_remote_datasource.dart';
 import '../../features/diagnostico_aplicado/data/repositories/diagnostico_aplicado_repository_impl.dart';
 import '../../features/diagnostico_aplicado/domain/repositories/diagnostico_aplicado_repository.dart';
+import '../../features/auditoria/data/datasources/auditoria_remote_datasource.dart';
+import '../../features/auditoria/data/datasources/auditoria_remote_datasource_impl.dart';
+import '../../features/auditoria/data/repositories/auditoria_repository_impl.dart';
+import '../../features/auditoria/domain/repositories/auditoria_repository.dart';
+
+// Módulo Reglas clínicas (HFX-CLIN-006)
+import '../../features/regla_clinica/data/datasources/regla_clinica_remote_datasource.dart';
+import '../../features/regla_clinica/data/datasources/regla_clinica_remote_datasource_impl.dart';
+import '../../features/regla_clinica/data/repositories/regla_clinica_repository_impl.dart';
+import '../../features/regla_clinica/domain/repositories/regla_clinica_repository.dart';
+import '../../features/regla_clinica/presentation/cubit/reglas_clinicas_cubit.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource_impl.dart';
 import '../../features/evaluacion_clinica/data/repositories/evaluacion_clinica_repository_impl.dart';
@@ -274,6 +283,12 @@ Future<void> init() async {
   sl.registerLazySingleton<EvaluacionClinicaRemoteDatasource>(
     () => EvaluacionClinicaRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<AuditoriaRemoteDatasource>(
+    () => AuditoriaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
+  sl.registerLazySingleton<ReglaClinicaRemoteDatasource>(
+    () => ReglaClinicaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<PlanTratamientoRemoteDatasource>(
     () => PlanTratamientoRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -369,6 +384,13 @@ Future<void> init() async {
   sl.registerLazySingleton<EvaluacionClinicaRepository>(
     () => EvaluacionClinicaRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<AuditoriaRepository>(
+    () => AuditoriaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<ReglaClinicaRepository>(
+    () => ReglaClinicaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerFactory<ReglasClinicasCubit>(() => ReglasClinicasCubit(sl()));
   sl.registerLazySingleton<PlanTratamientoRepository>(
     () => PlanTratamientoRepositoryImpl(remoteDataSource: sl()),
   );
@@ -434,9 +456,6 @@ Future<void> init() async {
     ),
   );
   sl.registerFactory<CrearConsultaUseCase>(() => CrearConsultaUseCase(sl()));
-  sl.registerFactory<FinalizarConsultaUseCase>(
-    () => FinalizarConsultaUseCase(sl()),
-  );
   sl.registerLazySingleton<UsuarioRemoteDataSource>(
     () => UsuarioRemoteDataSourceImpl(sl()),
   );
@@ -460,11 +479,9 @@ Future<void> init() async {
   sl.registerFactory<ConsultaCubit>(
     () => ConsultaCubit(
       sl<CrearConsultaUseCase>(),
-      sl<FinalizarConsultaUseCase>(),
       sl<SupabaseStorageHelper>(),
       sl<CitaRepository>(),
       sl<ConsultaRepository>(),
-      sl<DescontarStockPorConsumo>(),
     ),
   );
   sl.registerFactory<ConsultaDetalleCubit>(
@@ -535,7 +552,6 @@ Future<void> init() async {
   sl.registerFactory<HistorialFinancieroCubit>(
     () => HistorialFinancieroCubit(getHistorial: sl()),
   );
-  sl.registerLazySingleton(() => DescontarStockPorConsumo(sl()));
   sl.registerFactory<GetCondicionesPaciente>(
     () => GetCondicionesPaciente(sl()),
   );

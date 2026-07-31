@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/consentimiento_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
@@ -16,6 +17,37 @@ class _RepoFake implements PlanTratamientoRepository {
   PlanTratamiento? plan;
   int contadorIds = 0;
   final List<String> llamadas = [];
+
+  /// HFX-CLIN-003: la decisión del paciente se registra con su evidencia, y el
+  /// servidor es quien la aplica al plan.
+  @override
+  Future<ConsentimientoPlan> registrarConsentimiento({
+    required String planId,
+    required bool aceptado,
+    required String persona,
+    required MetodoConsentimiento metodo,
+    String relacion = 'titular',
+    String? motivoRechazo,
+  }) async {
+    llamadas.add('registrarConsentimiento');
+    final actual = plan;
+    plan = actual?.copyWith(
+      estado: aceptado
+          ? EstadoPlanTratamiento.aceptado
+          : EstadoPlanTratamiento.rechazado,
+      motivoRechazo: motivoRechazo,
+    );
+    return ConsentimientoPlan(
+      planId: planId,
+      versionPlan: actual?.version ?? 1,
+      aceptado: aceptado,
+      totalAceptado: actual?.totalEstimado ?? 0,
+      personaAcepta: persona,
+      relacionConPaciente: relacion,
+      metodo: metodo,
+      motivoRechazo: motivoRechazo,
+    );
+  }
 
   @override
   Future<PlanTratamiento> crearPlan(PlanTratamiento nuevo) async {

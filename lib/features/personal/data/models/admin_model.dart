@@ -12,7 +12,6 @@ class AdminModel extends Admin {
     required super.govID,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required super.departamento,
     required super.assistants,
     required super.specialty,
@@ -27,7 +26,6 @@ class AdminModel extends Admin {
     return AdminModel(
       id: json['id'] as String?,
 
-      
       specialty: doctorData['especialidad'] as String? ?? '',
       isAvailable: doctorData['esta_disponible'] as bool? ?? true,
 
@@ -43,7 +41,6 @@ class AdminModel extends Admin {
 
       estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
-      passwordHash: usuarioData['password_hash'] as String? ?? '',
 
       departamento: json['departamento'] as String? ?? '',
     );

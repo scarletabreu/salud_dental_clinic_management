@@ -20,6 +20,10 @@ class Paciente extends Persona {
   final int? fotoTamanoBytes;
   final DateTime? fotoActualizadaEn;
 
+  /// Versión optimista de la ficha (HFX-CLIN-004). Se envía al guardar: si otro
+  /// actor escribió primero, la base rechaza la edición en vez de pisarla.
+  final int? version;
+
   Paciente({
     super.id,
     required super.nombre,
@@ -40,6 +44,7 @@ class Paciente extends Persona {
     this.fotoMimeType,
     this.fotoTamanoBytes,
     this.fotoActualizadaEn,
+    this.version,
   });
 
   bool get tieneFoto => fotoRuta != null && fotoRuta!.trim().isNotEmpty;

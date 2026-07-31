@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/consentimiento_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
@@ -6,6 +7,21 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 abstract class PlanTratamientoRepository {
+  /// Registra la decisión del paciente sobre el plan y la aplica.
+  ///
+  /// Es una sola operación de servidor: no puede quedar un plan aceptado sin
+  /// evidencia, ni evidencia sin plan. El consentimiento queda atado a la
+  /// versión del plan que el paciente vio; si luego cambian actividades o
+  /// precios, deja de valer (HFX-CLIN-003).
+  Future<ConsentimientoPlan> registrarConsentimiento({
+    required String planId,
+    required bool aceptado,
+    required String persona,
+    required MetodoConsentimiento metodo,
+    String relacion,
+    String? motivoRechazo,
+  });
+
   /// Crea el plan con sus actividades y devuelve el plan persistido (con ids).
   Future<PlanTratamiento> crearPlan(PlanTratamiento plan);
 

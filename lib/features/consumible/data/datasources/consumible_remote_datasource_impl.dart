@@ -1,5 +1,4 @@
 import 'package:salud_dental_clinic_management/features/consumible/data/datasources/consumible_remote_datasource.dart';
-import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
@@ -18,18 +17,6 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
         .order('nombre', ascending: true);
 
     return List<Map<String, dynamic>>.from(response as List);
-  }
-
-  @override
-  Future<void> registrarConsumoClinico(
-    String consumibleId,
-    int cantidad,
-  ) async {
-    await supabaseClient.from('movimientos_stock_consumible').insert({
-      'consumible_id': consumibleId,
-      'diferencia': -cantidad,
-      'motivo': MotivoAjusteStock.usoInterno.name,
-    });
   }
 
   @override

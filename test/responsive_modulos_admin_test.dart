@@ -6,6 +6,16 @@ import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/admin.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
+import 'package:salud_dental_clinic_management/features/regla_clinica/domain/entities/regla_clinica.dart';
+import 'package:salud_dental_clinic_management/features/regla_clinica/domain/repositories/regla_clinica_repository.dart';
+import 'package:salud_dental_clinic_management/features/regla_clinica/presentation/cubit/reglas_clinicas_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
 import 'package:salud_dental_clinic_management/features/equipo/domain/entities/equipo.dart';
@@ -85,7 +95,6 @@ List<Usuario> _usuarios() => [
     ],
     estatus: EstatusPersona.activo,
     username: 'bsantana',
-    passwordHash: 'x',
     specialty: 'Endodoncia y rehabilitación oral',
     assistants: const [],
   ),
@@ -100,6 +109,57 @@ Tratamiento _tratamiento() => Tratamiento(
   costo: 18500.75,
   contraindicaciones: const [],
   alcance: Alcance.diente,
+);
+
+/// La sesión bajo la que se pinta la configuración.
+///
+/// Desde HFX-CLIN-006 la pantalla ofrece los umbrales clínicos sólo a quien
+/// ejerce, así que necesita saber quién está conectado. Montarla sin sesión ya
+/// no representa nada que ocurra en la app: allí siempre hay una.
+class _AuthCubitDoble extends Cubit<AuthState> implements AuthCubit {
+  _AuthCubitDoble(RolUsuario rol)
+    : super(
+        AuthState(
+          isAuthenticated: true,
+          usuario: rol == RolUsuario.admin
+              ? Admin(
+                  id: 'admin-1',
+                  nombre: 'Alma',
+                  apellido: 'Dirección',
+                  birthDate: DateTime(1980),
+                  govID: '001-0000001-1',
+                  contactos: const [],
+                  estatus: EstatusPersona.activo,
+                  username: 'adireccion',
+                  specialty: 'General',
+                  assistants: const [],
+                  departamento: 'Dirección',
+                )
+              : Asistente(
+                  id: 'asis-1',
+                  nombre: 'Rita',
+                  apellido: 'Recepción',
+                  birthDate: DateTime(1995),
+                  govID: '001-0000002-2',
+                  contactos: const [],
+                  estatus: EstatusPersona.activo,
+                  username: 'rrecepcion',
+                  shift: 'matutino',
+                ),
+        ),
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// La configuración, montada con la sesión y las dependencias que la app le da.
+Widget _configuracion({RolUsuario rol = RolUsuario.admin}) => MultiBlocProvider(
+  providers: [
+    BlocProvider<AuthCubit>(create: (_) => _AuthCubitDoble(rol)),
+    BlocProvider<SettingsCubit>(create: (_) => _SettingsCubitDoble()),
+  ],
+  child: const Scaffold(body: ConfiguracionPage()),
 );
 
 Widget _app(Widget pagina, {double textScale = 1}) => MaterialApp(
@@ -127,7 +187,94 @@ final _viewports = <String, Size>{
   'escritorio': const Size(1280, 900),
 };
 
+/// Reglas suficientes para que la sección se pinte con contenido real: una
+/// pantalla vacía no comprueba que el texto quepa.
+class _ReglasRepoDoble implements ReglaClinicaRepository {
+  @override
+  Future<List<ReglaClinica>> getReglasVigentes() async => const [
+    ReglaClinica(
+      id: 'r1',
+      codigo: 'COMB_HIPERTENSION_SIGNOS',
+      version: 1,
+      nombre: 'Hipertensión con presión alterada',
+      descripcion: 'Vigila la presión en pacientes con hipertensión arterial.',
+      categoria: 'condicion',
+      tipo: TipoRegla.combinacionCondicionSigno,
+      parametros: ParametrosRegla(
+        condicion: 'hipertensión',
+        signos: [
+          UmbralSigno(codigo: 'presion_sistolica', maximo: 160),
+          UmbralSigno(codigo: 'presion_diastolica', maximo: 100),
+        ],
+      ),
+      severidad: SeveridadAlerta.critica,
+      accion: AccionAlerta.documentar,
+      estado: EstadoRegla.aprobada,
+      editable: true,
+    ),
+  ];
+
+  @override
+  Future<List<SignoVitalCatalogo>> getCatalogoSignosVitales() async => const [
+    SignoVitalCatalogo(
+      codigo: 'presion_sistolica',
+      etiqueta: 'Presión sistólica',
+      unidad: 'mmHg',
+      minimoPosible: 30,
+      maximoPosible: 300,
+    ),
+  ];
+
+  @override
+  Future<ResultadoPublicacion> publicar(ReglaClinica regla, {String? nota}) async =>
+      ResultadoPublicacion(
+        codigo: regla.codigo,
+        version: regla.version,
+        sinCambios: true,
+      );
+}
+
 void main() {
+  setUpAll(() {
+    // La pantalla resuelve el cubit por el service locator, como el resto de
+    // la app; sin registrarlo aquí la sección del admin no llegaría a pintarse.
+    if (!sl.isRegistered<ReglasClinicasCubit>()) {
+      sl.registerFactory<ReglasClinicasCubit>(
+        () => ReglasClinicasCubit(_ReglasRepoDoble()),
+      );
+    }
+  });
+
+  tearDownAll(() {
+    if (sl.isRegistered<ReglasClinicasCubit>()) {
+      sl.unregister<ReglasClinicasCubit>();
+    }
+  });
+
+  testWidgets('recepción no ve los umbrales clínicos en configuración', (
+    tester,
+  ) async {
+    // Mover un umbral es una decisión médica: la sección no se le ofrece a
+    // quien después no podría guardarla.
+    _viewport(tester, const Size(1280, 900));
+    await tester.pumpWidget(_app(_configuracion(rol: RolUsuario.asistente)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('REGLAS CLÍNICAS'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('quien ejerce ve los umbrales clínicos en configuración', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(1280, 900));
+    await tester.pumpWidget(_app(_configuracion()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('REGLAS CLÍNICAS'), findsOneWidget);
+    expect(find.text('Hipertensión con presión alterada'), findsOneWidget);
+  });
+
   _viewports.forEach((nombre, tamano) {
     testWidgets('el listado de equipos se lee en $nombre', (tester) async {
       _viewport(tester, tamano);
@@ -225,12 +372,7 @@ void main() {
     testWidgets('la configuración se lee en $nombre', (tester) async {
       _viewport(tester, tamano);
       await tester.pumpWidget(
-        _app(
-          BlocProvider<SettingsCubit>(
-            create: (_) => _SettingsCubitDoble(),
-            child: const Scaffold(body: ConfiguracionPage()),
-          ),
-        ),
+        _app(_configuracion()),
       );
       await tester.pumpAndSettle();
 
@@ -247,13 +389,7 @@ void main() {
   ) async {
     _viewport(tester, const Size(320, 1600));
     await tester.pumpWidget(
-      _app(
-        BlocProvider<SettingsCubit>(
-          create: (_) => _SettingsCubitDoble(),
-          child: const Scaffold(body: ConfiguracionPage()),
-        ),
-        textScale: 2,
-      ),
+      _app(_configuracion(), textScale: 2),
     );
     await tester.pumpAndSettle();
 

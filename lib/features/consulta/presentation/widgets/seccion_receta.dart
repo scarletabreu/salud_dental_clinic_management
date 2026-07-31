@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/conflicto.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/receta_item_form_dialog.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seleccionar_medicina_sheet.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/usecases/verificar_contraindicaciones_usecase.dart';
@@ -65,23 +66,56 @@ class _SeccionRecetaState extends State<SeccionReceta> {
       medicina: medicina,
     );
 
-    String? justificacion;
-    if (conflictos.isNotEmpty) {
-      justificacion = await mostrarContraindicacionDialog(
-        context,
-        medicina.nombre,
-        conflictos,
-      );
-      if (justificacion == null || !mounted) return;
+    final absolutas = [
+      for (final c in conflictos)
+        if (c.severidad == SeveridadConflicto.absoluta) c,
+    ];
+
+    // Una contraindicación absoluta no se justifica: no hay camino que la
+    // sortee, ni aquí ni en el servidor, que rechaza la receta con CL010.
+    if (absolutas.isNotEmpty) {
+      await mostrarBloqueoAbsoluto(context, medicina.nombre, absolutas);
+      return;
     }
 
+    final relativas = [
+      for (final c in conflictos)
+        if (c.severidad != SeveridadConflicto.absoluta) c,
+    ];
+
     if (!mounted) return;
-    final itemReceta = await mostrarRecetaItemFormDialog(context, medicina);
+    final itemReceta = await mostrarRecetaItemFormDialog(
+      context,
+      medicina,
+      conflictosRelativos: relativas,
+    );
     if (itemReceta == null || !mounted) return;
+
+    // Duplicidad por medicamento o principio activo: dos marcas del mismo
+    // principio activo son una sobredosis silenciosa.
+    final repetido = _itemsReceta.any(
+      (existente) => existente.claveDuplicidad == itemReceta.claveDuplicidad,
+    );
+    if (repetido) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            itemReceta.informacionInsuficiente
+                ? '"${medicina.nombre}" ya está en la receta.'
+                : 'La receta ya incluye el principio activo '
+                      '"${itemReceta.principioActivo}".',
+          ),
+          backgroundColor: context.appColors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
 
     consultaCubit.agregarItemReceta(
       itemReceta: itemReceta,
-      justificacion: justificacion,
+      justificacion: itemReceta.justificacionRiesgo,
     );
 
     if (!mounted) return;
@@ -275,6 +309,38 @@ class _SeccionRecetaState extends State<SeccionReceta> {
                 _pildora(ac, 'Cantidad', item.cantidadIndicada),
             ],
           ),
+          if (item.informacionInsuficiente) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.help_outline_rounded, size: 14, color: ac.textMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Sin principio activo en el catálogo: no se pudo evaluar '
+                    'duplicidad ni interacción. No equivale a "sin riesgo".',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: ac.textMuted,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if ((item.justificacionRiesgo ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Justificación: ${item.justificacionRiesgo!.trim()}',
+              style: TextStyle(
+                fontSize: 12,
+                color: ac.textSecondary,
+                height: 1.35,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           if ((item.indicacionesEspecificas ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(

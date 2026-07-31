@@ -3,7 +3,6 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 
 abstract class Usuario extends Persona {
   final String username;
-  final String passwordHash;
 
   RolUsuario get rol;
 
@@ -16,6 +15,5 @@ abstract class Usuario extends Persona {
     required super.contactos,
     required super.estatus,
     required this.username,
-    required this.passwordHash,
   });
 }

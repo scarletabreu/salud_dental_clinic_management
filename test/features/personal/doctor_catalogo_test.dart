@@ -65,9 +65,12 @@ void main() {
   test('el catálogo no trae contraseñas del servidor', () async {
     final doctores = await datasource(_filas()).fetchActiveDoctores();
 
-    // La RPC dejó de devolver `password_hash` justamente porque acababa
-    // impreso en la consola del navegador.
-    expect(doctores.every((d) => d.passwordHash.isEmpty), isTrue);
+    expect(doctores, hasLength(2));
+    expect(
+      _filas(),
+      everyElement(isNot(contains('password_hash'))),
+      reason: 'la RPC no debe exponer credenciales al catálogo clínico',
+    );
   });
 
   test('un doctor dado de baja llega marcado como inactivo', () async {

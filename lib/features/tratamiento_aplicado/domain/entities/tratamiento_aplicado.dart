@@ -18,6 +18,16 @@ enum EstadoTratamientoAplicado {
   String get dbValue =>
       this == EstadoTratamientoAplicado.enProceso ? 'en_proceso' : name;
 
+  /// Cómo se nombra en pantalla. Un estado y su booleano histórico no pueden
+  /// contradecirse: desde HFX-CLIN-003 la base deriva `esta_terminado` de aquí.
+  /// Vocabulario de HFX-CLIN-005: lo ejecutado se llama «ejecutado» en todas
+  /// las pantallas, igual que en la cuenta y en la línea de tiempo.
+  String get etiqueta => switch (this) {
+    EstadoTratamientoAplicado.enProceso => 'En proceso',
+    EstadoTratamientoAplicado.aplicado => 'Ejecutado',
+    EstadoTratamientoAplicado.completado => 'Ejecutado y cerrado',
+  };
+
   static EstadoTratamientoAplicado fromDb(String? valor) {
     if (valor == 'en_proceso') return EstadoTratamientoAplicado.enProceso;
     // `indicado` es de antes de SD-135: era una intención guardada en el eje de

@@ -4,7 +4,12 @@ import 'package:salud_dental_clinic_management/features/consulta/data/datasource
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
-import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_guardado_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
@@ -98,27 +103,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       );
     }
     return runGuarded(() async {
-      final dientes = (consulta.odontograma?.dientes ?? [])
-          .map(
-            (d) => {
-              'fdi_code': d.fdiCode,
-              'superficies': d.superficies
-                  .map((s) => s.tipoSuperficie.name)
-                  .toList(),
-            },
-          )
-          .toList();
-
-      final documentos = consulta.documentosClinicos
-          .map(
-            (doc) => {
-              'descripcion': doc.descripcion,
-              'tipo_documento': doc.tipoDocumento.name,
-              'url_archivo': doc.urlArchivo,
-              'fecha_creacion': doc.fechaCreacion.toUtc().toIso8601String(),
-            },
-          )
-          .toList();
+      final dientes = _dientesDe(consulta);
+      final documentos = _documentosDe(consulta);
 
       final params = {
         'p_paciente_id': consulta.pacienteId,
@@ -143,70 +129,208 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     }, context: 'crear la consulta completa');
   }
 
+  List<Map<String, dynamic>> _dientesDe(Consulta consulta) =>
+      (consulta.odontograma?.dientes ?? [])
+          .map(
+            (d) => {
+              'fdi_code': d.fdiCode,
+              'superficies': d.superficies
+                  .map((s) => s.tipoSuperficie.name)
+                  .toList(),
+            },
+          )
+          .toList();
+
+  List<Map<String, dynamic>> _documentosDe(Consulta consulta) => consulta
+      .documentosClinicos
+      .map(
+        (doc) => {
+          'descripcion': doc.descripcion,
+          'tipo_documento': doc.tipoDocumento.name,
+          'url_archivo': doc.urlArchivo,
+          'fecha_creacion': doc.fechaCreacion.toUtc().toIso8601String(),
+        },
+      )
+      .toList();
+
   @override
-  Future<String> finalizarConsulta({required String consultaId, String? nota}) {
-    return runGuarded(
-      () => remoteDataSource.finalizarConsulta(
-        consultaId: consultaId,
-        nota: nota,
-      ),
-      context: 'finalizar la consulta',
-    );
+  Future<InicioConsulta> iniciarConsultaDeCita(Consulta consulta) {
+    final citaId = consulta.citaId;
+    if (!_isValidUuid(citaId)) {
+      throw Exception(
+        'No se puede iniciar una consulta sin una cita real de la agenda.',
+      );
+    }
+    return runGuarded(() async {
+      // Ni paciente, ni doctor, ni fecha viajan en la llamada: los toma la base
+      // de la propia cita. Es lo que impide que la consulta acabe firmada por
+      // quien no es o fechada el día del clic (SD-160).
+      final respuesta = await remoteDataSource.iniciarConsultaDeCita({
+        'p_cita_id': citaId,
+        'p_dientes': _dientesDe(consulta),
+        'p_documentos': _documentosDe(consulta),
+        'p_temp_condiciones': consulta.tempCondiciones,
+        'p_motivo_consulta': consulta.motivoConsulta,
+        'p_tipo_atencion': consulta.tipoAtencion.name,
+      });
+
+      final inicio = InicioConsulta.fromJson(respuesta);
+      if (inicio.estado == EstadoInicioConsulta.creada &&
+          consulta.signosVitales != null &&
+          !consulta.signosVitales!.estaVacia) {
+        await remoteDataSource.updateConsulta(inicio.consultaId, {
+          'signos_vitales': consulta.signosVitales!.toJson(),
+        });
+      }
+      return inicio;
+    }, context: 'iniciar la consulta de la cita');
   }
 
   @override
-  Future<ResultadoGuardadoOdontograma> guardarResultadoConsulta({
+  Future<ResultadoBorradorConsulta> guardarBorradorConsulta({
     required String consultaId,
-    required String? pacienteId,
+    int? version,
     required Odontograma odontograma,
     required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
-    bool? finalizada,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) {
     return runGuarded(() async {
-      final dientesPorFdi = <int, Map<String, dynamic>>{
-        for (final diente in odontograma.dientes)
-          diente.fdiCode: {
-            'esta_ausente': diente.estaAusente,
-            'observaciones': diente.observaciones,
-            'tratamientos': [
-              for (final t in diente.tratamientos)
-                {
-                  if (t.id != null) 'id': t.id,
-                  'tratamiento_id': t.tratamientoId,
-                  'es_continuo': t.esContinuo,
-                  'esta_terminado': t.estaTerminado,
-                  'superficie': t.superficie?.name.toLowerCase(),
-                  'precio_aplicado': t.precioAplicado,
-                  'notas': t.notas,
-                  'estado': t.estado.dbValue,
-                  'item_plan_id': t.itemPlanId,
-                  'justificacion_no_planificada': t.justificacionNoPlanificada,
-                  'doctor_ejecuta_id': t.doctorEjecutaId,
-                  'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
-                      ?.toUtc()
-                      .toIso8601String(),
-                },
-            ],
-            'diagnosticos': [
-              for (final diagnostico in diente.diagnosis)
-                {
-                  if (diagnostico.id != null) 'id': diagnostico.id,
-                  'diagnosis_id': diagnostico.diagnosisId,
-                  'severidad': diagnostico.severidad.name,
-                  'fecha_aplicacion': diagnostico.fechaAplicacion
-                      .toUtc()
-                      .toIso8601String(),
-                  'superficiecle': diagnostico.superficie?.name.toLowerCase(),
-                  'origen': diagnostico.origen.name,
-                  'notas': diagnostico.notas,
-                },
-            ],
-          },
-      };
+      final respuesta = await remoteDataSource.guardarBorradorConsulta(
+        consultaId: consultaId,
+        version: version,
+        payload: _payloadClinico(
+          odontograma: odontograma,
+          recetas: recetas,
+          insumos: insumos,
+          notas: notas,
+          signosVitales: signosVitales,
+          condicionesDetectadas: condicionesDetectadas,
+          tratamientosGenerales: tratamientosGenerales,
+          diagnosticosGenerales: diagnosticosGenerales,
+        ),
+      );
+      return ResultadoBorradorConsulta.fromRpc(respuesta);
+    }, context: 'guardar el resultado de la consulta');
+  }
 
-      final recetasJson = [
+  @override
+  Future<ResultadoCierreConsulta> cerrarConsulta({
+    required String consultaId,
+    int? version,
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    List<InsumoUtilizado> insumos = const [],
+    String? notas,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
+    required String idempotenciaKey,
+    String? nota,
+  }) {
+    return runGuarded(() async {
+      final respuesta = await remoteDataSource.cerrarConsulta(
+        consultaId: consultaId,
+        version: version,
+        payload: _payloadClinico(
+          odontograma: odontograma,
+          recetas: recetas,
+          insumos: insumos,
+          notas: notas,
+          signosVitales: signosVitales,
+          condicionesDetectadas: condicionesDetectadas,
+          tratamientosGenerales: tratamientosGenerales,
+          diagnosticosGenerales: diagnosticosGenerales,
+        ),
+        idempotenciaKey: idempotenciaKey,
+        nota: nota,
+      );
+      return ResultadoCierreConsulta.fromRpc(respuesta);
+    }, context: 'cerrar la consulta');
+  }
+
+  /// Contrato versionado que entienden `guardar_borrador_consulta` y
+  /// `cerrar_consulta`. Una clave presente describe el conjunto completo
+  /// deseado; lo que falte en ella se anula del lado del servidor.
+  Map<String, dynamic> _payloadClinico({
+    required Odontograma odontograma,
+    required List<Receta> recetas,
+    required List<InsumoUtilizado> insumos,
+    String? notas,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
+  }) {
+    final dientes = [
+      for (final diente in odontograma.dientes)
+        {
+          'fdi_code': diente.fdiCode,
+          'esta_ausente': diente.estaAusente,
+          'observaciones': diente.observaciones,
+          'tratamientos': [
+            for (final t in diente.tratamientos)
+              {
+                if (t.id != null) 'id': t.id,
+                'tratamiento_id': t.tratamientoId,
+                'es_continuo': t.esContinuo,
+                'esta_terminado': t.estaTerminado,
+                'superficie': t.superficie?.name.toLowerCase(),
+                'precio_aplicado': t.precioAplicado,
+                'notas': t.notas,
+                'estado': t.estado.dbValue,
+                'item_plan_id': t.itemPlanId,
+                'justificacion_no_planificada': t.justificacionNoPlanificada,
+                'doctor_ejecuta_id': t.doctorEjecutaId,
+                'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
+                    ?.toUtc()
+                    .toIso8601String(),
+              },
+          ],
+          'diagnosticos': [
+            for (final diagnostico in diente.diagnosis)
+              {
+                if (diagnostico.id != null) 'id': diagnostico.id,
+                'diagnosis_id': diagnostico.diagnosisId,
+                'severidad': diagnostico.severidad.name,
+                'fecha_aplicacion': diagnostico.fechaAplicacion
+                    .toUtc()
+                    .toIso8601String(),
+                'superficie': diagnostico.superficie?.name.toLowerCase(),
+                'origen': diagnostico.origen.name,
+                'notas': diagnostico.notas,
+              },
+          ],
+        },
+    ];
+
+    return {
+      'version_payload': 1,
+      if (notas != null) 'notas': notas,
+      // El resumen plano alimenta a los lectores antiguos; las mediciones son
+      // la verdad y las valida el servidor una por una (HFX-CLIN-003).
+      if (signosVitales != null) 'signos_vitales': signosVitales.toJson(),
+      if (signosVitales != null)
+        'signos_vitales_medidos': signosVitales.toPayloadMediciones(),
+      'condiciones_detectadas': [
+        for (final condicion in condicionesDetectadas) condicion.toPayload(),
+      ],
+      'generales': {
+        'tratamientos': [
+          for (final t in tratamientosGenerales) _tratamientoGeneralJson(t),
+        ],
+        'diagnosticos': [
+          for (final d in diagnosticosGenerales) _diagnosticoGeneralJson(d),
+        ],
+      },
+      'evaluacion_clinica': odontograma.evaluacionToJson(),
+      'dientes': dientes,
+      'recetas': [
         for (final r in recetas)
           {
             ...RecetaModel.fromEntity(r).toCabeceraJson(),
@@ -215,19 +339,49 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                 ItemRecetaModel.fromEntity(item).toJson(recetaId: r.id ?? ''),
             ],
           },
-      ];
+      ],
+      'insumos': [for (final insumo in insumos) insumo.toJson()],
+    };
+  }
 
-      return remoteDataSource.guardarResultadoConsulta(
-        consultaId: consultaId,
-        pacienteId: pacienteId,
-        dientesPorFdi: dientesPorFdi,
-        recetas: recetasJson,
-        evaluacionOdontologica: odontograma.evaluacionToJson(),
-        notas: notas,
-        signosVitales: signosVitales,
-        finalizada: finalizada,
-      );
-    }, context: 'guardar el resultado de la consulta');
+  /// Lo global no lleva pieza ni superficie: la base lo rechaza si las lleva.
+  Map<String, dynamic> _tratamientoGeneralJson(TratamientoAplicado t) => {
+    if (t.id != null) 'id': t.id,
+    'tratamiento_id': t.tratamientoId,
+    'precio_aplicado': t.precioAplicado,
+    'notas': t.notas,
+    'estado': t.estado.dbValue,
+    'item_plan_id': t.itemPlanId,
+    'justificacion_no_planificada': t.justificacionNoPlanificada,
+    'doctor_ejecuta_id': t.doctorEjecutaId,
+    'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
+        ?.toUtc()
+        .toIso8601String(),
+  };
+
+  Map<String, dynamic> _diagnosticoGeneralJson(DiagnosticoAplicado d) => {
+    if (d.id != null) 'id': d.id,
+    'diagnosis_id': d.diagnosisId,
+    'severidad': d.severidad.name,
+    'fecha_aplicacion': d.fechaAplicacion.toUtc().toIso8601String(),
+    'origen': d.origen.name,
+    'notas': d.notas,
+  };
+
+  @override
+  Future<void> resolverAlerta({
+    required String alertaId,
+    required bool documentada,
+    String? justificacion,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.resolverAlertaClinica(
+        alertaId: alertaId,
+        estado: documentada ? 'documentada' : 'confirmada',
+        justificacion: justificacion,
+      ),
+      context: 'registrar la decisión sobre la alerta clínica',
+    );
   }
 
   @override

@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/enums/categoria_condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/enums/tipo_condicion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
@@ -12,6 +14,11 @@ import 'package:salud_dental_clinic_management/features/consulta/presentation/cu
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_diagnostico_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/asignar_tratamiento_sheet.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/contraindicacion_dialog.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_alertas_clinicas.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_clinica_general.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_condiciones_detectadas.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_insumos.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seccion_receta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/tarjeta_consulta.dart';
@@ -34,6 +41,7 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/present
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/seccion_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/receta/presentation/pages/receta_form_dialog.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/usecases/get_condiciones_paciente.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
@@ -64,6 +72,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
   String? _evaluacionId;
   String? _consultaConEvaluacion;
   List<Condicion> _condicionesAsync = const [];
+  List<Condicion> _catalogoCondiciones = const [];
 
   @override
   void initState() {
@@ -71,6 +80,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     _cargarCatalogo();
     _cargarDiagnosticos();
     _cargarCondicionesPaciente();
+    _cargarCatalogoCondiciones();
     _cargarDoctores();
     _cargarHistorialPiezas();
 
@@ -151,9 +161,24 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     }
     final seleccionado = await seleccionarDiagnostico(
       context,
-      _catalogoDiagnosticos,
+      _catalogoDiagnosticosDePieza,
     );
     if (!mounted || seleccionado == null) return;
+    if (seleccionado.diagnostico.alcance == Alcance.puntual &&
+        superficie == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '"${seleccionado.diagnostico.nombre}" se registra sobre una cara '
+            'concreta. Selecciona la superficie en la pieza ${diente.fdiCode}.',
+          ),
+          backgroundColor: context.appColors.amber,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
     context.read<ConsultaCubit>().aplicarDiagnostico(
       diente,
       superficie,
@@ -235,6 +260,14 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     } catch (_) {}
   }
 
+  Future<void> _cargarCatalogoCondiciones() async {
+    try {
+      final catalogo = await sl<CondicionRepository>().getCondiciones();
+      if (!mounted) return;
+      setState(() => _catalogoCondiciones = catalogo);
+    } catch (_) {}
+  }
+
   Future<void> _prepararPlan(Consulta consulta) async {
     final consultaId = consulta.id;
     if (consultaId == null || _consultaConEvaluacion == consultaId) return;
@@ -279,22 +312,88 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     } catch (_) {}
   }
 
+  /// Lo que debe pesar en cualquier contraindicación: el expediente más lo
+  /// descubierto hoy. Una condición registrada en esta consulta cuenta desde
+  /// que se registra, no desde que se cierra (HFX-CLIN-003).
   List<Condicion> _condicionesPaciente() {
-    if (_condicionesAsync.isNotEmpty) return _condicionesAsync;
-    final state = context.read<PacienteCubit>().state;
-    if (state is PacienteDetailLoaded) {
-      return state.paciente.record.condiciones;
-    }
-    return [];
+    final delExpediente = _condicionesAsync.isNotEmpty
+        ? _condicionesAsync
+        : switch (context.read<PacienteCubit>().state) {
+            PacienteDetailLoaded(:final paciente) => paciente.record.condiciones,
+            _ => const <Condicion>[],
+          };
+
+    final detectadas = _condicionesDetectadas();
+    if (detectadas.isEmpty) return delExpediente;
+
+    final ids = {
+      for (final c in delExpediente)
+        if (c.id != null) c.id!,
+    };
+    return [
+      ...delExpediente,
+      for (final detectada in detectadas)
+        if (!ids.contains(detectada.condicionId))
+          detectada.condicion ??
+              _catalogoCondiciones.cast<Condicion?>().firstWhere(
+                    (c) => c?.id == detectada.condicionId,
+                    orElse: () => null,
+                  ) ??
+              Condicion(
+                id: detectada.condicionId,
+                nombre: detectada.nombre,
+                tipo: TipoCondicion.patologica,
+                categoria: CategoriaCondicion.temporal,
+              ),
+    ];
   }
+
+  List<CondicionDetectada> _condicionesDetectadas() {
+    final state = context.read<ConsultaCubit>().state;
+    return switch (state) {
+      ConsultaIniciada(:final consulta) => consulta.condicionesDetectadas,
+      ConsultaGuardando(:final consulta?) => consulta.condicionesDetectadas,
+      _ => const <CondicionDetectada>[],
+    };
+  }
+
+  /// El contexto manda: en una pieza solo se ofrece lo que se aplica a una
+  /// pieza o a una de sus caras. Lo global vive en su propia sección, y la
+  /// base rechaza la combinación equivocada aunque llegue por REST.
+  List<Tratamiento> get _catalogoDePieza => [
+    for (final t in _catalogo)
+      if (t.alcance == Alcance.diente || t.alcance == Alcance.puntual) t,
+  ];
+
+  List<Diagnosis> get _catalogoDiagnosticosDePieza => [
+    for (final d in _catalogoDiagnosticos)
+      if (d.alcance == Alcance.diente || d.alcance == Alcance.puntual) d,
+  ];
 
   Future<void> _onAddTratamiento(
     Diente diente,
     TipoSuperficie? superficie,
   ) async {
     if (_cargandoCatalogo) return;
-    final tratamiento = await seleccionarTratamiento(context, _catalogo);
+    final tratamiento = await seleccionarTratamiento(context, _catalogoDePieza);
     if (tratamiento == null || !mounted) return;
+
+    // Un tratamiento puntual sin cara es un dato incompleto: la base lo
+    // rechaza y aquí se dice antes, nombrando lo que falta.
+    if (tratamiento.alcance == Alcance.puntual && superficie == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '"${tratamiento.nombre}" se aplica sobre una cara concreta. '
+            'Selecciona la superficie en la pieza ${diente.fdiCode}.',
+          ),
+          backgroundColor: context.appColors.amber,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
 
     final candidatas = _itemsEjecutables
         .where((item) => item.fdiDiente == diente.fdiCode)
@@ -392,6 +491,47 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
       ),
+    );
+  }
+
+  Future<void> _onAgregarTratamientoGeneral() async {
+    final generales = SeccionClinicaGeneral.tratamientosGenerales(_catalogo);
+    if (generales.isEmpty) return;
+    final tratamiento = await seleccionarTratamiento(context, generales);
+    if (tratamiento == null || !mounted) return;
+
+    final conflictos = VerificarContraindicacionesUseCase().call(
+      condicionesPaciente: _condicionesPaciente(),
+      tratamiento: tratamiento,
+    );
+    String? justificacion;
+    if (conflictos.isNotEmpty) {
+      justificacion = await mostrarContraindicacionDialog(
+        context,
+        tratamiento.nombre,
+        conflictos,
+      );
+      if (justificacion == null || !mounted) return;
+    }
+
+    context.read<ConsultaCubit>().aplicarTratamientoGeneral(
+      tratamiento,
+      justificacionClinica: justificacion,
+    );
+  }
+
+  Future<void> _onAgregarDiagnosticoGeneral() async {
+    final generales = SeccionClinicaGeneral.diagnosticosGenerales(
+      _catalogoDiagnosticos,
+    );
+    if (generales.isEmpty) return;
+    final seleccionado = await seleccionarDiagnostico(context, generales);
+    if (seleccionado == null || !mounted) return;
+    context.read<ConsultaCubit>().aplicarDiagnosticoGeneral(
+      seleccionado.diagnostico,
+      severidad: seleccionado.severidad,
+      origen: seleccionado.origen,
+      notas: seleccionado.notas,
     );
   }
 
@@ -635,6 +775,21 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
             const SizedBox(height: 24),
 
+            if (state is ConsultaIniciada)
+              _AvisoPersistencia(
+                estado: state.guardado,
+                detalle: state.detalleFallo,
+                onReintentar: () =>
+                    context.read<ConsultaCubit>().guardarParcial(),
+                onRecargar: consulta.id == null
+                    ? null
+                    : () => context.read<ConsultaCubit>().reanudarConsulta(
+                        consultaId: consulta.id!,
+                      ),
+              ),
+
+            SeccionAlertasClinicas(alertas: consulta.alertas),
+
             TarjetaConsulta(
               icon: Icons.assignment_outlined,
               iconColor: ac.indigo,
@@ -667,6 +822,46 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                         )
                       : null,
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TarjetaConsulta(
+              icon: Icons.medical_information_outlined,
+              iconColor: ac.amber,
+              titulo: 'Condiciones detectadas hoy',
+              subtitulo:
+                  'Cuentan de inmediato en contraindicaciones y alertas',
+              child: SeccionCondicionesDetectadas(
+                detectadas: consulta.condicionesDetectadas,
+                catalogo: _catalogoCondiciones,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TarjetaConsulta(
+              icon: Icons.public_rounded,
+              iconColor: ac.teal,
+              titulo: 'Hallazgos y tratamientos generales',
+              subtitulo: 'Lo que no corresponde a una pieza concreta',
+              child: SeccionClinicaGeneral(
+                tratamientos: consulta.tratamientosGenerales,
+                diagnosticos: consulta.diagnosticosGenerales,
+                nombreTratamiento: _nombreTratamiento,
+                nombreDiagnostico: (id) => id,
+                onAgregarTratamiento: _onAgregarTratamientoGeneral,
+                onAgregarDiagnostico: _onAgregarDiagnosticoGeneral,
+                onQuitarTratamiento: (i) =>
+                    context.read<ConsultaCubit>().quitarTratamientoGeneral(i),
+                onQuitarDiagnostico: (i) =>
+                    context.read<ConsultaCubit>().quitarDiagnosticoGeneral(i),
+                hayCatalogoGeneral:
+                    SeccionClinicaGeneral.tratamientosGenerales(
+                      _catalogo,
+                    ).isNotEmpty ||
+                    SeccionClinicaGeneral.diagnosticosGenerales(
+                      _catalogoDiagnosticos,
+                    ).isNotEmpty,
               ),
             ),
             const SizedBox(height: 16),
@@ -814,7 +1009,13 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             _TerminarButton(
               cargando: cargando,
               label: 'Terminar consulta',
-              onTap: cargando
+              // El servidor rechaza el cierre con alertas sin resolver; aquí se
+              // dice antes y se explica cuántas faltan.
+              bloqueo: consulta.alertasBloqueantes.isEmpty
+                  ? null
+                  : 'Resuelve ${consulta.alertasBloqueantes.length} alerta(s) '
+                        'clínica(s) antes de cerrar la consulta.',
+              onTap: cargando || consulta.alertasBloqueantes.isNotEmpty
                   ? null
                   : () => context.read<ConsultaCubit>().terminarAtencion(),
               ac: ac,
@@ -832,14 +1033,57 @@ class _TerminarButton extends StatelessWidget {
     required this.onTap,
     required this.ac,
     required this.label,
+    this.bloqueo,
   });
   final bool cargando;
   final VoidCallback? onTap;
   final AppColors ac;
   final String label;
 
+  /// Por qué no se puede cerrar todavía. Un botón apagado sin explicación es
+  /// lo que obliga a adivinar.
+  final String? bloqueo;
+
   @override
   Widget build(BuildContext context) {
+    if (bloqueo case final motivo?) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: ac.red.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ac.red.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline_rounded, size: 17, color: ac.red),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    motivo,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: ac.red,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _boton(),
+        ],
+      );
+    }
+    return _boton();
+  }
+
+  Widget _boton() {
     return SizedBox(
       height: 52,
       child: FilledButton.icon(
@@ -872,6 +1116,126 @@ class _TerminarButton extends StatelessWidget {
   }
 }
 
+/// Aviso que no se va solo.
+///
+/// El chip del encabezado dice en qué punto está el guardado, pero cabe en dos
+/// palabras y vive lejos de donde se escribe. Cuando el servidor rechaza el
+/// trabajo clínico, el motivo se queda aquí —con la acción que lo resuelve—
+/// hasta que el guardado vuelva a confirmarse. Un snackbar de tres segundos
+/// para un diagnóstico que no se guardó es como no avisar.
+class _AvisoPersistencia extends StatelessWidget {
+  const _AvisoPersistencia({
+    required this.estado,
+    required this.detalle,
+    required this.onReintentar,
+    required this.onRecargar,
+  });
+
+  final EstadoGuardado estado;
+  final String? detalle;
+  final VoidCallback onReintentar;
+  final VoidCallback? onRecargar;
+
+  static const claveFallo = ValueKey('aviso-persistencia');
+
+  @override
+  Widget build(BuildContext context) {
+    if (estado != EstadoGuardado.fallido && estado != EstadoGuardado.conflicto) {
+      return const SizedBox.shrink();
+    }
+
+    final ac = context.appColors;
+    final esConflicto = estado == EstadoGuardado.conflicto;
+    final titulo = esConflicto
+        ? 'Otra sesión guardó esta consulta primero'
+        : 'No se pudo guardar el trabajo de esta consulta';
+    final cuerpo =
+        detalle ??
+        (esConflicto
+            ? 'Recarga para ver lo confirmado antes de volver a guardar. Lo '
+                  'que escribiste sigue en pantalla.'
+            : 'Los cambios siguen en pantalla. No cierres la consulta hasta '
+                  'que el guardado se confirme.');
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: claveFallo,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ac.red.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ac.red.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icono además del color: el rojo por sí solo no comunica.
+                Icon(
+                  esConflicto
+                      ? Icons.sync_problem_rounded
+                      : Icons.cloud_off_rounded,
+                  size: 18,
+                  color: ac.red,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    titulo,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: ac.red,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Text(
+                cuerpo,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: ac.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  if (esConflicto && onRecargar != null)
+                    TextButton.icon(
+                      onPressed: onRecargar,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Recargar lo confirmado'),
+                    ),
+                  TextButton.icon(
+                    onPressed: onReintentar,
+                    icon: const Icon(Icons.save_outlined, size: 16),
+                    label: const Text('Reintentar ahora'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _IndicadorGuardado extends StatelessWidget {
   final EstadoGuardado estado;
 
@@ -897,6 +1261,11 @@ class _IndicadorGuardado extends StatelessWidget {
         Icons.cloud_off_rounded,
         'No se pudo guardar',
       ),
+      EstadoGuardado.conflicto => (
+        ac.red,
+        Icons.sync_problem_rounded,
+        'Cambió en otra sesión',
+      ),
     };
 
     return Tooltip(
@@ -908,6 +1277,9 @@ class _IndicadorGuardado extends StatelessWidget {
         EstadoGuardado.guardando => 'Escribiendo los cambios en el servidor.',
         EstadoGuardado.fallido =>
           'Los cambios siguen aquí y se reintentará solo. No cierres la consulta.',
+        EstadoGuardado.conflicto =>
+          'Otra sesión guardó esta consulta primero. Recárgala para ver lo '
+              'confirmado antes de volver a guardar; tus cambios siguen aquí.',
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

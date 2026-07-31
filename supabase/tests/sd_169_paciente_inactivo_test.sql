@@ -40,6 +40,7 @@ declare
   v_cita_pasada    uuid;
   v_cita_completa  uuid;
   v_cita_otro      uuid;
+  v_cita_nueva     uuid;
   v_estado         text;
   v_conteo         integer;
 begin
@@ -108,8 +109,10 @@ begin
   returning id into v_cita_completa;
 
   -- Cita de OTRO paciente en la misma agenda.
+  -- Desplazada dos horas respecto a `v_cita_prog`: desde HFX-CLIN-004 dos
+  -- citas del mismo doctor no pueden cruzarse en el tiempo.
   insert into citas (persona_id, doctor_id, fecha_hora, estado, created_at)
-  values (v_otro_pac_id, v_doctor_id, now() + interval '3 days', 'programada', now())
+  values (v_otro_pac_id, v_doctor_id, now() + interval '3 days 2 hours', 'programada', now())
   returning id into v_cita_otro;
 
   -- ------------------------------------------------ 2..4 la desactivación
@@ -168,10 +171,15 @@ begin
   end if;
 
   -- ----------------------------------------------- 5. reactivar no cancela
-  update citas set estado = 'programada', updated_at = now() where id = v_cita_prog;
+  -- Una cita cancelada ya no se resucita (el grafo de HFX-CLIN-004 la trata
+  -- como terminal): se agenda una nueva, que es lo que haría recepción.
   update personas set estatus = 'activo' where id = v_paciente_id;
 
-  select estado::text into v_estado from citas where id = v_cita_prog;
+  insert into citas (persona_id, doctor_id, fecha_hora, estado, created_at)
+  values (v_paciente_id, v_doctor_id, now() + interval '9 days', 'programada', now())
+  returning id into v_cita_nueva;
+
+  select estado::text into v_estado from citas where id = v_cita_nueva;
   if v_estado <> 'programada' then
     raise exception 'Reactivar al paciente cambió una cita a %.', v_estado;
   end if;
@@ -180,10 +188,14 @@ begin
   -- La app manda `estatus` en cada update de persona; sin la guarda de
   -- transición, editar un teléfono cancelaría las citas otra vez.
   update personas set estatus = 'inactivo' where id = v_paciente_id;   -- transición real
-  update citas set estado = 'programada', updated_at = now() where id = v_cita_prog;
+
+  insert into citas (persona_id, doctor_id, fecha_hora, estado, created_at)
+  values (v_paciente_id, v_doctor_id, now() + interval '11 days', 'programada', now())
+  returning id into v_cita_nueva;
+
   update personas set estatus = 'inactivo', nombre = 'Luis Alberto' where id = v_paciente_id;
 
-  select estado::text into v_estado from citas where id = v_cita_prog;
+  select estado::text into v_estado from citas where id = v_cita_nueva;
   if v_estado <> 'programada' then
     raise exception
       'Un update sin cambio de estatus volvió a cancelar la agenda (la cita quedó en %).',

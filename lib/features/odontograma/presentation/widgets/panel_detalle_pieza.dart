@@ -881,7 +881,7 @@ class _MarcasPieza extends StatelessWidget {
                     ? () => onToggleTerminado!(
                         d!,
                         marca.indiceOrigen!,
-                        marca.estado != 'Terminado',
+                        !marca.ejecucionCerrada,
                       )
                     : null,
                 onQuitar: _editaEjecucion(marca) && onQuitarTratamiento != null

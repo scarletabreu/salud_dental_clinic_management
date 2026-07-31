@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
+import 'package:salud_dental_clinic_management/core/util/metricas_clinicas.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
@@ -35,9 +36,17 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
     emit(const CitaCubitLoading());
     try {
-      final citas = await _cargarSegunAlcance();
-      final citasFiltradas = _aplicarFiltroDoctor(citas);
-      final consultas = await _consultasDe(citasFiltradas);
+      // La agenda es lo primero que se abre cada mañana: si va lenta, se nota
+      // aquí antes que en ningún otro sitio. La medición no lleva ni el doctor
+      // ni las citas, sólo cuánto tardó (HFX-CLIN-005).
+      final (citasFiltradas, consultas) = await MetricasClinicas.medir(
+        OperacionClinica.agendaCargada,
+        () async {
+          final citas = await _cargarSegunAlcance();
+          final filtradas = _aplicarFiltroDoctor(citas);
+          return (filtradas, await _consultasDe(filtradas));
+        },
+      );
       if (isClosed) return;
       final now = DateTime.now();
       emit(

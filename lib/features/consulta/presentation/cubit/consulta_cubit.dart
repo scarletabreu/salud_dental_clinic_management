@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/data/datasources/supabase_st
 import 'package:salud_dental_clinic_management/core/domain/enums/alcance.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
+import 'package:salud_dental_clinic_management/core/util/metricas_clinicas.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/referencia_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -83,6 +84,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   /// la misma clave devuelve el resultado existente en vez de descontar
   /// inventario o facturar por segunda vez.
   String? _claveCierre;
+
+  /// La última consulta que el servidor confirmó, tal como quedó en memoria.
+  /// Es la referencia contra la que se decide si hay algo que guardar.
+  Consulta? _ultimaConfirmada;
 
   @override
   Future<void> close() {
@@ -952,21 +957,37 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
     if (consultaId == null || odontograma == null) return;
 
+    // Nada cambió desde el último guardado confirmado. Enviarlo igual costaba
+    // un viaje y, del otro lado, un centenar de sentencias reescribiendo las 32
+    // piezas con lo mismo que ya tenían. La comparación es por identidad: cada
+    // edición construye una `Consulta` nueva, así que sólo puede sobrar un
+    // guardado, nunca faltar uno.
+    if (identical(consulta, _ultimaConfirmada)) {
+      _autoguardado?.cancel();
+      MetricasClinicas.omitida(OperacionClinica.consultaGuardada);
+      emit(actual.copyWith(guardado: EstadoGuardado.alDia));
+      return;
+    }
+
     _autoguardado?.cancel();
     _guardando = true;
     emit(actual.copyWith(guardado: EstadoGuardado.guardando));
     try {
-      final confirmado = await _consultaRepository.guardarBorradorConsulta(
-        consultaId: consultaId,
-        version: consulta.version,
-        odontograma: odontograma,
-        recetas: consulta.recetas,
-        insumos: consulta.insumosUtilizados,
-        notas: consulta.notas,
-        signosVitales: consulta.signosVitales,
-        condicionesDetectadas: consulta.condicionesDetectadas,
-        tratamientosGenerales: consulta.tratamientosGenerales,
-        diagnosticosGenerales: consulta.diagnosticosGenerales,
+      final confirmado = await MetricasClinicas.medir(
+        OperacionClinica.consultaGuardada,
+        () => _consultaRepository.guardarBorradorConsulta(
+          consultaId: consultaId,
+          version: consulta.version,
+          odontograma: odontograma,
+          recetas: consulta.recetas,
+          insumos: consulta.insumosUtilizados,
+          notas: consulta.notas,
+          signosVitales: consulta.signosVitales,
+          condicionesDetectadas: consulta.condicionesDetectadas,
+          tratamientosGenerales: consulta.tratamientosGenerales,
+          diagnosticosGenerales: consulta.diagnosticosGenerales,
+        ),
+        codigoDeError: _codigoDeError,
       );
       _guardando = false;
       if (isClosed) return;
@@ -975,6 +996,8 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (vigente is! ConsultaIniciada) return;
       final sellada = _sellarIds(vigente.consulta, consulta, confirmado);
       final quedaPendiente = !identical(vigente.consulta, consulta);
+      // Sólo es "lo confirmado" si nadie escribió mientras se guardaba.
+      _ultimaConfirmada = quedaPendiente ? null : sellada;
       emit(
         ConsultaIniciada(
           consulta: sellada,
@@ -992,7 +1015,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       if (isClosed) return;
       if (e is ConsultaCerradaFailure) {
         // Seguir ofreciendo el workspace sería mentir: el expediente ya cerró.
-        emit(ConsultaError(e.message));
+        emit(
+          ConsultaCerradaEnServidor(
+            mensaje: e.message,
+            consultaId: consultaId,
+          ),
+        );
         return;
       }
       final vigente = state;
@@ -1037,18 +1065,22 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
     emit(ConsultaGuardando(consulta: consulta));
     try {
-      final cierre = await _consultaRepository.cerrarConsulta(
-        consultaId: consultaId,
-        version: consulta.version,
-        odontograma: odontograma,
-        recetas: consulta.recetas,
-        insumos: consulta.insumosUtilizados,
-        notas: consulta.notas,
-        signosVitales: consulta.signosVitales,
-        condicionesDetectadas: consulta.condicionesDetectadas,
-        tratamientosGenerales: consulta.tratamientosGenerales,
-        diagnosticosGenerales: consulta.diagnosticosGenerales,
-        idempotenciaKey: clave,
+      final cierre = await MetricasClinicas.medir(
+        OperacionClinica.consultaCerrada,
+        () => _consultaRepository.cerrarConsulta(
+          consultaId: consultaId,
+          version: consulta.version,
+          odontograma: odontograma,
+          recetas: consulta.recetas,
+          insumos: consulta.insumosUtilizados,
+          notas: consulta.notas,
+          signosVitales: consulta.signosVitales,
+          condicionesDetectadas: consulta.condicionesDetectadas,
+          tratamientosGenerales: consulta.tratamientosGenerales,
+          diagnosticosGenerales: consulta.diagnosticosGenerales,
+          idempotenciaKey: clave,
+        ),
+        codigoDeError: _codigoDeError,
       );
 
       _guardando = false;
@@ -1063,8 +1095,28 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     } catch (e) {
       _guardando = false;
       AppLog.error('terminar consulta', e);
-      emit(ConsultaError(_mensajeError(e, fallback: _falloCierre)));
-      emit(ConsultaIniciada(consulta: consulta));
+      if (e is ConsultaCerradaFailure) {
+        emit(
+          ConsultaCerradaEnServidor(
+            mensaje: e.message,
+            consultaId: consultaId,
+          ),
+        );
+        return;
+      }
+      // Un cierre fallido devuelve la consulta a su estado abierto, pero no
+      // "al día": el servidor no confirmó nada. Emitirla como guardada —que es
+      // lo que hacía este catch— pintaba el chip verde justo después de que el
+      // cierre se cayera. El motivo se queda en pantalla hasta que se resuelva.
+      emit(
+        ConsultaIniciada(
+          consulta: consulta,
+          guardado: e is ConflictoVersionFailure
+              ? EstadoGuardado.conflicto
+              : EstadoGuardado.fallido,
+          detalleFallo: _mensajeError(e, fallback: _falloCierre),
+        ),
+      );
     }
   }
 
@@ -1148,19 +1200,33 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       'No se pudo cerrar la consulta. No se descontó inventario ni se generó '
       'la pre-factura; la consulta sigue abierta.';
 
+  /// Traduce el fallo a un código estable para la métrica. Nunca el mensaje:
+  /// ahí van nombres de medicamentos y de insumos.
+  static String _codigoDeError(Object error) => switch (error) {
+    NetworkFailure() => 'RED',
+    ConflictoVersionFailure() => 'CONFLICTO_VERSION',
+    StockInsuficienteFailure() => 'STOCK_INSUFICIENTE',
+    ConsultaCerradaFailure() => 'CONSULTA_CERRADA',
+    ValidationFailure() => 'VALIDACION',
+    ServerFailure() => 'SERVIDOR',
+    _ => 'DESCONOCIDO',
+  };
+
   String _nuevaClaveCierre(String consultaId) =>
       '$consultaId:${DateTime.now().microsecondsSinceEpoch}';
 
   /// Explica qué falló sin exponer el payload: el doctor necesita saber qué
   /// operación no pasó, no el detalle interno del servidor.
-  String? _detalleFallo(Object e) {
-    if (e is ConflictoVersionFailure ||
-        e is StockInsuficienteFailure ||
-        e is NetworkFailure) {
-      return e.toString();
-    }
-    return null;
-  }
+  ///
+  /// Siempre devuelve un motivo. Antes callaba ante un fallo genérico y el
+  /// aviso quedaba con un título de alarma y ningún texto debajo, que es
+  /// exactamente la duda que HFX-CLIN-005 vino a quitar.
+  String _detalleFallo(Object e) => _mensajeError(
+    e,
+    fallback:
+        'No se pudo guardar el trabajo de esta consulta. Los cambios siguen '
+        'en pantalla y se reintentará solo.',
+  );
 
   String _mensajeError(
     Object e, {

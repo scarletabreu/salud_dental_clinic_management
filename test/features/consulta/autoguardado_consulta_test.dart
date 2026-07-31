@@ -133,6 +133,33 @@ final _resina = Tratamiento(
 
 void main() {
   group('autoguardado de la consulta', () {
+    test('guardar dos veces sin tocar nada sólo escribe una', () async {
+      final repo = _ConsultaRepoDoble(consulta: _consultaEnCurso());
+      final cubit = _cubitCon(repo);
+      addTearDown(cubit.close);
+      await cubit.reanudarConsulta(consultaId: 'c-1');
+      final diente = (cubit.state as ConsultaIniciada)
+          .consulta
+          .odontograma!
+          .dientes
+          .single;
+      cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
+
+      await cubit.guardarParcial();
+      expect(repo.guardados, 1);
+
+      // El segundo guardado no tiene nada que llevar: el viaje sobra y, del
+      // otro lado, reescribiría las 32 piezas con lo mismo.
+      await cubit.guardarParcial();
+      expect(repo.guardados, 1);
+      expect((cubit.state as ConsultaIniciada).guardado, EstadoGuardado.alDia);
+
+      // Y en cuanto se toca algo, vuelve a salir.
+      cubit.aplicarTratamiento(diente, TipoSuperficie.mesial, _resina);
+      await cubit.guardarParcial();
+      expect(repo.guardados, 2);
+    });
+
     test(
       'una ejecución agregada durante la consulta no exige justificación',
       () async {
@@ -435,23 +462,33 @@ void main() {
           .single;
       cubit.aplicarTratamiento(diente, TipoSuperficie.oclusal, _resina);
 
+      // Desde HFX-CLIN-005 el fallo no viaja como un estado de paso que la
+      // pantalla convertía en un snackbar de tres segundos: la consulta vuelve
+      // abierta y el motivo se queda dentro de su propio estado.
       final esperado = expectLater(
         cubit.stream,
         emitsInOrder([
           isA<ConsultaGuardando>(),
-          isA<ConsultaError>().having(
-            (e) => e.message,
-            'mensaje',
-            allOf(contains('Gasas'), contains('consume 3')),
-          ),
-          isA<ConsultaIniciada>(),
+          isA<ConsultaIniciada>()
+              .having(
+                (e) => e.guardado,
+                'guardado',
+                EstadoGuardado.fallido,
+              )
+              .having(
+                (e) => e.detalleFallo,
+                'detalle',
+                allOf(contains('Gasas'), contains('consume 3')),
+              ),
         ]),
       );
       await cubit.terminarConsulta();
       await esperado;
 
-      // El doctor vuelve a su consulta, que sigue abierta.
-      expect(cubit.state, isA<ConsultaIniciada>());
+      // El doctor vuelve a su consulta, que sigue abierta, y el chip no dice
+      // "Guardado" después de que el cierre se cayera.
+      final vigente = cubit.state as ConsultaIniciada;
+      expect(vigente.guardado, EstadoGuardado.fallido);
     });
 
     test('el cierre confirmado saca al doctor del workspace', () async {
@@ -492,11 +529,12 @@ void main() {
 
         // Seguir editando un expediente cerrado es la ficción que este ticket
         // elimina: la pantalla tiene que decirlo, no autoguardar en el vacío.
-        expect(cubit.state, isA<ConsultaError>());
-        expect(
-          (cubit.state as ConsultaError).message,
-          contains('ya fue finalizada'),
-        );
+        // No es un error cualquiera —no hay nada que reintentar—, así que
+        // desde HFX-CLIN-005 tiene su propio estado terminal.
+        expect(cubit.state, isA<ConsultaCerradaEnServidor>());
+        final cerrada = cubit.state as ConsultaCerradaEnServidor;
+        expect(cerrada.mensaje, contains('ya fue finalizada'));
+        expect(cerrada.consultaId, 'c-1');
       },
     );
 

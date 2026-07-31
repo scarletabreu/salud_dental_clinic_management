@@ -49,8 +49,12 @@ analyze_limpio() {
   local salida
   salida=$(flutter analyze 2>&1)
   echo "$salida"
+  # El ancla `^\s+` daba un falso verde: `flutter analyze` sangra las líneas de
+  # `info` pero no las de `warning`, de modo que el gate contaba cero mientras
+  # el análisis reportaba nueve. Se ancla al principio de línea con sangría
+  # opcional.
   local graves
-  graves=$(grep -cE '^\s+(error|warning) •' <<<"$salida" || true)
+  graves=$(grep -cE '^[[:space:]]*(error|warning) •' <<<"$salida" || true)
   echo
   echo "Errores y warnings: $graves"
   [[ "$graves" -eq 0 ]]

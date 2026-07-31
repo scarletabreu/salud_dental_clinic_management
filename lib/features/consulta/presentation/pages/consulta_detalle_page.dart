@@ -245,7 +245,7 @@ class ConsultaDetallePage extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: tieneFoto
                         ? Image.network(
-                            fotoUrl!,
+                            fotoUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Icon(
                               Icons.person_rounded,

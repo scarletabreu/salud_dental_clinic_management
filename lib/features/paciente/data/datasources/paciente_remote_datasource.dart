@@ -103,7 +103,7 @@ class PacienteRemoteDatasource {
           // crearlo después (la RLS de `records` es clínica) y la primera
           // consulta se encontraba una ficha a medias.
           'record': {
-            'tipo_sangre': paciente.record.tipoSangre.name,
+            'tipo_sangre': paciente.record.tipoSangre.dbValue,
             'cant_hijos': paciente.record.cantHijos,
             'cirugias_previas': paciente.record.cirugiasPrevias,
             'historial_familiar': paciente.record.historialFamiliar,

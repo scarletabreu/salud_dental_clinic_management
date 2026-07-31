@@ -26,7 +26,10 @@ class Record {
     required this.historialFamiliar,
   });
 
-  String get bloodType => tipoSangre.name.toUpperCase();
+  /// La etiqueta clínica ('O+'), no el nombre de la constante de Dart: con
+  /// `name` el panel del paciente y el PDF del expediente mostraban
+  /// «OPOSITIVO».
+  String get bloodType => tipoSangre.valor;
   List<Condicion> get conditions => condiciones;
   String get history => historialFamiliar;
   int get childrenCount => cantHijos;

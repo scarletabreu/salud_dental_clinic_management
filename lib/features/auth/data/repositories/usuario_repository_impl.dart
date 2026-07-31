@@ -14,11 +14,16 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
 
   UsuarioRepositoryImpl(this.remoteDataSource);
 
-  static const _selectPerfilCompleto =
-      '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
+  // `usuarios` tiene grants por columna (todo menos password_hash): un `*`
+  // sobre esa tabla falla con «permission denied», así que se piden columnas.
+  static const _columnasUsuario =
+      'id, username, last_login, created_at, deleted_at, updated_at';
 
-    static const _selectPerfilAdmin =
-      '*, doctores(*, usuarios(*, personas(*, persona_contactos(*, contactos(*)))))';
+  static const _selectPerfilCompleto =
+      '*, usuarios($_columnasUsuario, personas(*, persona_contactos(*, contactos(*))))';
+
+  static const _selectPerfilAdmin =
+      '*, doctores(*, usuarios($_columnasUsuario, personas(*, persona_contactos(*, contactos(*)))))';
 
   @override
   String? getCurrentUserId() {

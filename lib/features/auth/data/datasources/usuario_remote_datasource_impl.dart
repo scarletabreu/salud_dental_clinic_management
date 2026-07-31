@@ -3,8 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   final SupabaseClient supabase;
+  // `usuarios` tiene grants por columna (todo menos password_hash): un `*`
+  // sobre esa tabla falla con «permission denied», así que se piden columnas.
   static const _selectPerfilCompleto =
-      '*, usuarios(*, personas(*, persona_contactos(*, contactos(*))))';
+      '*, usuarios(id, username, last_login, created_at, deleted_at, updated_at, '
+      'personas(*, persona_contactos(*, contactos(*))))';
 
   UsuarioRemoteDataSourceImpl(this.supabase);
 

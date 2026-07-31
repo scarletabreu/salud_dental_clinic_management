@@ -14,18 +14,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
   Future<void> cargarCuentas() async {
     emit(const CuentasPorCobrarLoading());
     try {
-      final dynamic repo = _repository;
-      List<Cuenta> cuentas;
-      try {
-        cuentas = await repo.getCuentasPorCobrar();
-      } catch (_) {
-        try {
-          cuentas = await repo.getCuentas();
-        } catch (_) {
-          cuentas = await repo.getTodasLasCuentas();
-        }
-      }
-
+      final cuentas = await _repository.getCuentasPorCobrar();
       _evaluarYEmitir(cuentas: cuentas);
     } catch (e) {
       emit(CuentasPorCobrarError('Error al cargar cuentas por cobrar: $e'));
@@ -93,12 +82,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
     );
 
     try {
-      final dynamic repo = _repository;
-      try {
-        await repo.eliminarCuenta(id);
-      } catch (_) {
-        await repo.deleteCuenta(id);
-      }
+      await _repository.eliminarCuenta(id);
       await cargarCuentas();
       return true;
     } catch (_) {
@@ -107,32 +91,11 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
     }
   }
 
-  double _getMontoPendiente(Cuenta c) {
-    try {
-      final dynamic obj = c;
-      if (obj.montoPendiente != null)
-        return (obj.montoPendiente as num).toDouble();
-    } catch (_) {}
-    return (c.montoTotal - c.montoPagado);
-  }
+  double _getMontoPendiente(Cuenta c) => c.balancePendiente;
 
-  DateTime _getFecha(Cuenta c) {
-    try {
-      final dynamic obj = c;
-      if (obj.createdAt != null) return obj.createdAt as DateTime;
-      if (obj.fecha != null) return obj.fecha as DateTime;
-    } catch (_) {}
-    return DateTime(2020);
-  }
+  DateTime _getFecha(Cuenta c) => c.fechaCreacion;
 
-  String _getNotas(Cuenta c) {
-    try {
-      final dynamic obj = c;
-      if (obj.notas != null) return obj.notas.toString();
-      if (obj.observaciones != null) return obj.observaciones.toString();
-    } catch (_) {}
-    return '';
-  }
+  String _getNotas(Cuenta c) => c.nota ?? '';
 
   void _evaluarYEmitir({
     required List<Cuenta> cuentas,

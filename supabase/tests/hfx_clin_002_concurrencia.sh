@@ -43,6 +43,9 @@ delete from public.personas where id = '$PACIENTE';
 delete from public.doctores where id = '$DOCTOR';
 delete from public.usuarios where id = '$DOCTOR';
 delete from auth.users where id = '$DOCTOR';
+-- La persona del doctor la crea handle_new_user y no se borraba: un fallo a
+-- media prueba dejaba la cédula ocupada y la siguiente ejecución no arrancaba.
+delete from public.personas where id = '$DOCTOR';
 SQL
 }
 
@@ -63,14 +66,18 @@ insert into public.personas (id, nombre, apellido, fecha_nacimiento, cedula)
 values ('$PACIENTE', 'Paco', 'Concurrente', date '1990-01-01', 'HFX002-PC');
 insert into public.pacientes (id, genero) values ('$PACIENTE', 'masculino');
 
-insert into public.citas (id, persona_id, doctor_id, fecha_hora, duracion_minutos)
-values ('$CITA', '$PACIENTE', '$DOCTOR', now() + interval '1 day', 30);
+-- Nace en_consulta porque su consulta ya está abierta: desde HFX-CLIN-004 el
+-- grafo de estados de la cita lo impone la base.
+insert into public.citas (id, persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+values ('$CITA', '$PACIENTE', '$DOCTOR', now() + interval '1 day', 30, 'en_consulta');
 
 insert into public.consultas (id, paciente_id, doctor_id, cita_id, fecha)
 values ('$CONSULTA', '$PACIENTE', '$DOCTOR', '$CITA', now());
 
+-- De alcance global: el escenario no monta odontograma, y desde HFX-CLIN-003
+-- un tratamiento por pieza sin pieza lo rechaza la base.
 insert into public.tratamientos (id, nombre, costo, alcance)
-values ('$TRATAMIENTO', 'Resina concurrencia', 1200, 'diente');
+values ('$TRATAMIENTO', 'Profilaxis concurrencia', 1200, 'global');
 
 insert into public.consumibles (id, nombre, stock_actual, stock_minimo, precio)
 values ('$CONSUMIBLE', 'Gasas concurrencia', 10, 1, 20);

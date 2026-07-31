@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/features/consulta/data/models/con
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
@@ -102,27 +103,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       );
     }
     return runGuarded(() async {
-      final dientes = (consulta.odontograma?.dientes ?? [])
-          .map(
-            (d) => {
-              'fdi_code': d.fdiCode,
-              'superficies': d.superficies
-                  .map((s) => s.tipoSuperficie.name)
-                  .toList(),
-            },
-          )
-          .toList();
-
-      final documentos = consulta.documentosClinicos
-          .map(
-            (doc) => {
-              'descripcion': doc.descripcion,
-              'tipo_documento': doc.tipoDocumento.name,
-              'url_archivo': doc.urlArchivo,
-              'fecha_creacion': doc.fechaCreacion.toUtc().toIso8601String(),
-            },
-          )
-          .toList();
+      final dientes = _dientesDe(consulta);
+      final documentos = _documentosDe(consulta);
 
       final params = {
         'p_paciente_id': consulta.pacienteId,
@@ -145,6 +127,63 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       }
       return id;
     }, context: 'crear la consulta completa');
+  }
+
+  List<Map<String, dynamic>> _dientesDe(Consulta consulta) =>
+      (consulta.odontograma?.dientes ?? [])
+          .map(
+            (d) => {
+              'fdi_code': d.fdiCode,
+              'superficies': d.superficies
+                  .map((s) => s.tipoSuperficie.name)
+                  .toList(),
+            },
+          )
+          .toList();
+
+  List<Map<String, dynamic>> _documentosDe(Consulta consulta) => consulta
+      .documentosClinicos
+      .map(
+        (doc) => {
+          'descripcion': doc.descripcion,
+          'tipo_documento': doc.tipoDocumento.name,
+          'url_archivo': doc.urlArchivo,
+          'fecha_creacion': doc.fechaCreacion.toUtc().toIso8601String(),
+        },
+      )
+      .toList();
+
+  @override
+  Future<InicioConsulta> iniciarConsultaDeCita(Consulta consulta) {
+    final citaId = consulta.citaId;
+    if (!_isValidUuid(citaId)) {
+      throw Exception(
+        'No se puede iniciar una consulta sin una cita real de la agenda.',
+      );
+    }
+    return runGuarded(() async {
+      // Ni paciente, ni doctor, ni fecha viajan en la llamada: los toma la base
+      // de la propia cita. Es lo que impide que la consulta acabe firmada por
+      // quien no es o fechada el día del clic (SD-160).
+      final respuesta = await remoteDataSource.iniciarConsultaDeCita({
+        'p_cita_id': citaId,
+        'p_dientes': _dientesDe(consulta),
+        'p_documentos': _documentosDe(consulta),
+        'p_temp_condiciones': consulta.tempCondiciones,
+        'p_motivo_consulta': consulta.motivoConsulta,
+        'p_tipo_atencion': consulta.tipoAtencion.name,
+      });
+
+      final inicio = InicioConsulta.fromJson(respuesta);
+      if (inicio.estado == EstadoInicioConsulta.creada &&
+          consulta.signosVitales != null &&
+          !consulta.signosVitales!.estaVacia) {
+        await remoteDataSource.updateConsulta(inicio.consultaId, {
+          'signos_vitales': consulta.signosVitales!.toJson(),
+        });
+      }
+      return inicio;
+    }, context: 'iniciar la consulta de la cita');
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:salud_dental_clinic_management/core/domain/repositories/persona_
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart'; // AÑADIDO
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
@@ -110,51 +111,118 @@ class MisCitasDelDiaPage extends StatelessWidget {
         builder: (context, state) {
           if (state is! CitaCubitLoaded) return const SizedBox.shrink();
 
-          // Crear citas es de quien gestiona la agenda completa.
+          // Agendar es de quien gestiona la agenda completa; registrar una
+          // urgencia lo puede hacer cualquiera que esté en la clínica cuando
+          // llega alguien sin cita (HFX-CLIN-004).
           final authState = context.watch<AuthCubit>().state;
-          if (!authState.puedeGestionarAgendaCompleta) {
+          final puedeAgendar = authState.puedeGestionarAgendaCompleta;
+          final puedeUrgencia = authState.puedeRegistrarEmergencia;
+          if (!puedeAgendar && !puedeUrgencia) {
             return const SizedBox.shrink();
           }
 
-          Future<void> abrirNuevaCita() async {
-            await NuevaCitaDialog.show(
+          final compacto = MediaQuery.sizeOf(context).width < 360;
+          final ac = context.appColors;
+
+          Future<void> abrirFormulario({required bool emergencia}) async {
+            final citaId = await NuevaCitaDialog.show(
               context,
               personaRepository: sl<PersonaRepository>(),
               doctorRepository: sl<DoctorRepository>(),
               pacienteRepository: sl<IPacienteRepository>(),
               citaRepository: sl<CitaRepository>(),
+              emergencia: emergencia,
+              doctorPredeterminadoId: authState.puedeEjercerClinica
+                  ? authState.usuario?.id
+                  : null,
             );
-            if (context.mounted) context.read<CitaCubit>().load();
+            if (!context.mounted) return;
+            context.read<CitaCubit>().load();
+            // La urgencia termina donde tiene que terminar: en la consulta, sin
+            // obligar a buscar en la agenda al paciente que acaba de llegar.
+            if (citaId != null) {
+              await _abrirConsultaDeUrgencia(context, citaId);
+            }
           }
+
+          final urgencia = FloatingActionButton(
+            heroTag: 'fab_urgencia_unique_tag',
+            backgroundColor: ac.red,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            tooltip: 'Registrar urgencia (paciente sin cita)',
+            onPressed: () => abrirFormulario(emergencia: true),
+            child: const Icon(Icons.priority_high_rounded),
+          );
+
+          if (!puedeAgendar) return urgencia;
 
           // The extended label eats roughly 40% of a 320 px screen and covers
           // the last calendar row, so narrow phones get the compact button.
-          if (MediaQuery.sizeOf(context).width < 360) {
-            return FloatingActionButton(
-              heroTag: 'fab_nueva_cita_unique_tag',
-              backgroundColor: context.appColors.primaryGreen,
-              foregroundColor: Colors.white,
-              elevation: 2,
-              tooltip: 'Nueva Cita',
-              onPressed: abrirNuevaCita,
-              child: const Icon(Icons.add_rounded),
-            );
-          }
-          return FloatingActionButton.extended(
-            heroTag: 'fab_nueva_cita_unique_tag',
-            backgroundColor: context.appColors.primaryGreen,
-            foregroundColor: Colors.white,
-            elevation: 2,
-            onPressed: abrirNuevaCita,
-            icon: const Icon(Icons.add_rounded, size: 20),
-            label: const Text(
-              'Nueva Cita',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
+          final nueva = compacto
+              ? FloatingActionButton(
+                  heroTag: 'fab_nueva_cita_unique_tag',
+                  backgroundColor: ac.primaryGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  tooltip: 'Nueva Cita',
+                  onPressed: () => abrirFormulario(emergencia: false),
+                  child: const Icon(Icons.add_rounded),
+                )
+              : FloatingActionButton.extended(
+                  heroTag: 'fab_nueva_cita_unique_tag',
+                  backgroundColor: ac.primaryGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  onPressed: () => abrirFormulario(emergencia: false),
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text(
+                    'Nueva Cita',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                );
+
+          if (!puedeUrgencia) return nueva;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [urgencia, const SizedBox(height: 12), nueva],
           );
         },
       ),
     );
+  }
+
+  /// Entra a la consulta de la urgencia recién registrada.
+  ///
+  /// Solo lo hace quien puede firmarla: si la urgencia se asignó a otro doctor
+  /// —un asistente puede—, la cita queda en espera en su agenda y aquí no se
+  /// abre nada. Poder registrarla no es poder atenderla.
+  static Future<void> _abrirConsultaDeUrgencia(
+    BuildContext context,
+    String citaId,
+  ) async {
+    final estado = context.read<CitaCubit>().state;
+    if (estado is! CitaCubitLoaded) return;
+
+    final cita = estado.citas.where((c) => c.id == citaId).firstOrNull;
+    final pacienteId = cita?.persona.id;
+    final doctorId = cita?.doctor.id;
+    if (cita == null || pacienteId == null || doctorId == null) return;
+    if (!context.read<AuthCubit>().state.puedeAtenderCitaDe(doctorId)) return;
+
+    final cubit = context.read<CitaCubit>();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EfectuarConsultaPage(
+          citaId: citaId,
+          pacienteId: pacienteId,
+          doctorId: doctorId,
+          motivoCita: cita.motivo,
+        ),
+      ),
+    );
+    cubit.load();
   }
 
   static Widget _buildState(BuildContext context, CitaCubitState state) {
@@ -190,7 +258,7 @@ class _CalendarioView extends StatelessWidget {
           // que estando llena, y antes un fallo de carga se veía como agenda
           // llena de citas inventadas.
           if (state.citas.isEmpty) ...[
-            const _AgendaVaciaAviso(),
+            _AgendaVaciaAviso(sinDoctoresAsignados: state.sinDoctoresAsignados),
             const SizedBox(height: 12),
           ],
           Expanded(child: _CalendarioBody(state: state)),
@@ -200,12 +268,65 @@ class _CalendarioView extends StatelessWidget {
   }
 }
 
+/// Qué puede hacer *este* actor con una agenda vacía.
+///
+/// El texto anterior mandaba a todo el mundo a «Nueva Cita», un botón que el
+/// doctor no tiene: le decía que hiciera algo imposible justo cuando no sabía
+/// qué hacer. Cada rol lee ahora la acción que sí está a su alcance.
+class _MensajeAgendaVacia {
+  final String titulo;
+  final String detalle;
+
+  const _MensajeAgendaVacia(this.titulo, this.detalle);
+
+  factory _MensajeAgendaVacia.para(
+    AuthState auth, {
+    required bool sinDoctoresAsignados,
+    required bool deTodoElPeriodo,
+  }) {
+    if (sinDoctoresAsignados) {
+      return const _MensajeAgendaVacia(
+        'Todavía no tienes odontólogos asignados',
+        'La agenda que gestionas es la de los odontólogos a tu cargo. Pide a '
+            'administración que te asigne al menos uno.',
+      );
+    }
+    if (auth.puedeGestionarAgendaCompleta) {
+      return _MensajeAgendaVacia(
+        deTodoElPeriodo
+            ? 'Aún no hay citas registradas'
+            : 'Sin citas este día',
+        'Crea la primera con «Nueva Cita», o registra una urgencia si el '
+            'paciente ya está en la clínica.',
+      );
+    }
+    if (auth.puedeEjercerClinica) {
+      return _MensajeAgendaVacia(
+        deTodoElPeriodo ? 'No tienes citas asignadas' : 'Sin citas este día',
+        'Recepción agenda tus citas. Si llega alguien sin cita, regístralo con '
+            '«Urgencia» y podrás atenderlo enseguida.',
+      );
+    }
+    return const _MensajeAgendaVacia(
+      'Sin citas para mostrar',
+      'Tu perfil no gestiona la agenda clínica.',
+    );
+  }
+}
+
 class _AgendaVaciaAviso extends StatelessWidget {
-  const _AgendaVaciaAviso();
+  const _AgendaVaciaAviso({required this.sinDoctoresAsignados});
+
+  final bool sinDoctoresAsignados;
 
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final mensaje = _MensajeAgendaVacia.para(
+      context.watch<AuthCubit>().state,
+      sinDoctoresAsignados: sinDoctoresAsignados,
+      deTodoElPeriodo: true,
+    );
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       decoration: BoxDecoration(
@@ -233,7 +354,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Aún no hay citas registradas',
+                      mensaje.titulo,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -242,7 +363,7 @@ class _AgendaVaciaAviso extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'La agenda está vacía. Crea la primera con «Nueva Cita».',
+                      mensaje.detalle,
                       style: TextStyle(fontSize: 12, color: ac.textMuted),
                     ),
                   ],
@@ -1357,10 +1478,40 @@ class _CitaCard extends StatelessWidget {
                   // CAMBIO: el botón de consulta ahora depende también de
                   // puedeEfectuarConsulta, no solo del estado de la cita.
                   if (puedeEfectuarConsulta) _botonEfectuar(context),
+                  if (authState.puedeRegistrarLlegadaDe(cita.doctor.id))
+                    _botonLlegada(context),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// «Registrar llegada» es el paso que faltaba en la agenda del doctor: sin él
+  /// la cita nunca alcanzaba `en espera` y «Iniciar consulta» no aparecía nunca
+  /// para quien trabaja sin recepción.
+  Widget _botonLlegada(BuildContext context) {
+    final ac = context.appColors;
+    final citaId = cita.id;
+    final llegaHoy =
+        cita.estado == EstadoCita.programada ||
+        cita.estado == EstadoCita.confirmada;
+    if (!llegaHoy || citaId == null) return const SizedBox.shrink();
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: OutlinedButton.icon(
+          onPressed: () => context.read<CitaCubit>().registrarLlegada(citaId),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: ac.amber,
+            side: BorderSide(color: ac.amber.withValues(alpha: 0.5)),
+          ),
+          icon: const Icon(Icons.how_to_reg_outlined, size: 16),
+          label: const Text('Registrar llegada'),
         ),
       ),
     );
@@ -1563,6 +1714,11 @@ class _EmptyDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final mensaje = _MensajeAgendaVacia.para(
+      context.watch<AuthCubit>().state,
+      sinDoctoresAsignados: false,
+      deTodoElPeriodo: false,
+    );
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 40),
@@ -1584,17 +1740,19 @@ class _EmptyDay extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Sin citas este día',
+              mensaje.titulo,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: ac.textSecondary,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Selecciona otro día o crea una nueva cita',
+              mensaje.detalle,
               style: TextStyle(fontSize: 12, color: ac.textMuted),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

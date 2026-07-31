@@ -52,6 +52,24 @@ Failure mapExceptionToFailure(Object error, {String? context}) {
         return ConsultaCerradaFailure(error.message);
       case 'CL003':
         return StockInsuficienteFailure(error.message);
+      // Códigos de agenda y ficha (HFX-CLIN-004). También vienen redactados
+      // para quien está delante de la pantalla.
+      case 'CL015':
+      case 'CL016':
+      case 'CL017':
+      case 'CL018':
+        return ValidationFailure(error.message);
+      case 'CL019':
+        return ConflictoVersionFailure(error.message);
+    }
+    // El solapamiento lo rechaza una restricción de exclusión, y su mensaje
+    // crudo nombra un índice de PostgreSQL. Quien agenda necesita saber qué
+    // hacer, no cómo se llama la restricción.
+    if (error.code == '23P01' && error.message.contains('citas_sin_solape')) {
+      return const ValidationFailure(
+        'Ese horario ya está ocupado en la agenda del odontólogo. Elige otro '
+        'hueco, o regístralo como urgencia si el paciente ya está en la clínica.',
+      );
     }
     return ServerFailure(_serverMessage(context, error.message));
   }

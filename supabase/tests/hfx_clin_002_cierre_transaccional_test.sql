@@ -35,11 +35,14 @@ begin
   values (v_paciente, 'Petra', 'Paciente', date '1995-01-01', 'HFX002-P');
   insert into public.pacientes(id, genero) values (v_paciente, 'femenino');
 
-  insert into public.citas(persona_id, doctor_id, fecha_hora, duracion_minutos)
-  values (v_paciente, v_doc_a, now() + interval '1 day', 30)
+  -- Nacen `en_consulta` porque su consulta ya está abierta: desde HFX-CLIN-004
+  -- el grafo de estados vive en la base y cerrar una cita que nunca recibió al
+  -- paciente sería una transición imposible.
+  insert into public.citas(persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+  values (v_paciente, v_doc_a, now() + interval '1 day', 30, 'en_consulta')
   returning id into v_cita;
-  insert into public.citas(persona_id, doctor_id, fecha_hora, duracion_minutos)
-  values (v_paciente, v_doc_a, now() + interval '2 day', 30)
+  insert into public.citas(persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+  values (v_paciente, v_doc_a, now() + interval '2 day', 30, 'en_consulta')
   returning id into v_cita_2;
 
   insert into public.consultas(paciente_id, doctor_id, cita_id, fecha)

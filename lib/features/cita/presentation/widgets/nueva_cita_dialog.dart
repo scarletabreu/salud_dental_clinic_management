@@ -71,23 +71,41 @@ class NuevaCitaDialog extends StatefulWidget {
   /// obligaba a volver a elegir el día y la hora que ya se habían señalado.
   final DateTime? fechaInicial;
 
+  /// Atención de urgencia para alguien que ya está en la clínica (HFX-CLIN-004).
+  ///
+  /// Cambia lo que el formulario pide y lo que hace al confirmar: no hay fecha
+  /// ni hora que elegir —es ahora—, y la cita nace marcada como emergencia y ya
+  /// en espera. Hasta este ticket no existía ninguna vía para eso y la urgencia
+  /// se resolvía inventando citas o editando filas en Supabase.
+  final bool emergencia;
+
+  /// Doctor con el que abre el desplegable. Quien ejerce se propone a sí mismo;
+  /// un asistente llega sin nada preseleccionado y tiene que elegir responsable.
+  final String? doctorPredeterminadoId;
+
   const NuevaCitaDialog._({
     required this.personaRepository,
     required this.doctorRepository,
     required this.pacienteRepository,
     required this.citaRepository,
     this.fechaInicial,
+    this.emergencia = false,
+    this.doctorPredeterminadoId,
   });
 
-  static Future<void> show(
+  /// Devuelve el id de la cita de urgencia creada cuando [emergencia] es cierto,
+  /// para poder entrar directamente a su consulta. `null` en los demás casos.
+  static Future<String?> show(
     BuildContext context, {
     required PersonaRepository personaRepository,
     required DoctorRepository doctorRepository,
     required IPacienteRepository pacienteRepository,
     required CitaRepository citaRepository,
     DateTime? fechaInicial,
+    bool emergencia = false,
+    String? doctorPredeterminadoId,
   }) {
-    return showDialog<void>(
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (_) => BlocProvider.value(
@@ -98,6 +116,8 @@ class NuevaCitaDialog extends StatefulWidget {
           pacienteRepository: pacienteRepository,
           citaRepository: citaRepository,
           fechaInicial: fechaInicial,
+          emergencia: emergencia,
+          doctorPredeterminadoId: doctorPredeterminadoId,
         ),
       ),
     );
@@ -171,6 +191,7 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
       _fecha = DateTime(inicial.year, inicial.month, inicial.day);
       _hora = TimeOfDay(hour: inicial.hour, minute: inicial.minute);
     }
+    _esEmergencia = widget.emergencia;
   }
 
   @override
@@ -255,7 +276,12 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     setState(() => _cargandoDoctores = true);
     try {
       final lista = await widget.doctorRepository.getDoctores();
-      setState(() => _doctores = lista);
+      setState(() {
+        _doctores = lista;
+        _doctorSeleccionado ??= lista
+            .where((d) => d.id == widget.doctorPredeterminadoId)
+            .firstOrNull;
+      });
     } catch (_) {
     } finally {
       setState(() => _cargandoDoctores = false);
@@ -264,20 +290,25 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
 
   Future<void> _confirmar() async {
     if (!(_formKeyCita.currentState?.validate() ?? false)) return;
-    if (_fecha == null || _hora == null) {
+    // La urgencia es ahora: no se elige fecha ni hora, y por eso tampoco se
+    // comprueban. Pedirle a alguien que ya está sangrando que reserve un hueco
+    // futuro era exactamente el rodeo que obligaba a tocar la base a mano.
+    if (!widget.emergencia && (_fecha == null || _hora == null)) {
       _showError('Selecciona fecha y hora para la cita.');
       return;
     }
 
-    final fechaHora = DateTime(
-      _fecha!.year,
-      _fecha!.month,
-      _fecha!.day,
-      _hora!.hour,
-      _hora!.minute,
-    );
+    final fechaHora = widget.emergencia
+        ? DateTime.now()
+        : DateTime(
+            _fecha!.year,
+            _fecha!.month,
+            _fecha!.day,
+            _hora!.hour,
+            _hora!.minute,
+          );
 
-    if (fechaHora.isBefore(DateTime.now())) {
+    if (!widget.emergencia && fechaHora.isBefore(DateTime.now())) {
       _showError('No puedes agendar una cita en una fecha/hora pasada.');
       return;
     }
@@ -317,6 +348,27 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
     }
 
     final motivo = _motivoCtrl.text.trim();
+
+    if (widget.emergencia) {
+      setState(() => _guardando = true);
+      final citaId = await context.read<CitaCubit>().registrarEmergencia(
+        pacienteId: persona.id!,
+        doctorId: _doctorSeleccionado!.id!,
+        motivo: motivo.isEmpty ? null : motivo,
+      );
+      if (!mounted) return;
+      if (citaId == null) {
+        setState(() => _guardando = false);
+        _showError(
+          'No se pudo registrar la urgencia. Revisa la conexión e inténtalo de '
+          'nuevo: el paciente no quedó agendado.',
+        );
+        return;
+      }
+      Navigator.of(context).pop(citaId);
+      return;
+    }
+
     final cita = Cita(
       doctor: _doctorSeleccionado!,
       persona: persona,
@@ -1238,36 +1290,38 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                 ),
           const SizedBox(height: 16),
 
-          _SectionLabel(icon: Icons.schedule_outlined, label: 'Fecha y Hora'),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _DateTimeButton(
-                  icon: Icons.calendar_today_outlined,
-                  label: _fecha == null
-                      ? 'Seleccionar fecha'
-                      : _formatDate(_fecha!),
-                  hasValue: _fecha != null,
-                  onTap: _pickFecha,
-                  error: _guardando && _fecha == null,
+          if (!widget.emergencia) ...[
+            _SectionLabel(icon: Icons.schedule_outlined, label: 'Fecha y Hora'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _DateTimeButton(
+                    icon: Icons.calendar_today_outlined,
+                    label: _fecha == null
+                        ? 'Seleccionar fecha'
+                        : _formatDate(_fecha!),
+                    hasValue: _fecha != null,
+                    onTap: _pickFecha,
+                    error: _guardando && _fecha == null,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _DateTimeButton(
-                  icon: Icons.access_time_outlined,
-                  label: _hora == null
-                      ? 'Seleccionar hora'
-                      : _hora!.format(context),
-                  hasValue: _hora != null,
-                  onTap: _pickHora,
-                  error: _guardando && _hora == null,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _DateTimeButton(
+                    icon: Icons.access_time_outlined,
+                    label: _hora == null
+                        ? 'Seleccionar hora'
+                        : _hora!.format(context),
+                    hasValue: _hora != null,
+                    onTap: _pickHora,
+                    error: _guardando && _hora == null,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
 
           _SectionLabel(
             icon: Icons.notes_outlined,
@@ -1290,21 +1344,26 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
           ),
           const SizedBox(height: 16),
 
-          _SectionLabel(
-            icon: Icons.checklist_rounded,
-            label: 'Actividades del plan de tratamiento',
-          ),
-          const SizedBox(height: 8),
-          SelectorActividadesPlan(
-            pacienteId: _esNuevaPersona ? null : _personaSeleccionada?.id,
-            repository: widget.citaRepository,
-            seleccionadas: _actividades,
-            habilitado: !_guardando,
-            onChanged: (lista) => setState(() => _actividades = lista),
-          ),
-          const SizedBox(height: 10),
+          if (!widget.emergencia) ...[
+            _SectionLabel(
+              icon: Icons.checklist_rounded,
+              label: 'Actividades del plan de tratamiento',
+            ),
+            const SizedBox(height: 8),
+            SelectorActividadesPlan(
+              pacienteId: _esNuevaPersona ? null : _personaSeleccionada?.id,
+              repository: widget.citaRepository,
+              seleccionadas: _actividades,
+              habilitado: !_guardando,
+              onChanged: (lista) => setState(() => _actividades = lista),
+            ),
+            const SizedBox(height: 10),
+          ],
 
-          Material(
+          if (widget.emergencia)
+            _AvisoUrgencia()
+          else
+            Material(
             color: _esEmergencia ? ac.red.withValues(alpha: 0.08) : ac.bgPage,
             shape: RoundedRectangleBorder(
               side: BorderSide(color: _esEmergencia ? ac.red : ac.divider),
@@ -1366,9 +1425,17 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                           Icons.check_circle_outline_rounded,
                           size: 18,
                         ),
-                  label: Text(_guardando ? 'Guardando...' : 'Confirmar Cita'),
+                  label: Text(
+                    _guardando
+                        ? 'Guardando...'
+                        : widget.emergencia
+                        ? 'Registrar urgencia'
+                        : 'Confirmar Cita',
+                  ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryGreen,
+                    backgroundColor: widget.emergencia
+                        ? ac.red
+                        : ac.primaryGreen,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
@@ -1648,6 +1715,53 @@ class _PersonaTile extends StatelessWidget {
           color: ac.textMuted,
           size: 18,
         ),
+      ),
+    );
+  }
+}
+
+/// Dice en el propio formulario qué va a pasar al confirmar una urgencia: se
+/// crea ahora, marcada, y con el paciente ya dado por presente.
+class _AvisoUrgencia extends StatelessWidget {
+  const _AvisoUrgencia();
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ac.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.red.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.priority_high_rounded, size: 18, color: ac.red),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Atención de urgencia',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: ac.red,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Se registra con la hora actual, queda marcada como emergencia '
+                  'y el paciente entra en espera: no ocupa un hueco de la agenda.',
+                  style: TextStyle(fontSize: 11, color: ac.textMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

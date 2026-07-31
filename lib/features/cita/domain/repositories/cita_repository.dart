@@ -19,6 +19,24 @@ abstract class CitaRepository {
   );
 
   Future<void> createCita(Cita cita);
+
+  /// Deja constancia de que el paciente ya está en la clínica.
+  ///
+  /// Es idempotente y la autoriza la base: el doctor puede marcar la llegada de
+  /// sus propias citas sin depender de recepción, que es lo que le impedía
+  /// trabajar solo (HFX-CLIN-004).
+  Future<void> registrarLlegada(String citaId);
+
+  /// Abre una atención de urgencia para un paciente que ya está presente.
+  ///
+  /// Crea la cita marcada como emergencia y directamente en espera. Devuelve su
+  /// id para poder entrar a la consulta sin volver a buscarla en la agenda. Una
+  /// urgencia no reserva agenda: queda fuera del control de solapamiento.
+  Future<String> registrarEmergencia({
+    required String pacienteId,
+    required String doctorId,
+    String? motivo,
+  });
   Future<void> deleteCita(String id);
   Future<void> updateCitaEstado(String id, EstadoCita nuevoEstado);
   Future<void> updateCita(Cita cita);

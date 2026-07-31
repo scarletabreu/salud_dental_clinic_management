@@ -719,6 +719,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     children: [
                       Text(
                         'Consulta en curso',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
@@ -730,6 +732,8 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                       const SizedBox(height: 3),
                       Text(
                         'Diagnostica, planifica y registra lo realizado',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           color: ac.textMuted,
@@ -739,38 +743,55 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                     ],
                   ),
                 ),
-                _IndicadorGuardado(estado: guardado),
-                if (totalTratamientos > 0) const SizedBox(width: 8),
-                if (totalTratamientos > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ac.teal.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: ac.teal.withValues(alpha: 0.25),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.healing_rounded, size: 12, color: ac.teal),
-                        const SizedBox(width: 5),
-                        Text(
-                          '$totalTratamientos tratamiento${totalTratamientos > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: ac.teal,
+                // Los distintivos van en un `Wrap` flexible: juntos miden más
+                // que la cabecera entera cuando el panel se estrecha —al
+                // arrastrar el borde de la ventana, por ejemplo—, y como fila
+                // rígida desbordaban en vez de reacomodarse.
+                Flexible(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _IndicadorGuardado(estado: guardado),
+                      if (totalTratamientos > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ac.teal.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: ac.teal.withValues(alpha: 0.25),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.healing_rounded,
+                                size: 12,
+                                color: ac.teal,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '$totalTratamientos tratamiento${totalTratamientos > 1 ? 's' : ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: ac.teal,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 24),

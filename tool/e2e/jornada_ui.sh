@@ -30,6 +30,27 @@ psql "$DB_URL" -q -v ON_ERROR_STOP=1 \
 psql "$DB_URL" -q -v ON_ERROR_STOP=1 \
   -f supabase/tests/e2e_ui_login_overlay.sql \
   >"$EVIDENCIA/overlay.log" 2>&1 || { echo '  ✗ falló el overlay'; tail -20 "$EVIDENCIA/overlay.log"; exit 1; }
+
+# El alta escribe siempre la misma ficha, con la misma cédula. Sin limpiarla,
+# la segunda ejecución muere contra la unicidad de cédula y el fallo aparece
+# disfrazado de «la ficha no se cerró tras guardar», que apunta a otro sitio.
+psql "$DB_URL" -q -v ON_ERROR_STOP=1 >>"$EVIDENCIA/seed.log" 2>&1 <<'LIMPIEZA'
+do $$
+declare
+  v_id uuid;
+begin
+  select p.id into v_id
+    from public.personas p
+   where p.nombre = 'Elena' and p.apellido = 'Encarnación E2E';
+  if v_id is null then
+    return;
+  end if;
+  delete from public.records   where paciente_id = v_id;
+  delete from public.pacientes where id = v_id;
+  delete from public.personas  where id = v_id;
+end;
+$$;
+LIMPIEZA
 echo '  ✓ base lista'
 
 echo '▶ Arrancando chromedriver'

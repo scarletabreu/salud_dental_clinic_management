@@ -130,6 +130,6 @@ Analyzing salud_dental_clinic_management...
    info • The member 'noSuchMethod' overrides an inherited member but isn't annotated with '@override'. Try adding the '@override' annotation • test/features/odontograma/historial_pieza_test.dart:19:11 • annotate_overrides
    info • The local variable '_campo' starts with an underscore. Try renaming the variable to not start with an underscore • test/responsive_widgets_test.dart:209:18 • no_leading_underscores_for_local_identifiers
 
-129 issues found. (ran in 2.9s)
+129 issues found. (ran in 2.1s)
 
 Errores y warnings: 0

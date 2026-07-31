@@ -18,6 +18,14 @@ enum EstadoTratamientoAplicado {
   String get dbValue =>
       this == EstadoTratamientoAplicado.enProceso ? 'en_proceso' : name;
 
+  /// Cómo se nombra en pantalla. Un estado y su booleano histórico no pueden
+  /// contradecirse: desde HFX-CLIN-003 la base deriva `esta_terminado` de aquí.
+  String get etiqueta => switch (this) {
+    EstadoTratamientoAplicado.enProceso => 'En proceso',
+    EstadoTratamientoAplicado.aplicado => 'Aplicado',
+    EstadoTratamientoAplicado.completado => 'Completado',
+  };
+
   static EstadoTratamientoAplicado fromDb(String? valor) {
     if (valor == 'en_proceso') return EstadoTratamientoAplicado.enProceso;
     // `indicado` es de antes de SD-135: era una intención guardada en el eje de

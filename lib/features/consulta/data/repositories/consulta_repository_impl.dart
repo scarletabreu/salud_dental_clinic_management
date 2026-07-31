@@ -4,7 +4,9 @@ import 'package:salud_dental_clinic_management/features/consulta/data/datasource
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
@@ -153,7 +155,10 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) {
     return runGuarded(() async {
       final respuesta = await remoteDataSource.guardarBorradorConsulta(
@@ -165,6 +170,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
           insumos: insumos,
           notas: notas,
           signosVitales: signosVitales,
+          condicionesDetectadas: condicionesDetectadas,
+          tratamientosGenerales: tratamientosGenerales,
+          diagnosticosGenerales: diagnosticosGenerales,
         ),
       );
       return ResultadoBorradorConsulta.fromRpc(respuesta);
@@ -179,7 +187,10 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
     required String idempotenciaKey,
     String? nota,
   }) {
@@ -193,6 +204,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
           insumos: insumos,
           notas: notas,
           signosVitales: signosVitales,
+          condicionesDetectadas: condicionesDetectadas,
+          tratamientosGenerales: tratamientosGenerales,
+          diagnosticosGenerales: diagnosticosGenerales,
         ),
         idempotenciaKey: idempotenciaKey,
         nota: nota,
@@ -209,7 +223,10 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     required List<Receta> recetas,
     required List<InsumoUtilizado> insumos,
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) {
     final dientes = [
       for (final diente in odontograma.dientes)
@@ -256,7 +273,22 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     return {
       'version_payload': 1,
       if (notas != null) 'notas': notas,
-      if (signosVitales != null) 'signos_vitales': signosVitales,
+      // El resumen plano alimenta a los lectores antiguos; las mediciones son
+      // la verdad y las valida el servidor una por una (HFX-CLIN-003).
+      if (signosVitales != null) 'signos_vitales': signosVitales.toJson(),
+      if (signosVitales != null)
+        'signos_vitales_medidos': signosVitales.toPayloadMediciones(),
+      'condiciones_detectadas': [
+        for (final condicion in condicionesDetectadas) condicion.toPayload(),
+      ],
+      'generales': {
+        'tratamientos': [
+          for (final t in tratamientosGenerales) _tratamientoGeneralJson(t),
+        ],
+        'diagnosticos': [
+          for (final d in diagnosticosGenerales) _diagnosticoGeneralJson(d),
+        ],
+      },
       'evaluacion_clinica': odontograma.evaluacionToJson(),
       'dientes': dientes,
       'recetas': [
@@ -271,6 +303,46 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       ],
       'insumos': [for (final insumo in insumos) insumo.toJson()],
     };
+  }
+
+  /// Lo global no lleva pieza ni superficie: la base lo rechaza si las lleva.
+  Map<String, dynamic> _tratamientoGeneralJson(TratamientoAplicado t) => {
+    if (t.id != null) 'id': t.id,
+    'tratamiento_id': t.tratamientoId,
+    'precio_aplicado': t.precioAplicado,
+    'notas': t.notas,
+    'estado': t.estado.dbValue,
+    'item_plan_id': t.itemPlanId,
+    'justificacion_no_planificada': t.justificacionNoPlanificada,
+    'doctor_ejecuta_id': t.doctorEjecutaId,
+    'fecha_ejecucion': (t.fechaEjecucion ?? t.fechaAplicacion)
+        ?.toUtc()
+        .toIso8601String(),
+  };
+
+  Map<String, dynamic> _diagnosticoGeneralJson(DiagnosticoAplicado d) => {
+    if (d.id != null) 'id': d.id,
+    'diagnosis_id': d.diagnosisId,
+    'severidad': d.severidad.name,
+    'fecha_aplicacion': d.fechaAplicacion.toUtc().toIso8601String(),
+    'origen': d.origen.name,
+    'notas': d.notas,
+  };
+
+  @override
+  Future<void> resolverAlerta({
+    required String alertaId,
+    required bool documentada,
+    String? justificacion,
+  }) {
+    return runGuarded(
+      () => remoteDataSource.resolverAlertaClinica(
+        alertaId: alertaId,
+        estado: documentada ? 'documentada' : 'confirmada',
+        justificacion: justificacion,
+      ),
+      context: 'registrar la decisión sobre la alerta clínica',
+    );
   }
 
   @override

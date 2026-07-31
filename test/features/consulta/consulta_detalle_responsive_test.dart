@@ -49,7 +49,7 @@ Consulta _consulta() => Consulta(
   notas:
       'Se realiza apertura cameral y se confirma pulpitis irreversible. '
       'Se instrumenta y se deja medicación intraconducto.',
-  signosVitales: const SignosVitales(
+  signosVitales: SignosVitales.valores(
     presionSistolica: 128,
     presionDiastolica: 84,
     pulso: 76,

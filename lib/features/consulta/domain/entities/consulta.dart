@@ -1,4 +1,8 @@
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -15,7 +19,20 @@ class Consulta {
   final List<InsumoUtilizado> insumosUtilizados;
   final List<DocumentoClinico> documentosClinicos;
   final Odontograma? odontograma;
+  /// Texto libre de la anamnesis. Desde HFX-CLIN-003 es un complemento:
+  /// lo que participa en contraindicaciones es [condicionesDetectadas].
   final List<String> tempCondiciones;
+
+  /// Condiciones de catálogo descubiertas hoy. Cuentan desde que se registran.
+  final List<CondicionDetectada> condicionesDetectadas;
+
+  /// Lo que el catálogo declara global o de arcada: no cuelga de ninguna pieza,
+  /// y la base rechaza que se le asigne una.
+  final List<TratamientoAplicado> tratamientosGenerales;
+  final List<DiagnosticoAplicado> diagnosticosGenerales;
+
+  /// Alertas vigentes que devolvió el motor en el último guardado.
+  final List<AlertaClinica> alertas;
   final String? motivoConsulta;
   final String? notas;
   final SignosVitales? signosVitales;
@@ -40,6 +57,10 @@ class Consulta {
     this.documentosClinicos = const [],
     this.odontograma,
     this.tempCondiciones = const [],
+    this.condicionesDetectadas = const [],
+    this.tratamientosGenerales = const [],
+    this.diagnosticosGenerales = const [],
+    this.alertas = const [],
     this.motivoConsulta,
     this.notas,
     this.signosVitales,
@@ -50,6 +71,10 @@ class Consulta {
   });
 
   bool get tieneRecetas => recetas.isNotEmpty;
+
+  /// Alertas que impiden cerrar mientras nadie las confirme o documente.
+  List<AlertaClinica> get alertasBloqueantes =>
+      [for (final a in alertas) if (a.bloqueaCierre) a];
   bool get estaEnCurso => !finalizada;
   bool get tieneTratamientosAplicados =>
       odontograma?.dientes.any(
@@ -69,6 +94,10 @@ class Consulta {
     Odontograma? odontograma,
     String? citaId,
     List<String>? tempCondiciones,
+    List<CondicionDetectada>? condicionesDetectadas,
+    List<TratamientoAplicado>? tratamientosGenerales,
+    List<DiagnosticoAplicado>? diagnosticosGenerales,
+    List<AlertaClinica>? alertas,
     String? motivoConsulta,
     String? notas,
     SignosVitales? signosVitales,
@@ -89,6 +118,13 @@ class Consulta {
           documentosClinicos ?? List.from(this.documentosClinicos),
       odontograma: odontograma ?? this.odontograma,
       tempCondiciones: tempCondiciones ?? List.from(this.tempCondiciones),
+      condicionesDetectadas:
+          condicionesDetectadas ?? List.from(this.condicionesDetectadas),
+      tratamientosGenerales:
+          tratamientosGenerales ?? List.from(this.tratamientosGenerales),
+      diagnosticosGenerales:
+          diagnosticosGenerales ?? List.from(this.diagnosticosGenerales),
+      alertas: alertas ?? List.from(this.alertas),
       motivoConsulta: motivoConsulta ?? this.motivoConsulta,
       notas: notas ?? this.notas,
       signosVitales: signosVitales ?? this.signosVitales,

@@ -87,7 +87,7 @@ Paciente _pacienteCompleto({List<Consulta>? consultas}) {
           motivoConsulta: 'Revision inicial',
           notas: 'Evaluacion integral',
           odontograma: odontograma,
-          signosVitales: const SignosVitales(
+          signosVitales: SignosVitales.valores(
             presionSistolica: 120,
             presionDiastolica: 80,
           ),

@@ -55,7 +55,9 @@ begin
   returning id into v_diente;
 
   insert into public.tratamientos(nombre, costo, alcance)
-  values ('Resina HFX002', 1500, 'diente') returning id into v_tratamiento;
+  -- Puntual: se ejecuta sobre una cara, y el payload de la prueba manda la
+  -- superficie. Desde HFX-CLIN-003 la base exige que ambos concuerden.
+  values ('Resina HFX002', 1500, 'puntual') returning id into v_tratamiento;
   insert into public.diagnosticos(nombre, alcance, categoria)
   values ('Caries HFX002', 'puntual', 'caries') returning id into v_diagnostico;
 
@@ -140,8 +142,17 @@ begin
         ))
       )),
       'recetas', jsonb_build_array(jsonb_build_object(
+        -- Renglón estructurado (HFX-CLIN-003): la emisión exige dosis, vía,
+        -- frecuencia, duración y una cantidad coherente con ellas.
         'items_receta', jsonb_build_array(jsonb_build_object(
-          'nombre_medicamento', 'Ibuprofeno', 'dosis', '400 mg'
+          'nombre_medicamento', 'Ibuprofeno',
+          'dosis', '400 mg',
+          'dosis_cantidad', 1,
+          'dosis_unidad', 'tableta',
+          'via_administracion', 'oral',
+          'frecuencia_horas', 8,
+          'duracion_dias', 5,
+          'cantidad_total', 15
         ))
       )),
       'insumos', jsonb_build_array(

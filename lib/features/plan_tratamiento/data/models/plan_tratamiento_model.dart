@@ -10,6 +10,7 @@ class PlanTratamientoModel extends PlanTratamiento {
     super.consultaOrigenId,
     required super.doctorId,
     super.estado,
+    super.version,
     super.notas,
     required super.fechaPropuesta,
     super.fechaAceptacion,
@@ -26,6 +27,7 @@ class PlanTratamientoModel extends PlanTratamiento {
       consultaOrigenId: plan.consultaOrigenId,
       doctorId: plan.doctorId,
       estado: plan.estado,
+      version: plan.version,
       notas: plan.notas,
       fechaPropuesta: plan.fechaPropuesta,
       fechaAceptacion: plan.fechaAceptacion,
@@ -44,6 +46,7 @@ class PlanTratamientoModel extends PlanTratamiento {
       consultaOrigenId: json['consulta_origen_id'] as String?,
       doctorId: json['doctor_id'] as String? ?? '',
       estado: EstadoPlanTratamiento.fromDb(json['estado'] as String?),
+      version: (json['version'] as num?)?.toInt() ?? 1,
       notas: json['notas'] as String?,
       fechaPropuesta:
           DateTime.tryParse('${json['fecha_propuesta']}') ??

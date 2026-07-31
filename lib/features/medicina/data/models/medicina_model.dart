@@ -6,6 +6,7 @@ class MedicinaModel extends Medicina {
   MedicinaModel({
     required super.id,
     required super.nombre,
+    super.principioActivo,
     required super.contraindicaciones,
     super.efectosSecundarios = const [],
   });
@@ -45,6 +46,7 @@ class MedicinaModel extends Medicina {
     return MedicinaModel(
       id: json['id'] as String,
       nombre: json['nombre'] as String? ?? '',
+      principioActivo: json['principio_activo'] as String?,
       contraindicaciones: contras,
       efectosSecundarios: rawEfectosSecundarios
           .map(
@@ -60,6 +62,9 @@ class MedicinaModel extends Medicina {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'nombre': nombre.trim(),
+      'principio_activo': principioActivo?.trim().isEmpty ?? true
+          ? null
+          : principioActivo!.trim(),
       'efectos_secundarios': efectosSecundarios.map((e) => e.name).toList(),
     };
 
@@ -78,6 +83,7 @@ class MedicinaModel extends Medicina {
     return MedicinaModel(
       id: medicina.id,
       nombre: medicina.nombre,
+      principioActivo: medicina.principioActivo,
       contraindicaciones: medicina.contraindicaciones,
       efectosSecundarios: medicina.efectosSecundarios,
     );

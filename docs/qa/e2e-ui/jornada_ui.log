@@ -28,11 +28,11 @@ Got dependencies!
 24 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
 Launching integration_test/jornada_ui_test.dart on Web Server in debug mode...
-Waiting for connection from debug service on Web Server...         28.3s
-integration_test/jornada_ui_test.dart is being served at http://localhost:45025
+Waiting for connection from debug service on Web Server...         27.2s
+integration_test/jornada_ui_test.dart is being served at http://localhost:35249
 The web-server device requires the Dart Debug Chrome extension for debugging. Consider using the Chrome or Edge devices for an improved development workflow.
-Debug service listening on ws://127.0.0.1:46281/19lGgBA6nZo=/ws
-A Dart VM Service on Web Server is available at: http://127.0.0.1:46281/19lGgBA6nZo=
-The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:46281/19lGgBA6nZo=/devtools/?uri=ws://127.0.0.1:46281/19lGgBA6nZo=/ws
+Debug service listening on ws://127.0.0.1:33813/vcJIfBG9Vgg=/ws
+A Dart VM Service on Web Server is available at: http://127.0.0.1:33813/vcJIfBG9Vgg=
+The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:33813/vcJIfBG9Vgg=/devtools/?uri=ws://127.0.0.1:33813/vcJIfBG9Vgg=/ws
 All tests passed.
 Application finished.

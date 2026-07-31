@@ -1,0 +1,4 @@
+psql:supabase/migrations/20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql:53: NOTICE:  constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+psql:supabase/migrations/20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql:86: NOTICE:  trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+psql:supabase/migrations/20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql:146: NOTICE:  constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+psql:supabase/migrations/20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql:251: NOTICE:  trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping

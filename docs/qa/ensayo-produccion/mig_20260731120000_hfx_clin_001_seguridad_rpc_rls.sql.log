@@ -1,0 +1,2 @@
+psql:supabase/migrations/20260731120000_hfx_clin_001_seguridad_rpc_rls.sql:574: NOTICE:  policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/20260731120000_hfx_clin_001_seguridad_rpc_rls.sql:575: NOTICE:  policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping

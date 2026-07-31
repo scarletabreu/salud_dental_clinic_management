@@ -1,0 +1,10 @@
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:43: NOTICE:  constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:168: NOTICE:  trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:234: NOTICE:  trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:273: NOTICE:  trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:324: NOTICE:  trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:364: NOTICE:  trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:407: NOTICE:  trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:441: NOTICE:  trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:470: NOTICE:  trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+psql:supabase/migrations/20260804090000_hfx_clin_005_auditoria_ux.sql:501: NOTICE:  trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping

@@ -311,6 +311,40 @@ DO
 psql:supabase/tests/hfx_clin_006_reglas_editables_test.sql:482: NOTICE:  OK 13 · anon no alcanza las reglas clínicas por ninguna vía
 DO
 ROLLBACK
+── supabase/tests/hfx_clin_007_escrituras_directas_test.sql
+BEGIN
+SET
+psql:supabase/tests/hfx_clin_007_escrituras_directas_test.sql:50: NOTICE:  OK 1 · las columnas de cierre no son escribibles y las clínicas sí
+DO
+psql:supabase/tests/hfx_clin_007_escrituras_directas_test.sql:95: NOTICE:  OK 2 · el inventario sólo se mueve por el libro, y el libro por las RPC
+DO
+psql:supabase/tests/hfx_clin_007_escrituras_directas_test.sql:152: NOTICE:  OK 3 · el estado del consumible sigue a su stock en toda vía
+DO
+psql:supabase/tests/hfx_clin_007_escrituras_directas_test.sql:187: NOTICE:  OK 4 · las nueve etiquetas de TipoSangre.dbValue son válidas
+DO
+ROLLBACK
+── supabase/tests/hfx_clin_008_odontograma_completo_test.sql
+BEGIN
+SET
+DO
+SET
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "50800000-0000-4000-8000-000000000001", "role" : "authenticated"}
+(1 row)
+
+psql:supabase/tests/hfx_clin_008_odontograma_completo_test.sql:111: NOTICE:  OK 1 · la consulta nace con las 52 piezas y sus 260 caras
+DO
+psql:supabase/tests/hfx_clin_008_odontograma_completo_test.sql:161: NOTICE:  OK 2 · cada pieza recibe la cara interna y la quinta que le tocan
+DO
+psql:supabase/tests/hfx_clin_008_odontograma_completo_test.sql:214: NOTICE:  OK 3 · se puede anotar una pieza en una consulta abierta desde su cita
+DO
+SET
+psql:supabase/tests/hfx_clin_008_odontograma_completo_test.sql:256: NOTICE:  OK 4 · completar dos veces no duplica piezas ni pierde anotaciones
+DO
+psql:supabase/tests/hfx_clin_008_odontograma_completo_test.sql:270: NOTICE:  OK 5 · las piezas sólo las crea la apertura de la consulta
+DO
+ROLLBACK
 ── supabase/tests/sd_111_trigger_caja_test.sql
 BEGIN
 SET
@@ -344,10 +378,10 @@ ROLLBACK
 ── supabase/tests/sd_169_paciente_inactivo_test.sql
 BEGIN
 SET
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
-psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: 0fce05fa-f064-43e1-ac39-dd3048fb9f78. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
+psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  Cita cancelada para la persona id: f52fc4ba-e315-49bf-9924-57181880990a. El horario ha sido liberado.
 psql:supabase/tests/sd_169_paciente_inactivo_test.sql:206: NOTICE:  SD-169 OK · baja del paciente: 3 citas canceladas; en_consulta, consulta abierta, pasada, terminal y ajena intactas
 DO
 ROLLBACK

@@ -84,3 +84,84 @@ begin
     'SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).';
 end;
 $seed$;
+
+-- ============================================================================
+--  Usuarios de desarrollo
+--
+--  El campo de usuario del login muestra `pruebadoctor` como texto de ejemplo
+--  (`login_page.dart`), pero nadie lo creaba nunca: el seed no traía usuarios y
+--  ese nombre no existía en ninguna base. Quien seguía la pista del formulario
+--  se topaba con «credenciales inválidas» sin manera de saber por qué.
+--
+--    pruebadoctor    / pruebadoctor      · doctor
+--    pruebaadmin     / pruebaadmin       · admin (y doctor en todas las capas,
+--                                          por HFX-CLIN-000)
+--    pruebaasistente / pruebaasistente   · asistente
+--
+--  El correo tiene que ser `<usuario>@saluddental.com`: la pantalla de login no
+--  pide correo sino usuario y compone ese dominio de forma fija
+--  (`usuario_repository_impl.dart`).
+--
+--  La contraseña es igual al usuario **a propósito**, porque esto sólo se
+--  ejecuta en el stack local: `supabase db reset` nunca corre contra un
+--  proyecto remoto. Estas credenciales no deben sembrarse en un entorno
+--  desplegado.
+--
+--  Idempotente: si ya existen, no hace nada.
+-- ============================================================================
+do
+$usuarios$
+declare
+  v_instancia uuid := '00000000-0000-0000-0000-000000000000';
+  v_actor     record;
+begin
+  for v_actor in
+    select * from (values
+      ('11111111-0000-4000-8000-000000000001'::uuid, 'pruebadoctor',
+       '{"rol":"doctor","nombre":"Daniel","apellido":"Prueba","fecha_nacimiento":"1985-05-20","cedula":"PRUEBA-DOC","username":"pruebadoctor","especialidad":"Odontología general","telefono":"(809) 555-0201"}'::jsonb),
+      ('11111111-0000-4000-8000-000000000002'::uuid, 'pruebaadmin',
+       '{"rol":"admin","nombre":"Andrea","apellido":"Prueba","fecha_nacimiento":"1980-11-02","cedula":"PRUEBA-ADM","username":"pruebaadmin","especialidad":"Odontología general","departamento":"Dirección","telefono":"(809) 555-0202"}'::jsonb),
+      ('11111111-0000-4000-8000-000000000003'::uuid, 'pruebaasistente',
+       '{"rol":"asistente","nombre":"Alicia","apellido":"Prueba","fecha_nacimiento":"1993-07-14","cedula":"PRUEBA-ASI","username":"pruebaasistente","turno":"matutino","telefono":"(809) 555-0203"}'::jsonb)
+    ) as t(id, usuario, metadata)
+  loop
+    if exists (select 1 from auth.users where id = v_actor.id) then
+      continue;
+    end if;
+
+    -- `handle_new_user` cuelga de `auth.users` y crea persona, usuario y
+    -- perfil: basta con insertar aquí con la metadata completa.
+    insert into auth.users (
+      id, instance_id, aud, role, email, encrypted_password,
+      email_confirmed_at, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
+      email_change_token_current, phone_change, phone_change_token,
+      reauthentication_token,
+      raw_app_meta_data, raw_user_meta_data
+    ) values (
+      v_actor.id, v_instancia, 'authenticated', 'authenticated',
+      v_actor.usuario || '@saluddental.com',
+      extensions.crypt(v_actor.usuario, extensions.gen_salt('bf')),
+      now(), now(), now(),
+      '', '', '', '', '', '', '', '',
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      v_actor.metadata
+    );
+
+    -- Sin fila en `auth.identities` el usuario existe pero no tiene con qué
+    -- probar que el correo es suyo, y GoTrue rechaza el inicio de sesión.
+    insert into auth.identities (
+      id, user_id, provider_id, identity_data, provider,
+      last_sign_in_at, created_at, updated_at
+    ) values (
+      gen_random_uuid(), v_actor.id, v_actor.id::text,
+      jsonb_build_object('sub', v_actor.id::text,
+                         'email', v_actor.usuario || '@saluddental.com',
+                         'email_verified', true),
+      'email', now(), now(), now()
+    );
+
+    raise notice 'seed: usuario % creado (contraseña igual al usuario).', v_actor.usuario;
+  end loop;
+end;
+$usuarios$;

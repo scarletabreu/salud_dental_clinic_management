@@ -763,7 +763,7 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                   icon: Icons.bloodtype_outlined,
                   iconColor: ac.red,
                   label: 'TIPO DE SANGRE',
-                  value: record.tipoSangre.name.toUpperCase(),
+                  value: record.tipoSangre.valor,
                 ),
               ),
               const SizedBox(width: 12),

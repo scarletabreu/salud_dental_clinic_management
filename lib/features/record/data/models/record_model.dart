@@ -20,9 +20,8 @@ class RecordModel extends Record {
     return RecordModel(
       id: json['id'] as String?,
       pacienteId: json['paciente_id'] ?? json['pacienteId'],
-      tipoSangre: TipoSangre.values.firstWhere(
-        (e) => e.name == (json['tipo_sangre'] ?? json['tipoSangre']),
-        orElse: () => TipoSangre.desconocido,
+      tipoSangre: TipoSangre.desdeDb(
+        json['tipo_sangre'] ?? json['tipoSangre'],
       ),
       condiciones:
           (json['condiciones'] as List?)
@@ -52,7 +51,7 @@ class RecordModel extends Record {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'paciente_id': pacienteId,
-      'tipo_sangre': tipoSangre.name,
+      'tipo_sangre': tipoSangre.dbValue,
       'condiciones': condiciones
           .map(
             (e) => e is CondicionModel

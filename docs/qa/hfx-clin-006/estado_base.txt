@@ -11,6 +11,8 @@ cd8039160e741978  20260731090000_hfx_clin_000_identidad_admin_doctor.sql
 780d1cae7d5c1f4f  20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql
 d9fcc8c59d360d8a  20260804090000_hfx_clin_005_auditoria_ux.sql
 d3793b500a006a9b  20260805090000_hfx_clin_006_reglas_clinicas_editables.sql
+5ff12ef511f2b537  20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql
+a4d04d57972cf642  20260807090000_hfx_clin_008_odontograma_sin_piezas.sql
 
 # Reglas clínicas en vigor
 codigo | version | estado | severidad | accion | parametros

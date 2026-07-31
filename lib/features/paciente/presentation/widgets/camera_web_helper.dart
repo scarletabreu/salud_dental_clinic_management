@@ -70,7 +70,7 @@ Future<Uint8List?> mostrarDialogoCamaraWeb(BuildContext context) async {
           TextButton(
             onPressed: () {
               stream?.getTracks().toDart.forEach((track) {
-                (track as web.MediaStreamTrack).stop();
+                track.stop();
               });
               Navigator.pop(dialogCtx);
             },
@@ -92,7 +92,7 @@ Future<Uint8List?> mostrarDialogoCamaraWeb(BuildContext context) async {
               fotoCapturadaBytes = Uri.parse(dataUrl).data?.contentAsBytes();
 
               stream?.getTracks().toDart.forEach((track) {
-                (track as web.MediaStreamTrack).stop();
+                track.stop();
               });
 
               Navigator.pop(dialogCtx);

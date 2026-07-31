@@ -47,7 +47,7 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
         .select()
         .single();
 
-    return response as Map<String, dynamic>;
+    return response;
   }
 
   @override

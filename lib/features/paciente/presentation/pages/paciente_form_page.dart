@@ -136,6 +136,15 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   bool get _isCompletarRegistro =>
       widget.modo == PacienteFormModo.completarRegistro;
 
+  /// La ficha se abrió para dar de alta a alguien que todavía no existe.
+  ///
+  /// El botón «Nuevo Paciente» del listado entra por aquí con un paciente sin
+  /// `id`, y hasta HFX-CLIN-007 el formulario guardaba siempre por la vía de
+  /// actualización: sin `id`, el datasource lanzaba «No se puede actualizar un
+  /// paciente sin ID», el aviso se desvanecía a los pocos segundos y la ficha
+  /// se quedaba abierta como si no hubiera pasado nada.
+  bool get _esAlta => widget.paciente.id == null;
+
   @override
   void initState() {
     super.initState();
@@ -311,7 +320,14 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       version: widget.paciente.version,
     );
 
-    context.read<PacienteCubit>().updatePaciente(paciente);
+    // Alta y edición son dos operaciones distintas en el servidor: el alta pasa
+    // por `registrar_paciente`, que crea persona, paciente y expediente en una
+    // sola transacción.
+    if (_esAlta) {
+      context.read<PacienteCubit>().addPaciente(paciente);
+    } else {
+      context.read<PacienteCubit>().updatePaciente(paciente);
+    }
   }
 
   Future<void> _guardarDiffCondiciones() async {
@@ -725,6 +741,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                     Text(
                       _isCompletarRegistro
                           ? 'Completar ficha clínica'
+                          : _esAlta
+                          ? 'Nuevo paciente'
                           : 'Editar paciente',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

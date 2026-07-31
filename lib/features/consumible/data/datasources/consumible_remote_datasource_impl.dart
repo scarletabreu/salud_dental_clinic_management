@@ -19,31 +19,24 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
     return List<Map<String, dynamic>>.from(response as List);
   }
 
+  /// El ajuste va por la RPC, que es quien tiene capacidad para moverlo.
+  ///
+  /// Antes se leía el stock y se insertaba el movimiento a mano. Eso dejaba la
+  /// diferencia calculada en el cliente —dos ajustes simultáneos se pisaban— y
+  /// exigía que `movimientos_stock_consumible` fuese escribible por cualquier
+  /// usuario autenticado, que es el agujero que cierra HFX-CLIN-007.
+  /// `ajustar_stock_consumible` exige capacidad administrativa, toma el lock y
+  /// deja el estado del consumible recalculado.
   @override
   Future<void> adjustStock(String id, int nuevoStock, String motivo) async {
-    final actual = await supabaseClient
-        .from('consumibles')
-        .select('stock_actual')
-        .eq('id', id)
-        .single();
-    final diferencia = nuevoStock - (actual['stock_actual'] as int);
-
-    await supabaseClient.from('movimientos_stock_consumible').insert({
-      'consumible_id': id,
-      'diferencia': diferencia,
-      'motivo': motivo,
-    });
-  }
-
-  @override
-  Future<void> updateStock(String id, int nuevoStock) async {
-    await supabaseClient
-        .from('consumibles')
-        .update({
-          'stock_actual': nuevoStock,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+    await supabaseClient.rpc(
+      'ajustar_stock_consumible',
+      params: {
+        'p_consumible_id': id,
+        'p_nuevo_stock': nuevoStock,
+        'p_motivo': motivo,
+      },
+    );
   }
 
   @override

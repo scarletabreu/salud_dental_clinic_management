@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
@@ -63,24 +60,9 @@ class _ExpedientePageState extends State<ExpedientePage> {
   TipoFormatoExpediente _formatoSeleccionado =
       TipoFormatoExpediente.conOdontograma;
 
-  pw.MemoryImage? _logoImage;
-
-  @override
-  void initState() {
-    super.initState();
-    _precargarLogo();
-  }
-
-  Future<void> _precargarLogo() async {
-    try {
-      final logoBytes = await rootBundle.load('assets/images/logo.png');
-      if (mounted) {
-        setState(() {
-          _logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-        });
-      }
-    } catch (_) {}
-  }
+  // La precarga del logo vivía aquí y no se pasaba a ninguna parte:
+  // `ExpedientePdfBuilder` ya lo carga solo cuando no se le entrega uno, así
+  // que era trabajo duplicado que además nunca llegaba al documento.
 
   String get _nombreArchivo =>
       'Expediente_${widget.paciente.nombre}_${widget.paciente.apellido}.pdf'

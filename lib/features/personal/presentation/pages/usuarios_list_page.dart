@@ -65,69 +65,6 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     );
   }
 
-  void _mostrarOpciones(BuildContext context, Usuario usuario) {
-    final esAdmin = usuario.rol == RolUsuario.admin;
-    final ac = context.appColors;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Editar usuario'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _navegarAEditarUsuario(usuario);
-                },
-              ),
-              if (!esAdmin)
-                ListTile(
-                  leading: const Icon(
-                    Icons.person_off_outlined,
-                    color: Colors.redAccent,
-                  ),
-                  title: const Text(
-                    'Desactivar usuario',
-                    style: TextStyle(color: Colors.redAccent),
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _confirmarDesactivacion(usuario);
-                  },
-                )
-              else
-                ListTile(
-                  leading: Icon(Icons.lock_outline, color: ac.textMuted),
-                  title: Text(
-                    'Los administradores no pueden desactivarse desde aquí',
-                    style: TextStyle(color: ac.textMuted, fontSize: 13),
-                  ),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _confirmarDesactivacion(Usuario usuario) async {
     final confirmado = await showDialog<bool>(
       context: context,

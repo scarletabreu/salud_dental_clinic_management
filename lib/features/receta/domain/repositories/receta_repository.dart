@@ -1,4 +1,3 @@
-import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
 
 abstract class RecetaRepository {

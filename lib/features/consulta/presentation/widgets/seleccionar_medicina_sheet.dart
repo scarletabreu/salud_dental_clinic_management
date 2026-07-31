@@ -54,11 +54,16 @@ class _MedicinaSheetContentState extends State<_MedicinaSheetContent> {
       maxChildSize: 0.92,
       expand: false,
       builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: ac.cardBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        // El fondo lo pone un Material y no un BoxDecoration: las filas del
+        // catálogo son ListTile y pintan su realce sobre el Material más
+        // cercano, que aquí era el de la hoja modal —transparente— y quedaba
+        // tapado por este contenedor. En debug eso no era un detalle estético:
+        // el framework lanzaba una aserción y el selector de medicinas no
+        // llegaba a abrirse (HFX-CLIN-005).
+        return Material(
+          color: ac.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
               const SizedBox(height: 12),

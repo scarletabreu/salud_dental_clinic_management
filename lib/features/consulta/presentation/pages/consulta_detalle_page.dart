@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
+import 'package:salud_dental_clinic_management/features/auditoria/presentation/widgets/linea_tiempo_consulta.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
@@ -172,6 +173,16 @@ class ConsultaDetallePage extends StatelessWidget {
                         height: 1.45,
                       ),
                     ),
+                  ),
+                ],
+                if (consulta.id != null) ...[
+                  const SizedBox(height: 16),
+                  _seccion(
+                    context,
+                    'Historial de la consulta',
+                    Icons.history_rounded,
+                    ac.teal,
+                    LineaTiempoConsulta(consultaId: consulta.id!),
                   ),
                 ],
                 const SizedBox(height: 16),

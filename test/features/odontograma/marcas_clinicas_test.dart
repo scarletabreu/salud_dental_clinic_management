@@ -139,7 +139,7 @@ void main() {
       expect(marca.procedencia, ProcedenciaMarca.ejecutado);
       expect(marca.doctorId, 'doc-2');
       expect(marca.fecha, DateTime(2026, 7, 25));
-      expect(marca.estado, 'Terminado');
+      expect(marca.estado, 'Ejecutado');
     });
 
     test(

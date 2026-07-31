@@ -775,6 +775,19 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
             ),
             const SizedBox(height: 24),
 
+            if (state is ConsultaIniciada)
+              _AvisoPersistencia(
+                estado: state.guardado,
+                detalle: state.detalleFallo,
+                onReintentar: () =>
+                    context.read<ConsultaCubit>().guardarParcial(),
+                onRecargar: consulta.id == null
+                    ? null
+                    : () => context.read<ConsultaCubit>().reanudarConsulta(
+                        consultaId: consulta.id!,
+                      ),
+              ),
+
             SeccionAlertasClinicas(alertas: consulta.alertas),
 
             TarjetaConsulta(
@@ -1098,6 +1111,126 @@ class _TerminarButton extends StatelessWidget {
               )
             : const Icon(Icons.check_circle_outline_rounded, size: 20),
         label: Text(cargando ? 'Finalizando…' : label),
+      ),
+    );
+  }
+}
+
+/// Aviso que no se va solo.
+///
+/// El chip del encabezado dice en qué punto está el guardado, pero cabe en dos
+/// palabras y vive lejos de donde se escribe. Cuando el servidor rechaza el
+/// trabajo clínico, el motivo se queda aquí —con la acción que lo resuelve—
+/// hasta que el guardado vuelva a confirmarse. Un snackbar de tres segundos
+/// para un diagnóstico que no se guardó es como no avisar.
+class _AvisoPersistencia extends StatelessWidget {
+  const _AvisoPersistencia({
+    required this.estado,
+    required this.detalle,
+    required this.onReintentar,
+    required this.onRecargar,
+  });
+
+  final EstadoGuardado estado;
+  final String? detalle;
+  final VoidCallback onReintentar;
+  final VoidCallback? onRecargar;
+
+  static const claveFallo = ValueKey('aviso-persistencia');
+
+  @override
+  Widget build(BuildContext context) {
+    if (estado != EstadoGuardado.fallido && estado != EstadoGuardado.conflicto) {
+      return const SizedBox.shrink();
+    }
+
+    final ac = context.appColors;
+    final esConflicto = estado == EstadoGuardado.conflicto;
+    final titulo = esConflicto
+        ? 'Otra sesión guardó esta consulta primero'
+        : 'No se pudo guardar el trabajo de esta consulta';
+    final cuerpo =
+        detalle ??
+        (esConflicto
+            ? 'Recarga para ver lo confirmado antes de volver a guardar. Lo '
+                  'que escribiste sigue en pantalla.'
+            : 'Los cambios siguen en pantalla. No cierres la consulta hasta '
+                  'que el guardado se confirme.');
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: claveFallo,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ac.red.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ac.red.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icono además del color: el rojo por sí solo no comunica.
+                Icon(
+                  esConflicto
+                      ? Icons.sync_problem_rounded
+                      : Icons.cloud_off_rounded,
+                  size: 18,
+                  color: ac.red,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    titulo,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: ac.red,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Text(
+                cuerpo,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: ac.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  if (esConflicto && onRecargar != null)
+                    TextButton.icon(
+                      onPressed: onRecargar,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Recargar lo confirmado'),
+                    ),
+                  TextButton.icon(
+                    onPressed: onReintentar,
+                    icon: const Icon(Icons.save_outlined, size: 16),
+                    label: const Text('Reintentar ahora'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

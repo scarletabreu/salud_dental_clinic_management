@@ -688,10 +688,22 @@ class _PiezaDentalState extends State<_PiezaDental> {
     );
 
     if (widget.tocable) {
-      pieza = MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
+      // La pieza es la acción crítica del odontograma: es por donde se anota un
+      // hallazgo. Con un GestureDetector suelto sólo existía para el ratón;
+      // ahora entra en el recorrido de tabulación y responde a Enter y espacio
+      // igual que cualquier botón (HFX-CLIN-005).
+      pieza = FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: (activo) => setState(() => _hover = activo),
+        onShowFocusHighlight: (activo) => setState(() => _hover = activo),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onTap();
+              return null;
+            },
+          ),
+        },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,

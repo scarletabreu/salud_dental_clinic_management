@@ -92,6 +92,24 @@ class ConsultaTerminada extends ConsultaState {
   List<Object?> get props => [consultaId, cuentaId, montoTotal];
 }
 
+/// El servidor rechazó seguir editando porque la consulta ya está cerrada.
+///
+/// Es distinto de [ConsultaError]: no hay nada que reintentar ni cambios que
+/// rescatar. El expediente cerró —aquí o en otra sesión— y la pantalla debe
+/// dejar de ofrecer un borrador que ya no existe.
+class ConsultaCerradaEnServidor extends ConsultaState {
+  final String? consultaId;
+  final String mensaje;
+
+  const ConsultaCerradaEnServidor({
+    required this.mensaje,
+    this.consultaId,
+  });
+
+  @override
+  List<Object?> get props => [consultaId, mensaje];
+}
+
 /// Falló la operación u ocurrió un error.
 class ConsultaError extends ConsultaState {
   final String message;

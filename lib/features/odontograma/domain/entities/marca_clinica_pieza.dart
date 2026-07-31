@@ -32,7 +32,11 @@ extension ProcedenciaMarcaX on ProcedenciaMarca {
     ProcedenciaMarca.historico => 'Histórico',
     ProcedenciaMarca.evaluado => 'Evaluado',
     ProcedenciaMarca.planificado => 'Planificado',
-    ProcedenciaMarca.ejecutado => 'Ejecutado',
+    // «Ejecutado hoy» y no «Ejecutado» a secas: en la misma ficha, el chip de
+    // estado de una fila dice «Ejecutado» para hablar de otra cosa —si la
+    // ejecución está cerrada—. Dos rótulos idénticos con dos significados en
+    // el mismo panel es la ambigüedad que este ticket quita.
+    ProcedenciaMarca.ejecutado => 'Ejecutado hoy',
   };
 
   /// Lo que significa para el doctor, tal como se lee en la leyenda.
@@ -40,7 +44,11 @@ extension ProcedenciaMarcaX on ProcedenciaMarca {
     ProcedenciaMarca.historico => 'Anotado en una consulta anterior',
     ProcedenciaMarca.evaluado => 'Hallazgo de la evaluación de hoy',
     ProcedenciaMarca.planificado => 'Decidido en el plan, aún sin ejecutar',
-    ProcedenciaMarca.ejecutado => 'Realizado en esta consulta',
+    // No dice "realizado": la procedencia sólo afirma en qué sesión se registró
+    // la ejecución. Si dijera "realizado", una ejecución de varias sesiones
+    // aparecería como «Realizado en esta consulta» junto a su estado «En
+    // proceso», que es la contradicción que auditó HFX-CLIN-005.
+    ProcedenciaMarca.ejecutado => 'Registrado como ejecución en esta consulta',
   };
 
   /// Cuál manda cuando varias marcas caen sobre la misma cara.
@@ -144,6 +152,11 @@ class MarcaClinicaPieza {
   });
 
   bool get esPiezaCompleta => superficie == null;
+
+  /// La ejecución que describe está cerrada. Se pregunta por aquí y no
+  /// comparando el texto del chip: la etiqueta es de pantalla y cambió una vez
+  /// ya (HFX-CLIN-005), llevándose por delante al que la comparaba a mano.
+  bool get ejecucionCerrada => estado == etiquetaEjecutado;
 
   /// Con qué tinta se anota. El dato clínico es *cuál* de las tres, no su
   /// valor RGB: cada papel la resuelve a su manera.
@@ -388,7 +401,7 @@ MarcaClinicaPieza marcaDeTratamiento(
     // necesita distinguir sobre una ejecución.
     estado: tratamiento.estaAnulado
         ? _etiquetaAnulado
-        : (tratamiento.estaTerminado ? 'Terminado' : 'En proceso'),
+        : (tratamiento.estaTerminado ? etiquetaEjecutado : 'En proceso'),
     fecha: tratamiento.fechaEjecucion ?? tratamiento.fechaAplicacion,
     consultaId: tratamiento.consultaId,
     doctorId: tratamiento.doctorEjecutaId,
@@ -432,6 +445,10 @@ MarcaClinicaPieza marcaDeItemPlan(
 /// Lo que se lee en el chip de estado de una fila anulada. Una sola constante
 /// para que los tres ejes digan exactamente lo mismo.
 const _etiquetaAnulado = 'Anulado';
+
+/// Ejecución terminada. El vocabulario de HFX-CLIN-005 dice «ejecutado» —lo
+/// mismo que factura la cuenta— y no «terminado».
+const etiquetaEjecutado = 'Ejecutado';
 
 MarcaClinicaPieza _deHallazgo(
   int fdi,

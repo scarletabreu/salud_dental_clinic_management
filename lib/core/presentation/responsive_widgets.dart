@@ -17,6 +17,7 @@ class AppDialog extends StatelessWidget {
     required this.content,
     this.actions = const [],
     this.preferredWidth = 480,
+    this.maxHeight = 620,
     this.backgroundColor,
     this.shape,
     this.scrollable = true,
@@ -30,6 +31,15 @@ class AppDialog extends StatelessWidget {
   /// Width used when the viewport can afford it.
   final double preferredWidth;
 
+  /// Cap on the content box height.
+  ///
+  /// `AlertDialog` never overflows — it bounds its content to the viewport —
+  /// but on a tall screen that bound is the whole screen, and a form grew to
+  /// 1200 px of unbroken fields that nobody can scan. Past this height the
+  /// content scrolls instead of stretching. The cap is only ever lowered by
+  /// the viewport, never raised above it.
+  final double maxHeight;
+
   final Color? backgroundColor;
   final ShapeBorder? shape;
 
@@ -40,6 +50,9 @@ class AppDialog extends StatelessWidget {
 
   /// Horizontal padding [AlertDialog] applies around its content.
   static const double _contentInset = 48;
+
+  /// Rough vertical budget for the dialog's own title and action rows.
+  static const double _altoTituloYAcciones = 140;
 
   /// Identifies the sized content box, so tests can assert on it directly.
   static const Key contentKey = ValueKey('app-dialog-content');
@@ -53,6 +66,11 @@ class AppDialog extends StatelessWidget {
     final available = mediaQuery.size.width - inset * 2 - _contentInset;
     final width = math.max(0.0, math.min(preferredWidth, available));
 
+    // Lo que queda de alto una vez descontados los insets, el título y las
+    // acciones. Sobre pantallas bajas manda el viewport; sobre altas, el tope.
+    final alturaLibre = mediaQuery.size.height - 48 - _altoTituloYAcciones;
+    final alto = math.max(120.0, math.min(maxHeight, alturaLibre));
+
     return AlertDialog(
       backgroundColor: backgroundColor,
       shape:
@@ -62,9 +80,13 @@ class AppDialog extends StatelessWidget {
       title: title,
       // `AlertDialog` hands its content a bounded height, so a scroll view here
       // is enough to survive the keyboard and enlarged text.
-      content: SizedBox(
+      content: ConstrainedBox(
         key: contentKey,
-        width: width,
+        constraints: BoxConstraints(
+          minWidth: width,
+          maxWidth: width,
+          maxHeight: alto,
+        ),
         child: scrollable ? SingleChildScrollView(child: content) : content,
       ),
       actions: actions.isEmpty ? null : actions,

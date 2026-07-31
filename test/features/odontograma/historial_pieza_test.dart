@@ -251,7 +251,7 @@ void main() {
         for (final evento in historial[36]!.eventos) evento.id: evento,
       };
       expect(porId['ta-activo']!.estado, 'En proceso');
-      expect(porId['ta-final']!.estado, 'Terminado');
+      expect(porId['ta-final']!.estado, 'Ejecutado');
       expect(porId['ta-anulado']!.estado, 'Anulado');
       expect(porId['ta-anulado']!.anulada, isTrue);
       expect(porId['ta-anulado']!.vigente, isFalse);

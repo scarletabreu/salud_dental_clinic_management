@@ -141,6 +141,10 @@ import '../../features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import '../../features/diagnostico_aplicado/data/datasources/diagnostico_aplicado_remote_datasource.dart';
 import '../../features/diagnostico_aplicado/data/repositories/diagnostico_aplicado_repository_impl.dart';
 import '../../features/diagnostico_aplicado/domain/repositories/diagnostico_aplicado_repository.dart';
+import '../../features/auditoria/data/datasources/auditoria_remote_datasource.dart';
+import '../../features/auditoria/data/datasources/auditoria_remote_datasource_impl.dart';
+import '../../features/auditoria/data/repositories/auditoria_repository_impl.dart';
+import '../../features/auditoria/domain/repositories/auditoria_repository.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource.dart';
 import '../../features/evaluacion_clinica/data/datasources/evaluacion_clinica_remote_datasource_impl.dart';
 import '../../features/evaluacion_clinica/data/repositories/evaluacion_clinica_repository_impl.dart';
@@ -272,6 +276,9 @@ Future<void> init() async {
   sl.registerLazySingleton<EvaluacionClinicaRemoteDatasource>(
     () => EvaluacionClinicaRemoteDatasourceImpl(supabaseClient: sl()),
   );
+  sl.registerLazySingleton<AuditoriaRemoteDatasource>(
+    () => AuditoriaRemoteDatasourceImpl(supabaseClient: sl()),
+  );
   sl.registerLazySingleton<PlanTratamientoRemoteDatasource>(
     () => PlanTratamientoRemoteDatasourceImpl(supabaseClient: sl()),
   );
@@ -366,6 +373,9 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<EvaluacionClinicaRepository>(
     () => EvaluacionClinicaRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton<AuditoriaRepository>(
+    () => AuditoriaRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerLazySingleton<PlanTratamientoRepository>(
     () => PlanTratamientoRepositoryImpl(remoteDataSource: sl()),

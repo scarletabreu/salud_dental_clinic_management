@@ -125,7 +125,7 @@ void main() {
 
       expect(find.text('Resina compuesta · Oclusal'), findsOneWidget);
       expect(find.text('Caries oclusal · Oclusal'), findsOneWidget);
-      expect(find.text('Terminado'), findsOneWidget);
+      expect(find.text('Ejecutado'), findsOneWidget);
       expect(find.text('Moderado'), findsOneWidget);
       expect(find.text('Cara oclusal reblandecida'), findsOneWidget);
       expect(find.text('RD\$ 1,500.00'), findsOneWidget);

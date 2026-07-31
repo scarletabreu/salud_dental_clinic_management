@@ -54,143 +54,104 @@ class PacienteRemoteDatasource {
   String _generoDb(Genero g) =>
       g == Genero.noPrefiereDecir ? Genero.otro.name : g.name;
 
+  /// Contactos de la ficha tal como los espera la base: el primero es el
+  /// principal y el resto quedan como contactos de emergencia.
+  List<Map<String, dynamic>> _contactosPayload(PacienteModel paciente) => [
+    for (var i = 0; i < paciente.contactos.length; i++)
+      {
+        if (_isValidUuid(paciente.contactos[i].id))
+          'id': paciente.contactos[i].id,
+        'email': paciente.contactos[i].email,
+        'numero_telefono': paciente.contactos[i].numeroTelefono,
+        'direccion': paciente.contactos[i].direccion,
+        'es_emergencia': paciente.contactos[i].esEmergencia || i > 0,
+      },
+  ];
+
   /// Devuelve el id del paciente creado (el mismo de su persona) para que
   /// quien lo registra pueda seguir trabajando sobre él sin releer la lista:
   /// agendarle la cita del mismo flujo o subirle la foto de perfil.
+  ///
+  /// El alta es una sola llamada porque es una sola transacción: persona,
+  /// contactos, ficha y expediente entran juntos o no entra ninguno. Antes eran
+  /// cuatro escrituras encadenadas con una limpieza manual en el `catch`, que
+  /// una caída de red entre dos de ellas se saltaba dejando huérfanos (y la
+  /// cédula ocupada para siempre). La foto sigue fuera: solo puede subirse
+  /// cuando ya hay un id confirmado.
   Future<String> addPaciente(PacienteModel paciente) async {
     if (paciente.contactos.isEmpty) {
       throw Exception('El paciente debe tener al menos un contacto.');
     }
 
-    String? contactoId;
-    String? personaId;
-    try {
-      final contacto = paciente.contactos.first;
-      final contactoRes = await client
-          .from('contactos')
-          .insert({
-            'email': contacto.email,
-            'numero_telefono': contacto.numeroTelefono,
-            'direccion': contacto.direccion,
-          })
-          .select('id')
-          .single();
-      contactoId = contactoRes['id'] as String;
-
-      final personaRes = await client
-          .from('personas')
-          .insert({
-            'nombre': paciente.nombre,
-            'apellido': paciente.apellido,
-            'fecha_nacimiento': paciente.birthDate.toIso8601String(),
-            'cedula': paciente.govID,
-            'estatus': paciente.estatus.name,
-          })
-          .select('id')
-          .single();
-      personaId = personaRes['id'] as String;
-
-      await client.from('persona_contactos').insert({
-        'persona_id': personaId,
-        'contacto_id': contactoId,
-        'es_principal': true,
-      });
-
-      final data = paciente.toJson()
-        ..['id'] = personaId
-        ..['genero'] = _generoDb(paciente.genero)
-        ..['created_at'] = DateTime.now().toIso8601String()
-        ..['updated_at'] = DateTime.now().toIso8601String();
-      await client.from('pacientes').insert(data);
-      return personaId;
-    } on PostgrestException {
-      if (personaId != null) {
-        await client
-            .from('persona_contactos')
-            .delete()
-            .eq('persona_id', personaId);
-        await client.from('personas').delete().eq('id', personaId);
-      }
-      if (contactoId != null) {
-        await client.from('contactos').delete().eq('id', contactoId);
-      }
-      rethrow;
-    }
-  }
-
-  Future<void> updatePaciente(PacienteModel paciente) async {
-    final pacienteId = paciente.id;
-    if (pacienteId == null) {
-      throw Exception('No se puede actualizar un paciente sin ID.');
-    }
-
-    final now = DateTime.now().toIso8601String();
-
-    await client
-        .from('personas')
-        .update({
+    final respuesta = await client.rpc(
+      'registrar_paciente',
+      params: {
+        'p_payload': {
           'nombre': paciente.nombre,
           'apellido': paciente.apellido,
           'fecha_nacimiento': paciente.birthDate.toIso8601String(),
           'cedula': paciente.govID,
           'estatus': paciente.estatus.name,
-          'updated_at': now,
-        })
-        .eq('id', pacienteId);
-
-    await client
-        .from('pacientes')
-        .update({
           'genero': _generoDb(paciente.genero),
           'tipo_paciente': paciente.tipoPaciente.name,
           'trabajo': paciente.trabajo,
           'referencia': paciente.referencia,
           'peso': paciente.peso,
           'altura': paciente.altura,
-          // Las columnas `foto_*` se omiten a propósito: su única ruta de
-          // escritura es `PacienteFotoStorage`, que las mantiene en sincronía
-          // con el objeto de Storage. Incluirlas aquí borraba la foto cada vez
-          // que se editaba cualquier otro dato de la ficha.
-          'updated_at': now,
-        })
-        .eq('id', pacienteId);
+          'contactos': _contactosPayload(paciente),
+          // El expediente nace con el paciente: sin él, un asistente no podría
+          // crearlo después (la RLS de `records` es clínica) y la primera
+          // consulta se encontraba una ficha a medias.
+          'record': {
+            'tipo_sangre': paciente.record.tipoSangre.name,
+            'cant_hijos': paciente.record.cantHijos,
+            'cirugias_previas': paciente.record.cirugiasPrevias,
+            'historial_familiar': paciente.record.historialFamiliar,
+          },
+          'condiciones': [
+            for (final condicion in paciente.record.condiciones)
+              if (condicion.id != null) {'condicion_id': condicion.id},
+          ],
+        },
+      },
+    );
 
-    for (int i = 0; i < paciente.contactos.length; i++) {
-      final contacto = paciente.contactos[i];
-      final isPrincipal = i == 0;
-      final isEmergencia = contacto.esEmergencia || i > 0;
+    return (respuesta as Map)['paciente_id'] as String;
+  }
 
-      if (contacto.id != null && _isValidUuid(contacto.id)) {
-        await client
-            .from('contactos')
-            .update({
-              'email': contacto.email,
-              'numero_telefono': contacto.numeroTelefono,
-              'direccion': contacto.direccion,
-              'updated_at': now,
-            })
-            .eq('id', contacto.id!);
-      } else if (contacto.numeroTelefono.trim().isNotEmpty) {
-        final nuevoRes = await client
-            .from('contactos')
-            .insert({
-              'email': contacto.email,
-              'numero_telefono': contacto.numeroTelefono,
-              'direccion': contacto.direccion,
-            })
-            .select('id')
-            .single();
-
-        final nuevoContactoId = nuevoRes['id'] as String;
-
-        await client.from('persona_contactos').insert({
-          'persona_id': pacienteId,
-          'contacto_id': nuevoContactoId,
-          'es_principal': isPrincipal,
-          'es_emergencia': isEmergencia,
-        });
-      }
+  /// [version] es la que el formulario cree tener. Si otro actor guardó primero,
+  /// la base responde `CL019` y no escribe nada, en vez de pisar su edición.
+  Future<void> updatePaciente(PacienteModel paciente, {int? version}) async {
+    final pacienteId = paciente.id;
+    if (pacienteId == null) {
+      throw Exception('No se puede actualizar un paciente sin ID.');
     }
+
+    await client.rpc(
+      'actualizar_paciente',
+      params: {
+        'p_paciente_id': pacienteId,
+        'p_version': version,
+        'p_payload': {
+          'nombre': paciente.nombre,
+          'apellido': paciente.apellido,
+          'fecha_nacimiento': paciente.birthDate.toIso8601String(),
+          'cedula': paciente.govID,
+          'estatus': paciente.estatus.name,
+          'genero': _generoDb(paciente.genero),
+          'tipo_paciente': paciente.tipoPaciente.name,
+          'trabajo': paciente.trabajo,
+          'referencia': paciente.referencia,
+          'peso': paciente.peso,
+          'altura': paciente.altura,
+          // Las columnas `foto_*` no viajan a propósito: su única ruta de
+          // escritura es `PacienteFotoStorage`, que las mantiene en sincronía
+          // con el objeto de Storage. Incluirlas borraba la foto cada vez que
+          // se editaba cualquier otro dato de la ficha.
+          'contactos': _contactosPayload(paciente),
+        },
+      },
+    );
   }
 
   Future<void> deletePaciente(String id) async {

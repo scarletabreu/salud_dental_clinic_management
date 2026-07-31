@@ -13,6 +13,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/crear_consulta_usecase.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
@@ -33,19 +34,11 @@ void main() {
       'una cita futura fija la fecha de la consulta, no el día del clic',
       () async {
         final agendada = DateTime(2026, 8, 14, 15, 30);
-        final crear = _CrearConsultaEspia();
+        final consultas = _ConsultaRepoFalso();
         final cubit = _consultaCubit(
-          crear: crear,
-          citas: _CitaRepoFalso(
-            referencias: {
-              'cita-1': ReferenciaCita(
-                id: 'cita-1',
-                fechaHora: agendada,
-                estado: EstadoCita.enEspera,
-                doctorId: 'doctor-1',
-              ),
-            },
-          ),
+          crear: _CrearConsultaEspia(),
+          citas: _CitaRepoFalso(referencias: {'cita-1': _enEspera(agendada)}),
+          consultas: consultas,
         );
 
         await cubit.iniciar(
@@ -58,7 +51,7 @@ void main() {
         );
 
         expect(
-          crear.recibida?.fecha,
+          consultas.iniciada?.fecha,
           agendada,
           reason:
               'la consulta abierta desde una cita de agosto tiene que quedar en '
@@ -88,18 +81,20 @@ void main() {
       await cubit.close();
     });
 
-    test('la cita pasa a enConsulta al iniciarla', () async {
+    test('la cita pasa a enConsulta dentro de la misma operación', () async {
+      // HFX-CLIN-004: la transición dejó de ser una segunda llamada del cliente.
+      // La hace `iniciar_consulta_de_cita` en la transacción que crea la
+      // consulta, así que ya no puede quedar una consulta abierta sobre una
+      // cita que sigue «en espera» porque se cayó la red entre ambas.
       final citas = _CitaRepoFalso(
-        referencias: {
-          'cita-1': ReferenciaCita(
-            id: 'cita-1',
-            fechaHora: DateTime(2026, 8, 14, 9, 0),
-            estado: EstadoCita.enEspera,
-            doctorId: 'doctor-1',
-          ),
-        },
+        referencias: {'cita-1': _enEspera(DateTime(2026, 8, 14, 9, 0))},
       );
-      final cubit = _consultaCubit(crear: _CrearConsultaEspia(), citas: citas);
+      final consultas = _ConsultaRepoFalso();
+      final cubit = _consultaCubit(
+        crear: _CrearConsultaEspia(),
+        citas: citas,
+        consultas: consultas,
+      );
 
       await cubit.iniciar(
         pacienteId: _pacienteId,
@@ -110,7 +105,72 @@ void main() {
         adjuntos: const [],
       );
 
-      expect(citas.estadosEscritos, [EstadoCita.enConsulta]);
+      expect(consultas.iniciada?.citaId, 'cita-1');
+      expect(
+        citas.estadosEscritos,
+        isEmpty,
+        reason: 'el estado de la cita lo mueve la base, no el cliente',
+      );
+      await cubit.close();
+    });
+
+    test('reintentar sobre una cita ya abierta reanuda la misma consulta', () async {
+      final consultas = _ConsultaRepoFalso(
+        estado: EstadoInicioConsulta.reanudada,
+        detalle: Consulta(
+          id: 'consulta-1',
+          pacienteId: _pacienteId,
+          doctorId: 'doctor-1',
+          citaId: 'cita-1',
+          fecha: DateTime(2026, 8, 14, 9, 0),
+        ),
+      );
+      final cubit = _consultaCubit(
+        crear: _CrearConsultaEspia(),
+        citas: _CitaRepoFalso(
+          referencias: {'cita-1': _enEspera(DateTime(2026, 8, 14, 9, 0))},
+        ),
+        consultas: consultas,
+      );
+
+      await cubit.iniciar(
+        pacienteId: _pacienteId,
+        doctorId: 'doctor-1',
+        citaId: 'cita-1',
+        motivoConsulta: 'control',
+        tempCondiciones: const [],
+        adjuntos: const [],
+      );
+
+      final estado = cubit.state;
+      expect(estado, isA<ConsultaIniciada>());
+      expect((estado as ConsultaIniciada).consulta.id, 'consulta-1');
+      await cubit.close();
+    });
+
+    test('una cita ya atendida no se reabre', () async {
+      final consultas = _ConsultaRepoFalso(
+        estado: EstadoInicioConsulta.finalizada,
+      );
+      final cubit = _consultaCubit(
+        crear: _CrearConsultaEspia(),
+        citas: _CitaRepoFalso(
+          referencias: {'cita-1': _enEspera(DateTime(2026, 8, 14, 9, 0))},
+        ),
+        consultas: consultas,
+      );
+
+      await cubit.iniciar(
+        pacienteId: _pacienteId,
+        doctorId: 'doctor-1',
+        citaId: 'cita-1',
+        motivoConsulta: 'control',
+        tempCondiciones: const [],
+        adjuntos: const [],
+      );
+
+      expect(cubit.state, isA<ConsultaError>());
+      expect((cubit.state as ConsultaError).message, contains('ya fue atendida'));
       await cubit.close();
     });
 
@@ -345,14 +405,22 @@ Cita _citaDe(String id, String doctorId) => Cita(
   estado: EstadoCita.enEspera,
 );
 
+ReferenciaCita _enEspera(DateTime fechaHora) => ReferenciaCita(
+  id: 'cita-1',
+  fechaHora: fechaHora,
+  estado: EstadoCita.enEspera,
+  doctorId: 'doctor-1',
+);
+
 ConsultaCubit _consultaCubit({
   required _CrearConsultaEspia crear,
   required _CitaRepoFalso citas,
+  _ConsultaRepoFalso? consultas,
 }) => ConsultaCubit(
   crear,
   _StorageNoUsado(),
   citas,
-  _ConsultaRepoFalso(),
+  consultas ?? _ConsultaRepoFalso(),
 );
 
 /// Captura la consulta que se manda a crear, que es donde se observa la fecha.
@@ -431,6 +499,26 @@ class _LookupFalso implements ConsultaAbiertaLookup {
 
 class _ConsultaRepoFalso extends Fake implements ConsultaRepository {
   final llamadas = <String>[];
+  final EstadoInicioConsulta estado;
+  final Consulta? detalle;
+
+  /// Consulta que el cubit mandó abrir: es donde se observa que la fecha y la
+  /// cita viajan correctas antes de que las resuelva el servidor.
+  Consulta? iniciada;
+
+  _ConsultaRepoFalso({
+    this.estado = EstadoInicioConsulta.creada,
+    this.detalle,
+  });
+
+  @override
+  Future<InicioConsulta> iniciarConsultaDeCita(Consulta consulta) async {
+    iniciada = consulta;
+    return InicioConsulta(consultaId: 'consulta-1', estado: estado);
+  }
+
+  @override
+  Future<Consulta?> getDetalleConsulta(String id) async => detalle;
 
   @override
   Future<List<Consulta>> getConsultasByDoctor(String doctorId) async {

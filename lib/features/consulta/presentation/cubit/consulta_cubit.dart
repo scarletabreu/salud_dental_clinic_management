@@ -12,6 +12,7 @@ import 'package:salud_dental_clinic_management/features/cita/domain/repositories
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
@@ -262,51 +263,80 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         tipoAtencion: tipoAtencion,
       );
 
-      final consultaId = await _crearConsulta(consultaInicial);
-
-      // Ya validado arriba que la transición es legal. Si la cita venía en
-      // `enConsulta` no se reescribe: el grafo no admite ese lazo.
-      if (citaId != null && citaOrigen?.estado != EstadoCita.enConsulta) {
-        await _citaRepository.updateCitaEstado(citaId, EstadoCita.enConsulta);
+      // Con cita, la apertura es una sola operación en la base: crea o reanuda,
+      // y mueve la cita a «en consulta» dentro de la misma transacción. Antes
+      // eran dos llamadas y un reintento chocaba contra el índice único
+      // (HFX-CLIN-004).
+      if (citaId != null) {
+        final inicio = await _consultaRepository.iniciarConsultaDeCita(
+          consultaInicial,
+        );
+        switch (inicio.estado) {
+          case EstadoInicioConsulta.reanudada:
+            await reanudarConsulta(consultaId: inicio.consultaId);
+            return;
+          case EstadoInicioConsulta.finalizada:
+            emit(
+              const ConsultaError(
+                'Esta cita ya fue atendida y su consulta está cerrada. '
+                'Ábrela desde el historial del paciente para consultarla.',
+              ),
+            );
+            return;
+          case EstadoInicioConsulta.creada:
+            break;
+        }
+        await _emitirConsultaNueva(consultaInicial, inicio.consultaId);
+        return;
       }
-      final historial = await _cargarHistorial(
-        pacienteId,
-        excluyendoConsultaId: consultaId,
-      );
 
-      final odontograma = Odontograma(
-        consultaId: consultaId,
-        evaluacionHistorica:
-            historial.evaluacion ?? EvaluacionOdontologica.vacia,
-        dientes: kFdiTodas.map((fdi) {
-          return Diente(
-            odontogramaId: '',
-            fdiCode: fdi,
-            superficies: superficiesParaFdi(fdi)
-                .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
-                .toList(),
-            tratamientosHistoricos:
-                historial.tratamientosPorFdi?[fdi] ?? const [],
-            diagnosticosHistoricos:
-                historial.diagnosticosPorFdi?[fdi] ?? const [],
-          );
-        }).toList(),
-      );
-
-      final consultaActiva = consultaInicial.copyWith(
-        id: consultaId,
-        odontograma: odontograma,
-        finalizada: false,
-      );
-
-      // Se emite como cambio pendiente a propósito: el primer autoguardado es
-      // el que lleva las mediciones y las condiciones detectadas a sus tablas,
-      // donde el servidor las valida y el motor de alertas las evalúa.
-      _emitirCambio(consultaActiva);
+      final consultaId = await _crearConsulta(consultaInicial);
+      await _emitirConsultaNueva(consultaInicial, consultaId);
     } catch (e) {
       AppLog.error('crear consulta', e);
       emit(ConsultaError(_mensajeError(e)));
     }
+  }
+
+  /// Deja la consulta recién creada lista para trabajar: odontograma en blanco
+  /// sobre el historial del paciente, y todo marcado como cambio pendiente para
+  /// que el primer autoguardado lleve mediciones y condiciones a sus tablas.
+  Future<void> _emitirConsultaNueva(
+    Consulta consultaInicial,
+    String consultaId,
+  ) async {
+    final historial = await _cargarHistorial(
+      consultaInicial.pacienteId,
+      excluyendoConsultaId: consultaId,
+    );
+
+    final odontograma = Odontograma(
+      consultaId: consultaId,
+      evaluacionHistorica: historial.evaluacion ?? EvaluacionOdontologica.vacia,
+      dientes: kFdiTodas.map((fdi) {
+        return Diente(
+          odontogramaId: '',
+          fdiCode: fdi,
+          superficies: superficiesParaFdi(fdi)
+              .map((tipo) => Superficie(dienteId: '', tipoSuperficie: tipo))
+              .toList(),
+          tratamientosHistoricos: historial.tratamientosPorFdi?[fdi] ?? const [],
+          diagnosticosHistoricos:
+              historial.diagnosticosPorFdi?[fdi] ?? const [],
+        );
+      }).toList(),
+    );
+
+    // Se emite como cambio pendiente a propósito: el primer autoguardado es el
+    // que lleva las mediciones y las condiciones detectadas a sus tablas, donde
+    // el servidor las valida y el motor de alertas las evalúa.
+    _emitirCambio(
+      consultaInicial.copyWith(
+        id: consultaId,
+        odontograma: odontograma,
+        finalizada: false,
+      ),
+    );
   }
 
   /// Cita de la que nace la consulta, ya validada. `null` para una atención sin

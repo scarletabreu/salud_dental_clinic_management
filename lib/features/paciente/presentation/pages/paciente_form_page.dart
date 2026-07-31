@@ -306,6 +306,9 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
       fotoMimeType: widget.paciente.fotoMimeType,
       fotoTamanoBytes: widget.paciente.fotoTamanoBytes,
       fotoActualizadaEn: widget.paciente.fotoActualizadaEn,
+      // La versión con la que se abrió el formulario: si otro actor guardó
+      // mientras tanto, la base rechaza esta edición en vez de pisar la suya.
+      version: widget.paciente.version,
     );
 
     context.read<PacienteCubit>().updatePaciente(paciente);

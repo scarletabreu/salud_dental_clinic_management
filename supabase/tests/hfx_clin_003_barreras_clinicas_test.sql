@@ -34,8 +34,8 @@ begin
   values (v_paciente, 'o_positivo', '{}', 'Sin antecedentes')
   returning id into v_record;
 
-  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos)
-  values (v_paciente, v_doc, now() + interval '1 day', 30)
+  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+  values (v_paciente, v_doc, now() + interval '1 day', 30, 'en_consulta')
   returning id into v_cita;
 
   insert into public.consultas (paciente_id, doctor_id, cita_id, fecha)
@@ -614,8 +614,8 @@ begin
     (v_record, '40000000-0000-4000-8000-000000000102', true),
     (v_record, '40000000-0000-4000-8000-000000000103', true);
 
-  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos)
-  values (v_adulto, v_doc, now() + interval '2 day', 30)
+  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+  values (v_adulto, v_doc, now() + interval '2 day', 30, 'en_consulta')
   returning id into v_cita;
   insert into public.consultas (paciente_id, doctor_id, cita_id, fecha)
   values (v_adulto, v_doc, v_cita, now())
@@ -629,8 +629,8 @@ begin
   insert into public.records (paciente_id, tipo_sangre, cirugias_previas, historial_familiar)
   values (v_nino, 'o_positivo', '{}', 'Sin antecedentes');
 
-  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos)
-  values (v_nino, v_doc, now() + interval '3 day', 30)
+  insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
+  values (v_nino, v_doc, now() + interval '3 day', 30, 'en_consulta')
   returning id into v_cita;
   insert into public.consultas (paciente_id, doctor_id, cita_id, fecha)
   values (v_nino, v_doc, v_cita, now())

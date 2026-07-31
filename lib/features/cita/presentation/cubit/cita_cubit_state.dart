@@ -28,6 +28,11 @@ class CitaCubitLoaded extends CitaCubitState {
   /// Permite saltar de la agenda a la consulta y saber si sigue abierta.
   final Map<String, ConsultaDeCita> consultasPorCitaId;
 
+  /// El actor tiene la agenda acotada a una lista de doctores y esa lista está
+  /// vacía. Distingue «no hay citas» de «no tienes a quién ver todavía», que es
+  /// el caso del asistente al que nadie ha asignado un odontólogo.
+  final bool sinDoctoresAsignados;
+
   const CitaCubitLoaded({
     required this.citas,
     required this.focusedDay,
@@ -36,6 +41,7 @@ class CitaCubitLoaded extends CitaCubitState {
     this.isSubmitting = false,
     this.errorMessage,
     this.consultasPorCitaId = const {},
+    this.sinDoctoresAsignados = false,
   });
 
   ConsultaDeCita? consultaDe(Cita cita) =>
@@ -61,6 +67,7 @@ class CitaCubitLoaded extends CitaCubitState {
     bool? isSubmitting,
     String? Function()? errorMessage,
     Map<String, ConsultaDeCita>? consultasPorCitaId,
+    bool? sinDoctoresAsignados,
   }) {
     return CitaCubitLoaded(
       citas: citas ?? this.citas,
@@ -70,6 +77,8 @@ class CitaCubitLoaded extends CitaCubitState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       consultasPorCitaId: consultasPorCitaId ?? this.consultasPorCitaId,
+      sinDoctoresAsignados:
+          sinDoctoresAsignados ?? this.sinDoctoresAsignados,
     );
   }
 
@@ -82,6 +91,7 @@ class CitaCubitLoaded extends CitaCubitState {
     isSubmitting,
     errorMessage,
     consultasPorCitaId,
+    sinDoctoresAsignados,
   ];
 }
 

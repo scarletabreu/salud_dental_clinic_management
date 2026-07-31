@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/inicio_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
@@ -25,6 +26,14 @@ abstract class ConsultaRepository {
   );
 
   Future<String> crearConsultaCompleta(Consulta consulta);
+
+  /// Abre —o recupera— la consulta de una cita.
+  ///
+  /// La identidad, la fecha y el estado los resuelve la base a partir de la
+  /// cita: el cliente ya no propone paciente ni doctor, así que no puede
+  /// desalinearlos. Reintentar es seguro; el resultado dice si la consulta se
+  /// creó, se reanudó o ya estaba cerrada.
+  Future<InicioConsulta> iniciarConsultaDeCita(Consulta consulta);
 
   /// Guarda el borrador clínico completo en una sola transacción: odontograma,
   /// recetas, insumos declarados, notas y signos vitales.

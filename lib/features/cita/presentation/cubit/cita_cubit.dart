@@ -47,6 +47,9 @@ class CitaCubit extends Cubit<CitaCubitState> {
           selectedDay: now,
           viewMode: CalendarioViewMode.mensual,
           consultasPorCitaId: consultas,
+          sinDoctoresAsignados:
+              _restringidoADoctorId == null &&
+              (_doctorIdsPermitidos?.isEmpty ?? false),
         ),
       );
     } catch (e) {
@@ -89,11 +92,23 @@ class CitaCubit extends Cubit<CitaCubitState> {
     return citas.where((c) => permitidos.contains(c.doctor.id)).toList();
   }
 
+  /// Aviso temprano de solapamiento, para no hacer ir al servidor a por un «no».
+  ///
+  /// La autoridad es la restricción `citas_sin_solape` (HFX-CLIN-004); esta
+  /// comprobación replica exactamente su alcance para no rechazar aquí lo que
+  /// la base sí aceptaría: los estados terminales ya no reservan el hueco, y una
+  /// urgencia no reserva agenda, la interrumpe.
   bool _tieneConflictoHorario(Cita nuevaCita, List<Cita> todasLasCitas) {
+    if (nuevaCita.esEmergencia) return false;
     return todasLasCitas.any((c) {
       if (c.id == nuevaCita.id) return false;
       if (c.doctor.id != nuevaCita.doctor.id) return false;
-      if (c.estado == EstadoCita.cancelada) return false;
+      if (c.esEmergencia) return false;
+      if (c.estado == EstadoCita.cancelada ||
+          c.estado == EstadoCita.completada ||
+          c.estado == EstadoCita.noAsistio) {
+        return false;
+      }
 
       return nuevaCita.date.isBefore(c.fechaFin) &&
           c.date.isBefore(nuevaCita.fechaFin);
@@ -134,6 +149,68 @@ class CitaCubit extends Cubit<CitaCubitState> {
           ),
         );
       }
+    }
+  }
+
+  /// Marca que el paciente ya llegó. Es la puerta a «Iniciar consulta», y desde
+  /// HFX-CLIN-004 puede abrirla el propio doctor: trabajar sin asistente dejó de
+  /// significar quedarse fuera de la consulta.
+  Future<void> registrarLlegada(String citaId) async {
+    final current = state;
+    if (current is! CitaCubitLoaded) return;
+
+    try {
+      await _repository.registrarLlegada(citaId);
+      emit(
+        current.copyWith(
+          citas: [
+            for (final cita in current.citas)
+              cita.id == citaId
+                  ? cita.copyWith(estado: EstadoCita.enEspera)
+                  : cita,
+          ],
+        ),
+      );
+    } catch (e) {
+      AppLog.error('registrarLlegada', e);
+      emit(
+        current.copyWith(
+          errorMessage: () => 'No se pudo registrar la llegada: $e',
+        ),
+      );
+    }
+  }
+
+  /// Registra una urgencia para un paciente que ya está en la clínica y
+  /// devuelve su cita, para poder entrar directamente a la consulta.
+  ///
+  /// Devuelve `null` si falló; el motivo queda en `errorMessage`.
+  Future<String?> registrarEmergencia({
+    required String pacienteId,
+    required String doctorId,
+    String? motivo,
+  }) async {
+    final current = state;
+    if (current is! CitaCubitLoaded) return null;
+
+    try {
+      final citaId = await _repository.registrarEmergencia(
+        pacienteId: pacienteId,
+        doctorId: doctorId,
+        motivo: motivo,
+      );
+      await load();
+      return citaId;
+    } catch (e) {
+      AppLog.error('registrarEmergencia', e);
+      if (!isClosed) {
+        emit(
+          current.copyWith(
+            errorMessage: () => 'No se pudo registrar la emergencia: $e',
+          ),
+        );
+      }
+      return null;
     }
   }
 

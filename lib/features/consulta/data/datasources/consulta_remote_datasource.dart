@@ -1,6 +1,16 @@
 abstract class ConsultaRemoteDatasource {
   Future<String> crearConsultaCompleta(Map<String, dynamic> params);
 
+  /// Abre la consulta de una cita (`iniciar_consulta_de_cita`).
+  ///
+  /// La base bloquea la cita, comprueba identidad y estado, y mueve la cita a
+  /// «en consulta» en la misma transacción. Es idempotente: si ya había una
+  /// consulta viva devuelve esa, y si la cita ya fue atendida lo dice en vez de
+  /// abrir una segunda.
+  Future<Map<String, dynamic>> iniciarConsultaDeCita(
+    Map<String, dynamic> params,
+  );
+
   /// Guarda el borrador clínico completo en una sola transacción
   /// (`guardar_borrador_consulta`).
   ///

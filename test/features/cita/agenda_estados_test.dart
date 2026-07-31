@@ -5,6 +5,7 @@ import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dar
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
@@ -14,6 +15,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/pages/
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/asistente.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
@@ -112,14 +114,26 @@ Cita _cita() => Cita(
   estado: EstadoCita.confirmada,
 );
 
-Widget _app(_CitaCubitDoble cubit) => MaterialApp(
+Asistente _asistente() => Asistente(
+  id: '44444444-4444-4444-4444-444444444444',
+  nombre: 'Carla',
+  apellido: 'Recepción',
+  birthDate: DateTime(1992, 1, 1),
+  govID: '402-7654321-9',
+  contactos: const [],
+  estatus: EstatusPersona.activo,
+  username: 'crecepcion',
+  shift: 'matutino',
+);
+
+Widget _app(_CitaCubitDoble cubit, {Usuario? usuario}) => MaterialApp(
   theme: AppTheme.light,
   home: MultiBlocProvider(
     providers: [
       BlocProvider<CitaCubit>.value(value: cubit),
       BlocProvider<AuthCubit>(
         create: (_) => _AuthCubitDoble(
-          AuthState(isAuthenticated: true, usuario: _doctor()),
+          AuthState(isAuthenticated: true, usuario: usuario ?? _doctor()),
         ),
       ),
     ],
@@ -141,7 +155,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Aún no hay citas registradas'), findsNothing);
+    expect(find.text('No tienes citas asignadas'), findsNothing);
     expect(find.text('Reintentar'), findsNothing);
   });
 
@@ -161,7 +175,7 @@ void main() {
       findsOneWidget,
     );
     // El fallo no se disfraza de agenda: no hay ninguna cita en pantalla.
-    expect(find.text('Aún no hay citas registradas'), findsNothing);
+    expect(find.text('No tienes citas asignadas'), findsNothing);
 
     await tester.tap(find.text('Reintentar'));
     await tester.pump();
@@ -174,13 +188,51 @@ void main() {
     await tester.pumpWidget(_app(cubit));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aún no hay citas registradas'), findsOneWidget);
+    expect(find.text('No tienes citas asignadas'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('Error al cargar citas'), findsNothing);
 
     await tester.tap(find.text('Actualizar'));
     await tester.pump();
     expect(cubit.recargas, 1);
+  });
+
+  // HFX-CLIN-004. El texto de la agenda vacía mandaba a todo el mundo a «Nueva
+  // Cita», un botón que el doctor no tiene: le pedía justo lo que no puede
+  // hacer. Cada rol lee ahora la acción que sí está a su alcance.
+  testWidgets('el doctor no ve instrucciones que no puede seguir', (
+    tester,
+  ) async {
+    _viewport(tester);
+    final cubit = _CitaCubitDoble(_cargada(citas: const []));
+    await tester.pumpWidget(_app(cubit));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Nueva Cita'), findsNothing);
+    expect(find.textContaining('Urgencia'), findsWidgets);
+  });
+
+  testWidgets('quien gestiona la agenda sí ve «Nueva Cita»', (tester) async {
+    _viewport(tester);
+    final cubit = _CitaCubitDoble(_cargada(citas: const []));
+    await tester.pumpWidget(_app(cubit, usuario: _asistente()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aún no hay citas registradas'), findsOneWidget);
+    expect(find.textContaining('«Nueva Cita»'), findsWidgets);
+  });
+
+  testWidgets('un asistente sin odontólogos asignados sabe por qué no ve nada', (
+    tester,
+  ) async {
+    _viewport(tester);
+    final cubit = _CitaCubitDoble(
+      _cargada(citas: const []).copyWith(sinDoctoresAsignados: true),
+    );
+    await tester.pumpWidget(_app(cubit, usuario: _asistente()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Todavía no tienes odontólogos asignados'), findsOneWidget);
   });
 
   testWidgets('con citas reales no se muestra el aviso de agenda vacía', (
@@ -191,7 +243,7 @@ void main() {
     await tester.pumpWidget(_app(cubit));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aún no hay citas registradas'), findsNothing);
+    expect(find.text('No tienes citas asignadas'), findsNothing);
     expect(find.text('Error al cargar citas'), findsNothing);
     expect(find.textContaining('Rodríguez Montás'), findsWidgets);
   });
@@ -205,7 +257,7 @@ void main() {
     await tester.pumpWidget(_app(cubit));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aún no hay citas registradas'), findsOneWidget);
+    expect(find.text('No tienes citas asignadas'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

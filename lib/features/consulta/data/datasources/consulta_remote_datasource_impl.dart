@@ -74,6 +74,17 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       error.message.contains('p_tipo_atencion');
 
   @override
+  Future<Map<String, dynamic>> iniciarConsultaDeCita(
+    Map<String, dynamic> params,
+  ) async {
+    final respuesta = await supabaseClient.rpc(
+      'iniciar_consulta_de_cita',
+      params: params,
+    );
+    return Map<String, dynamic>.from(respuesta as Map);
+  }
+
+  @override
   Future<Map<String, dynamic>> guardarBorradorConsulta({
     required String consultaId,
     int? version,

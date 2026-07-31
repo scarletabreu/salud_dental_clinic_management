@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_state.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/seleccionar_condicion_sheet.dart';
 
 class FormularioEvaluacion extends StatefulWidget {
   final String pacienteId;
@@ -38,14 +43,65 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
   final _pulsoCtrl = TextEditingController();
   final _temperaturaCtrl = TextEditingController();
   final _saturacionCtrl = TextEditingController();
+  final _dolorCtrl = TextEditingController();
+  // Peso y talla: la dosificación pediátrica depende del peso, así que tiene
+  // que poder registrarse aquí y no solo en el expediente.
+  final _pesoCtrl = TextEditingController();
+  final _tallaCtrl = TextEditingController();
 
+  /// Texto libre: sigue existiendo como complemento de la anamnesis.
   final List<String> _condiciones = [];
+
+  /// Condiciones de catálogo: son las que participan en contraindicaciones y
+  /// alertas desde el primer momento (HFX-CLIN-003).
+  final List<CondicionDetectada> _condicionesCatalogo = [];
+  List<Condicion> _catalogoCondiciones = const [];
+
   final List<DocumentoAdjunto> _adjuntos = [];
+
+  /// Lo que la base rechazaría, calculado antes de enviar.
+  List<ProblemaSignoVital> _problemasVitales = const [];
 
   @override
   void initState() {
     super.initState();
     _motivoController.text = widget.motivoCita ?? '';
+    for (final ctrl in [
+      _sistolicaCtrl,
+      _diastolicaCtrl,
+      _pulsoCtrl,
+      _temperaturaCtrl,
+      _saturacionCtrl,
+      _dolorCtrl,
+      _pesoCtrl,
+      _tallaCtrl,
+    ]) {
+      ctrl.addListener(_revisarSignosVitales);
+    }
+    _cargarCondiciones();
+  }
+
+  Future<void> _cargarCondiciones() async {
+    try {
+      final catalogo = await sl<CondicionRepository>().getCondiciones();
+      if (!mounted) return;
+      setState(() => _catalogoCondiciones = catalogo);
+    } catch (_) {
+      // Sin catálogo el doctor sigue pudiendo anotar en texto libre.
+    }
+  }
+
+  void _revisarSignosVitales() {
+    final problemas = _construirSignosVitales(validando: true).validar();
+    if (problemas.length == _problemasVitales.length &&
+        problemas
+            .map((p) => p.mensaje)
+            .join()
+            .compareTo(_problemasVitales.map((p) => p.mensaje).join()) ==
+            0) {
+      return;
+    }
+    setState(() => _problemasVitales = problemas);
   }
 
   @override
@@ -58,6 +114,9 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     _pulsoCtrl.dispose();
     _temperaturaCtrl.dispose();
     _saturacionCtrl.dispose();
+    _dolorCtrl.dispose();
+    _pesoCtrl.dispose();
+    _tallaCtrl.dispose();
     super.dispose();
   }
 
@@ -93,28 +152,72 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
     });
   }
 
+  SignosVitales _construirSignosVitales({bool validando = false}) =>
+      SignosVitales.valores(
+        presionSistolica: double.tryParse(_sistolicaCtrl.text.trim()),
+        presionDiastolica: double.tryParse(_diastolicaCtrl.text.trim()),
+        pulso: double.tryParse(_pulsoCtrl.text.trim()),
+        temperatura: double.tryParse(_temperaturaCtrl.text.trim()),
+        saturacionO2: double.tryParse(_saturacionCtrl.text.trim()),
+        dolor: double.tryParse(_dolorCtrl.text.trim()),
+        peso: double.tryParse(_pesoCtrl.text.trim()),
+        talla: double.tryParse(_tallaCtrl.text.trim()),
+        medidoEn: validando ? null : DateTime.now(),
+        medidoPor: validando ? null : widget.doctorId,
+      );
+
   SignosVitales? _buildSignosVitales() {
-    final sv = SignosVitales(
-      presionSistolica: int.tryParse(_sistolicaCtrl.text.trim()),
-      presionDiastolica: int.tryParse(_diastolicaCtrl.text.trim()),
-      pulso: int.tryParse(_pulsoCtrl.text.trim()),
-      temperatura: double.tryParse(_temperaturaCtrl.text.trim()),
-      saturacionO2: int.tryParse(_saturacionCtrl.text.trim()),
-    );
+    final sv = _construirSignosVitales();
     return sv.estaVacia ? null : sv;
   }
 
   void _guardar() {
     if (!_formKey.currentState!.validate()) return;
+
+    // Un valor imposible no llega al servidor: se corrige aquí, con el nombre
+    // del signo y su rango, en vez de morir con un error de base de datos.
+    final problemas = _construirSignosVitales(validando: true).validar();
+    if (problemas.isNotEmpty) {
+      setState(() => _problemasVitales = problemas);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(problemas.first.mensaje),
+          backgroundColor: context.appColors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
     context.read<ConsultaCubit>().iniciar(
       pacienteId: widget.pacienteId,
       doctorId: widget.doctorId,
       citaId: widget.citaId,
       motivoConsulta: _motivoController.text.trim(),
       tempCondiciones: _condiciones,
+      condicionesDetectadas: _condicionesCatalogo,
       adjuntos: _adjuntos,
       signosVitales: _buildSignosVitales(),
     );
+  }
+
+  Future<void> _agregarCondicionCatalogo() async {
+    final disponibles = [
+      for (final c in _catalogoCondiciones)
+        if (!_condicionesCatalogo.any((d) => d.condicionId == c.id)) c,
+    ];
+    if (disponibles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay más condiciones en el catálogo.'),
+        ),
+      );
+      return;
+    }
+    final elegida = await seleccionarCondicionDetectada(context, disponibles);
+    if (elegida == null || !mounted) return;
+    setState(() => _condicionesCatalogo.add(elegida));
   }
 
   @override
@@ -164,10 +267,92 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
             ac: ac,
             icon: Icons.medical_information_outlined,
             iconColor: ac.amber,
-            title: 'Condiciones temporales',
-            subtitle: 'Hallazgos o condiciones observadas en esta visita',
+            title: 'Condiciones detectadas hoy',
+            subtitle:
+                'Del catálogo, para que cuenten en contraindicaciones y alertas',
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _agregarCondicionCatalogo,
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Agregar condición del catálogo'),
+                  ),
+                ),
+                if (_condicionesCatalogo.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ..._condicionesCatalogo.asMap().entries.map((entrada) {
+                    final condicion = entrada.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ac.amber.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: ac.amber.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    condicion.nombre,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: ac.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${condicion.severidad.etiqueta}'
+                                    '${condicion.incorporarAlExpediente ? ' · pasa al expediente' : ' · solo esta consulta'}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: ac.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => setState(
+                                () => _condicionesCatalogo.removeAt(
+                                  entrada.key,
+                                ),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: ac.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+                const SizedBox(height: 14),
+                Text(
+                  'Complemento en texto libre',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -252,25 +437,73 @@ class _FormularioEvaluacionState extends State<FormularioEvaluacion> {
             icon: Icons.monitor_heart_outlined,
             iconColor: ac.red,
             title: 'Signos vitales',
-            subtitle: 'Presión, pulso, temperatura y saturación (opcionales)',
-            child: Row(
+            subtitle:
+                'Presión, pulso, temperatura, saturación, dolor, peso y talla',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg')),
-                const SizedBox(width: 8),
-                Expanded(child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg')),
-                const SizedBox(width: 8),
-                Expanded(child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm')),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _campoVital(
-                    ac,
-                    _temperaturaCtrl,
-                    'Temp °C',
-                    decimal: true,
-                  ),
+                Row(
+                  children: [
+                    Expanded(child: _campoVital(ac, _sistolicaCtrl, 'PS mmHg')),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _campoVital(ac, _diastolicaCtrl, 'PD mmHg'),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: _campoVital(ac, _pulsoCtrl, 'Pulso lpm')),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _campoVital(
+                        ac,
+                        _temperaturaCtrl,
+                        'Temp °C',
+                        decimal: true,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: _campoVital(ac, _saturacionCtrl, 'Sat %')),
+                    const SizedBox(width: 8),
+                    Expanded(child: _campoVital(ac, _dolorCtrl, 'Dolor 0-10')),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(child: _campoVital(ac, _saturacionCtrl, 'Sat %')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _campoVital(ac, _pesoCtrl, 'Peso kg', decimal: true),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _campoVital(ac, _tallaCtrl, 'Talla cm', decimal: true),
+                    ),
+                    const Spacer(flex: 4),
+                  ],
+                ),
+                if (_problemasVitales.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ..._problemasVitales.map(
+                    (problema) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline_rounded, size: 15, color: ac.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              problema.mensaje,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: ac.red,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

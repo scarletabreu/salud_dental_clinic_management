@@ -35,6 +35,14 @@ abstract class ConsultaRemoteDatasource {
     String? nota,
   });
 
+  /// Registra la decisión clínica sobre una alerta (`resolver_alerta_clinica`).
+  /// [estado] es `confirmada` o `documentada`; la segunda exige justificación.
+  Future<void> resolverAlertaClinica({
+    required String alertaId,
+    required String estado,
+    String? justificacion,
+  });
+
   Future<List<Map<String, dynamic>>> fetchConsultas();
   Future<List<Map<String, dynamic>>> fetchConsultasByDoctor(String doctorId);
   Future<List<Map<String, dynamic>>> fetchConsultasByPaciente(

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
@@ -91,7 +95,10 @@ class _ConsultaRepositorioEspia implements ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) async {
     escrituras++;
     guardado = odontograma;

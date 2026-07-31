@@ -91,6 +91,22 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   }
 
   @override
+  Future<void> resolverAlertaClinica({
+    required String alertaId,
+    required String estado,
+    String? justificacion,
+  }) async {
+    await supabaseClient.rpc(
+      'resolver_alerta_clinica',
+      params: {
+        'p_alerta_id': alertaId,
+        'p_estado': estado,
+        'p_justificacion': justificacion,
+      },
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> cerrarConsulta({
     required String consultaId,
     int? version,

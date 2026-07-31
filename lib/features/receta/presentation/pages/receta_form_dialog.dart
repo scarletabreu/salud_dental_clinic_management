@@ -275,9 +275,21 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: ctrl.dosisCtrl,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   labelText: 'Dosis *',
-                                  hintText: 'Ej: 1 tableta',
+                                  hintText: 'Ej: 1',
+                                ),
+                                validator: _numeroPositivo,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextFormField(
+                                controller: ctrl.unidadCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Unidad *',
+                                  hintText: 'tableta, ml',
                                 ),
                                 validator: (v) => v == null || v.trim().isEmpty
                                     ? 'Requerido'
@@ -289,22 +301,24 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
                               child: TextFormField(
                                 controller: ctrl.viaCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Vía de Adm.',
-                                  hintText: 'vía oral',
+                                  labelText: 'Vía de Adm. *',
+                                  hintText: 'oral',
                                 ),
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Requerido'
+                                    : null,
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: ctrl.frecuenciaCtrl,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                  labelText: 'Frecuencia *',
-                                  hintText: 'Cada 8 horas',
+                                  labelText: 'Cada … horas *',
+                                  hintText: '8',
                                 ),
-                                validator: (v) => v == null || v.trim().isEmpty
-                                    ? 'Requerido'
-                                    : null,
+                                validator: _numeroPositivo,
                               ),
                             ),
                           ],
@@ -316,23 +330,24 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: ctrl.duracionCtrl,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                  labelText: 'Duración *',
-                                  hintText: 'Por 7 días',
+                                  labelText: 'Durante … días *',
+                                  hintText: '7',
                                 ),
-                                validator: (v) => v == null || v.trim().isEmpty
-                                    ? 'Requerido'
-                                    : null,
+                                validator: _numeroPositivo,
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: ctrl.cantidadCtrl,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                  labelText: 'Cantidad a Despachar',
-                                  hintText: '21 tabletas',
+                                  labelText: 'Cantidad a despachar *',
+                                  hintText: '21',
                                 ),
+                                validator: _numeroPositivo,
                               ),
                             ),
                           ],
@@ -391,14 +406,27 @@ class _RecetaFormDialogState extends State<RecetaFormDialog> {
   }
 }
 
+/// Los campos de la pauta son numéricos desde HFX-CLIN-003: es lo que permite
+/// comprobar que la cantidad despachada alcanza para el tratamiento indicado.
+String? _numeroPositivo(String? valor) {
+  final numero = double.tryParse((valor ?? '').trim());
+  if (numero == null || numero <= 0) return 'Indica un número mayor que 0';
+  return null;
+}
+
 class _ItemFormControllers {
   final nombreCtrl = TextEditingController();
   final presentacionCtrl = TextEditingController();
   final dosisCtrl = TextEditingController();
-  final viaCtrl = TextEditingController(text: 'vía oral');
+  final unidadCtrl = TextEditingController(text: 'tableta');
+  final viaCtrl = TextEditingController(text: 'oral');
   final frecuenciaCtrl = TextEditingController();
   final duracionCtrl = TextEditingController();
   final cantidadCtrl = TextEditingController();
+
+  String? medicamentoId;
+  String? principioActivo;
+  String? justificacionRiesgo;
 
   _ItemFormControllers();
 
@@ -406,23 +434,37 @@ class _ItemFormControllers {
     final c = _ItemFormControllers();
     c.nombreCtrl.text = i.nombreMedicamento;
     c.presentacionCtrl.text = i.presentacionConcentracion;
-    c.dosisCtrl.text = i.dosis;
+    c.dosisCtrl.text = i.dosisCantidad == null
+        ? ''
+        : ItemReceta.formatearNumero(i.dosisCantidad!);
+    c.unidadCtrl.text = i.dosisUnidad.isEmpty ? 'tableta' : i.dosisUnidad;
     c.viaCtrl.text = i.viaAdministracion;
-    c.frecuenciaCtrl.text = i.frecuencia;
-    c.duracionCtrl.text = i.duracion;
-    c.cantidadCtrl.text = i.cantidadIndicada;
+    c.frecuenciaCtrl.text = i.frecuenciaHoras == null
+        ? ''
+        : ItemReceta.formatearNumero(i.frecuenciaHoras!);
+    c.duracionCtrl.text = i.duracionDias?.toString() ?? '';
+    c.cantidadCtrl.text = i.cantidadTotal == null
+        ? ''
+        : ItemReceta.formatearNumero(i.cantidadTotal!);
+    c.medicamentoId = i.medicamentoId;
+    c.principioActivo = i.principioActivo;
+    c.justificacionRiesgo = i.justificacionRiesgo;
     return c;
   }
 
   ItemReceta toItem() {
-    return ItemReceta(
+    return ItemReceta.estructurado(
+      medicamentoId: medicamentoId,
       nombreMedicamento: nombreCtrl.text.trim(),
+      principioActivo: principioActivo,
       presentacionConcentracion: presentacionCtrl.text.trim(),
-      dosis: dosisCtrl.text.trim(),
+      dosisCantidad: double.tryParse(dosisCtrl.text.trim()) ?? 0,
+      dosisUnidad: unidadCtrl.text.trim(),
       viaAdministracion: viaCtrl.text.trim(),
-      frecuencia: frecuenciaCtrl.text.trim(),
-      duracion: duracionCtrl.text.trim(),
-      cantidadIndicada: cantidadCtrl.text.trim(),
+      frecuenciaHoras: double.tryParse(frecuenciaCtrl.text.trim()) ?? 0,
+      duracionDias: int.tryParse(duracionCtrl.text.trim()) ?? 0,
+      cantidadTotal: double.tryParse(cantidadCtrl.text.trim()) ?? 0,
+      justificacionRiesgo: justificacionRiesgo,
     );
   }
 
@@ -430,6 +472,7 @@ class _ItemFormControllers {
     nombreCtrl.dispose();
     presentacionCtrl.dispose();
     dosisCtrl.dispose();
+    unidadCtrl.dispose();
     viaCtrl.dispose();
     frecuenciaCtrl.dispose();
     duracionCtrl.dispose();

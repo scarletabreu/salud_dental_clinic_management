@@ -1,7 +1,9 @@
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/tratamiento_aplicado_detalle.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_cierre_consulta.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
@@ -42,7 +44,10 @@ abstract class ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos,
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas,
+    List<TratamientoAplicado> tratamientosGenerales,
+    List<DiagnosticoAplicado> diagnosticosGenerales,
   });
 
   /// Cierra la consulta como una sola operación: guarda el borrador final,
@@ -58,9 +63,20 @@ abstract class ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos,
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas,
+    List<TratamientoAplicado> tratamientosGenerales,
+    List<DiagnosticoAplicado> diagnosticosGenerales,
     required String idempotenciaKey,
     String? nota,
+  });
+
+  /// Deja constancia de la decisión clínica sobre una alerta (HFX-CLIN-003).
+  /// `documentada` exige justificación; sin ella el cierre sigue bloqueado.
+  Future<void> resolverAlerta({
+    required String alertaId,
+    required bool documentada,
+    String? justificacion,
   });
   Future<Map<String, TratamientoAplicadoDetalle>>
   getDetalleTratamientosAplicados(List<String> ids);

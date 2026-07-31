@@ -1,3 +1,5 @@
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
+
 /// Lo que el servidor confirmó de un guardado clínico.
 ///
 /// Sellar estas identidades en memoria evita que el siguiente autoguardado
@@ -16,12 +18,17 @@ class ResultadoBorradorConsulta {
   /// Ids de receta en el mismo orden en que se enviaron.
   final List<String> recetaIds;
 
+  /// Alertas vigentes que devolvió el motor tras aplicar el borrador
+  /// (HFX-CLIN-003). Vienen del servidor porque las reglas viven allí.
+  final List<AlertaClinica> alertas;
+
   const ResultadoBorradorConsulta({
     this.version,
     this.actualizadoEn,
     this.tratamientosPorFdi = const {},
     this.diagnosticosPorFdi = const {},
     this.recetaIds = const [],
+    this.alertas = const [],
   });
 
   bool get sinIdentidades =>
@@ -52,6 +59,7 @@ class ResultadoBorradorConsulta {
         for (final receta in (json['recetas'] as List? ?? const []))
           if (receta is Map && receta['id'] != null) receta['id'].toString(),
       ],
+      alertas: AlertaClinica.listaFromJson(json['alertas']),
     );
   }
 

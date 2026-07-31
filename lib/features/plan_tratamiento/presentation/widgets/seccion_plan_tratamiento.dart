@@ -7,8 +7,10 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/dialogo_consentimiento_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/widgets/estado_plan_estilos.dart';
 import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
@@ -215,7 +217,7 @@ class SeccionPlanTratamiento extends StatelessWidget {
                   doctorId: doctorId,
                 ),
               const SizedBox(height: 14),
-              _ResumenPlan(plan: plan!),
+              _ResumenPlan(plan: plan!, habilitado: !cargado.guardando),
             ],
           ],
         );
@@ -501,8 +503,34 @@ class _FilaActividad extends StatelessWidget {
 
 class _ResumenPlan extends StatelessWidget {
   final PlanTratamiento plan;
+  final bool habilitado;
 
-  const _ResumenPlan({required this.plan});
+  const _ResumenPlan({required this.plan, this.habilitado = true});
+
+  /// Un plan solo se decide una vez por versión: mientras esté aceptado o
+  /// rechazado no se vuelve a preguntar, y si cambia de contenido sube su
+  /// versión y la decisión anterior deja de valer.
+  bool get _admiteDecision =>
+      plan.estado != EstadoPlanTratamiento.aceptado &&
+      plan.estado != EstadoPlanTratamiento.rechazado &&
+      plan.items.isNotEmpty;
+
+  Future<void> _decidir(BuildContext context, {required bool aceptar}) async {
+    final cubit = context.read<PlanTratamientoCubit>();
+    final decision = await mostrarDialogoConsentimiento(
+      context,
+      plan: plan,
+      aceptar: aceptar,
+    );
+    if (decision == null) return;
+    await cubit.registrarConsentimiento(
+      aceptado: decision.aceptado,
+      persona: decision.persona,
+      metodo: decision.metodo,
+      relacion: decision.relacion,
+      motivoRechazo: decision.motivoRechazo,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -541,6 +569,64 @@ class _ResumenPlan extends StatelessWidget {
             'consulta.',
             style: TextStyle(fontSize: 10, color: ac.textMuted, height: 1.4),
           ),
+          if (_admiteDecision) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Decisión del paciente sobre la versión ${plan.version} del plan',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: ac.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: habilitado
+                        ? () => _decidir(context, aceptar: false)
+                        : null,
+                    icon: const Icon(Icons.thumb_down_alt_outlined, size: 16),
+                    label: const Text('Registrar rechazo'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: habilitado
+                        ? () => _decidir(context, aceptar: true)
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.primaryGreen,
+                    ),
+                    icon: const Icon(Icons.how_to_reg_rounded, size: 17),
+                    label: const Text('Registrar aceptación'),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (plan.estado == EstadoPlanTratamiento.aceptado ||
+              plan.estado == EstadoPlanTratamiento.rechazado) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                  Icons.verified_user_outlined,
+                  size: 15,
+                  color: ac.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Consentimiento registrado sobre la versión '
+                    '${plan.version} del plan.',
+                    style: TextStyle(fontSize: 11, color: ac.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

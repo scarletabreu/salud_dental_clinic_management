@@ -10,6 +10,8 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/ref
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/resultado_borrador_consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
@@ -104,7 +106,12 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     Consulta enviada,
     ResultadoBorradorConsulta confirmado,
   ) {
-    final sellada = vigente.copyWith(version: confirmado.version);
+    // Las alertas las decide el servidor: son las reglas aprobadas aplicadas a
+    // lo que quedó guardado, no a lo que la pantalla cree tener.
+    final sellada = vigente.copyWith(
+      version: confirmado.version,
+      alertas: confirmado.alertas,
+    );
     final odonto = sellada.odontograma;
     if (odonto == null || confirmado.sinIdentidades) {
       return _sellarRecetas(sellada, enviada, confirmado.recetaIds);
@@ -209,6 +216,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     String? citaId,
     required String? motivoConsulta,
     required List<String> tempCondiciones,
+    List<CondicionDetectada> condicionesDetectadas = const [],
     required List<DocumentoAdjunto> adjuntos,
     SignosVitales? signosVitales,
     TipoAtencionClinica tipoAtencion = TipoAtencionClinica.consulta,
@@ -248,6 +256,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         fecha: fechaConsulta,
         motivoConsulta: motivoConsulta,
         tempCondiciones: tempCondiciones,
+        condicionesDetectadas: condicionesDetectadas,
         documentosClinicos: documentos,
         signosVitales: signosVitales,
         tipoAtencion: tipoAtencion,
@@ -290,7 +299,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         finalizada: false,
       );
 
-      emit(ConsultaIniciada(consulta: consultaActiva));
+      // Se emite como cambio pendiente a propósito: el primer autoguardado es
+      // el que lleva las mediciones y las condiciones detectadas a sus tablas,
+      // donde el servidor las valida y el motor de alertas las evalúa.
+      _emitirCambio(consultaActiva);
     } catch (e) {
       AppLog.error('crear consulta', e);
       emit(ConsultaError(_mensajeError(e)));
@@ -372,6 +384,154 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       final actual = (state as ConsultaIniciada).consulta;
       _emitirCambio(actual.copyWith(signosVitales: signos));
     }
+  }
+
+  /// Registra una condición de catálogo descubierta hoy. Cuenta desde este
+  /// momento para contraindicaciones y alertas: no espera al cierre.
+  void agregarCondicionDetectada(CondicionDetectada condicion) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (actual.condicionesDetectadas.any(
+      (c) => c.condicionId == condicion.condicionId,
+    )) {
+      return;
+    }
+    _emitirCambio(
+      actual.copyWith(
+        condicionesDetectadas: [...actual.condicionesDetectadas, condicion],
+      ),
+    );
+  }
+
+  void actualizarCondicionDetectada(int index, CondicionDetectada condicion) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.condicionesDetectadas.length) return;
+    final nuevas = [...actual.condicionesDetectadas];
+    nuevas[index] = condicion;
+    _emitirCambio(actual.copyWith(condicionesDetectadas: nuevas));
+  }
+
+  void quitarCondicionDetectada(int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.condicionesDetectadas.length) return;
+    final nuevas = [...actual.condicionesDetectadas]..removeAt(index);
+    _emitirCambio(actual.copyWith(condicionesDetectadas: nuevas));
+  }
+
+  /// Ejecución de alcance global o de arcada: no cuelga de ninguna pieza.
+  void aplicarTratamientoGeneral(
+    Tratamiento tratamiento, {
+    String? justificacionClinica,
+    String? itemPlanId,
+  }) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final aplicado = TratamientoAplicado(
+      tratamientoId: tratamiento.id ?? '',
+      esContinuo: false,
+      estaTerminado: false,
+      precioAplicado: tratamiento.costo,
+      notas: justificacionClinica,
+      itemPlanId: itemPlanId,
+      nombreTratamiento: tratamiento.nombre,
+      claveOdontograma: tratamiento.claveOdontograma,
+      fechaAplicacion: DateTime.now(),
+      doctorEjecutaId: actual.doctorId,
+      fechaEjecucion: DateTime.now(),
+    );
+    _emitirCambio(
+      actual.copyWith(
+        tratamientosGenerales: [...actual.tratamientosGenerales, aplicado],
+      ),
+    );
+  }
+
+  void quitarTratamientoGeneral(int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.tratamientosGenerales.length) return;
+    final nuevos = [...actual.tratamientosGenerales]..removeAt(index);
+    _emitirCambio(actual.copyWith(tratamientosGenerales: nuevos));
+  }
+
+  void aplicarDiagnosticoGeneral(
+    Diagnosis diagnostico, {
+    SeveridadDiagnosis? severidad,
+    OrigenMarcaOdontograma origen = OrigenMarcaOdontograma.estaConsulta,
+    String notas = '',
+  }) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    final aplicado = DiagnosticoAplicado(
+      diagnosisId: diagnostico.id ?? '',
+      severidad: severidad ?? diagnostico.severidadDefault,
+      fechaAplicacion: DateTime.now(),
+      notas: notas,
+      origen: origen,
+      doctorId: actual.doctorId,
+      nombreDiagnostico: diagnostico.nombre,
+      claveOdontograma: diagnostico.claveOdontograma,
+    );
+    _emitirCambio(
+      actual.copyWith(
+        diagnosticosGenerales: [...actual.diagnosticosGenerales, aplicado],
+      ),
+    );
+  }
+
+  void quitarDiagnosticoGeneral(int index) {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    if (index < 0 || index >= actual.diagnosticosGenerales.length) return;
+    final nuevos = [...actual.diagnosticosGenerales]..removeAt(index);
+    _emitirCambio(actual.copyWith(diagnosticosGenerales: nuevos));
+  }
+
+  /// Deja constancia de la decisión sobre una alerta y refresca el estado con
+  /// lo que el servidor confirmó.
+  Future<void> resolverAlerta(
+    AlertaClinica alerta, {
+    required bool documentada,
+    String? justificacion,
+  }) async {
+    if (state is! ConsultaIniciada) return;
+    final actual = (state as ConsultaIniciada).consulta;
+    try {
+      await _consultaRepository.resolverAlerta(
+        alertaId: alerta.id,
+        documentada: documentada,
+        justificacion: justificacion,
+      );
+    } catch (e) {
+      AppLog.error('resolver alerta clínica', e);
+      if (isClosed) return;
+      emit(ConsultaError(_mensajeError(e, fallback: _falloAlerta)));
+      emit(ConsultaIniciada(consulta: actual));
+      return;
+    }
+
+    final vigente = state;
+    if (isClosed || vigente is! ConsultaIniciada) return;
+    emit(
+      vigente.copyWith(
+        consulta: vigente.consulta.copyWith(
+          alertas: [
+            for (final a in vigente.consulta.alertas)
+              if (a.id == alerta.id)
+                a.copyWith(
+                  estado: documentada
+                      ? EstadoAlerta.documentada
+                      : EstadoAlerta.confirmada,
+                  justificacion: justificacion,
+                )
+              else
+                a,
+          ],
+        ),
+      ),
+    );
   }
 
   void actualizarObservaciones(String notas) {
@@ -773,7 +933,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         recetas: consulta.recetas,
         insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
-        signosVitales: consulta.signosVitales?.toJson(),
+        signosVitales: consulta.signosVitales,
+        condicionesDetectadas: consulta.condicionesDetectadas,
+        tratamientosGenerales: consulta.tratamientosGenerales,
+        diagnosticosGenerales: consulta.diagnosticosGenerales,
       );
       _guardando = false;
       if (isClosed) return;
@@ -851,7 +1014,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         recetas: consulta.recetas,
         insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
-        signosVitales: consulta.signosVitales?.toJson(),
+        signosVitales: consulta.signosVitales,
+        condicionesDetectadas: consulta.condicionesDetectadas,
+        tratamientosGenerales: consulta.tratamientosGenerales,
+        diagnosticosGenerales: consulta.diagnosticosGenerales,
         idempotenciaKey: clave,
       );
 
@@ -917,7 +1083,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         recetas: consulta.recetas,
         insumos: consulta.insumosUtilizados,
         notas: consulta.notas,
-        signosVitales: consulta.signosVitales?.toJson(),
+        signosVitales: consulta.signosVitales,
+        condicionesDetectadas: consulta.condicionesDetectadas,
+        tratamientosGenerales: consulta.tratamientosGenerales,
+        diagnosticosGenerales: consulta.diagnosticosGenerales,
         idempotenciaKey: clave,
       );
       _guardando = false;
@@ -940,6 +1109,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       emit(ConsultaIniciada(consulta: consulta));
     }
   }
+
+  static const _falloAlerta =
+      'No se pudo registrar la decisión sobre la alerta. La consulta sigue '
+      'abierta y la alerta continúa pendiente.';
 
   static const _falloCierre =
       'No se pudo cerrar la consulta. No se descontó inventario ni se generó '

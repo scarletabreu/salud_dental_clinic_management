@@ -152,12 +152,14 @@ begin
   -- REGLA extra: el eje de ejecución ya no admite intenciones.
   v_fallo := false;
   begin
+    -- Con superficie: así el rechazo lo produce el estado «indicado» y no la
+    -- barrera de alcance de HFX-CLIN-003, que se prueba aparte.
     insert into tratamientos_aplicados (
-      tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
-      precio_aplicado, estado, justificacion_no_planificada,
+      tratamiento_id, consulta_id, diente_id, superficie, es_continuo,
+      esta_terminado, precio_aplicado, estado, justificacion_no_planificada,
       created_at, updated_at
     ) values (
-      v_tratamiento_id, v_consulta_id, v_diente_id, false, false,
+      v_tratamiento_id, v_consulta_id, v_diente_id, 'oclusal', false, false,
       2500.00, 'indicado', 'Prueba del eje de ejecución', now(), now()
     );
     v_fallo := true;
@@ -210,12 +212,14 @@ begin
   -- REGLA DEL FLUJO UNIFICADO: una intervención agregada durante la consulta
   -- puede ejecutarse sin item del plan ni justificación obligatoria. La
   -- auditoría clínica (doctor y fecha) se conserva.
+  -- La cara es obligatoria: el catálogo declara este tratamiento como puntual
+  -- y desde HFX-CLIN-003 la base rechaza la ejecución sin superficie.
   insert into tratamientos_aplicados (
-    tratamiento_id, consulta_id, diente_id, es_continuo, esta_terminado,
-    precio_aplicado, estado, doctor_ejecuta_id, fecha_ejecucion,
+    tratamiento_id, consulta_id, diente_id, superficie, es_continuo,
+    esta_terminado, precio_aplicado, estado, doctor_ejecuta_id, fecha_ejecucion,
     created_at, updated_at
   ) values (
-    v_tratamiento_id, v_consulta_id, v_diente_id, false, true,
+    v_tratamiento_id, v_consulta_id, v_diente_id, 'oclusal', false, true,
     2500.00, 'aplicado', v_doctor_id, now(), now(), now()
   );
 

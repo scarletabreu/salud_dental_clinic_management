@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/consentimiento_plan.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/data/datasources/plan_tratamiento_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/data/models/item_plan_tratamiento_model.dart';
@@ -225,5 +226,27 @@ class PlanTratamientoRepositoryImpl implements PlanTratamientoRepository {
         ).toJson(),
     ]);
     return filas.map(ItemPlanTratamientoModel.fromJson).toList();
+  }
+
+  @override
+  Future<ConsentimientoPlan> registrarConsentimiento({
+    required String planId,
+    required bool aceptado,
+    required String persona,
+    required MetodoConsentimiento metodo,
+    String relacion = 'titular',
+    String? motivoRechazo,
+  }) {
+    return runGuarded(() async {
+      final respuesta = await remoteDataSource.registrarConsentimiento(
+        planId: planId,
+        decision: aceptado ? 'aceptado' : 'rechazado',
+        persona: persona,
+        metodo: metodo.dbValue,
+        relacion: relacion,
+        motivo: motivoRechazo,
+      );
+      return ConsentimientoPlan.fromRpc(respuesta);
+    }, context: 'registrar el consentimiento del plan');
   }
 }

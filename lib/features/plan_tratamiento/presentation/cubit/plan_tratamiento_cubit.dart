@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/consentimiento_plan.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/plan_tratamiento.dart';
@@ -172,6 +173,55 @@ class PlanTratamientoCubit extends Cubit<PlanTratamientoState> {
         actual.copyWith(
           guardando: false,
           aviso: 'No se pudo actualizar la actividad: $e',
+        ),
+      );
+    }
+  }
+
+  /// Registra la decisión del paciente y la aplica al plan. La evidencia y el
+  /// cambio de estado viajan juntos: el servidor rechaza aceptar un plan sin
+  /// consentimiento de esa misma versión (HFX-CLIN-003).
+  Future<void> registrarConsentimiento({
+    required bool aceptado,
+    required String persona,
+    required MetodoConsentimiento metodo,
+    String relacion = 'titular',
+    String? motivoRechazo,
+  }) async {
+    final actual = state is PlanTratamientoCargado
+        ? state as PlanTratamientoCargado
+        : null;
+    final plan = actual?.plan;
+    final planId = plan?.id;
+    if (actual == null || plan == null || planId == null) return;
+
+    emit(actual.copyWith(guardando: true, limpiarAviso: true));
+    try {
+      await _repository.registrarConsentimiento(
+        planId: planId,
+        aceptado: aceptado,
+        persona: persona,
+        metodo: metodo,
+        relacion: relacion,
+        motivoRechazo: motivoRechazo,
+      );
+      final refrescado = await _repository.getPlanDeConsulta(
+        plan.consultaOrigenId ?? '',
+      );
+      emit(
+        PlanTratamientoCargado(
+          plan: refrescado ?? plan.copyWith(
+            estado: aceptado
+                ? EstadoPlanTratamiento.aceptado
+                : EstadoPlanTratamiento.rechazado,
+          ),
+        ),
+      );
+    } catch (e) {
+      emit(
+        actual.copyWith(
+          guardando: false,
+          aviso: 'No se pudo registrar el consentimiento: $e',
         ),
       );
     }

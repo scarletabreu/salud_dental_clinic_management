@@ -1,4 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
@@ -53,7 +57,10 @@ class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) async {
     guardados++;
     ultimoOdontograma = odontograma;
@@ -72,7 +79,10 @@ class _ConsultaRepoDoble extends _Vacio implements ConsultaRepository {
     required List<Receta> recetas,
     List<InsumoUtilizado> insumos = const [],
     String? notas,
-    Map<String, dynamic>? signosVitales,
+    SignosVitales? signosVitales,
+    List<CondicionDetectada> condicionesDetectadas = const [],
+    List<TratamientoAplicado> tratamientosGenerales = const [],
+    List<DiagnosticoAplicado> diagnosticosGenerales = const [],
     required String idempotenciaKey,
     String? nota,
   }) async {

@@ -26,4 +26,16 @@ abstract class PlanTratamientoRemoteDatasource {
   /// de todos sus planes).
   Future<List<Map<String, dynamic>>> fetchResumenPorPaciente(String pacienteId);
   Future<void> insertEjecucion(Map<String, dynamic> data);
+
+  /// `registrar_consentimiento_plan`: guarda la evidencia y aplica la decisión
+  /// al plan en la misma transacción. Los precios aceptados los congela el
+  /// servidor desde el plan vigente, no el cliente.
+  Future<Map<String, dynamic>> registrarConsentimiento({
+    required String planId,
+    required String decision,
+    required String persona,
+    required String metodo,
+    String relacion,
+    String? motivo,
+  });
 }

@@ -1,0 +1,8 @@
+psql:supabase/tests/e2e_ui_login_overlay.sql:50: NOTICE:  E2E overlay: 0 actores alcanzables desde el login.
+    username    |             email              
+----------------+--------------------------------
+ cert_admin     | cert_admin@saluddental.com
+ cert_asistente | cert_asistente@saluddental.com
+ cert_doctora   | cert_doctora@saluddental.com
+(3 rows)
+

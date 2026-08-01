@@ -24,6 +24,13 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
+CREATE EXTENSION IF NOT EXISTS "btree_gist" WITH SCHEMA "public";
+
+
+
+
+
+
 CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
 
 
@@ -414,6 +421,92 @@ CREATE TYPE "public"."tipo_suplidor" AS ENUM (
 ALTER TYPE "public"."tipo_suplidor" OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_version_actual integer;
+  v_cedula         text;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null
+          or not (public.es_admin() or public.es_doctor() or public.es_asistente())) then
+    raise exception 'Sesión activa requerida para editar un paciente.'
+      using errcode = '42501';
+  end if;
+
+  select version into v_version_actual
+    from public.pacientes
+   where id = p_paciente_id and deleted_at is null
+   for update;
+  if not found then
+    raise exception 'El paciente no existe o fue dado de baja.' using errcode = 'P0002';
+  end if;
+
+  if p_version is not null and p_version <> v_version_actual then
+    raise exception
+      'La ficha cambió mientras la editabas. Recárgala para no perder lo que guardó el otro actor.'
+      using errcode = 'CL019';
+  end if;
+
+  v_cedula := public.hfx_clin_004_normalizar_cedula(p_payload ->> 'cedula');
+  if v_cedula is not null and exists (
+    select 1 from public.personas
+     where deleted_at is null
+       and id <> p_paciente_id
+       and public.hfx_clin_004_normalizar_cedula(cedula) = v_cedula
+  ) then
+    raise exception 'Ya existe otro registro con esa cédula.' using errcode = 'CL017';
+  end if;
+
+  update public.personas
+     set nombre = coalesce(nullif(btrim(coalesce(p_payload ->> 'nombre', '')), ''), nombre),
+         apellido = coalesce(nullif(btrim(coalesce(p_payload ->> 'apellido', '')), ''), apellido),
+         fecha_nacimiento = coalesce((p_payload ->> 'fecha_nacimiento')::date, fecha_nacimiento),
+         cedula = coalesce(p_payload ->> 'cedula', cedula),
+         estatus = coalesce(
+           nullif(p_payload ->> 'estatus', '')::public.estatus_persona, estatus
+         ),
+         updated_at = now()
+   where id = p_paciente_id;
+
+  update public.pacientes
+     set genero = coalesce(nullif(p_payload ->> 'genero', '')::public.genero, genero),
+         tipo_paciente = coalesce(
+           nullif(p_payload ->> 'tipo_paciente', '')::public.tipo_paciente, tipo_paciente
+         ),
+         trabajo = coalesce(p_payload ->> 'trabajo', trabajo),
+         referencia = coalesce(p_payload ->> 'referencia', referencia),
+         peso = coalesce((p_payload ->> 'peso')::numeric, peso),
+         altura = coalesce((p_payload ->> 'altura')::numeric, altura),
+         -- Las columnas `foto_*` no se tocan: su única ruta de escritura es
+         -- `PacienteFotoStorage`, que las mantiene en sincronía con Storage.
+         version = version + 1,
+         updated_at = now()
+   where id = p_paciente_id;
+
+  if p_payload ? 'contactos' then
+    perform public.hfx_clin_004_sincronizar_contactos(
+      p_paciente_id, p_payload -> 'contactos'
+    );
+  end if;
+
+  select version into v_version_actual
+    from public.pacientes where id = p_paciente_id;
+
+  return jsonb_build_object('paciente_id', p_paciente_id, 'version', v_version_actual);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") IS 'HFX-CLIN-004. Actualización transaccional con versión optimista: o se aplica entera, o no queda ficha parcial.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."actualizar_stock_por_compra"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -555,6 +648,7 @@ declare
   v_cuenta_id   uuid;
   v_recetas     integer := 0;
   v_facturables integer := 0;
+  v_condiciones integer := 0;
 begin
   v_actor_id := public.hfx_clin_002_actor_clinico(p_consulta_id);
 
@@ -564,7 +658,6 @@ begin
    where id = p_consulta_id and deleted_at is null
      for update;
 
-  -- Idempotencia: el mismo intento lógico devuelve el resultado existente.
   if v_finalizada then
     if p_idempotencia_key is null
        or v_cierre_key is null
@@ -582,15 +675,19 @@ begin
       using errcode = 'CL001';
   end if;
 
-  -- La cita se bloquea junto con la consulta: el cierre las mueve a la vez.
   if v_cita_id is not null then
     perform 1 from citas where id = v_cita_id for update;
   end if;
 
-  -- 8.1 Último borrador dentro de la misma transacción del cierre.
   perform public.hfx_clin_002_aplicar_borrador(p_consulta_id, v_actor_id, p_payload);
+  perform public.hfx_clin_003_aplicar_extras(p_consulta_id, v_actor_id, p_payload);
 
-  -- 8.2 Consumo de inventario: verificar antes de mover, y mover una sola vez.
+  -- Barreras clínicas antes de mover inventario o dinero: si algo falta, la
+  -- consulta sigue abierta y nada cambió.
+  perform public.hfx_clin_003_barreras_de_cierre(p_consulta_id);
+
+  v_condiciones := public.hfx_clin_003_incorporar_condiciones(p_consulta_id);
+
   for v_consumo in
     select cc.consumible_id, cc.cantidad, cc.nombre
       from consumos_consulta cc
@@ -626,7 +723,6 @@ begin
     do nothing;
   end loop;
 
-  -- 8.3 Emisión de las recetas que quedaron en borrador con contenido.
   update recetas
      set estado = 'emitida',
          emitida_at = now(),
@@ -639,17 +735,12 @@ begin
      and jsonb_array_length(coalesce(items_receta, '[]'::jsonb)) > 0;
   get diagnostics v_recetas = row_count;
 
-  -- Un borrador vacío no se emite: no es un documento clínico.
   update recetas
      set deleted_at = now(), updated_at = now()
    where consulta_id = p_consulta_id
      and deleted_at is null
      and estado = 'borrador';
 
-  -- 8.4 Cuenta, ítems de lo ejecutado y cierre de la cita.
-  --
-  -- Una evaluación sin ejecución no genera pre-factura: cobrar cero es ruido
-  -- administrativo, y el plan propuesto o aceptado no factura por sí mismo.
   select count(*) into v_facturables
     from tratamientos_aplicados
    where consulta_id = p_consulta_id
@@ -659,8 +750,6 @@ begin
   if v_facturables > 0 then
     v_cuenta_id := public.hfx_base_finalizar_consulta(p_consulta_id, p_metodo_pago, p_nota);
   elsif v_cita_id is not null then
-    -- `hfx_base_finalizar_consulta` es quien cierra la cita; si no se invoca,
-    -- el cierre igual tiene que dejarla completada.
     update citas
        set estado = 'completada'::estado_cita, updated_at = now()
      where id = v_cita_id
@@ -668,7 +757,6 @@ begin
        and estado <> 'cancelada'::estado_cita;
   end if;
 
-  -- 8.5 Cierre clínico.
   update consultas
      set finalizada = true,
          finalizada_at = now(),
@@ -687,6 +775,7 @@ begin
     jsonb_build_object(
       'cuenta_id', v_cuenta_id,
       'recetas_emitidas', v_recetas,
+      'condiciones_incorporadas', v_condiciones,
       'idempotencia_key', p_idempotencia_key
     )
   );
@@ -835,6 +924,23 @@ $$;
 ALTER FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_cita_id" "uuid", "p_fecha" timestamp with time zone, "p_motivo_consulta" "text", "p_temp_condiciones" "jsonb", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_tipo_atencion" "public"."tipo_atencion_clinica") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT
+        es_doctor_no_admin()
+        AND EXISTS (SELECT 1 FROM pacientes p WHERE p.id = p_persona_id);
+$$;
+
+
+ALTER FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") IS 'true si quien consulta es un doctor regular (no admin) y la persona referenciada es un paciente. Usado para enmascarar cédula/teléfono/dirección/referencia en las vistas *_seguro.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."es_admin"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -895,6 +1001,21 @@ $$;
 ALTER FUNCTION "public"."es_doctor"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."es_doctor_no_admin"() RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT es_doctor() AND NOT es_admin();
+$$;
+
+
+ALTER FUNCTION "public"."es_doctor_no_admin"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."es_doctor_no_admin"() IS 'Distingue un doctor regular de un admin (que también es doctor por herencia). Necesario porque la regla de visibilidad de pacientes difiere entre ambos.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text" DEFAULT 'contado'::"text", "p_nota" "text" DEFAULT NULL::"text") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -921,34 +1042,176 @@ ALTER FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_p
 CREATE OR REPLACE FUNCTION "public"."fn_aplicar_movimiento_stock"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
-DECLARE
-  v_stock_actual INT;
-  v_stock_nuevo INT;
-BEGIN
-  SELECT stock_actual INTO v_stock_actual
-  FROM consumibles
-  WHERE id = NEW.consumible_id
-  FOR UPDATE; -- bloquea la fila mientras se calcula, evita carrera con otro movimiento simultáneo
+declare
+  v_stock_actual int;
+  v_stock_nuevo  int;
+  v_stock_minimo int;
+begin
+  select stock_actual, stock_minimo
+    into v_stock_actual, v_stock_minimo
+    from public.consumibles
+   where id = new.consumible_id
+     for update; -- bloquea la fila mientras se calcula: evita la carrera con
+                 -- otro movimiento simultáneo sobre el mismo consumible.
 
-  IF v_stock_actual IS NULL THEN
-    RAISE EXCEPTION 'Consumible % no existe', NEW.consumible_id;
+  if v_stock_actual is null then
+    raise exception 'Consumible % no existe', new.consumible_id;
+  end if;
+
+  v_stock_nuevo := greatest(v_stock_actual + new.diferencia, 0);
+
+  new.stock_anterior := v_stock_actual;
+  new.stock_nuevo := v_stock_nuevo;
+
+  update public.consumibles
+     set stock_actual = v_stock_nuevo,
+         estado = case
+           when v_stock_nuevo <= 0 then 'agotado'::public.estado_consumible
+           when v_stock_nuevo <= coalesce(v_stock_minimo, 0)
+             then 'bajo_stock'::public.estado_consumible
+           else 'disponible'::public.estado_consumible
+         end,
+         updated_at = now()
+   where id = new.consumible_id;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."fn_aplicar_movimiento_stock"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."fn_aplicar_movimiento_stock"() IS 'Aplica el movimiento bajo lock y recalcula el estado del consumible. HFX-CLIN-007: el estado vive aquí para que ninguna vía de consumo lo olvide.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."fn_auditoria_log"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_usuario_id UUID;
+  v_entidad_id TEXT;
+  v_detalles JSONB;
+BEGIN
+  SELECT id INTO v_usuario_id FROM public.usuarios WHERE id = auth.uid();
+
+  IF TG_OP = 'DELETE' THEN
+    v_entidad_id := OLD.id::text;
+    v_detalles := jsonb_build_object('eliminado', to_jsonb(OLD));
+    INSERT INTO auditoria_log (usuario_id, accion, entidad, entidad_id, detalles, fecha)
+    VALUES (v_usuario_id, 'DELETE', TG_TABLE_NAME, v_entidad_id, v_detalles, NOW());
+    RETURN OLD;
+
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_entidad_id := NEW.id::text;
+    v_detalles := jsonb_build_object(
+      'antes', to_jsonb(OLD),
+      'despues', to_jsonb(NEW)
+    );
+    INSERT INTO auditoria_log (usuario_id, accion, entidad, entidad_id, detalles, fecha)
+    VALUES (v_usuario_id, 'UPDATE', TG_TABLE_NAME, v_entidad_id, v_detalles, NOW());
+    RETURN NEW;
+
+  ELSIF TG_OP = 'INSERT' THEN
+    v_entidad_id := NEW.id::text;
+    v_detalles := jsonb_build_object('creado', to_jsonb(NEW));
+    INSERT INTO auditoria_log (usuario_id, accion, entidad, entidad_id, detalles, fecha)
+    VALUES (v_usuario_id, 'CREATE', TG_TABLE_NAME, v_entidad_id, v_detalles, NOW());
+    RETURN NEW;
   END IF;
 
-  v_stock_nuevo := GREATEST(v_stock_actual + NEW.diferencia, 0);
+  RETURN NULL;
+END;
+$$;
 
-  NEW.stock_anterior := v_stock_actual;
-  NEW.stock_nuevo := v_stock_nuevo;
 
-  UPDATE consumibles
-  SET stock_actual = v_stock_nuevo, updated_at = NOW()
-  WHERE id = NEW.consumible_id;
+ALTER FUNCTION "public"."fn_auditoria_log"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."fn_autoasignar_doctor_paciente"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+    -- Cada doctor que atiende una consulta de este paciente queda con acceso
+    -- activo, sin importar si otro doctor ya lo tenía (cobertura de emergencia,
+    -- referencias, co-tratamiento). El chequeo es por PAR doctor-paciente, no
+    -- exclusivo por paciente, así que múltiples doctores pueden acumular acceso
+    -- legítimamente con el tiempo.
+    IF NOT EXISTS (
+        SELECT 1 FROM doctor_paciente
+        WHERE paciente_id = NEW.paciente_id
+          AND doctor_id = NEW.doctor_id
+          AND activo = true
+    ) THEN
+        INSERT INTO doctor_paciente (doctor_id, paciente_id, asignado_por, motivo)
+        VALUES (
+            NEW.doctor_id,
+            NEW.paciente_id,
+            NEW.doctor_id,
+            'asignación automática: consulta ' || NEW.id::text
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."fn_autoasignar_doctor_paciente"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."fn_autoasignar_doctor_paciente"() IS 'Cada doctor que crea una consulta para un paciente queda con acceso activo en doctor_paciente. No es exclusivo: varios doctores pueden acumular acceso (cobertura de emergencia, co-tratamiento) sin que eso desactive el acceso de otros. La revocación de acceso (transferencia formal) sigue siendo una acción manual explícita en doctor_paciente, no automática.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."fn_cascade_deleted_at_doctor"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at THEN
+    UPDATE admins SET deleted_at = NEW.deleted_at WHERE id = NEW.id;
+  END IF;
   RETURN NEW;
 END;
 $$;
 
 
-ALTER FUNCTION "public"."fn_aplicar_movimiento_stock"() OWNER TO "postgres";
+ALTER FUNCTION "public"."fn_cascade_deleted_at_doctor"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."fn_cascade_deleted_at_usuario"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at THEN
+    UPDATE doctores SET deleted_at = NEW.deleted_at WHERE id = NEW.id;
+    UPDATE asistentes SET deleted_at = NEW.deleted_at WHERE id = NEW.id;
+    -- Ya NO se toca admin aquí directamente:
+    -- admin ahora cuelga de doctor, no de usuario.
+    -- El UPDATE de arriba a `doctor` disparará el trigger de nivel 2 solito.
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."fn_cascade_deleted_at_usuario"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."generar_codigo_receta"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  IF NEW.codigo_receta IS NULL OR NEW.codigo_receta = '' THEN
+    NEW.codigo_receta := 'RX-' || TO_CHAR(NOW(), 'YYYY') || '-' || LPAD(NEXTVAL('secuencia_codigo_receta')::TEXT, 5, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."generar_codigo_receta"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."generar_plan_cuotas"("p_cuenta_id" "uuid", "p_cuotas" "jsonb") RETURNS "void"
@@ -1007,15 +1270,15 @@ CREATE OR REPLACE FUNCTION "public"."guardar_borrador_consulta"("p_consulta_id" 
     SET "search_path" TO 'public'
     AS $$
 declare
-  v_actor_id  uuid;
-  v_version   integer;
-  v_finalizada boolean;
-  v_resultado jsonb;
+  v_actor_id    uuid;
+  v_version     integer;
+  v_finalizada  boolean;
+  v_resultado   jsonb;
+  v_alertas     jsonb;
   v_actualizado timestamptz;
 begin
   v_actor_id := public.hfx_clin_002_actor_clinico(p_consulta_id);
 
-  -- Serializa los guardados concurrentes de la misma consulta.
   select version, coalesce(finalizada, false)
     into v_version, v_finalizada
     from consultas
@@ -1034,6 +1297,7 @@ begin
   end if;
 
   v_resultado := public.hfx_clin_002_aplicar_borrador(p_consulta_id, v_actor_id, p_payload);
+  v_alertas := public.hfx_clin_003_aplicar_extras(p_consulta_id, v_actor_id, p_payload);
 
   update consultas
      set version = version + 1, updated_at = now()
@@ -1044,7 +1308,8 @@ begin
     'consulta_id', p_consulta_id,
     'version', v_version,
     'actualizado_en', v_actualizado,
-    'finalizada', false
+    'finalizada', false,
+    'alertas', v_alertas
   );
 end;
 $$;
@@ -1240,8 +1505,8 @@ begin
   values (v_consulta_id, now(), now())
   returning id into v_odontograma_id;
 
-  -- 3. Dientes + superficies
-  for v_diente in select * from jsonb_array_elements(p_dientes)
+  -- 3. Dientes + superficies descritos por quien llama
+  for v_diente in select * from jsonb_array_elements(coalesce(p_dientes, '[]'::jsonb))
   loop
     insert into dientes (
       odontograma_id, fdi_code, created_at, updated_at
@@ -1251,7 +1516,8 @@ begin
     )
     returning id into v_diente_id;
 
-    for v_superficie in select * from jsonb_array_elements(v_diente -> 'superficies')
+    for v_superficie in
+      select * from jsonb_array_elements(coalesce(v_diente -> 'superficies', '[]'::jsonb))
     loop
       insert into superficies (
         diente_id, tipo_superficie, tratamientos_ids, created_at, updated_at
@@ -1263,6 +1529,13 @@ begin
       );
     end loop;
   end loop;
+
+  -- 3.bis. HFX-CLIN-008 — el resto de la dentición.
+  -- Es la corrección: sin esto, una llamada con `p_dientes = []` dejaba la
+  -- consulta con un odontograma vacío y ninguna anotación clínica podía
+  -- guardarse, porque `guardar_borrador_consulta` busca la pieza por su
+  -- `fdi_code` y la rechaza con CL004 si no existe.
+  perform public.hfx_clin_008_completar_odontograma(v_odontograma_id);
 
   -- 4. Documentos clínicos (radiografías ya subidas a Storage)
   if p_documentos is not null then
@@ -1496,7 +1769,6 @@ DECLARE
   v_estado_compra TEXT;
   v_item RECORD;
 BEGIN
-  -- 1. Verificar estado de la compra
   SELECT estado::text INTO v_estado_compra
   FROM compras
   WHERE id = p_compra_id;
@@ -1509,13 +1781,11 @@ BEGIN
     RAISE EXCEPTION 'Esta compra ya fue recibida anteriormente.';
   END IF;
 
-  -- 2. Calcular el monto total de la compra
   SELECT COALESCE(SUM(cantidad * precio_unitario), 0)
   INTO v_monto_total
   FROM consumibles_compras
   WHERE compra_id = p_compra_id;
 
-  -- 3. Obtener la caja activa (cerrada = false)
   SELECT id INTO v_caja_id
   FROM cajas
   WHERE cerrada = false
@@ -1526,27 +1796,32 @@ BEGIN
     RAISE EXCEPTION 'No hay ninguna caja abierta actualmente.';
   END IF;
 
-  -- 4. Marcar compra como recibida
   UPDATE compras
-  SET 
+  SET
     estado = 'recibido'::estado_compra,
     updated_at = NOW()
   WHERE id = p_compra_id;
 
-  -- 5. Incrementar stock en consumibles
-  FOR v_item IN 
-    SELECT consumible_id, cantidad 
-    FROM consumibles_compras 
+  -- 5. Registrar movimiento de stock por cada artículo recibido.
+  --    El trigger fn_aplicar_movimiento_stock actualiza consumibles.stock_actual
+  --    y calcula stock_anterior/stock_nuevo, con FOR UPDATE para evitar carreras
+  --    con otros movimientos concurrentes sobre el mismo consumible.
+  FOR v_item IN
+    SELECT consumible_id, cantidad
+    FROM consumibles_compras
     WHERE compra_id = p_compra_id
   LOOP
-    UPDATE consumibles
-    SET 
-      stock_actual = stock_actual + v_item.cantidad,
-      updated_at = NOW()
-    WHERE id = v_item.consumible_id;
+    INSERT INTO movimientos_stock_consumible (
+      consumible_id,
+      diferencia,
+      motivo
+    ) VALUES (
+      v_item.consumible_id,
+      v_item.cantidad,
+      'compra_recibida'
+    );
   END LOOP;
 
-  -- 6. Insertar movimiento de egreso
   IF v_monto_total > 0 THEN
     INSERT INTO movimientos_caja (
       caja_diaria_id,
@@ -1566,14 +1841,12 @@ BEGIN
       NOW()
     );
 
-    -- 7. Actualizar explícitamente la columna monto_esperado en la tabla cajas
     UPDATE cajas
-    SET 
+    SET
       monto_esperado = COALESCE(monto_esperado, 0) - v_monto_total,
       updated_at = NOW()
     WHERE id = v_caja_id;
   END IF;
-
 END;
 $$;
 
@@ -2301,6 +2574,1788 @@ $$;
 ALTER FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_aplicar_extras"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_fila        jsonb;
+  v_conservados uuid[];
+  v_codigos     text[];
+  v_sistolica   numeric;
+  v_diastolica  numeric;
+  v_paciente    uuid;
+  v_record      uuid;
+  v_id          uuid;
+  v_diente_id   uuid;
+  v_signos      jsonb := '{}'::jsonb;
+begin
+  p_payload := coalesce(p_payload, '{}'::jsonb);
+
+  select paciente_id into v_paciente from consultas where id = p_consulta_id;
+
+  -- 10.1 Signos vitales estructurados.
+  if jsonb_exists(p_payload, 'signos_vitales_medidos')
+     and jsonb_typeof(p_payload -> 'signos_vitales_medidos') = 'array' then
+
+    v_codigos := coalesce((
+      select array_agg(f ->> 'codigo')
+        from jsonb_array_elements(p_payload -> 'signos_vitales_medidos') as f
+       where nullif(f ->> 'codigo', '') is not null
+         and nullif(f ->> 'valor', '') is not null), '{}'::text[]);
+
+    update signos_vitales_consulta
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and deleted_at is null
+       and not (codigo = any (v_codigos));
+
+    for v_fila in
+      select value from jsonb_array_elements(p_payload -> 'signos_vitales_medidos')
+    loop
+      if nullif(v_fila ->> 'codigo', '') is null
+         or nullif(v_fila ->> 'valor', '') is null then
+        continue;
+      end if;
+
+      insert into signos_vitales_consulta (
+        consulta_id, codigo, valor, unidad, medido_en, medido_por, origen,
+        observacion, estado_validacion
+      ) values (
+        p_consulta_id,
+        v_fila ->> 'codigo',
+        (v_fila ->> 'valor')::numeric,
+        coalesce(nullif(v_fila ->> 'unidad', ''),
+                 (select unidad from catalogo_signos_vitales
+                   where codigo = v_fila ->> 'codigo')),
+        coalesce(nullif(v_fila ->> 'medido_en', '')::timestamptz, now()),
+        coalesce(nullif(v_fila ->> 'medido_por', '')::uuid, p_actor_id),
+        coalesce(nullif(v_fila ->> 'origen', ''), 'medido'),
+        nullif(v_fila ->> 'observacion', ''),
+        coalesce(nullif(v_fila ->> 'estado_validacion', ''), 'valido')
+      )
+      on conflict (consulta_id, codigo) where deleted_at is null
+      do update set valor = excluded.valor,
+                    unidad = excluded.unidad,
+                    medido_en = excluded.medido_en,
+                    medido_por = excluded.medido_por,
+                    origen = excluded.origen,
+                    observacion = excluded.observacion,
+                    estado_validacion = excluded.estado_validacion,
+                    updated_at = now();
+    end loop;
+
+    -- Relación imposible: se comprueba con las dos mediciones ya guardadas.
+    select max(valor) filter (where codigo = 'presion_sistolica'),
+           max(valor) filter (where codigo = 'presion_diastolica')
+      into v_sistolica, v_diastolica
+      from signos_vitales_consulta
+     where consulta_id = p_consulta_id and deleted_at is null;
+
+    if v_sistolica is not null and v_diastolica is not null
+       and v_diastolica >= v_sistolica then
+      raise exception 'La diastólica (%) no puede igualar ni superar la sistólica (%).',
+        v_diastolica, v_sistolica
+        using errcode = 'CL006';
+    end if;
+
+    -- `consultas.signos_vitales` se conserva como resumen derivado para los
+    -- lectores antiguos (detalle, PDF del expediente); la tabla es la verdad.
+    select coalesce(jsonb_object_agg(codigo, valor), '{}'::jsonb)
+      into v_signos
+      from signos_vitales_consulta
+     where consulta_id = p_consulta_id and deleted_at is null;
+
+    update consultas
+       set signos_vitales = case when v_signos = '{}'::jsonb then null else v_signos end,
+           updated_at = now()
+     where id = p_consulta_id;
+  end if;
+
+  -- 10.2 Condiciones descubiertas durante la consulta.
+  if jsonb_exists(p_payload, 'condiciones_detectadas')
+     and jsonb_typeof(p_payload -> 'condiciones_detectadas') = 'array' then
+
+    v_conservados := coalesce((
+      select array_agg((f ->> 'condicion_id')::uuid)
+        from jsonb_array_elements(p_payload -> 'condiciones_detectadas') as f
+       where nullif(f ->> 'condicion_id', '') is not null), '{}'::uuid[]);
+
+    update condiciones_consulta
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and deleted_at is null
+       and not (condicion_id = any (v_conservados));
+
+    for v_fila in
+      select value from jsonb_array_elements(p_payload -> 'condiciones_detectadas')
+    loop
+      if nullif(v_fila ->> 'condicion_id', '') is null then
+        continue;
+      end if;
+
+      insert into condiciones_consulta (
+        consulta_id, condicion_id, severidad, notas, detectada_en,
+        incorporar_al_expediente, confirmada_por, confirmada_en
+      ) values (
+        p_consulta_id,
+        (v_fila ->> 'condicion_id')::uuid,
+        coalesce(nullif(v_fila ->> 'severidad', ''), 'moderada'),
+        nullif(v_fila ->> 'notas', ''),
+        coalesce(nullif(v_fila ->> 'detectada_en', '')::timestamptz, now()),
+        coalesce((v_fila ->> 'incorporar_al_expediente')::boolean, false),
+        case when coalesce((v_fila ->> 'incorporar_al_expediente')::boolean, false)
+             then p_actor_id end,
+        case when coalesce((v_fila ->> 'incorporar_al_expediente')::boolean, false)
+             then now() end
+      )
+      on conflict (consulta_id, condicion_id) where deleted_at is null
+      do update set severidad = excluded.severidad,
+                    notas = excluded.notas,
+                    incorporar_al_expediente = excluded.incorporar_al_expediente,
+                    confirmada_por = excluded.confirmada_por,
+                    confirmada_en = excluded.confirmada_en,
+                    updated_at = now();
+    end loop;
+  end if;
+
+  -- 10.3 Hallazgos y ejecuciones sin pieza: lo que el catálogo declara global o
+  -- de arcada. Antes solo existía la vía por diente, que es justo lo que la
+  -- base ahora rechaza.
+  if jsonb_exists(p_payload, 'generales')
+     and jsonb_typeof(p_payload -> 'generales') = 'object' then
+
+    v_conservados := coalesce((
+      select array_agg((f ->> 'id')::uuid)
+        from jsonb_array_elements(
+               coalesce(p_payload -> 'generales' -> 'tratamientos', '[]'::jsonb)) as f
+       where nullif(f ->> 'id', '') is not null), '{}'::uuid[]);
+
+    update tratamientos_aplicados
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and diente_id is null
+       and deleted_at is null
+       and not (id = any (v_conservados));
+
+    for v_fila in
+      select value from jsonb_array_elements(
+        coalesce(p_payload -> 'generales' -> 'tratamientos', '[]'::jsonb))
+    loop
+      v_id := nullif(v_fila ->> 'id', '')::uuid;
+      if v_id is null then
+        insert into tratamientos_aplicados (
+          tratamiento_id, consulta_id, precio_aplicado, notas, estado,
+          item_plan_id, justificacion_no_planificada, doctor_ejecuta_id,
+          fecha_ejecucion, created_at, updated_at
+        ) values (
+          (v_fila ->> 'tratamiento_id')::uuid,
+          p_consulta_id,
+          nullif(v_fila ->> 'precio_aplicado', '')::numeric,
+          v_fila ->> 'notas',
+          coalesce(nullif(v_fila ->> 'estado', ''), 'aplicado'),
+          nullif(v_fila ->> 'item_plan_id', '')::uuid,
+          v_fila ->> 'justificacion_no_planificada',
+          coalesce(nullif(v_fila ->> 'doctor_ejecuta_id', '')::uuid, p_actor_id),
+          coalesce(nullif(v_fila ->> 'fecha_ejecucion', '')::timestamptz, now()),
+          now(), now()
+        );
+      else
+        update tratamientos_aplicados
+           set tratamiento_id = (v_fila ->> 'tratamiento_id')::uuid,
+               precio_aplicado = nullif(v_fila ->> 'precio_aplicado', '')::numeric,
+               notas = v_fila ->> 'notas',
+               estado = coalesce(nullif(v_fila ->> 'estado', ''), estado),
+               item_plan_id = nullif(v_fila ->> 'item_plan_id', '')::uuid,
+               justificacion_no_planificada = v_fila ->> 'justificacion_no_planificada',
+               deleted_at = null,
+               updated_at = now()
+         where id = v_id and consulta_id = p_consulta_id and diente_id is null;
+
+        if not found then
+          raise exception 'El tratamiento general % no pertenece a la consulta %.',
+            v_id, p_consulta_id using errcode = 'CL004';
+        end if;
+      end if;
+    end loop;
+
+    v_conservados := coalesce((
+      select array_agg((f ->> 'id')::uuid)
+        from jsonb_array_elements(
+               coalesce(p_payload -> 'generales' -> 'diagnosticos', '[]'::jsonb)) as f
+       where nullif(f ->> 'id', '') is not null), '{}'::uuid[]);
+
+    update diagnosticos_aplicados
+       set deleted_at = now(), updated_at = now()
+     where consulta_id = p_consulta_id
+       and diente_id is null
+       and deleted_at is null
+       and not (id = any (v_conservados));
+
+    for v_fila in
+      select value from jsonb_array_elements(
+        coalesce(p_payload -> 'generales' -> 'diagnosticos', '[]'::jsonb))
+    loop
+      v_id := nullif(v_fila ->> 'id', '')::uuid;
+      if v_id is null then
+        insert into diagnosticos_aplicados (
+          diagnosis_id, severidad, fecha_aplicacion, notas, consulta_id,
+          origen, created_at, updated_at
+        ) values (
+          (v_fila ->> 'diagnosis_id')::uuid,
+          (v_fila ->> 'severidad')::severidad_diagnosis,
+          coalesce(nullif(v_fila ->> 'fecha_aplicacion', '')::timestamptz, now()),
+          v_fila ->> 'notas',
+          p_consulta_id,
+          coalesce(nullif(v_fila ->> 'origen', ''), 'preexistente'),
+          now(), now()
+        );
+      else
+        update diagnosticos_aplicados
+           set diagnosis_id = (v_fila ->> 'diagnosis_id')::uuid,
+               severidad = (v_fila ->> 'severidad')::severidad_diagnosis,
+               notas = v_fila ->> 'notas',
+               origen = coalesce(nullif(v_fila ->> 'origen', ''), origen),
+               deleted_at = null,
+               updated_at = now()
+         where id = v_id and consulta_id = p_consulta_id and diente_id is null;
+
+        if not found then
+          raise exception 'El hallazgo general % no pertenece a la consulta %.',
+            v_id, p_consulta_id using errcode = 'CL004';
+        end if;
+      end if;
+    end loop;
+  end if;
+
+  -- 10.4 Receta: el bloqueo absoluto vive aquí, no solo en la pantalla.
+  for v_fila in
+    select r.items_receta
+      from recetas r
+     where r.consulta_id = p_consulta_id
+       and r.deleted_at is null
+       and r.estado = 'borrador'
+  loop
+    perform public.hfx_clin_003_validar_receta(p_consulta_id, v_fila, false);
+  end loop;
+
+  return public.hfx_clin_003_evaluar_alertas(p_consulta_id);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_aplicar_extras"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_barreras_de_cierre"("p_consulta_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_alerta record;
+  v_items  jsonb;
+begin
+  -- Una alerta que exige acción no se cierra por cansancio: o se confirma, o se
+  -- documenta.
+  for v_alerta in
+    select * from alertas_clinicas
+     where consulta_id = p_consulta_id
+       and estado = 'pendiente'
+       and accion in ('confirmar', 'documentar', 'bloquear_electivo', 'referir')
+     order by created_at
+  loop
+    raise exception 'Alerta clínica sin resolver: %. Confírmala o documenta la acción antes de cerrar.',
+      v_alerta.mensaje
+      using errcode = 'CL007';
+  end loop;
+
+  -- Lo que se va a emitir se valida entero: es un documento que sale de aquí.
+  for v_items in
+    select r.items_receta
+      from recetas r
+     where r.consulta_id = p_consulta_id
+       and r.deleted_at is null
+       and r.estado = 'borrador'
+       and jsonb_array_length(coalesce(r.items_receta, '[]'::jsonb)) > 0
+  loop
+    perform public.hfx_clin_003_validar_receta(p_consulta_id, v_items, true);
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_barreras_de_cierre"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_coherencia_ejecucion"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  new.esta_terminado := (coalesce(new.estado, 'aplicado') = 'completado');
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_coherencia_ejecucion"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_conflictos_receta"("p_consulta_id" "uuid", "p_items" "jsonb") RETURNS TABLE("medicina_id" "uuid", "medicina" "text", "condicion" "text", "tipo" "text", "descripcion" "text")
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select m.id,
+         coalesce(m.nombre, i ->> 'nombre_medicamento'),
+         c.nombre,
+         ci.tipo_contraindicacion::text,
+         ci.descripcion
+    from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) i
+    join medicinas m on m.id = nullif(i ->> 'medicamento_id', '')::uuid
+    join contraindicaciones ci
+      on ci.medicina_id = m.id and ci.deleted_at is null
+    join condiciones c on c.id = ci.condicion_id
+   where exists (
+     select 1
+       from condiciones_activas_paciente cap
+       join consultas cons on cons.id = p_consulta_id
+      where cap.paciente_id = cons.paciente_id
+        and cap.condicion_id = ci.condicion_id
+   );
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_conflictos_receta"("p_consulta_id" "uuid", "p_items" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_edad_paciente"("p_paciente_id" "uuid") RETURNS numeric
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select case
+           when p.fecha_nacimiento is null then null
+           else extract(epoch from age(current_date, p.fecha_nacimiento)) / 31557600.0
+         end
+    from personas p
+   where p.id = p_paciente_id;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_edad_paciente"("p_paciente_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_evaluar_alertas"("p_consulta_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_regla     record;
+  v_signo     record;
+  v_vigentes  text[] := '{}';
+  v_valor     numeric;
+  v_min       numeric;
+  v_max       numeric;
+  v_codigo    text;
+  v_mensaje   text;
+  v_cond      text;
+  v_paciente  uuid;
+  v_edad      numeric;
+begin
+  select paciente_id into v_paciente from consultas where id = p_consulta_id;
+  v_edad := public.hfx_clin_003_edad_paciente(v_paciente);
+
+  for v_regla in
+    select * from reglas_clinicas
+     where estado = 'aprobada'
+       and parametros is not null
+       and tipo in ('valor_critico', 'combinacion_condicion_signo',
+                    'requisito_dato')
+     order by codigo
+  loop
+    -- Una regla limitada a una franja etaria no se evalúa fuera de ella.
+    if not public.hfx_clin_003_regla_aplica_edad(v_regla.parametros, v_edad) then
+      continue;
+    end if;
+
+    if v_regla.tipo = 'requisito_dato' then
+      v_codigo := v_regla.parametros ->> 'codigo';
+
+      -- El dato exigido ya está: nada que avisar.
+      if exists (
+        select 1 from signos_vitales_consulta sv
+         where sv.consulta_id = p_consulta_id
+           and sv.codigo = v_codigo
+           and sv.deleted_at is null
+      ) then
+        continue;
+      end if;
+
+      v_mensaje := format('%s: falta registrar %s en esta consulta.',
+        v_regla.nombre,
+        coalesce((select lower(etiqueta) from catalogo_signos_vitales
+                   where codigo = v_codigo), v_codigo));
+
+      insert into alertas_clinicas (
+        consulta_id, regla_id, regla_codigo, regla_version, severidad, accion,
+        mensaje, disparador
+      ) values (
+        p_consulta_id, v_regla.id, v_regla.codigo, v_regla.version,
+        v_regla.severidad, v_regla.accion, v_mensaje,
+        jsonb_build_object('codigo', v_codigo, 'valor', null,
+                           'edad_anios', round(v_edad, 1), 'faltante', true)
+      )
+      on conflict (consulta_id, regla_codigo, regla_version)
+        where estado <> 'obsoleta'
+      do update set mensaje = excluded.mensaje,
+                    disparador = excluded.disparador,
+                    updated_at = now();
+
+      v_vigentes := v_vigentes || v_regla.codigo;
+
+    elsif v_regla.tipo = 'valor_critico' then
+      v_codigo := v_regla.parametros ->> 'codigo';
+      v_min := nullif(v_regla.parametros ->> 'min', '')::numeric;
+      v_max := nullif(v_regla.parametros ->> 'max', '')::numeric;
+
+      select sv.valor, cat.etiqueta, cat.unidad
+        into v_signo
+        from signos_vitales_consulta sv
+        join catalogo_signos_vitales cat on cat.codigo = sv.codigo
+       where sv.consulta_id = p_consulta_id
+         and sv.codigo = v_codigo
+         and sv.deleted_at is null
+       limit 1;
+
+      if not found then
+        continue;
+      end if;
+
+      v_valor := v_signo.valor;
+      if (v_min is not null and v_valor < v_min)
+         or (v_max is not null and v_valor > v_max) then
+        v_mensaje := format('%s = %s %s fuera del rango clínico aprobado (%s a %s).',
+          v_signo.etiqueta, v_valor, v_signo.unidad,
+          coalesce(v_min::text, '—'), coalesce(v_max::text, '—'));
+
+        insert into alertas_clinicas (
+          consulta_id, regla_id, regla_codigo, regla_version, severidad, accion,
+          mensaje, disparador
+        ) values (
+          p_consulta_id, v_regla.id, v_regla.codigo, v_regla.version,
+          v_regla.severidad, v_regla.accion, v_mensaje,
+          jsonb_build_object('codigo', v_codigo, 'valor', v_valor,
+                             'min', v_min, 'max', v_max)
+        )
+        on conflict (consulta_id, regla_codigo, regla_version)
+          where estado <> 'obsoleta'
+        do update set mensaje = excluded.mensaje,
+                      disparador = excluded.disparador,
+                      updated_at = now();
+
+        v_vigentes := v_vigentes || v_regla.codigo;
+      end if;
+
+    else -- combinacion_condicion_signo
+      v_cond := v_regla.parametros ->> 'condicion';
+
+      if not exists (
+        select 1 from condiciones_activas_paciente cap
+          join condiciones c on c.id = cap.condicion_id
+         where cap.paciente_id = v_paciente
+           and lower(c.nombre) like '%' || lower(v_cond) || '%'
+      ) then
+        continue;
+      end if;
+
+      for v_signo in
+        select (s ->> 'codigo') as codigo,
+               nullif(s ->> 'min', '')::numeric as minimo,
+               nullif(s ->> 'max', '')::numeric as maximo
+          from jsonb_array_elements(coalesce(v_regla.parametros -> 'signos', '[]'::jsonb)) s
+      loop
+        select sv.valor into v_valor
+          from signos_vitales_consulta sv
+         where sv.consulta_id = p_consulta_id
+           and sv.codigo = v_signo.codigo
+           and sv.deleted_at is null
+         limit 1;
+
+        if v_valor is null then
+          continue;
+        end if;
+
+        if (v_signo.minimo is not null and v_valor < v_signo.minimo)
+           or (v_signo.maximo is not null and v_valor > v_signo.maximo) then
+          v_mensaje := format('%s: %s = %s con la condición "%s" registrada.',
+            v_regla.nombre, v_signo.codigo, v_valor, v_cond);
+
+          insert into alertas_clinicas (
+            consulta_id, regla_id, regla_codigo, regla_version, severidad,
+            accion, mensaje, disparador
+          ) values (
+            p_consulta_id, v_regla.id, v_regla.codigo, v_regla.version,
+            v_regla.severidad, v_regla.accion, v_mensaje,
+            jsonb_build_object('condicion', v_cond, 'codigo', v_signo.codigo,
+                               'valor', v_valor)
+          )
+          on conflict (consulta_id, regla_codigo, regla_version)
+            where estado <> 'obsoleta'
+          do update set mensaje = excluded.mensaje,
+                        disparador = excluded.disparador,
+                        updated_at = now();
+
+          v_vigentes := v_vigentes || v_regla.codigo;
+          exit;
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  -- Lo que dejó de aplicar no sigue exigiendo acción, pero queda registrado.
+  update alertas_clinicas
+     set estado = 'obsoleta', updated_at = now()
+   where consulta_id = p_consulta_id
+     and estado = 'pendiente'
+     and not (regla_codigo = any (v_vigentes));
+
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', a.id,
+             'regla', a.regla_codigo,
+             'severidad', a.severidad,
+             'accion', a.accion,
+             'mensaje', a.mensaje,
+             'estado', a.estado,
+             'disparador', a.disparador
+           ) order by a.created_at)
+      from alertas_clinicas a
+     where a.consulta_id = p_consulta_id
+       and a.estado <> 'obsoleta'
+  ), '[]'::jsonb);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_evaluar_alertas"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_exigir_consentimiento"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.estado::text not in ('aceptado', 'rechazado') then
+    return new;
+  end if;
+  if old.estado::text = new.estado::text then
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from consentimientos_plan cp
+     where cp.plan_id = new.id
+       and cp.decision = new.estado::text
+       and cp.version_plan = new.version
+  ) then
+    raise exception 'El plan % no puede pasar a "%" sin consentimiento registrado de la versión % del plan.',
+      new.id, new.estado, new.version
+      using errcode = 'CL013';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_exigir_consentimiento"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_incorporar_condiciones"("p_consulta_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_record uuid;
+  v_total  integer := 0;
+begin
+  select r.id into v_record
+    from records r
+    join consultas c on c.paciente_id = r.paciente_id
+   where c.id = p_consulta_id and r.deleted_at is null
+   limit 1;
+
+  if v_record is null then
+    return 0;
+  end if;
+
+  insert into record_condicion (record_id, condicion_id, fecha_deteccion, notas, activo)
+  select v_record, cc.condicion_id, cc.detectada_en, cc.notas, true
+    from condiciones_consulta cc
+   where cc.consulta_id = p_consulta_id
+     and cc.deleted_at is null
+     and cc.incorporar_al_expediente
+     and not exists (
+       select 1 from record_condicion rc
+        where rc.record_id = v_record and rc.condicion_id = cc.condicion_id
+     );
+
+  get diagnostics v_total = row_count;
+  return v_total;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_incorporar_condiciones"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_regla_aplica_edad"("p_parametros" "jsonb", "p_edad" numeric) RETURNS boolean
+    LANGUAGE "sql" IMMUTABLE
+    AS $$
+  select case
+           when p_parametros is null then true
+           when (p_parametros ? 'edad_min_anios') is false
+            and (p_parametros ? 'edad_max_anios') is false then true
+           when p_edad is null then false
+           else coalesce(p_edad >= (p_parametros ->> 'edad_min_anios')::numeric, true)
+            and coalesce(p_edad <  (p_parametros ->> 'edad_max_anios')::numeric, true)
+         end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_regla_aplica_edad"("p_parametros" "jsonb", "p_edad" numeric) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_validar_alcance"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_alcance text;
+  v_nombre  text;
+begin
+  if tg_table_name = 'diagnosticos_aplicados' then
+    select d.alcance::text, d.nombre into v_alcance, v_nombre
+      from diagnosticos d where d.id = new.diagnosis_id;
+  else
+    select t.alcance::text, t.nombre into v_alcance, v_nombre
+      from tratamientos t where t.id = new.tratamiento_id;
+  end if;
+
+  if v_alcance is null then
+    return new; -- El catálogo responde por su propia integridad referencial.
+  end if;
+
+  if v_alcance = 'puntual' then
+    if new.diente_id is null then
+      raise exception '"%" se aplica sobre una superficie y llegó sin pieza.', v_nombre
+        using errcode = 'CL012';
+    end if;
+    if new.superficie is null then
+      raise exception '"%" se aplica sobre una superficie concreta: falta indicarla.', v_nombre
+        using errcode = 'CL012';
+    end if;
+  elsif v_alcance = 'diente' then
+    if new.diente_id is null then
+      raise exception '"%" se aplica sobre una pieza y llegó sin pieza.', v_nombre
+        using errcode = 'CL012';
+    end if;
+    if new.superficie is not null then
+      raise exception '"%" se aplica a la pieza completa, no a una superficie.', v_nombre
+        using errcode = 'CL012';
+    end if;
+  else -- arcada, global
+    if new.diente_id is not null then
+      raise exception '"%" tiene alcance % y no puede asignarse a una pieza.',
+        v_nombre, v_alcance
+        using errcode = 'CL012';
+    end if;
+    if new.superficie is not null then
+      raise exception '"%" tiene alcance % y no puede asignarse a una superficie.',
+        v_nombre, v_alcance
+        using errcode = 'CL012';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_validar_alcance"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_validar_receta"("p_consulta_id" "uuid", "p_items" "jsonb", "p_estricto" boolean DEFAULT false) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_item        jsonb;
+  v_conflicto   record;
+  v_nombre      text;
+  v_dosis       numeric;
+  v_frecuencia  numeric;
+  v_duracion    numeric;
+  v_cantidad    numeric;
+  v_esperada    numeric;
+  v_vistos      text[] := '{}';
+  v_clave       text;
+  v_principio   text;
+  v_paciente    uuid;
+  v_edad        numeric;
+  v_req         record;
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array'
+     or jsonb_array_length(p_items) = 0 then
+    return;
+  end if;
+
+  -- 9.1 Contraindicación absoluta: sin excepción, ni con justificación.
+  for v_conflicto in
+    select * from public.hfx_clin_003_conflictos_receta(p_consulta_id, p_items)
+     where tipo = 'absoluta'
+  loop
+    raise exception '% está contraindicado de forma absoluta por "%": %.',
+      v_conflicto.medicina, v_conflicto.condicion, v_conflicto.descripcion
+      using errcode = 'CL010';
+  end loop;
+
+  -- 9.1.b Dosificación por peso: si el dueño clínico aprobó hasta qué edad la
+  -- receta exige peso registrado, no se emite sin ese dato. Mientras la regla
+  -- siga pendiente no hay barrera: aquí no se inventa el corte pediátrico.
+  if p_estricto then
+    select paciente_id into v_paciente from consultas where id = p_consulta_id;
+    v_edad := public.hfx_clin_003_edad_paciente(v_paciente);
+
+    for v_req in
+      select * from reglas_clinicas
+       where estado = 'aprobada'
+         and parametros is not null
+         and tipo = 'requisito_dato'
+         and coalesce((parametros ->> 'exige_al_recetar')::boolean, false)
+    loop
+      if not public.hfx_clin_003_regla_aplica_edad(v_req.parametros, v_edad) then
+        continue;
+      end if;
+
+      if not exists (
+        select 1 from signos_vitales_consulta sv
+         where sv.consulta_id = p_consulta_id
+           and sv.codigo = v_req.parametros ->> 'codigo'
+           and sv.deleted_at is null
+      ) then
+        raise exception 'No se puede emitir la receta: falta % y la dosificación de este paciente depende de ese dato.',
+          coalesce((select lower(etiqueta) from catalogo_signos_vitales
+                     where codigo = v_req.parametros ->> 'codigo'),
+                   v_req.parametros ->> 'codigo')
+          using errcode = 'CL012';
+      end if;
+    end loop;
+  end if;
+
+  for v_item in select value from jsonb_array_elements(p_items)
+  loop
+    v_nombre := coalesce(nullif(v_item ->> 'nombre_medicamento', ''), 'el medicamento');
+
+    -- 9.2 Riesgo relativo: justificación por medicamento, no una nota global.
+    if exists (
+      select 1 from public.hfx_clin_003_conflictos_receta(
+                   p_consulta_id, jsonb_build_array(v_item))
+       where tipo = 'relativa'
+    ) and coalesce(btrim(v_item ->> 'justificacion_riesgo'), '') = '' then
+      raise exception '% tiene una contraindicación relativa para este paciente y exige justificación clínica propia.',
+        v_nombre
+        using errcode = 'CL011';
+    end if;
+
+    if not p_estricto then
+      continue;
+    end if;
+
+    -- 9.3 Renglón estructurado.
+    v_dosis      := nullif(v_item ->> 'dosis_cantidad', '')::numeric;
+    v_frecuencia := nullif(v_item ->> 'frecuencia_horas', '')::numeric;
+    v_duracion   := nullif(v_item ->> 'duracion_dias', '')::numeric;
+    v_cantidad   := nullif(v_item ->> 'cantidad_total', '')::numeric;
+
+    if v_dosis is null or v_dosis <= 0
+       or coalesce(btrim(v_item ->> 'dosis_unidad'), '') = ''
+       or coalesce(btrim(v_item ->> 'via_administracion'), '') = '' then
+      raise exception 'El renglón de % no tiene dosis, unidad o vía de administración.',
+        v_nombre using errcode = 'CL008';
+    end if;
+
+    if v_frecuencia is null or v_frecuencia <= 0 or v_frecuencia > 168 then
+      raise exception 'La frecuencia de % debe estar entre 1 y 168 horas.',
+        v_nombre using errcode = 'CL008';
+    end if;
+
+    if v_duracion is null or v_duracion <= 0 or v_duracion > 365 then
+      raise exception 'La duración de % debe estar entre 1 y 365 días.',
+        v_nombre using errcode = 'CL008';
+    end if;
+
+    if v_cantidad is null or v_cantidad <= 0 then
+      raise exception 'Falta la cantidad total a despachar de %.',
+        v_nombre using errcode = 'CL008';
+    end if;
+
+    -- 9.4 Coherencia: lo que se despacha tiene que alcanzar para el tratamiento
+    -- indicado, y no duplicarlo.
+    v_esperada := ceil(24.0 / v_frecuencia) * v_duracion * v_dosis;
+    if v_cantidad < v_esperada or v_cantidad > v_esperada * 2 then
+      raise exception 'La cantidad de % (%) no cuadra con % cada % horas durante % días (se esperaban ~%).',
+        v_nombre, v_cantidad, v_dosis, v_frecuencia, v_duracion, v_esperada
+        using errcode = 'CL008';
+    end if;
+
+    -- 9.5 Duplicidad: por medicamento y por principio activo cuando se conoce.
+    v_clave := coalesce(nullif(v_item ->> 'medicamento_id', ''),
+                        lower(btrim(coalesce(v_item ->> 'nombre_medicamento', ''))));
+    if v_clave = any (v_vistos) then
+      raise exception 'La receta repite %.', v_nombre using errcode = 'CL009';
+    end if;
+    v_vistos := v_vistos || v_clave;
+
+    select lower(btrim(m.principio_activo)) into v_principio
+      from medicinas m
+     where m.id = nullif(v_item ->> 'medicamento_id', '')::uuid
+       and coalesce(btrim(m.principio_activo), '') <> '';
+
+    if v_principio is not null then
+      if ('pa:' || v_principio) = any (v_vistos) then
+        raise exception 'La receta repite el principio activo "%" en más de un medicamento.',
+          v_principio using errcode = 'CL009';
+      end if;
+      v_vistos := v_vistos || ('pa:' || v_principio);
+    end if;
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_validar_receta"("p_consulta_id" "uuid", "p_items" "jsonb", "p_estricto" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_validar_signo_vital"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_cat record;
+begin
+  select * into v_cat
+    from catalogo_signos_vitales
+   where codigo = new.codigo;
+
+  if not found then
+    raise exception 'El signo vital "%" no está en el catálogo.', new.codigo
+      using errcode = 'CL006';
+  end if;
+
+  if new.valor < v_cat.minimo_posible or new.valor > v_cat.maximo_posible then
+    raise exception '% = % % está fuera del rango físicamente posible (% a % %).',
+      v_cat.etiqueta, new.valor, v_cat.unidad,
+      v_cat.minimo_posible, v_cat.maximo_posible, v_cat.unidad
+      using errcode = 'CL006';
+  end if;
+
+  new.unidad := coalesce(nullif(new.unidad, ''), v_cat.unidad);
+
+  if new.unidad <> v_cat.unidad then
+    raise exception '% se registra en % y llegó en "%".',
+      v_cat.etiqueta, v_cat.unidad, new.unidad
+      using errcode = 'CL006';
+  end if;
+
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_validar_signo_vital"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_003_versionar_plan"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_plan uuid := coalesce(new.plan_id, old.plan_id);
+begin
+  if tg_op = 'UPDATE'
+     and new.tratamiento_id is not distinct from old.tratamiento_id
+     and new.precio_estimado is not distinct from old.precio_estimado
+     and new.diente_id is not distinct from old.diente_id
+     and new.superficie is not distinct from old.superficie
+     and new.deleted_at is not distinct from old.deleted_at then
+    return new;
+  end if;
+
+  update planes_tratamiento
+     set version = version + 1, updated_at = now()
+   where id = v_plan;
+
+  return coalesce(new, old);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_003_versionar_plan"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_calcular_fin_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  new.fin := new.fecha_hora + make_interval(mins => new.duracion_minutos::int);
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_calcular_fin_cita"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_estado_cita_canonico"("p_estado" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select case p_estado
+           when 'pendiente'   then 'programada'
+           when 'atendida'    then 'completada'
+           when 'no_asistida' then 'no_asistio'
+           else p_estado
+         end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_estado_cita_canonico"("p_estado" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_normalizar_cedula"("p_cedula" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select nullif(
+    upper(regexp_replace(coalesce(p_cedula, ''), '[\s\-\._]', '', 'g')),
+    ''
+  );
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_normalizar_cedula"("p_cedula" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_normalizar_email"("p_email" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select nullif(lower(btrim(coalesce(p_email, ''))), '');
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_normalizar_email"("p_email" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_normalizar_telefono"("p_telefono" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  select nullif(regexp_replace(coalesce(p_telefono, ''), '[^0-9]', '', 'g'), '');
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_normalizar_telefono"("p_telefono" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_sincronizar_contactos"("p_persona_id" "uuid", "p_contactos" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_contacto   jsonb;
+  v_indice     integer := 0;
+  v_telefono   text;
+  v_id         uuid;
+begin
+  for v_contacto in
+    select * from jsonb_array_elements(coalesce(p_contactos, '[]'::jsonb))
+  loop
+    v_telefono := public.hfx_clin_004_normalizar_telefono(
+      v_contacto ->> 'numero_telefono'
+    );
+    v_id := nullif(v_contacto ->> 'id', '')::uuid;
+
+    if v_telefono is null then
+      v_indice := v_indice + 1;
+      continue;
+    end if;
+
+    if v_id is not null and exists (
+      select 1 from public.contactos where id = v_id
+    ) then
+      update public.contactos
+         set numero_telefono = v_telefono,
+             email = public.hfx_clin_004_normalizar_email(v_contacto ->> 'email'),
+             direccion = nullif(btrim(coalesce(v_contacto ->> 'direccion', '')), ''),
+             updated_at = now()
+       where id = v_id;
+    else
+      insert into public.contactos (email, numero_telefono, direccion)
+      values (
+        public.hfx_clin_004_normalizar_email(v_contacto ->> 'email'),
+        v_telefono,
+        nullif(btrim(coalesce(v_contacto ->> 'direccion', '')), '')
+      )
+      returning id into v_id;
+
+      insert into public.persona_contactos (
+        persona_id, contacto_id, es_principal, es_emergencia
+      )
+      values (
+        p_persona_id, v_id, v_indice = 0,
+        coalesce((v_contacto ->> 'es_emergencia')::boolean, v_indice > 0)
+      );
+    end if;
+
+    v_indice := v_indice + 1;
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_sincronizar_contactos"("p_persona_id" "uuid", "p_contactos" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_004_validar_transicion_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_desde text := public.hfx_clin_004_estado_cita_canonico(old.estado::text);
+  v_hasta text := public.hfx_clin_004_estado_cita_canonico(new.estado::text);
+  v_permitidas text[];
+begin
+  if v_desde = v_hasta then
+    return new;
+  end if;
+
+  v_permitidas := case v_desde
+    when 'programada'  then array['confirmada', 'en_espera', 'cancelada', 'no_asistio']
+    when 'confirmada'  then array['en_espera', 'cancelada', 'no_asistio']
+    when 'en_espera'   then array['en_consulta', 'cancelada', 'no_asistio']
+    when 'en_consulta' then array['completada', 'cancelada']
+    else array[]::text[]
+  end;
+
+  if not (v_hasta = any(v_permitidas)) then
+    raise exception
+      'La cita está en "%" y no puede pasar a "%".', v_desde, v_hasta
+      using errcode = 'CL016';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_004_validar_transicion_cita"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_004_validar_transicion_cita"() IS 'HFX-CLIN-004. Mismo grafo que EstadoCita en Dart. `programada → en_espera` existe porque el paciente puede llegar sin haber confirmado.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_alerta"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  perform public.hfx_clin_005_registrar_evento(
+    'alerta_emitida', new.consulta_id, null,
+    jsonb_build_object(
+      'alerta_id', new.id,
+      'regla', new.regla_codigo,
+      'severidad', new.severidad,
+      'accion', new.accion
+    )
+  );
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_alerta"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_evento text;
+begin
+  if tg_op = 'INSERT' then
+    perform public.hfx_clin_005_registrar_evento(
+      'cita_creada', null, new.id,
+      jsonb_build_object(
+        'estado', new.estado,
+        'es_emergencia', coalesce(new.es_emergencia, false),
+        'duracion_minutos', new.duracion_minutos
+      )
+    );
+    return null;
+  end if;
+
+  if new.deleted_at is not null and old.deleted_at is null then
+    perform public.hfx_clin_005_registrar_evento(
+      'cita_eliminada', null, new.id, '{}'::jsonb
+    );
+    return null;
+  end if;
+
+  if new.estado is distinct from old.estado then
+    v_evento := case new.estado::text
+      when 'en_espera'   then 'cita_llegada'
+      when 'en_consulta' then 'cita_en_consulta'
+      when 'completada'  then 'cita_completada'
+      when 'cancelada'   then 'cita_cancelada'
+      when 'no_asistio'  then 'cita_no_asistio'
+      when 'no_asistida' then 'cita_no_asistio'
+      else 'cita_estado_cambiado'
+    end;
+    perform public.hfx_clin_005_registrar_evento(
+      v_evento, null, new.id,
+      jsonb_build_object('estado_previo', old.estado, 'estado', new.estado)
+    );
+  elsif new.fecha_hora is distinct from old.fecha_hora
+     or new.doctor_id is distinct from old.doctor_id
+  then
+    perform public.hfx_clin_005_registrar_evento(
+      'cita_reprogramada', null, new.id,
+      jsonb_build_object(
+        'fecha_hora_previa', old.fecha_hora,
+        'fecha_hora', new.fecha_hora,
+        'cambio_doctor', new.doctor_id is distinct from old.doctor_id
+      )
+    );
+  end if;
+
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_cita"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_consentimiento"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_consulta uuid;
+begin
+  select p.consulta_origen_id into v_consulta
+    from public.planes_tratamiento p where p.id = new.plan_id;
+
+  perform public.hfx_clin_005_registrar_evento(
+    'consentimiento_' || new.decision, v_consulta, null,
+    jsonb_build_object(
+      'plan_id', new.plan_id,
+      'version_plan', new.version_plan,
+      'metodo', new.metodo,
+      'relacion_con_paciente', new.relacion_con_paciente,
+      'total_aceptado', new.total_aceptado,
+      'motivo', new.motivo_rechazo
+    )
+  );
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_consentimiento"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_consulta"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.version is distinct from old.version
+     and coalesce(new.finalizada, false) = coalesce(old.finalizada, false)
+  then
+    perform public.hfx_clin_005_registrar_evento(
+      'consulta_guardada', new.id, new.cita_id,
+      jsonb_build_object('version', new.version)
+    );
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_consulta"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_correccion"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  perform public.hfx_clin_005_registrar_evento(
+    'correccion_administrativa', new.consulta_id, null,
+    jsonb_build_object(
+      'motivo', new.motivo,
+      'autor_original_id', new.autor_original_id,
+      'campos', (
+        select coalesce(jsonb_agg(k order by k), '[]'::jsonb)
+          from jsonb_object_keys(coalesce(new.datos_nuevos, '{}'::jsonb)) as k
+      )
+    )
+  );
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_correccion"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_diagnostico"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_nombre text;
+begin
+  select d.nombre into v_nombre
+    from public.diagnosticos d where d.id = new.diagnosis_id;
+
+  if tg_op = 'INSERT' then
+    perform public.hfx_clin_005_registrar_evento(
+      'diagnostico_agregado', new.consulta_id, null,
+      jsonb_build_object(
+        'diagnostico', v_nombre,
+        'severidad', new.severidad,
+        'diente_id', new.diente_id,
+        'superficie', new.superficie
+      )
+    );
+  elsif new.deleted_at is not null and old.deleted_at is null then
+    perform public.hfx_clin_005_registrar_evento(
+      'diagnostico_retirado', new.consulta_id, null,
+      jsonb_build_object('diagnostico', v_nombre, 'diente_id', new.diente_id)
+    );
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_diagnostico"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_plan"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_estado_previo text := case tg_op when 'INSERT' then null else old.estado::text end;
+  v_evento text;
+begin
+  if new.estado::text is not distinct from v_estado_previo then
+    return null;
+  end if;
+
+  v_evento := case new.estado::text
+    when 'propuesto' then 'plan_propuesto'
+    when 'aceptado'  then 'plan_aceptado'
+    when 'rechazado' then 'plan_rechazado'
+    else null
+  end;
+  if v_evento is null then
+    return null;
+  end if;
+
+  perform public.hfx_clin_005_registrar_evento(
+    v_evento, new.consulta_origen_id, null,
+    jsonb_build_object(
+      'plan_id', new.id,
+      'version', new.version,
+      'motivo', new.motivo_rechazo
+    )
+  );
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_plan"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_receta"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_estado_previo text := case tg_op when 'INSERT' then null else old.estado end;
+begin
+  if new.estado is not distinct from v_estado_previo then
+    return null;
+  end if;
+
+  if new.estado not in ('emitida', 'anulada', 'reemplazada') then
+    return null;
+  end if;
+
+  perform public.hfx_clin_005_registrar_evento(
+    'receta_' || new.estado, new.consulta_id, null,
+    jsonb_build_object(
+      'receta_id', new.id,
+      'items', jsonb_array_length(coalesce(new.items_receta, '[]'::jsonb)),
+      'motivo', new.motivo_anulacion,
+      'reemplaza_a', new.receta_reemplazada_id
+    )
+  );
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_receta"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_auditar_tratamiento"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_nombre text;
+begin
+  select t.nombre into v_nombre
+    from public.tratamientos t where t.id = new.tratamiento_id;
+
+  if tg_op = 'INSERT' then
+    perform public.hfx_clin_005_registrar_evento(
+      'tratamiento_ejecutado', new.consulta_id, null,
+      jsonb_build_object(
+        'tratamiento', v_nombre,
+        'estado', new.estado,
+        'diente_id', new.diente_id,
+        'superficie', new.superficie,
+        'planificado', new.item_plan_id is not null
+      )
+    );
+  elsif new.deleted_at is not null and old.deleted_at is null then
+    perform public.hfx_clin_005_registrar_evento(
+      'tratamiento_anulado', new.consulta_id, null,
+      jsonb_build_object('tratamiento', v_nombre)
+    );
+  elsif new.estado is distinct from old.estado
+     or new.esta_terminado is distinct from old.esta_terminado
+  then
+    perform public.hfx_clin_005_registrar_evento(
+      'tratamiento_actualizado', new.consulta_id, null,
+      jsonb_build_object(
+        'tratamiento', v_nombre,
+        'estado_previo', old.estado,
+        'estado', new.estado
+      )
+    );
+  end if;
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_auditar_tratamiento"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_005_registrar_evento"("p_evento" "text", "p_consulta_id" "uuid", "p_cita_id" "uuid", "p_metadata" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if p_consulta_id is null and p_cita_id is null then
+    return;
+  end if;
+
+  insert into public.auditoria_clinica (
+    consulta_id, cita_id, evento, actor_id, rol, metadata
+  )
+  values (
+    p_consulta_id,
+    p_cita_id,
+    p_evento,
+    auth.uid(),
+    case
+      when auth.uid() is null then 'sistema'
+      when public.es_admin() then 'admin'
+      when public.es_doctor() then 'doctor'
+      when public.es_asistente() then 'asistente'
+      else 'desconocido'
+    end,
+    coalesce(p_metadata, '{}'::jsonb)
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_005_registrar_evento"("p_evento" "text", "p_consulta_id" "uuid", "p_cita_id" "uuid", "p_metadata" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_005_registrar_evento"("p_evento" "text", "p_consulta_id" "uuid", "p_cita_id" "uuid", "p_metadata" "jsonb") IS 'HFX-CLIN-005. Escribe un evento de auditoría resolviendo actor y rol de la sesión. Sin sesión el rol es "sistema" y el actor queda nulo.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_006_validar_parametros_regla"("p_tipo" "text", "p_parametros" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_signo jsonb;
+  v_min   numeric;
+  v_max   numeric;
+begin
+  if p_parametros is null or jsonb_typeof(p_parametros) <> 'object' then
+    raise exception 'Los parámetros de la regla deben ser un objeto JSON.'
+      using errcode = 'CL030';
+  end if;
+
+  -- Una franja etaria invertida no filtra nada: la regla no se evaluaría nunca
+  -- y el doctor creería haberla dejado activa.
+  if (p_parametros ? 'edad_min_anios') and (p_parametros ? 'edad_max_anios') then
+    if (p_parametros ->> 'edad_min_anios')::numeric
+       >= (p_parametros ->> 'edad_max_anios')::numeric then
+      raise exception 'La edad mínima debe ser menor que la máxima.'
+        using errcode = 'CL030';
+    end if;
+  end if;
+
+  if p_tipo in ('valor_critico', 'requisito_dato') then
+    if nullif(trim(p_parametros ->> 'codigo'), '') is null then
+      raise exception 'La regla necesita el código del signo vital que vigila.'
+        using errcode = 'CL030';
+    end if;
+
+    if p_tipo = 'valor_critico' then
+      v_min := nullif(p_parametros ->> 'min', '')::numeric;
+      v_max := nullif(p_parametros ->> 'max', '')::numeric;
+
+      if v_min is null and v_max is null then
+        raise exception 'Una regla de valor crítico necesita al menos un límite (min o max).'
+          using errcode = 'CL030';
+      end if;
+
+      if v_min is not null and v_max is not null and v_min > v_max then
+        raise exception 'El límite inferior no puede ser mayor que el superior.'
+          using errcode = 'CL030';
+      end if;
+    end if;
+
+  elsif p_tipo = 'combinacion_condicion_signo' then
+    if nullif(trim(p_parametros ->> 'condicion'), '') is null then
+      raise exception 'La regla necesita la condición del paciente que la activa.'
+        using errcode = 'CL030';
+    end if;
+
+    if jsonb_typeof(p_parametros -> 'signos') <> 'array'
+       or jsonb_array_length(p_parametros -> 'signos') = 0 then
+      raise exception 'La regla necesita al menos un signo vital que vigilar.'
+        using errcode = 'CL030';
+    end if;
+
+    for v_signo in
+      select value from jsonb_array_elements(p_parametros -> 'signos')
+    loop
+      if nullif(trim(v_signo ->> 'codigo'), '') is null then
+        raise exception 'Cada signo vigilado necesita su código.'
+          using errcode = 'CL030';
+      end if;
+
+      v_min := nullif(v_signo ->> 'min', '')::numeric;
+      v_max := nullif(v_signo ->> 'max', '')::numeric;
+
+      if v_min is null and v_max is null then
+        raise exception 'El signo "%" no tiene ningún límite que vigilar.',
+          v_signo ->> 'codigo' using errcode = 'CL030';
+      end if;
+
+      if v_min is not null and v_max is not null and v_min > v_max then
+        raise exception 'El signo "%" tiene el límite inferior por encima del superior.',
+          v_signo ->> 'codigo' using errcode = 'CL030';
+      end if;
+    end loop;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_006_validar_parametros_regla"("p_tipo" "text", "p_parametros" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_006_validar_parametros_regla"("p_tipo" "text", "p_parametros" "jsonb") IS 'HFX-CLIN-006. Comprueba la forma de los parámetros según el tipo de regla. El motor de alertas los lee sin validar: una clave mal escrita deja la regla muda en vez de fallar.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_006_validar_signos_de_regla"("p_tipo" "text", "p_parametros" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" STABLE
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_codigo text;
+begin
+  for v_codigo in
+    select case
+             when p_tipo in ('valor_critico', 'requisito_dato')
+               then p_parametros ->> 'codigo'
+           end
+    union all
+    select s ->> 'codigo'
+      from jsonb_array_elements(
+             case when p_tipo = 'combinacion_condicion_signo'
+                  then coalesce(p_parametros -> 'signos', '[]'::jsonb)
+                  else '[]'::jsonb end) s
+  loop
+    if v_codigo is null then
+      continue;
+    end if;
+
+    if not exists (
+      select 1 from public.catalogo_signos_vitales where codigo = v_codigo
+    ) then
+      raise exception 'El signo vital "%" no existe en el catálogo.', v_codigo
+        using errcode = 'CL030';
+    end if;
+  end loop;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_006_validar_signos_de_regla"("p_tipo" "text", "p_parametros" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_006_validar_signos_de_regla"("p_tipo" "text", "p_parametros" "jsonb") IS 'HFX-CLIN-006. Verifica contra el catálogo que los signos que la regla vigila existen. Vigilar un código inexistente equivale a no vigilar nada.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_008_completar_odontograma"("p_odontograma_id" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_creadas integer;
+begin
+  with nuevas as (
+    insert into dientes (odontograma_id, fdi_code, created_at, updated_at)
+    select p_odontograma_id, d.fdi, now(), now()
+      from public.hfx_clin_008_denticion_fdi() as d
+     where not exists (
+       select 1 from dientes x
+        where x.odontograma_id = p_odontograma_id
+          and x.fdi_code = d.fdi
+     )
+    returning id, fdi_code
+  )
+  insert into superficies (diente_id, tipo_superficie, tratamientos_ids, created_at, updated_at)
+  select n.id, s.cara, '{}'::uuid[], now(), now()
+    from nuevas n,
+         unnest(public.hfx_clin_008_superficies_de(n.fdi_code)) as s(cara);
+
+  get diagnostics v_creadas = row_count;
+  -- Cada pieza nueva trae cinco caras.
+  return v_creadas / 5;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_008_completar_odontograma"("p_odontograma_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_008_completar_odontograma"("p_odontograma_id" "uuid") IS 'HFX-CLIN-008. Materializa las piezas FDI que falten, con sus caras. Idempotente.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_008_denticion_fdi"() RETURNS TABLE("fdi" integer)
+    LANGUAGE "sql" IMMUTABLE
+    AS $$
+  -- Permanentes: cuadrantes 1 a 4, piezas 1 a 8.
+  select q * 10 + p
+    from generate_series(1, 4) as q,
+         generate_series(1, 8) as p
+  union all
+  -- Temporales: cuadrantes 5 a 8, piezas 1 a 5.
+  select q * 10 + p
+    from generate_series(5, 8) as q,
+         generate_series(1, 5) as p;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_008_denticion_fdi"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_008_denticion_fdi"() IS 'HFX-CLIN-008. Las 52 piezas FDI (32 permanentes + 20 temporales).';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) RETURNS "public"."tipo_superficie"[]
+    LANGUAGE "sql" IMMUTABLE
+    AS $$
+  select array[
+    'mesial'::public.tipo_superficie,
+    'distal'::public.tipo_superficie,
+    'vestibular'::public.tipo_superficie,
+    -- Cara interna: palatina arriba (cuadrantes 1-2 y 5-6), lingual abajo.
+    case when p_fdi between 11 and 28 or p_fdi between 51 and 68
+         then 'palatina'::public.tipo_superficie
+         else 'lingual'::public.tipo_superficie end,
+    -- Quinta cara: incisal en anteriores (último dígito 1-3), oclusal en el resto.
+    case when p_fdi % 10 between 1 and 3
+         then 'incisal'::public.tipo_superficie
+         else 'oclusal'::public.tipo_superficie end
+  ];
+$$;
+
+
+ALTER FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) IS 'HFX-CLIN-008. Caras que corresponden a una pieza según su código FDI.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb" DEFAULT '[]'::"jsonb", "p_documentos" "jsonb" DEFAULT '[]'::"jsonb", "p_temp_condiciones" "jsonb" DEFAULT '[]'::"jsonb", "p_motivo_consulta" "text" DEFAULT NULL::"text", "p_tipo_atencion" "public"."tipo_atencion_clinica" DEFAULT 'consulta'::"public"."tipo_atencion_clinica") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_cita        public.citas%rowtype;
+  v_consulta_id uuid;
+  v_finalizada  boolean;
+  v_estado      text;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null or not public.es_doctor()) then
+    raise exception 'Sesión clínica activa requerida.' using errcode = '42501';
+  end if;
+
+  -- El bloqueo es lo que hace segura la comprobación siguiente: dos pestañas
+  -- que pulsen "Iniciar consulta" a la vez se serializan aquí, y la segunda ve
+  -- la consulta que creó la primera.
+  select * into v_cita
+    from public.citas
+   where id = p_cita_id and deleted_at is null
+   for update;
+  if not found then
+    raise exception 'La cita ya no existe o fue eliminada.' using errcode = 'CL015';
+  end if;
+
+  if not public.es_contexto_interno()
+     and v_cita.doctor_id is distinct from auth.uid() then
+    raise exception 'No puede atender una cita asignada a otro doctor.'
+      using errcode = '42501';
+  end if;
+
+  select c.id, coalesce(c.finalizada, false)
+    into v_consulta_id, v_finalizada
+    from public.consultas c
+   where c.cita_id = p_cita_id
+     and c.deleted_at is null
+   order by coalesce(c.finalizada, false), c.created_at desc
+   limit 1;
+
+  -- Reanudar es la respuesta correcta al reintento, y también la única forma
+  -- de volver a una consulta que quedó abierta ayer.
+  if found and not v_finalizada then
+    return jsonb_build_object(
+      'consulta_id', v_consulta_id,
+      'estado', 'reanudada',
+      'cita_estado', v_cita.estado::text
+    );
+  end if;
+
+  -- Una cita ya atendida no se reabre: se consulta. Quien llame decide si
+  -- navega al detalle, pero no puede escribir sobre ella.
+  if found and v_finalizada then
+    return jsonb_build_object(
+      'consulta_id', v_consulta_id,
+      'estado', 'finalizada',
+      'cita_estado', v_cita.estado::text
+    );
+  end if;
+
+  -- La llegada es un hecho clínico, no un trámite de recepción: sin ella nadie
+  -- puede afirmar que el paciente está presente. Se exige explícitamente en vez
+  -- de darla por supuesta, y el doctor que trabaja solo la registra él mismo
+  -- con `registrar_llegada_cita`.
+  v_estado := public.hfx_clin_004_estado_cita_canonico(v_cita.estado::text);
+  if v_estado in ('cancelada', 'completada', 'no_asistio') then
+    raise exception
+      'La cita está "%" y no admite iniciar una consulta.', v_estado
+      using errcode = 'CL015';
+  end if;
+  if v_estado not in ('en_espera', 'en_consulta') then
+    raise exception
+      'La cita está "%": registra la llegada del paciente antes de iniciar la consulta.',
+      v_estado
+      using errcode = 'CL015';
+  end if;
+
+  v_consulta_id := public.crear_consulta_completa(
+    v_cita.persona_id,
+    v_cita.doctor_id,
+    v_cita.id,
+    -- La consulta hereda la fecha agendada, no la del clic (SD-160).
+    v_cita.fecha_hora,
+    coalesce(nullif(btrim(coalesce(p_motivo_consulta, '')), ''), v_cita.motivo),
+    coalesce(p_temp_condiciones, '[]'::jsonb),
+    coalesce(p_dientes, '[]'::jsonb),
+    coalesce(p_documentos, '[]'::jsonb),
+    p_tipo_atencion
+  );
+
+  -- La transición viaja dentro de la misma transacción que la creación: no
+  -- puede quedar una consulta abierta sobre una cita que sigue "en espera".
+  if v_estado <> 'en_consulta' then
+    update public.citas
+       set estado = 'en_consulta',
+           updated_at = now()
+     where id = p_cita_id;
+  end if;
+
+  insert into public.auditoria_clinica (consulta_id, evento, actor_id, rol, metadata)
+  values (
+    v_consulta_id,
+    'consulta_iniciada',
+    auth.uid(),
+    case when public.es_admin() then 'admin' else 'doctor' end,
+    jsonb_build_object(
+      'cita_id', p_cita_id,
+      'es_emergencia', coalesce(v_cita.es_emergencia, false),
+      'estado_cita_previo', v_estado
+    )
+  );
+
+  return jsonb_build_object(
+    'consulta_id', v_consulta_id,
+    'estado', 'creada',
+    'cita_estado', 'en_consulta'
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") IS 'HFX-CLIN-004. Idempotente: crea, reanuda o señala finalizada. Bloquea la cita y mueve su estado en la misma transacción.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."limpiar_diagnosticos_superficie"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -2314,6 +4369,56 @@ $$;
 
 
 ALTER FUNCTION "public"."limpiar_diagnosticos_superficie"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") RETURNS TABLE("id" "uuid", "evento" "text", "categoria" "text", "ocurrido_en" timestamp with time zone, "actor_id" "uuid", "actor_nombre" "text", "rol" "text", "motivo" "text", "metadata" "jsonb")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_cita_id uuid;
+begin
+  if not public.es_contexto_interno()
+     and not public.puede_ver_consulta(p_consulta_id) then
+    raise exception 'CL020: la consulta no existe o no es visible para este usuario'
+      using errcode = 'check_violation';
+  end if;
+
+  select c.cita_id into v_cita_id
+    from public.consultas c where c.id = p_consulta_id;
+
+  return query
+  select a.id,
+         a.evento,
+         case
+           when a.evento like 'cita_%' then 'agenda'
+           when a.evento like 'plan_%'
+             or a.evento like 'consentimiento_%' then 'plan'
+           when a.evento like 'receta_%' then 'receta'
+           when a.evento like 'alerta_%' then 'alerta'
+           when a.evento like 'correccion_%' then 'correccion'
+           else 'clinico'
+         end as categoria,
+         a.created_at,
+         a.actor_id,
+         nullif(btrim(coalesce(p.nombre, '') || ' ' || coalesce(p.apellido, '')), ''),
+         a.rol,
+         nullif(btrim(coalesce(a.metadata ->> 'motivo', '')), ''),
+         a.metadata
+    from public.auditoria_clinica a
+    left join public.personas p on p.id = a.actor_id
+   where a.consulta_id = p_consulta_id
+      or (v_cita_id is not null and a.cita_id = v_cita_id)
+   order by a.created_at, a.id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") IS 'HFX-CLIN-005. Historia cronológica de una consulta y de su cita, con actor, rol, fecha y motivo. Comprueba visibilidad antes de devolver nada.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."manejar_cita_cancelada"() RETURNS "trigger"
@@ -2450,6 +4555,112 @@ COMMENT ON FUNCTION "public"."perfil_actual"() IS 'HFX-CLIN-000: perfil de la se
 
 
 
+CREATE OR REPLACE FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text" DEFAULT NULL::"text", "p_accion" "text" DEFAULT NULL::"text", "p_nota" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_actor   uuid := auth.uid();
+  v_vigente public.reglas_clinicas%rowtype;
+  v_nueva   public.reglas_clinicas%rowtype;
+begin
+  -- Un umbral clínico lo mueve quien ejerce. El admin entra por aquí porque
+  -- desde HFX-CLIN-000 tiene fila en `doctores`.
+  if not public.es_doctor() then
+    raise exception 'Sólo quien ejerce clínica puede modificar una regla clínica.'
+      using errcode = 'CL031';
+  end if;
+
+  select * into v_vigente
+    from public.reglas_clinicas
+   where codigo = p_codigo
+     and estado <> 'retirada'
+   order by version desc
+   limit 1;
+
+  if not found then
+    raise exception 'No existe una regla clínica vigente con código "%".', p_codigo
+      using errcode = 'CL032';
+  end if;
+
+  perform public.hfx_clin_006_validar_parametros_regla(
+    v_vigente.tipo, p_parametros);
+  perform public.hfx_clin_006_validar_signos_de_regla(
+    v_vigente.tipo, p_parametros);
+
+  -- Nada que publicar: la pantalla puede reenviar el formulario sin cambios y
+  -- eso no debe generar una versión nueva ni un evento de auditoría vacío.
+  if v_vigente.estado = 'aprobada'
+     and v_vigente.parametros = p_parametros
+     and v_vigente.severidad = coalesce(p_severidad, v_vigente.severidad)
+     and v_vigente.accion = coalesce(p_accion, v_vigente.accion) then
+    return jsonb_build_object(
+      'codigo', v_vigente.codigo,
+      'version', v_vigente.version,
+      'estado', v_vigente.estado,
+      'sin_cambios', true);
+  end if;
+
+  -- La versión anterior se retira antes de publicar la nueva: si las dos
+  -- quedaran aprobadas, el motor evaluaría el mismo código dos veces y el
+  -- doctor vería la alerta duplicada con dos umbrales distintos.
+  update public.reglas_clinicas
+     set estado = 'retirada', updated_at = now()
+   where codigo = p_codigo
+     and estado <> 'retirada';
+
+  insert into public.reglas_clinicas (
+    codigo, version, nombre, descripcion, categoria, tipo, parametros,
+    accion, severidad, estado, fuente, aprobada_por, aprobada_en
+  ) values (
+    v_vigente.codigo,
+    v_vigente.version + 1,
+    v_vigente.nombre,
+    v_vigente.descripcion,
+    v_vigente.categoria,
+    v_vigente.tipo,
+    p_parametros,
+    coalesce(p_accion, v_vigente.accion),
+    coalesce(p_severidad, v_vigente.severidad),
+    'aprobada',
+    coalesce(nullif(trim(p_nota), ''),
+             'Editada desde la aplicación por quien ejerce clínica.'),
+    v_actor,
+    now()
+  )
+  returning * into v_nueva;
+
+  insert into public.auditoria_reglas_clinicas (
+    actor_id, operacion, regla_id, codigo, version, metadata
+  ) values (
+    v_actor, 'publicada', v_nueva.id, v_nueva.codigo, v_nueva.version,
+    jsonb_build_object(
+      'version_anterior', v_vigente.version,
+      'parametros_anteriores', v_vigente.parametros,
+      'parametros', v_nueva.parametros,
+      'severidad_anterior', v_vigente.severidad,
+      'severidad', v_nueva.severidad,
+      'accion_anterior', v_vigente.accion,
+      'accion', v_nueva.accion,
+      'nota', nullif(trim(p_nota), ''))
+  );
+
+  return jsonb_build_object(
+    'codigo', v_nueva.codigo,
+    'version', v_nueva.version,
+    'estado', v_nueva.estado,
+    'sin_cambios', false);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") IS 'HFX-CLIN-006. Publica una versión nueva de una regla clínica y retira la anterior. Un umbral clínico es una decisión médica: se cambia desde la aplicación, no con un despliegue.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2483,6 +4694,129 @@ $$;
 
 
 ALTER FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") IS 'Encadena hasta puede_ver_paciente() para tablas colgadas de consultas.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_paciente(COALESCE(cu.paciente_id, c.paciente_id))
+    FROM cuentas cu LEFT JOIN consultas c ON c.id = cu.consulta_id
+    WHERE cu.id = p_cuenta_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") IS 'Encadena: cuenta -> paciente (directo o vía consulta).';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_odontograma(d.odontograma_id) FROM dientes d WHERE d.id = p_diente_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") IS 'Encadena: diente -> odontograma -> consulta -> paciente.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_evaluacion"("p_evaluacion_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_paciente(e.paciente_id) FROM evaluaciones_clinicas e WHERE e.id = p_evaluacion_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_evaluacion"("p_evaluacion_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_consulta(o.consulta_id) FROM odontogramas o WHERE o.id = p_odontograma_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") IS 'Encadena: odontograma -> consulta -> paciente.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT
+        es_asistente()
+        OR (
+            es_doctor_no_admin() AND EXISTS (
+                SELECT 1 FROM doctor_paciente dp
+                WHERE dp.paciente_id = p_paciente_id
+                  AND dp.doctor_id = auth.uid()
+                  AND dp.activo
+            )
+        )
+        OR (
+            es_admin() AND NOT EXISTS (
+                SELECT 1 FROM doctor_paciente dp
+                JOIN admins a ON a.id = dp.doctor_id
+                WHERE dp.paciente_id = p_paciente_id
+                  AND dp.activo
+                  AND dp.doctor_id <> auth.uid()
+            )
+        );
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") IS 'Regla de negocio: un doctor regular solo ve pacientes con asignación activa en doctor_paciente; un admin ve todos los pacientes excepto los asignados activamente a OTRO admin; un asistente ve todos. Reutilizar esta función en toda policy que filtre por paciente_id.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_plan"("p_plan_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_paciente(pt.paciente_id) FROM planes_tratamiento pt WHERE pt.id = p_plan_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_plan"("p_plan_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+    SELECT puede_ver_paciente(COALESCE(r.paciente_id, c.paciente_id))
+    FROM recetas r LEFT JOIN consultas c ON c.id = r.consulta_id
+    WHERE r.id = p_receta_id;
+$$;
+
+
+ALTER FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") IS 'Encadena: receta -> paciente (directo o vía consulta).';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() RETURNS "trigger"
@@ -2535,6 +4869,213 @@ $$;
 ALTER FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid" DEFAULT NULL::"uuid", "p_motivo" "text" DEFAULT NULL::"text", "p_duracion_minutos" integer DEFAULT 30) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_doctor_id uuid;
+  v_cita_id   uuid;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null
+          or not (public.es_admin() or public.es_doctor() or public.es_asistente())) then
+    raise exception 'Sesión activa requerida para registrar una emergencia.'
+      using errcode = '42501';
+  end if;
+
+  -- Sin doctor explícito, la emergencia es de quien la registra si ejerce.
+  -- Un asistente tiene que decir a quién se la asigna: no puede firmar por
+  -- nadie ni dejar la urgencia sin responsable.
+  v_doctor_id := coalesce(p_doctor_id, auth.uid());
+  if v_doctor_id is null then
+    raise exception 'La emergencia necesita un doctor responsable.'
+      using errcode = 'CL018';
+  end if;
+  if not exists (
+    select 1 from public.doctores where id = v_doctor_id and deleted_at is null
+  ) then
+    raise exception 'El responsable indicado no es un doctor activo.'
+      using errcode = 'CL018';
+  end if;
+
+  if not exists (
+    select 1 from public.pacientes where id = p_paciente_id and deleted_at is null
+  ) then
+    raise exception 'El paciente de la emergencia no existe.' using errcode = 'P0002';
+  end if;
+
+  insert into public.citas (
+    persona_id, doctor_id, fecha_hora, duracion_minutos,
+    es_emergencia, estado, motivo, created_at, updated_at
+  )
+  values (
+    p_paciente_id, v_doctor_id, now(), greatest(coalesce(p_duracion_minutos, 30), 1),
+    true, 'en_espera',
+    coalesce(nullif(btrim(coalesce(p_motivo, '')), ''), 'Emergencia'),
+    now(), now()
+  )
+  returning id into v_cita_id;
+
+  return jsonb_build_object(
+    'cita_id', v_cita_id,
+    'doctor_id', v_doctor_id,
+    'paciente_id', p_paciente_id
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_motivo" "text", "p_duracion_minutos" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_motivo" "text", "p_duracion_minutos" integer) IS 'HFX-CLIN-004. Crea la cita de urgencia ya en espera y marcada como emergencia. Queda fuera de la restricción de solapamiento a propósito.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_consentimiento_plan"("p_plan_id" "uuid", "p_decision" "text", "p_persona" "text", "p_metodo" "text", "p_relacion" "text" DEFAULT 'titular'::"text", "p_motivo" "text" DEFAULT NULL::"text", "p_items" "jsonb" DEFAULT NULL::"jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_plan     record;
+  v_items    jsonb;
+  v_total    numeric(15,2);
+  v_actor    uuid := auth.uid();
+  v_id       uuid;
+begin
+  if p_decision not in ('aceptado', 'rechazado') then
+    raise exception 'Decisión de consentimiento no válida: %.', p_decision
+      using errcode = 'CL013';
+  end if;
+
+  select * into v_plan from planes_tratamiento
+   where id = p_plan_id and deleted_at is null
+     for update;
+
+  if not found then
+    raise exception 'El plan % no existe o fue eliminado.', p_plan_id
+      using errcode = 'CL004';
+  end if;
+
+  if not public.es_contexto_interno() then
+    if v_actor is null or not (public.es_doctor() or public.es_admin()) then
+      raise exception 'Solo un doctor puede registrar el consentimiento de un plan.'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  if coalesce(btrim(p_persona), '') = '' then
+    raise exception 'Falta el nombre de quien acepta o rechaza el plan.'
+      using errcode = 'CL013';
+  end if;
+
+  -- Los precios que se guardan como aceptados son los del plan en este momento,
+  -- no los que el cliente diga: la evidencia no la redacta la pantalla.
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'item_plan_id', i.id,
+           'tratamiento_id', i.tratamiento_id,
+           'diente_id', i.diente_id,
+           'superficie', i.superficie,
+           'precio_estimado', i.precio_estimado,
+           'estado', i.estado
+         ) order by i.orden), '[]'::jsonb),
+         coalesce(sum(i.precio_estimado), 0)
+    into v_items, v_total
+    from items_plan_tratamiento i
+   where i.plan_id = p_plan_id
+     and i.deleted_at is null
+     and (p_items is null or i.id::text in (
+           select jsonb_array_elements_text(p_items)));
+
+  insert into consentimientos_plan (
+    plan_id, version_plan, decision, items, total_aceptado, persona_acepta,
+    relacion_con_paciente, metodo, motivo_rechazo, registrado_por
+  ) values (
+    p_plan_id, v_plan.version, p_decision, v_items,
+    case when p_decision = 'aceptado' then v_total else 0 end,
+    btrim(p_persona), coalesce(nullif(btrim(p_relacion), ''), 'titular'),
+    p_metodo, nullif(btrim(p_motivo), ''), v_actor
+  ) returning id into v_id;
+
+  update planes_tratamiento
+     set estado = p_decision::estado_plan_tratamiento,
+         fecha_aceptacion = case when p_decision = 'aceptado' then now() else fecha_aceptacion end,
+         fecha_rechazo = case when p_decision = 'rechazado' then now() else fecha_rechazo end,
+         motivo_rechazo = case when p_decision = 'rechazado' then nullif(btrim(p_motivo), '') else motivo_rechazo end,
+         updated_at = now()
+   where id = p_plan_id;
+
+  return jsonb_build_object(
+    'consentimiento_id', v_id,
+    'plan_id', p_plan_id,
+    'version_plan', v_plan.version,
+    'decision', p_decision,
+    'total_aceptado', case when p_decision = 'aceptado' then v_total else 0 end,
+    'items', v_items
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_consentimiento_plan"("p_plan_id" "uuid", "p_decision" "text", "p_persona" "text", "p_metodo" "text", "p_relacion" "text", "p_motivo" "text", "p_items" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_cita   public.citas%rowtype;
+  v_estado text;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null
+          or not (public.es_admin() or public.es_doctor() or public.es_asistente())) then
+    raise exception 'Sesión activa requerida para registrar la llegada.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_cita
+    from public.citas
+   where id = p_cita_id and deleted_at is null
+   for update;
+  if not found then
+    raise exception 'La cita ya no existe o fue eliminada.' using errcode = 'CL015';
+  end if;
+
+  -- Un doctor registra la llegada de sus pacientes; quien gestiona la agenda
+  -- completa (admin y asistente) la de cualquiera.
+  if not public.es_contexto_interno()
+     and not (public.es_admin() or public.es_asistente())
+     and v_cita.doctor_id is distinct from auth.uid() then
+    raise exception 'No puede registrar la llegada de una cita ajena.'
+      using errcode = '42501';
+  end if;
+
+  v_estado := public.hfx_clin_004_estado_cita_canonico(v_cita.estado::text);
+  if v_estado = 'en_espera' then
+    return jsonb_build_object('cita_id', p_cita_id, 'estado', 'en_espera',
+                             'ya_registrada', true);
+  end if;
+
+  update public.citas
+     set estado = 'en_espera', updated_at = now()
+   where id = p_cita_id;
+
+  return jsonb_build_object('cita_id', p_cita_id, 'estado', 'en_espera',
+                           'ya_registrada', false);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") IS 'HFX-CLIN-004. Idempotente. El doctor puede marcar la llegada de sus propias citas sin depender de recepción.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text" DEFAULT 'Mantenimiento'::"text") RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2552,6 +5093,127 @@ $$;
 
 
 ALTER FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_persona_id  uuid;
+  v_record_id   uuid;
+  v_cedula      text;
+  v_telefono    text;
+  v_condicion   jsonb;
+begin
+  if not public.es_contexto_interno()
+     and (auth.uid() is null
+          or not (public.es_admin() or public.es_doctor() or public.es_asistente())) then
+    raise exception 'Sesión activa requerida para registrar un paciente.'
+      using errcode = '42501';
+  end if;
+
+  if nullif(btrim(coalesce(p_payload ->> 'nombre', '')), '') is null
+     or nullif(btrim(coalesce(p_payload ->> 'apellido', '')), '') is null then
+    raise exception 'El paciente necesita nombre y apellido.' using errcode = 'CL018';
+  end if;
+
+  if p_payload ->> 'fecha_nacimiento' is null then
+    raise exception 'El paciente necesita fecha de nacimiento.' using errcode = 'CL018';
+  end if;
+
+  v_cedula := public.hfx_clin_004_normalizar_cedula(p_payload ->> 'cedula');
+  v_telefono := public.hfx_clin_004_normalizar_telefono(
+    p_payload #>> '{contactos,0,numero_telefono}'
+  );
+  if v_telefono is null then
+    raise exception 'El paciente necesita al menos un teléfono de contacto.'
+      using errcode = 'CL018';
+  end if;
+
+  if v_cedula is not null and exists (
+    select 1 from public.personas
+     where deleted_at is null
+       and public.hfx_clin_004_normalizar_cedula(cedula) = v_cedula
+  ) then
+    raise exception 'Ya existe un registro con esa cédula.' using errcode = 'CL017';
+  end if;
+
+  insert into public.personas (nombre, apellido, fecha_nacimiento, cedula, estatus)
+  values (
+    btrim(p_payload ->> 'nombre'),
+    btrim(p_payload ->> 'apellido'),
+    (p_payload ->> 'fecha_nacimiento')::date,
+    coalesce(btrim(p_payload ->> 'cedula'), ''),
+    coalesce(nullif(p_payload ->> 'estatus', ''), 'activo')::public.estatus_persona
+  )
+  returning id into v_persona_id;
+
+  perform public.hfx_clin_004_sincronizar_contactos(
+    v_persona_id, p_payload -> 'contactos'
+  );
+
+  insert into public.pacientes (
+    id, genero, tipo_paciente, trabajo, referencia, peso, altura,
+    created_at, updated_at
+  )
+  values (
+    v_persona_id,
+    coalesce(nullif(p_payload ->> 'genero', ''), 'otro')::public.genero,
+    coalesce(nullif(p_payload ->> 'tipo_paciente', ''), 'integrado')::public.tipo_paciente,
+    coalesce(p_payload ->> 'trabajo', ''),
+    coalesce(p_payload ->> 'referencia', ''),
+    (p_payload ->> 'peso')::numeric,
+    (p_payload ->> 'altura')::numeric,
+    now(), now()
+  );
+
+  -- El expediente nace con el paciente: sin él, el asistente que registra al
+  -- paciente no puede crearlo después (RLS de `records` es clínica) y la
+  -- primera consulta se encontraba una ficha a medias.
+  insert into public.records (
+    paciente_id, tipo_sangre, cant_hijos, cirugias_previas, historial_familiar
+  )
+  values (
+    v_persona_id,
+    coalesce(nullif(p_payload #>> '{record,tipo_sangre}', ''), 'desconocido')::public.tipo_sangre,
+    coalesce((p_payload #>> '{record,cant_hijos}')::integer, 0),
+    coalesce(
+      (select array_agg(value)
+         from jsonb_array_elements_text(
+           coalesce(p_payload #> '{record,cirugias_previas}', '[]'::jsonb)
+         )),
+      '{}'::text[]
+    ),
+    coalesce(p_payload #>> '{record,historial_familiar}', '')
+  )
+  returning id into v_record_id;
+
+  for v_condicion in
+    select * from jsonb_array_elements(coalesce(p_payload -> 'condiciones', '[]'::jsonb))
+  loop
+    insert into public.record_condicion (record_id, condicion_id, notas)
+    values (
+      v_record_id,
+      (v_condicion ->> 'condicion_id')::uuid,
+      nullif(btrim(coalesce(v_condicion ->> 'notas', '')), '')
+    );
+  end loop;
+
+  return jsonb_build_object(
+    'paciente_id', v_persona_id,
+    'record_id', v_record_id,
+    'version', 1
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") IS 'HFX-CLIN-004. Alta completa del paciente en una transacción: persona, contacto principal, ficha, expediente y condiciones iniciales.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."registrar_pago"("p_cuenta_id" "uuid", "p_monto" numeric, "p_metodo_pago" "text", "p_cuota_id" "uuid" DEFAULT NULL::"uuid") RETURNS "uuid"
@@ -2625,6 +5287,148 @@ $$;
 
 
 ALTER FUNCTION "public"."registrar_pago_en_caja"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reglas_clinicas_vigentes"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select coalesce(jsonb_agg(fila order by fila ->> 'codigo'), '[]'::jsonb)
+    from (
+      select jsonb_build_object(
+               'id', r.id,
+               'codigo', r.codigo,
+               'version', r.version,
+               'nombre', r.nombre,
+               'descripcion', r.descripcion,
+               'categoria', r.categoria,
+               'tipo', r.tipo,
+               'parametros', r.parametros,
+               'accion', r.accion,
+               'severidad', r.severidad,
+               'estado', r.estado,
+               'fuente', r.fuente,
+               'aprobada_en', r.aprobada_en,
+               'editable', r.tipo in ('valor_critico',
+                                      'combinacion_condicion_signo',
+                                      'requisito_dato')
+             ) as fila
+        from public.reglas_clinicas r
+       where r.estado <> 'retirada'
+    ) vigentes;
+$$;
+
+
+ALTER FUNCTION "public"."reglas_clinicas_vigentes"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."reglas_clinicas_vigentes"() IS 'HFX-CLIN-006. Reglas no retiradas, para la pantalla de ajustes clínicos. Las de tipo rango/relación imposible viajan marcadas como no editables: no dependen de un umbral, sino del catálogo.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."resolver_alerta_clinica"("p_alerta_id" "uuid", "p_estado" "text", "p_justificacion" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_alerta record;
+  v_actor  uuid;
+begin
+  if p_estado not in ('confirmada', 'documentada') then
+    raise exception 'Estado de alerta no válido: %.', p_estado
+      using errcode = 'CL007';
+  end if;
+
+  select * into v_alerta from alertas_clinicas where id = p_alerta_id;
+  if not found then
+    raise exception 'La alerta % no existe.', p_alerta_id using errcode = 'CL004';
+  end if;
+
+  v_actor := public.hfx_clin_002_actor_clinico(v_alerta.consulta_id);
+
+  if p_estado = 'documentada' and coalesce(btrim(p_justificacion), '') = '' then
+    raise exception 'Esta alerta exige una acción documentada: falta la justificación clínica.'
+      using errcode = 'CL007';
+  end if;
+
+  update alertas_clinicas
+     set estado = p_estado,
+         justificacion = nullif(btrim(p_justificacion), ''),
+         resuelta_por = v_actor,
+         resuelta_en = now(),
+         updated_at = now()
+   where id = p_alerta_id;
+
+  insert into auditoria_clinica (consulta_id, evento, actor_id, rol, metadata)
+  values (
+    v_alerta.consulta_id, 'alerta_resuelta', v_actor,
+    case when public.es_admin() then 'admin' else 'doctor' end,
+    jsonb_build_object('alerta_id', p_alerta_id, 'regla', v_alerta.regla_codigo,
+                       'estado', p_estado)
+  );
+
+  return jsonb_build_object('id', p_alerta_id, 'estado', p_estado);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."resolver_alerta_clinica"("p_alerta_id" "uuid", "p_estado" "text", "p_justificacion" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_actor   uuid := auth.uid();
+  v_vigente public.reglas_clinicas%rowtype;
+begin
+  if not public.es_doctor() then
+    raise exception 'Sólo quien ejerce clínica puede retirar una regla clínica.'
+      using errcode = 'CL031';
+  end if;
+
+  if nullif(trim(p_motivo), '') is null then
+    raise exception 'Retirar una regla clínica exige un motivo.'
+      using errcode = 'CL033';
+  end if;
+
+  select * into v_vigente
+    from public.reglas_clinicas
+   where codigo = p_codigo
+     and estado <> 'retirada'
+   order by version desc
+   limit 1;
+
+  if not found then
+    raise exception 'No existe una regla clínica vigente con código "%".', p_codigo
+      using errcode = 'CL032';
+  end if;
+
+  update public.reglas_clinicas
+     set estado = 'retirada', updated_at = now()
+   where id = v_vigente.id;
+
+  insert into public.auditoria_reglas_clinicas (
+    actor_id, operacion, regla_id, codigo, version, metadata
+  ) values (
+    v_actor, 'retirada', v_vigente.id, v_vigente.codigo, v_vigente.version,
+    jsonb_build_object('motivo', trim(p_motivo),
+                       'parametros', v_vigente.parametros)
+  );
+
+  return jsonb_build_object('codigo', v_vigente.codigo,
+                            'version', v_vigente.version,
+                            'estado', 'retirada');
+end;
+$$;
+
+
+ALTER FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") IS 'HFX-CLIN-006. Retira la versión vigente de una regla clínica dejando constancia del motivo. No borra: las alertas que emitió siguen explicándose.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_disponibilidad_doctor"() RETURNS "trigger"
@@ -2781,41 +5585,6 @@ ALTER FUNCTION "public"."validar_cita_item_plan"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."validar_cita_item_plan"() IS 'SD-146. Impide vincular a una cita una actividad de otro paciente, retirada del plan o ya decidida en contra/terminada.';
 
-
-
-CREATE OR REPLACE FUNCTION "public"."validar_disponibilidad_doctor_simple"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    AS $$
-DECLARE
-    is_doctor_available boolean;
-BEGIN
-    -- 1. Buscamos el valor de 'esta_disponible' (bool) en la tabla doctores
-    SELECT esta_disponible INTO is_doctor_available 
-    FROM doctores 
-    WHERE id = NEW.doctor_id;
-
-    -- 2. Si el bool es false, bloqueamos la cita
-    IF is_doctor_available = false THEN
-        RAISE EXCEPTION 'El doctor ha marcado su estado como NO DISPONIBLE.';
-    END IF;
-
-    -- 3. La parte de las citas solapadas sigue igual (esto busca en la tabla citas)
-    IF EXISTS (
-        SELECT 1 FROM citas 
-        WHERE doctor_id = NEW.doctor_id 
-        AND fecha_hora = NEW.fecha_hora 
-        AND estado NOT IN ('candelada', 'no_asistida') -- Estos son los estados de la CITA, no del doctor
-        AND id != NEW.id
-    ) THEN
-        RAISE EXCEPTION 'Ya existe una cita ocupando este horario para este doctor.';
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."validar_disponibilidad_doctor_simple"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."validar_doctor_activo"() RETURNS "trigger"
@@ -3005,8 +5774,13 @@ CREATE TABLE IF NOT EXISTS "public"."items_plan_tratamiento" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone,
+    "tipo_ejecucion" "text" DEFAULT 'unica'::"text" NOT NULL,
+    "sesiones_planificadas" integer,
     CONSTRAINT "items_plan_fechas_coherentes" CHECK (((("estado" <> 'rechazado'::"public"."estado_item_plan") OR ("fecha_rechazo" IS NOT NULL)) AND (("estado" <> 'completado'::"public"."estado_item_plan") OR ("fecha_completado" IS NOT NULL)))),
-    CONSTRAINT "items_plan_precio_no_negativo" CHECK (("precio_estimado" >= (0)::numeric))
+    CONSTRAINT "items_plan_precio_no_negativo" CHECK (("precio_estimado" >= (0)::numeric)),
+    CONSTRAINT "items_plan_sesiones_coherentes" CHECK (((("tipo_ejecucion" = 'unica'::"text") AND ("sesiones_planificadas" IS NULL)) OR ("tipo_ejecucion" = 'por_sesiones'::"text"))),
+    CONSTRAINT "items_plan_tratamiento_sesiones_planificadas_check" CHECK ((("sesiones_planificadas" IS NULL) OR ("sesiones_planificadas" > 0))),
+    CONSTRAINT "items_plan_tratamiento_tipo_ejecucion_check" CHECK (("tipo_ejecucion" = ANY (ARRAY['unica'::"text", 'por_sesiones'::"text"])))
 );
 
 
@@ -3031,7 +5805,8 @@ CREATE TABLE IF NOT EXISTS "public"."planes_tratamiento" (
     "motivo_rechazo" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "deleted_at" timestamp with time zone
+    "deleted_at" timestamp with time zone,
+    "version" integer DEFAULT 1 NOT NULL
 );
 
 
@@ -3039,6 +5814,10 @@ ALTER TABLE "public"."planes_tratamiento" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."planes_tratamiento" IS 'Lo que se decide tratar. Agrupa las actividades propuestas al paciente a partir de una evaluación; solo un subconjunto de los hallazgos llega aquí.';
+
+
+
+COMMENT ON COLUMN "public"."planes_tratamiento"."version" IS 'HFX-CLIN-003. Sube con cada cambio de actividades o precios; el consentimiento guarda la versión que el paciente vio.';
 
 
 
@@ -3098,6 +5877,34 @@ CREATE TABLE IF NOT EXISTS "public"."admins" (
 ALTER TABLE "public"."admins" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."alertas_clinicas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "regla_id" "uuid",
+    "regla_codigo" "text" NOT NULL,
+    "regla_version" integer DEFAULT 1 NOT NULL,
+    "severidad" "text" NOT NULL,
+    "accion" "text" NOT NULL,
+    "mensaje" "text" NOT NULL,
+    "disparador" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "estado" "text" DEFAULT 'pendiente'::"text" NOT NULL,
+    "justificacion" "text",
+    "resuelta_por" "uuid",
+    "resuelta_en" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "alertas_clinicas_estado_check" CHECK (("estado" = ANY (ARRAY['pendiente'::"text", 'confirmada'::"text", 'documentada'::"text", 'obsoleta'::"text"]))),
+    CONSTRAINT "alertas_clinicas_justificacion_check" CHECK ((("estado" <> 'documentada'::"text") OR (COALESCE("btrim"("justificacion"), ''::"text") <> ''::"text")))
+);
+
+
+ALTER TABLE "public"."alertas_clinicas" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."alertas_clinicas" IS 'HFX-CLIN-003. Alerta emitida por el motor sobre una consulta. Guarda qué dato la disparó y qué acción exige.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."asistentes" (
     "id" "uuid" NOT NULL,
     "turno" "text" NOT NULL,
@@ -3111,16 +5918,22 @@ ALTER TABLE "public"."asistentes" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."auditoria_clinica" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "consulta_id" "uuid" NOT NULL,
+    "consulta_id" "uuid",
     "evento" "text" NOT NULL,
     "actor_id" "uuid",
     "rol" "text",
     "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "cita_id" "uuid",
+    CONSTRAINT "auditoria_clinica_ancla" CHECK ((("consulta_id" IS NOT NULL) OR ("cita_id" IS NOT NULL)))
 );
 
 
 ALTER TABLE "public"."auditoria_clinica" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."auditoria_clinica"."cita_id" IS 'HFX-CLIN-005. Ancla del evento cuando ocurre antes de existir la consulta (creación de la cita, llegada, reprogramación).';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."auditoria_correcciones_clinicas" (
@@ -3143,6 +5956,35 @@ COMMENT ON TABLE "public"."auditoria_correcciones_clinicas" IS 'HFX-CLIN-001: co
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."auditoria_log" (
+    "id" bigint NOT NULL,
+    "usuario_id" "uuid",
+    "accion" character varying(20) NOT NULL,
+    "entidad" character varying(50) NOT NULL,
+    "entidad_id" "text" NOT NULL,
+    "detalles" "jsonb",
+    "fecha" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."auditoria_log" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."auditoria_log_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."auditoria_log_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."auditoria_log_id_seq" OWNED BY "public"."auditoria_log"."id";
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."auditoria_operaciones_admin" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "actor_id" "uuid" NOT NULL,
@@ -3158,6 +6000,26 @@ ALTER TABLE "public"."auditoria_operaciones_admin" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."auditoria_operaciones_admin" IS 'HFX-CLIN-001: operaciones administrativas sin contraseñas ni payloads sensibles.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."auditoria_reglas_clinicas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "actor_id" "uuid",
+    "operacion" "text" NOT NULL,
+    "regla_id" "uuid" NOT NULL,
+    "codigo" "text" NOT NULL,
+    "version" integer NOT NULL,
+    "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "auditoria_reglas_clinicas_operacion_check" CHECK (("operacion" = ANY (ARRAY['publicada'::"text", 'retirada'::"text"])))
+);
+
+
+ALTER TABLE "public"."auditoria_reglas_clinicas" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."auditoria_reglas_clinicas" IS 'HFX-CLIN-006. Quién cambió qué umbral clínico y por qué. La escriben sólo las RPC de publicación y retirada: un rastro que el auditado puede editar no audita nada.';
 
 
 
@@ -3200,6 +6062,25 @@ CREATE TABLE IF NOT EXISTS "public"."cajas_diarias" (
 ALTER TABLE "public"."cajas_diarias" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."catalogo_signos_vitales" (
+    "codigo" "text" NOT NULL,
+    "etiqueta" "text" NOT NULL,
+    "unidad" "text" NOT NULL,
+    "minimo_posible" numeric NOT NULL,
+    "maximo_posible" numeric NOT NULL,
+    "decimales" integer DEFAULT 0 NOT NULL,
+    "orden" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT "catalogo_signos_vitales_rango" CHECK (("minimo_posible" < "maximo_posible"))
+);
+
+
+ALTER TABLE "public"."catalogo_signos_vitales" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."catalogo_signos_vitales" IS 'HFX-CLIN-006. Definición de qué se puede medir y en qué rango es físicamente posible. Sólo lectura desde el cliente: la escriben las migraciones, porque de sus límites depende la barrera SV_RANGO_IMPOSIBLE.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."citas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "persona_id" "uuid" NOT NULL,
@@ -3209,16 +6090,26 @@ CREATE TABLE IF NOT EXISTS "public"."citas" (
     "estado" "public"."estado_cita" DEFAULT 'programada'::"public"."estado_cita",
     "created_at" timestamp with time zone DEFAULT "now"(),
     "deleted_at" timestamp with time zone,
-    "duracion_minutos" bigint,
+    "duracion_minutos" bigint DEFAULT 30 NOT NULL,
     "updated_at" timestamp with time zone,
-    "motivo" "text"
+    "motivo" "text",
+    "fin" timestamp with time zone NOT NULL,
+    CONSTRAINT "citas_duracion_posible" CHECK ((("duracion_minutos" > 0) AND ("duracion_minutos" <= 1440)))
 );
 
 
 ALTER TABLE "public"."citas" OWNER TO "postgres";
 
 
+COMMENT ON COLUMN "public"."citas"."duracion_minutos" IS 'HFX-CLIN-004. Minutos que la cita ocupa la agenda del doctor. Obligatoria: define el intervalo que la restricción de exclusión compara.';
+
+
+
 COMMENT ON COLUMN "public"."citas"."motivo" IS 'Motivo declarado al agendar la cita. Prellena consultas.motivo_consulta.';
+
+
+
+COMMENT ON COLUMN "public"."citas"."fin" IS 'HFX-CLIN-004. Derivada de fecha_hora + duracion_minutos. La mantiene el trigger trg_citas_fin; no se escribe desde el cliente.';
 
 
 
@@ -3267,6 +6158,30 @@ COMMENT ON TABLE "public"."condiciones" IS 'Catálogo maestro de condiciones mé
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."condiciones_consulta" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "condicion_id" "uuid" NOT NULL,
+    "severidad" "text" DEFAULT 'moderada'::"text" NOT NULL,
+    "notas" "text",
+    "detectada_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "incorporar_al_expediente" boolean DEFAULT false NOT NULL,
+    "confirmada_por" "uuid",
+    "confirmada_en" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone,
+    CONSTRAINT "condiciones_consulta_severidad_check" CHECK (("severidad" = ANY (ARRAY['leve'::"text", 'moderada'::"text", 'severa'::"text"])))
+);
+
+
+ALTER TABLE "public"."condiciones_consulta" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."condiciones_consulta" IS 'HFX-CLIN-003. Condición de catálogo detectada durante la consulta. Participa en contraindicaciones desde el momento en que se registra; el texto libre de consultas.temp_condiciones queda como complemento.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."consultas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "paciente_id" "uuid" NOT NULL,
@@ -3304,7 +6219,103 @@ COMMENT ON COLUMN "public"."consultas"."version" IS 'Versión optimista del borr
 
 
 
-COMMENT ON COLUMN "public"."consultas"."cierre_key" IS 'Clave de idempotencia del intento de cierre que efectivamente cerró la consulta.';
+COMMENT ON COLUMN "public"."consultas"."cierre_key" IS 'Clave de idempotencia del cierre. HFX-CLIN-007: junto con finalizada, finalizada_at, cerrada_por y version, no es escribible por authenticated; sólo la escribe cerrar_consulta.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."record_condicion" (
+    "record_id" "uuid" NOT NULL,
+    "condicion_id" "uuid" NOT NULL,
+    "fecha_deteccion" timestamp with time zone DEFAULT "now"(),
+    "medicamento" "text",
+    "dosis" "text",
+    "frecuencia" "text",
+    "medico_tratante" "text",
+    "contacto_medico" "text",
+    "notas" "text",
+    "activo" boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE "public"."record_condicion" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."record_condicion" IS 'Relación entre expediente y condición médica con detalles de tratamiento externo.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."records" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "paciente_id" "uuid" NOT NULL,
+    "tipo_sangre" "public"."tipo_sangre" NOT NULL,
+    "cant_hijos" integer DEFAULT 0,
+    "cirugias_previas" "text"[] DEFAULT '{}'::"text"[],
+    "historial_familiar" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."records" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."condiciones_activas_paciente" WITH ("security_invoker"='on') AS
+ SELECT "rc"."record_id",
+    "r"."paciente_id",
+    "rc"."condicion_id",
+    NULL::"uuid" AS "consulta_id",
+    'expediente'::"text" AS "origen",
+    NULL::"text" AS "severidad",
+    "rc"."fecha_deteccion" AS "detectada_en"
+   FROM ("public"."record_condicion" "rc"
+     JOIN "public"."records" "r" ON (("r"."id" = "rc"."record_id")))
+  WHERE ("rc"."activo" AND ("r"."deleted_at" IS NULL))
+UNION ALL
+ SELECT NULL::"uuid" AS "record_id",
+    "c"."paciente_id",
+    "cc"."condicion_id",
+    "cc"."consulta_id",
+    'consulta'::"text" AS "origen",
+    "cc"."severidad",
+    "cc"."detectada_en"
+   FROM ("public"."condiciones_consulta" "cc"
+     JOIN "public"."consultas" "c" ON (("c"."id" = "cc"."consulta_id")))
+  WHERE (("cc"."deleted_at" IS NULL) AND ("c"."deleted_at" IS NULL));
+
+
+ALTER VIEW "public"."condiciones_activas_paciente" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."condiciones_activas_paciente" IS 'HFX-CLIN-003. Condiciones que deben participar en contraindicaciones: las del expediente y las descubiertas en consulta.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."consentimientos_plan" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "plan_id" "uuid" NOT NULL,
+    "version_plan" integer NOT NULL,
+    "decision" "text" NOT NULL,
+    "items" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "total_aceptado" numeric(15,2) DEFAULT 0 NOT NULL,
+    "persona_acepta" "text" NOT NULL,
+    "relacion_con_paciente" "text" DEFAULT 'titular'::"text" NOT NULL,
+    "metodo" "text" NOT NULL,
+    "motivo_rechazo" "text",
+    "registrado_por" "uuid",
+    "fecha" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "consentimientos_plan_decision_check" CHECK (("decision" = ANY (ARRAY['aceptado'::"text", 'rechazado'::"text"]))),
+    CONSTRAINT "consentimientos_plan_metodo_check" CHECK (("metodo" = ANY (ARRAY['verbal_presencial'::"text", 'firma_fisica'::"text", 'firma_digital'::"text", 'telefonico'::"text"]))),
+    CONSTRAINT "consentimientos_plan_persona_check" CHECK ((COALESCE("btrim"("persona_acepta"), ''::"text") <> ''::"text")),
+    CONSTRAINT "consentimientos_plan_rechazo_check" CHECK ((("decision" <> 'rechazado'::"text") OR (COALESCE("btrim"("motivo_rechazo"), ''::"text") <> ''::"text")))
+);
+
+
+ALTER TABLE "public"."consentimientos_plan" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."consentimientos_plan" IS 'HFX-CLIN-003. Evidencia de la decisión del paciente: versión del plan mostrado, tratamientos y precios aceptados, quién decidió y por qué medio. Una decisión del doctor en la UI no es una firma del paciente.';
 
 
 
@@ -3484,6 +6495,74 @@ CREATE TABLE IF NOT EXISTS "public"."diagnosticos_aplicados" (
 ALTER TABLE "public"."diagnosticos_aplicados" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."pacientes" (
+    "id" "uuid" NOT NULL,
+    "genero" "public"."genero" NOT NULL,
+    "trabajo" "text",
+    "referencia" "text",
+    "tipo_paciente" "public"."tipo_paciente" DEFAULT 'integrado'::"public"."tipo_paciente" NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
+    "created_at" timestamp with time zone,
+    "peso" numeric(5,2),
+    "altura" numeric(5,2),
+    "foto_ruta" "text",
+    "foto_mime_type" "text",
+    "foto_tamano_bytes" integer,
+    "foto_actualizada_en" timestamp with time zone,
+    "version" integer DEFAULT 1 NOT NULL,
+    CONSTRAINT "pacientes_foto_mime_type_check" CHECK ((("foto_mime_type" IS NULL) OR ("foto_mime_type" = 'image/jpeg'::"text"))),
+    CONSTRAINT "pacientes_foto_tamano_bytes_check" CHECK ((("foto_tamano_bytes" IS NULL) OR (("foto_tamano_bytes" >= 1) AND ("foto_tamano_bytes" <= 2097152))))
+);
+
+
+ALTER TABLE "public"."pacientes" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."pacientes"."peso" IS 'Peso base del paciente en kg o lbs';
+
+
+
+COMMENT ON COLUMN "public"."pacientes"."altura" IS 'Altura del paciente en cm';
+
+
+
+COMMENT ON COLUMN "public"."pacientes"."version" IS 'HFX-CLIN-004. Versión optimista de la ficha. La incrementa actualizar_paciente; un desajuste devuelve CL019.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."personas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "nombre" "text" NOT NULL,
+    "apellido" "text" NOT NULL,
+    "fecha_nacimiento" "date" NOT NULL,
+    "cedula" "text" NOT NULL,
+    "estatus" "public"."estatus_persona" DEFAULT 'activo'::"public"."estatus_persona",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."personas" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."directorio_pacientes" AS
+ SELECT "p"."id",
+    "per"."nombre",
+    "per"."apellido"
+   FROM ("public"."pacientes" "p"
+     JOIN "public"."personas" "per" ON (("per"."id" = "p"."id")))
+  WHERE ("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"());
+
+
+ALTER VIEW "public"."directorio_pacientes" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."directorio_pacientes" IS 'Directorio de nombres de pacientes, legible por todo el personal clínico autenticado. Existe para que los listados (consultas, agenda) puedan mostrar un nombre en filas cuyo paciente el rol no tiene derecho a abrir por completo. Sin datos clínicos ni de contacto: la ficha sigue gobernada por puede_ver_paciente().';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."doctor_asistentes" (
     "doctor_id" "uuid" NOT NULL,
     "asistente_id" "uuid" NOT NULL
@@ -3491,6 +6570,43 @@ CREATE TABLE IF NOT EXISTS "public"."doctor_asistentes" (
 
 
 ALTER TABLE "public"."doctor_asistentes" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."doctor_paciente" (
+    "id" bigint NOT NULL,
+    "doctor_id" "uuid" NOT NULL,
+    "paciente_id" "uuid" NOT NULL,
+    "fecha_asignacion" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "fecha_fin" timestamp with time zone,
+    "activo" boolean DEFAULT true NOT NULL,
+    "asignado_por" "uuid",
+    "motivo" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+ALTER TABLE ONLY "public"."doctor_paciente" FORCE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."doctor_paciente" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."doctor_paciente" IS 'Asignación explícita de qué doctor(es) tienen acceso a la información de un paciente. Reemplaza cualquier inferencia basada en citas. Una fila con activo=true representa una asignación vigente; el historial se preserva marcando activo=false en vez de borrar.';
+
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."doctor_paciente_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."doctor_paciente_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."doctor_paciente_id_seq" OWNED BY "public"."doctor_paciente"."id";
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."doctores" (
@@ -3581,11 +6697,33 @@ CREATE TABLE IF NOT EXISTS "public"."items_cuenta" (
     "cantidad" integer DEFAULT 1 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "deleted_at" timestamp with time zone,
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "tratamiento_aplicado_id" "uuid"
 );
 
 
 ALTER TABLE "public"."items_cuenta" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."items_receta" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "receta_id" "uuid" NOT NULL,
+    "medicamento_id" "uuid",
+    "nombre_medicamento" "text" NOT NULL,
+    "presentacion_concentracion" "text" DEFAULT ''::"text",
+    "dosis" "text" NOT NULL,
+    "via_administracion" "text" DEFAULT 'vía oral'::"text",
+    "frecuencia" "text" NOT NULL,
+    "duracion" "text" NOT NULL,
+    "cantidad_indicada" "text" DEFAULT ''::"text",
+    "indicaciones_especificas" "text" DEFAULT ''::"text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."items_receta" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."medicinas" (
@@ -3594,11 +6732,16 @@ CREATE TABLE IF NOT EXISTS "public"."medicinas" (
     "efectos_secundarios" "public"."efecto_secundario"[],
     "created_at" timestamp with time zone DEFAULT "now"(),
     "deleted_at" timestamp with time zone,
-    "updated_at" timestamp with time zone
+    "updated_at" timestamp with time zone,
+    "principio_activo" "text"
 );
 
 
 ALTER TABLE "public"."medicinas" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."medicinas"."principio_activo" IS 'HFX-CLIN-003. Cuando falta, el sistema informa "información insuficiente" en vez de afirmar que no hay conflicto.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."movimientos_caja" (
@@ -3671,37 +6814,6 @@ CREATE TABLE IF NOT EXISTS "public"."ordenes_medicas" (
 ALTER TABLE "public"."ordenes_medicas" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."pacientes" (
-    "id" "uuid" NOT NULL,
-    "genero" "public"."genero" NOT NULL,
-    "trabajo" "text",
-    "referencia" "text",
-    "tipo_paciente" "public"."tipo_paciente" DEFAULT 'integrado'::"public"."tipo_paciente" NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "deleted_at" timestamp with time zone,
-    "created_at" timestamp with time zone,
-    "peso" numeric(5,2),
-    "altura" numeric(5,2),
-    "foto_ruta" "text",
-    "foto_mime_type" "text",
-    "foto_tamano_bytes" integer,
-    "foto_actualizada_en" timestamp with time zone,
-    CONSTRAINT "pacientes_foto_mime_type_check" CHECK ((("foto_mime_type" IS NULL) OR ("foto_mime_type" = 'image/jpeg'::"text"))),
-    CONSTRAINT "pacientes_foto_tamano_bytes_check" CHECK ((("foto_tamano_bytes" IS NULL) OR (("foto_tamano_bytes" >= 1) AND ("foto_tamano_bytes" <= 2097152))))
-);
-
-
-ALTER TABLE "public"."pacientes" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."pacientes"."peso" IS 'Peso base del paciente en kg o lbs';
-
-
-
-COMMENT ON COLUMN "public"."pacientes"."altura" IS 'Altura del paciente en cm';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."pagos" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "cuenta_id" "uuid" NOT NULL,
@@ -3732,22 +6844,6 @@ CREATE TABLE IF NOT EXISTS "public"."persona_contactos" (
 
 
 ALTER TABLE "public"."persona_contactos" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."personas" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "nombre" "text" NOT NULL,
-    "apellido" "text" NOT NULL,
-    "fecha_nacimiento" "date" NOT NULL,
-    "cedula" "text" NOT NULL,
-    "estatus" "public"."estatus_persona" DEFAULT 'activo'::"public"."estatus_persona",
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "deleted_at" timestamp with time zone,
-    "updated_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."personas" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."procedimientos" (
@@ -3787,6 +6883,7 @@ CREATE TABLE IF NOT EXISTS "public"."recetas" (
     "items_receta" "jsonb" DEFAULT '[]'::"jsonb",
     "version" integer DEFAULT 1 NOT NULL,
     "emitida_at" timestamp with time zone,
+    "codigo_receta" "text",
     CONSTRAINT "recetas_estado_check" CHECK (("estado" = ANY (ARRAY['borrador'::"text", 'emitida'::"text", 'anulada'::"text", 'reemplazada'::"text"])))
 );
 
@@ -3806,41 +6903,136 @@ COMMENT ON COLUMN "public"."recetas"."version" IS 'Versión de la receta. Permit
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."record_condicion" (
-    "record_id" "uuid" NOT NULL,
-    "condicion_id" "uuid" NOT NULL,
-    "fecha_deteccion" timestamp with time zone DEFAULT "now"(),
-    "medicamento" "text",
-    "dosis" "text",
-    "frecuencia" "text",
-    "medico_tratante" "text",
-    "contacto_medico" "text",
-    "notas" "text",
-    "activo" boolean DEFAULT true NOT NULL
-);
-
-
-ALTER TABLE "public"."record_condicion" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."record_condicion" IS 'Relación entre expediente y condición médica con detalles de tratamiento externo.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."records" (
+CREATE TABLE IF NOT EXISTS "public"."reglas_clinicas" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "paciente_id" "uuid" NOT NULL,
-    "tipo_sangre" "public"."tipo_sangre" NOT NULL,
-    "cant_hijos" integer DEFAULT 0,
-    "cirugias_previas" "text"[] DEFAULT '{}'::"text"[],
-    "historial_familiar" "text",
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "deleted_at" timestamp with time zone
+    "codigo" "text" NOT NULL,
+    "version" integer DEFAULT 1 NOT NULL,
+    "nombre" "text" NOT NULL,
+    "descripcion" "text",
+    "categoria" "text" NOT NULL,
+    "tipo" "text" NOT NULL,
+    "parametros" "jsonb",
+    "accion" "text" NOT NULL,
+    "severidad" "text" DEFAULT 'advertencia'::"text" NOT NULL,
+    "estado" "text" DEFAULT 'pendiente_aprobacion'::"text" NOT NULL,
+    "fuente" "text",
+    "aprobada_por" "uuid",
+    "aprobada_en" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "reglas_clinicas_accion_check" CHECK (("accion" = ANY (ARRAY['advertir'::"text", 'confirmar'::"text", 'documentar'::"text", 'bloquear_electivo'::"text", 'referir'::"text"]))),
+    CONSTRAINT "reglas_clinicas_aprobada_completa" CHECK ((("estado" <> 'aprobada'::"text") OR (("parametros" IS NOT NULL) AND ("aprobada_en" IS NOT NULL)))),
+    CONSTRAINT "reglas_clinicas_categoria_check" CHECK (("categoria" = ANY (ARRAY['signo_vital'::"text", 'condicion'::"text", 'medicamento'::"text", 'tratamiento'::"text"]))),
+    CONSTRAINT "reglas_clinicas_estado_check" CHECK (("estado" = ANY (ARRAY['pendiente_aprobacion'::"text", 'aprobada'::"text", 'retirada'::"text"]))),
+    CONSTRAINT "reglas_clinicas_severidad_check" CHECK (("severidad" = ANY (ARRAY['informativa'::"text", 'advertencia'::"text", 'critica'::"text", 'absoluta'::"text"]))),
+    CONSTRAINT "reglas_clinicas_tipo_check" CHECK (("tipo" = ANY (ARRAY['rango_imposible'::"text", 'relacion_imposible'::"text", 'valor_critico'::"text", 'combinacion_condicion_signo'::"text", 'requisito_dato'::"text"])))
 );
 
 
-ALTER TABLE "public"."records" OWNER TO "postgres";
+ALTER TABLE "public"."reglas_clinicas" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."reglas_clinicas" IS 'HFX-CLIN-003. Reglas del motor de alertas. Solo evalúan las aprobadas con parámetros; los umbrales clínicos requieren aprobación del dueño doctor.';
+
+
+
+COMMENT ON COLUMN "public"."reglas_clinicas"."parametros" IS 'Forma según tipo. valor_critico: {"codigo":"pulso","min":50,"max":110}. combinacion_condicion_signo: {"condicion":"embarazo","signos":[{"codigo":"presion_sistolica","max":140}]}. requisito_dato: {"codigo":"peso","exige_al_recetar":true}. Cualquier regla admite además "edad_min_anios" y "edad_max_anios" para limitarla a una franja etaria.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "tratamiento_id" "uuid" NOT NULL,
+    "tratamiento_padre_id" "uuid",
+    "es_continuo" boolean DEFAULT false,
+    "esta_terminado" boolean DEFAULT false,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "diente_id" "uuid",
+    "superficie" "public"."tipo_superficie",
+    "precio_aplicado" numeric(10,2),
+    "consulta_id" "uuid",
+    "notas" "text",
+    "estado" "text" DEFAULT 'aplicado'::"text" NOT NULL,
+    "item_plan_id" "uuid",
+    "doctor_ejecuta_id" "uuid",
+    "fecha_ejecucion" timestamp with time zone,
+    "justificacion_no_planificada" "text",
+    "cantidad_realizada" numeric(10,2) DEFAULT 1 NOT NULL,
+    CONSTRAINT "tratamientos_aplicados_cantidad_realizada_check" CHECK (("cantidad_realizada" > (0)::numeric)),
+    CONSTRAINT "tratamientos_aplicados_solo_ejecucion" CHECK ((("deleted_at" IS NOT NULL) OR ("estado" = ANY (ARRAY['aplicado'::"text", 'en_proceso'::"text", 'completado'::"text"]))))
+);
+
+
+ALTER TABLE "public"."tratamientos_aplicados" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico opcional para una ejecución sin item_plan_id.';
+
+
+
+CREATE OR REPLACE VIEW "public"."resumen_actividad_plan" AS
+ WITH "realizado" AS (
+         SELECT "ta"."item_plan_id",
+            "sum"("ta"."cantidad_realizada") AS "cantidad_realizada_total",
+            "sum"(("ta"."precio_aplicado" * "ta"."cantidad_realizada")) AS "monto_realizado"
+           FROM "public"."tratamientos_aplicados" "ta"
+          WHERE (("ta"."deleted_at" IS NULL) AND (COALESCE("ta"."estado", 'aplicado'::"text") <> 'indicado'::"text"))
+          GROUP BY "ta"."item_plan_id"
+        ), "facturado" AS (
+         SELECT "ta"."item_plan_id",
+            "sum"(("ic"."precio_unitario" * ("ic"."cantidad")::numeric)) AS "monto_facturado",
+            "array_agg"(DISTINCT "ic"."cuenta_id") AS "cuentas_involucradas"
+           FROM ("public"."items_cuenta" "ic"
+             JOIN "public"."tratamientos_aplicados" "ta" ON (("ta"."id" = "ic"."tratamiento_aplicado_id")))
+          WHERE (("ic"."deleted_at" IS NULL) AND ("ta"."deleted_at" IS NULL))
+          GROUP BY "ta"."item_plan_id"
+        ), "pagos_por_cuenta" AS (
+         SELECT "c"."id" AS "cuenta_id",
+            "c"."monto_total",
+            COALESCE("sum"("p_1"."monto"), (0)::numeric) AS "total_pagado_cuenta"
+           FROM ("public"."cuentas" "c"
+             LEFT JOIN "public"."pagos" "p_1" ON ((("p_1"."cuenta_id" = "c"."id") AND ("p_1"."deleted_at" IS NULL) AND ("p_1"."estado" = 'completado'::"public"."estado_pago"))))
+          WHERE ("c"."deleted_at" IS NULL)
+          GROUP BY "c"."id", "c"."monto_total"
+        ), "pagado" AS (
+         SELECT "ta"."item_plan_id",
+            "sum"(
+                CASE
+                    WHEN ("ppc"."monto_total" > (0)::numeric) THEN ((("ic"."precio_unitario" * ("ic"."cantidad")::numeric) / "ppc"."monto_total") * "ppc"."total_pagado_cuenta")
+                    ELSE (0)::numeric
+                END) AS "monto_pagado_prorrateado"
+           FROM (("public"."items_cuenta" "ic"
+             JOIN "public"."tratamientos_aplicados" "ta" ON (("ta"."id" = "ic"."tratamiento_aplicado_id")))
+             JOIN "pagos_por_cuenta" "ppc" ON (("ppc"."cuenta_id" = "ic"."cuenta_id")))
+          WHERE (("ic"."deleted_at" IS NULL) AND ("ta"."deleted_at" IS NULL))
+          GROUP BY "ta"."item_plan_id"
+        )
+ SELECT "ipt"."id" AS "item_plan_id",
+    "ipt"."plan_id",
+    "pt"."paciente_id",
+    "ipt"."tratamiento_id",
+    "t"."nombre" AS "tratamiento_nombre",
+    "ipt"."tipo_ejecucion",
+    "ipt"."sesiones_planificadas",
+    "ipt"."estado",
+    "ipt"."precio_estimado" AS "monto_presupuestado",
+    COALESCE("r"."cantidad_realizada_total", (0)::numeric) AS "cantidad_realizada",
+    COALESCE("r"."monto_realizado", (0)::numeric) AS "monto_realizado",
+    COALESCE("f"."monto_facturado", (0)::numeric) AS "monto_facturado",
+    COALESCE("p"."monto_pagado_prorrateado", (0)::numeric) AS "monto_pagado",
+    GREATEST(("ipt"."precio_estimado" - COALESCE("f"."monto_facturado", (0)::numeric)), (0)::numeric) AS "monto_pendiente"
+   FROM ((((("public"."items_plan_tratamiento" "ipt"
+     JOIN "public"."planes_tratamiento" "pt" ON (("pt"."id" = "ipt"."plan_id")))
+     LEFT JOIN "public"."tratamientos" "t" ON (("t"."id" = "ipt"."tratamiento_id")))
+     LEFT JOIN "realizado" "r" ON (("r"."item_plan_id" = "ipt"."id")))
+     LEFT JOIN "facturado" "f" ON (("f"."item_plan_id" = "ipt"."id")))
+     LEFT JOIN "pagado" "p" ON (("p"."item_plan_id" = "ipt"."id")))
+  WHERE ("ipt"."deleted_at" IS NULL);
+
+
+ALTER VIEW "public"."resumen_actividad_plan" OWNER TO "postgres";
 
 
 CREATE OR REPLACE VIEW "public"."resumen_actividades_cita" AS
@@ -3866,6 +7058,43 @@ ALTER VIEW "public"."resumen_actividades_cita" OWNER TO "postgres";
 
 
 COMMENT ON VIEW "public"."resumen_actividades_cita" IS 'SD-146. Resumen mínimo de las actividades planificadas de cada cita, legible por el asistente que agenda. No expone diagnóstico ni notas clínicas.';
+
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."secuencia_codigo_receta"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."secuencia_codigo_receta" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."signos_vitales_consulta" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "consulta_id" "uuid" NOT NULL,
+    "codigo" "text" NOT NULL,
+    "valor" numeric NOT NULL,
+    "unidad" "text" NOT NULL,
+    "medido_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "medido_por" "uuid",
+    "origen" "text" DEFAULT 'medido'::"text" NOT NULL,
+    "observacion" "text",
+    "estado_validacion" "text" DEFAULT 'valido'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "deleted_at" timestamp with time zone,
+    CONSTRAINT "signos_vitales_estado_check" CHECK (("estado_validacion" = ANY (ARRAY['valido'::"text", 'confirmado_por_doctor'::"text", 'descartado'::"text"]))),
+    CONSTRAINT "signos_vitales_origen_check" CHECK (("origen" = ANY (ARRAY['medido'::"text", 'referido'::"text", 'dispositivo'::"text"])))
+);
+
+
+ALTER TABLE "public"."signos_vitales_consulta" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."signos_vitales_consulta" IS 'HFX-CLIN-003. Una medición por fila: valor, unidad, momento, actor, origen y estado de validación.';
 
 
 
@@ -3908,36 +7137,6 @@ CREATE TABLE IF NOT EXISTS "public"."suplidores_contactos" (
 ALTER TABLE "public"."suplidores_contactos" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."tratamientos_aplicados" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "tratamiento_id" "uuid" NOT NULL,
-    "tratamiento_padre_id" "uuid",
-    "es_continuo" boolean DEFAULT false,
-    "esta_terminado" boolean DEFAULT false,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "deleted_at" timestamp with time zone,
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    "diente_id" "uuid",
-    "superficie" "public"."tipo_superficie",
-    "precio_aplicado" numeric(10,2),
-    "consulta_id" "uuid",
-    "notas" "text",
-    "estado" "text" DEFAULT 'aplicado'::"text" NOT NULL,
-    "item_plan_id" "uuid",
-    "doctor_ejecuta_id" "uuid",
-    "fecha_ejecucion" timestamp with time zone,
-    "justificacion_no_planificada" "text",
-    CONSTRAINT "tratamientos_aplicados_solo_ejecucion" CHECK ((("deleted_at" IS NOT NULL) OR ("estado" = ANY (ARRAY['aplicado'::"text", 'en_proceso'::"text", 'completado'::"text"]))))
-);
-
-
-ALTER TABLE "public"."tratamientos_aplicados" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."tratamientos_aplicados"."justificacion_no_planificada" IS 'Motivo clínico opcional para una ejecución sin item_plan_id.';
-
-
-
 CREATE TABLE IF NOT EXISTS "public"."usuarios" (
     "id" "uuid" NOT NULL,
     "username" "text" NOT NULL,
@@ -3956,8 +7155,21 @@ COMMENT ON COLUMN "public"."usuarios"."password_hash" IS 'Hash Bcrypt o Argon2 d
 
 
 
+ALTER TABLE ONLY "public"."auditoria_log" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."auditoria_log_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."doctor_paciente" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."doctor_paciente_id_seq"'::"regclass");
+
+
+
 ALTER TABLE ONLY "public"."admins"
     ADD CONSTRAINT "admin_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."alertas_clinicas"
+    ADD CONSTRAINT "alertas_clinicas_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3976,8 +7188,18 @@ ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
 
 
 
+ALTER TABLE ONLY "public"."auditoria_log"
+    ADD CONSTRAINT "auditoria_log_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."auditoria_operaciones_admin"
     ADD CONSTRAINT "auditoria_operaciones_admin_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_reglas_clinicas"
+    ADD CONSTRAINT "auditoria_reglas_clinicas_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3991,6 +7213,11 @@ ALTER TABLE ONLY "public"."cajas"
 
 
 
+ALTER TABLE ONLY "public"."catalogo_signos_vitales"
+    ADD CONSTRAINT "catalogo_signos_vitales_pkey" PRIMARY KEY ("codigo");
+
+
+
 ALTER TABLE ONLY "public"."citas_items_plan"
     ADD CONSTRAINT "citas_items_plan_pkey" PRIMARY KEY ("cita_id", "item_plan_id");
 
@@ -4001,8 +7228,22 @@ ALTER TABLE ONLY "public"."citas"
 
 
 
+ALTER TABLE ONLY "public"."citas"
+    ADD CONSTRAINT "citas_sin_solape" EXCLUDE USING "gist" ("doctor_id" WITH =, "tstzrange"("fecha_hora", "fin", '[)'::"text") WITH &&) WHERE ((("deleted_at" IS NULL) AND (COALESCE("es_emergencia", false) = false) AND ("estado" <> ALL (ARRAY['cancelada'::"public"."estado_cita", 'completada'::"public"."estado_cita", 'no_asistio'::"public"."estado_cita", 'no_asistida'::"public"."estado_cita"]))));
+
+
+
+COMMENT ON CONSTRAINT "citas_sin_solape" ON "public"."citas" IS 'HFX-CLIN-004. Un doctor no puede tener dos citas vivas cuyos intervalos se crucen. Las citas consecutivas no se cruzan: el rango es semiabierto. Las emergencias quedan fuera a propósito.';
+
+
+
 ALTER TABLE ONLY "public"."compras"
     ADD CONSTRAINT "compras_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."condiciones_consulta"
+    ADD CONSTRAINT "condiciones_consulta_pkey" PRIMARY KEY ("id");
 
 
 
@@ -4013,6 +7254,11 @@ ALTER TABLE ONLY "public"."condiciones"
 
 ALTER TABLE ONLY "public"."condiciones"
     ADD CONSTRAINT "condiciones_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."consentimientos_plan"
+    ADD CONSTRAINT "consentimientos_plan_pkey" PRIMARY KEY ("id");
 
 
 
@@ -4076,6 +7322,11 @@ ALTER TABLE ONLY "public"."doctor_asistentes"
 
 
 
+ALTER TABLE ONLY "public"."doctor_paciente"
+    ADD CONSTRAINT "doctor_paciente_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."doctores"
     ADD CONSTRAINT "doctores_pkey" PRIMARY KEY ("id");
 
@@ -4108,6 +7359,11 @@ ALTER TABLE ONLY "public"."items_cuenta"
 
 ALTER TABLE ONLY "public"."items_plan_tratamiento"
     ADD CONSTRAINT "items_plan_tratamiento_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."items_receta"
+    ADD CONSTRAINT "items_receta_pkey" PRIMARY KEY ("id");
 
 
 
@@ -4206,6 +7462,21 @@ ALTER TABLE ONLY "public"."records"
 
 
 
+ALTER TABLE ONLY "public"."reglas_clinicas"
+    ADD CONSTRAINT "reglas_clinicas_codigo_version_uk" UNIQUE ("codigo", "version");
+
+
+
+ALTER TABLE ONLY "public"."reglas_clinicas"
+    ADD CONSTRAINT "reglas_clinicas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."signos_vitales_consulta"
+    ADD CONSTRAINT "signos_vitales_consulta_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."superficies"
     ADD CONSTRAINT "superficies_pkey" PRIMARY KEY ("id");
 
@@ -4246,11 +7517,43 @@ ALTER TABLE ONLY "public"."usuarios"
 
 
 
+CREATE INDEX "alertas_clinicas_consulta_idx" ON "public"."alertas_clinicas" USING "btree" ("consulta_id", "created_at" DESC);
+
+
+
+CREATE UNIQUE INDEX "alertas_clinicas_vigente_uk" ON "public"."alertas_clinicas" USING "btree" ("consulta_id", "regla_codigo", "regla_version") WHERE ("estado" <> 'obsoleta'::"text");
+
+
+
+CREATE INDEX "auditoria_clinica_cita_idx" ON "public"."auditoria_clinica" USING "btree" ("cita_id", "created_at");
+
+
+
+CREATE INDEX "auditoria_clinica_consulta_cronologico_idx" ON "public"."auditoria_clinica" USING "btree" ("consulta_id", "created_at");
+
+
+
 CREATE INDEX "auditoria_clinica_consulta_idx" ON "public"."auditoria_clinica" USING "btree" ("consulta_id", "created_at" DESC);
 
 
 
+CREATE INDEX "auditoria_reglas_clinicas_codigo_idx" ON "public"."auditoria_reglas_clinicas" USING "btree" ("codigo", "created_at" DESC);
+
+
+
 CREATE UNIQUE INDEX "cajas_una_abierta_idx" ON "public"."cajas" USING "btree" ("cerrada") WHERE ("cerrada" = false);
+
+
+
+CREATE INDEX "condiciones_consulta_consulta_idx" ON "public"."condiciones_consulta" USING "btree" ("consulta_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE UNIQUE INDEX "condiciones_consulta_vigente_uk" ON "public"."condiciones_consulta" USING "btree" ("consulta_id", "condicion_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "consentimientos_plan_plan_idx" ON "public"."consentimientos_plan" USING "btree" ("plan_id", "fecha" DESC);
 
 
 
@@ -4275,6 +7578,18 @@ CREATE UNIQUE INDEX "cuentas_consulta_vigente_uk" ON "public"."cuentas" USING "b
 
 
 CREATE INDEX "idx_afliccion_record" ON "public"."record_condicion" USING "btree" ("record_id");
+
+
+
+CREATE INDEX "idx_auditoria_entidad" ON "public"."auditoria_log" USING "btree" ("entidad", "entidad_id");
+
+
+
+CREATE INDEX "idx_auditoria_fecha" ON "public"."auditoria_log" USING "btree" ("fecha");
+
+
+
+CREATE INDEX "idx_auditoria_usuario" ON "public"."auditoria_log" USING "btree" ("usuario_id");
 
 
 
@@ -4314,6 +7629,10 @@ CREATE INDEX "idx_diagnosticos_aplicados_evaluacion" ON "public"."diagnosticos_a
 
 
 
+CREATE INDEX "idx_doctor_paciente_activo" ON "public"."doctor_paciente" USING "btree" ("paciente_id", "doctor_id") WHERE ("activo" = true);
+
+
+
 CREATE INDEX "idx_documentos_consulta" ON "public"."documentos_clinicos" USING "btree" ("consulta_id");
 
 
@@ -4338,6 +7657,10 @@ CREATE INDEX "idx_items_plan_plan" ON "public"."items_plan_tratamiento" USING "b
 
 
 
+CREATE INDEX "idx_items_receta_receta_id" ON "public"."items_receta" USING "btree" ("receta_id");
+
+
+
 CREATE INDEX "idx_pagos_cuota_id" ON "public"."pagos" USING "btree" ("cuota_id") WHERE (("cuota_id" IS NOT NULL) AND ("deleted_at" IS NULL));
 
 
@@ -4354,7 +7677,15 @@ CREATE INDEX "idx_recetas_consulta" ON "public"."recetas" USING "btree" ("consul
 
 
 
+CREATE INDEX "idx_recetas_consulta_id" ON "public"."recetas" USING "btree" ("consulta_id");
+
+
+
 CREATE INDEX "idx_recetas_paciente" ON "public"."recetas" USING "btree" ("paciente_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE INDEX "idx_recetas_paciente_id" ON "public"."recetas" USING "btree" ("paciente_id");
 
 
 
@@ -4394,7 +7725,63 @@ CREATE UNIQUE INDEX "movimientos_stock_consumo_clinico_uk" ON "public"."movimien
 
 
 
+CREATE UNIQUE INDEX "personas_cedula_normalizada_uk" ON "public"."personas" USING "btree" ("public"."hfx_clin_004_normalizar_cedula"("cedula")) WHERE (("deleted_at" IS NULL) AND ("public"."hfx_clin_004_normalizar_cedula"("cedula") IS NOT NULL));
+
+
+
+CREATE INDEX "reglas_clinicas_vigentes_idx" ON "public"."reglas_clinicas" USING "btree" ("categoria", "estado") WHERE ("estado" = 'aprobada'::"text");
+
+
+
+CREATE INDEX "signos_vitales_consulta_idx" ON "public"."signos_vitales_consulta" USING "btree" ("consulta_id") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE UNIQUE INDEX "signos_vitales_consulta_vigente_uk" ON "public"."signos_vitales_consulta" USING "btree" ("consulta_id", "codigo") WHERE ("deleted_at" IS NULL);
+
+
+
+CREATE UNIQUE INDEX "uq_doctor_paciente_activo" ON "public"."doctor_paciente" USING "btree" ("doctor_id", "paciente_id") WHERE ("activo" = true);
+
+
+
 CREATE UNIQUE INDEX "uq_evaluaciones_clinicas_consulta" ON "public"."evaluaciones_clinicas" USING "btree" ("consulta_id") WHERE (("consulta_id" IS NOT NULL) AND ("deleted_at" IS NULL));
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_alerta" AFTER INSERT ON "public"."alertas_clinicas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_alerta"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_cita" AFTER INSERT OR UPDATE ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_cita"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_consentimiento" AFTER INSERT ON "public"."consentimientos_plan" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_consentimiento"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_consulta" AFTER UPDATE ON "public"."consultas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_consulta"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_correccion" AFTER INSERT ON "public"."auditoria_correcciones_clinicas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_correccion"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_diagnostico" AFTER INSERT OR UPDATE ON "public"."diagnosticos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_diagnostico"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_plan" AFTER INSERT OR UPDATE ON "public"."planes_tratamiento" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_plan"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_receta" AFTER INSERT OR UPDATE ON "public"."recetas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_receta"();
+
+
+
+CREATE OR REPLACE TRIGGER "hfx_clin_005_auditar_tratamiento" AFTER INSERT OR UPDATE ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_005_auditar_tratamiento"();
 
 
 
@@ -4462,6 +7849,62 @@ CREATE OR REPLACE TRIGGER "trg_aplicar_movimiento_stock" BEFORE INSERT ON "publi
 
 
 
+CREATE OR REPLACE TRIGGER "trg_auditoria_caja_diaria" AFTER INSERT OR DELETE OR UPDATE ON "public"."cajas_diarias" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_auditoria_cita" AFTER INSERT OR DELETE OR UPDATE ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_auditoria_compra" AFTER INSERT OR DELETE OR UPDATE ON "public"."compras" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_auditoria_consulta" AFTER INSERT OR DELETE OR UPDATE ON "public"."consultas" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_auditoria_cuenta" AFTER INSERT OR DELETE OR UPDATE ON "public"."cuentas" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_auditoria_pago" AFTER INSERT OR DELETE OR UPDATE ON "public"."pagos" FOR EACH ROW EXECUTE FUNCTION "public"."fn_auditoria_log"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_autoasignar_doctor_paciente" AFTER INSERT ON "public"."consultas" FOR EACH ROW EXECUTE FUNCTION "public"."fn_autoasignar_doctor_paciente"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_cascade_deleted_at_doctor" AFTER UPDATE OF "deleted_at" ON "public"."doctores" FOR EACH ROW EXECUTE FUNCTION "public"."fn_cascade_deleted_at_doctor"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_cascade_deleted_at_usuario" AFTER UPDATE OF "deleted_at" ON "public"."usuarios" FOR EACH ROW EXECUTE FUNCTION "public"."fn_cascade_deleted_at_usuario"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_citas_fin" BEFORE INSERT OR UPDATE OF "fecha_hora", "duracion_minutos" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_004_calcular_fin_cita"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_citas_transicion" BEFORE UPDATE OF "estado" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_004_validar_transicion_cita"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_coherencia_ejecucion" BEFORE INSERT OR UPDATE ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_003_coherencia_ejecucion"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_exigir_consentimiento_plan" BEFORE UPDATE OF "estado" ON "public"."planes_tratamiento" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_003_exigir_consentimiento"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_generar_codigo_receta" BEFORE INSERT ON "public"."recetas" FOR EACH ROW EXECUTE FUNCTION "public"."generar_codigo_receta"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_item_plan_ejecutable" BEFORE INSERT OR UPDATE OF "item_plan_id" ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."verificar_item_plan_ejecutable"();
 
 
@@ -4478,7 +7921,23 @@ CREATE OR REPLACE TRIGGER "trg_sync_disponibilidad_doctor" AFTER INSERT OR DELET
 
 
 
+CREATE OR REPLACE TRIGGER "trg_validar_alcance_diagnostico" BEFORE INSERT OR UPDATE OF "diagnosis_id", "diente_id", "superficie" ON "public"."diagnosticos_aplicados" FOR EACH ROW WHEN (("new"."deleted_at" IS NULL)) EXECUTE FUNCTION "public"."hfx_clin_003_validar_alcance"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_validar_alcance_tratamiento" BEFORE INSERT OR UPDATE OF "tratamiento_id", "diente_id", "superficie" ON "public"."tratamientos_aplicados" FOR EACH ROW WHEN (("new"."deleted_at" IS NULL)) EXECUTE FUNCTION "public"."hfx_clin_003_validar_alcance"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_validar_cita_item_plan" BEFORE INSERT OR UPDATE ON "public"."citas_items_plan" FOR EACH ROW EXECUTE FUNCTION "public"."validar_cita_item_plan"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_validar_signo_vital" BEFORE INSERT OR UPDATE ON "public"."signos_vitales_consulta" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_003_validar_signo_vital"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_versionar_plan" AFTER INSERT OR DELETE OR UPDATE ON "public"."items_plan_tratamiento" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_clin_003_versionar_plan"();
 
 
 
@@ -4495,13 +7954,28 @@ COMMENT ON CONSTRAINT "admins_id_doctores_fkey" ON "public"."admins" IS 'HFX-CLI
 
 
 
-ALTER TABLE ONLY "public"."admins"
-    ADD CONSTRAINT "admins_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."usuarios"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."alertas_clinicas"
+    ADD CONSTRAINT "alertas_clinicas_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."alertas_clinicas"
+    ADD CONSTRAINT "alertas_clinicas_regla_id_fkey" FOREIGN KEY ("regla_id") REFERENCES "public"."reglas_clinicas"("id");
+
+
+
+ALTER TABLE ONLY "public"."alertas_clinicas"
+    ADD CONSTRAINT "alertas_clinicas_resuelta_por_fkey" FOREIGN KEY ("resuelta_por") REFERENCES "public"."usuarios"("id");
 
 
 
 ALTER TABLE ONLY "public"."asistentes"
     ADD CONSTRAINT "asistentes_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."usuarios"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."auditoria_clinica"
+    ADD CONSTRAINT "auditoria_clinica_cita_id_fkey" FOREIGN KEY ("cita_id") REFERENCES "public"."citas"("id") ON DELETE CASCADE;
 
 
 
@@ -4525,8 +7999,23 @@ ALTER TABLE ONLY "public"."auditoria_correcciones_clinicas"
 
 
 
+ALTER TABLE ONLY "public"."auditoria_log"
+    ADD CONSTRAINT "auditoria_log_usuario_id_fkey" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."auditoria_operaciones_admin"
     ADD CONSTRAINT "auditoria_operaciones_admin_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "public"."admins"("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_reglas_clinicas"
+    ADD CONSTRAINT "auditoria_reglas_clinicas_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "public"."usuarios"("id");
+
+
+
+ALTER TABLE ONLY "public"."auditoria_reglas_clinicas"
+    ADD CONSTRAINT "auditoria_reglas_clinicas_regla_id_fkey" FOREIGN KEY ("regla_id") REFERENCES "public"."reglas_clinicas"("id");
 
 
 
@@ -4566,7 +8055,32 @@ ALTER TABLE ONLY "public"."citas_items_plan"
 
 
 ALTER TABLE ONLY "public"."citas"
-    ADD CONSTRAINT "citas_persona_id_fkey" FOREIGN KEY ("persona_id") REFERENCES "public"."personas"("id");
+    ADD CONSTRAINT "citas_persona_id_fkey" FOREIGN KEY ("persona_id") REFERENCES "public"."personas"("id") ON UPDATE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."condiciones_consulta"
+    ADD CONSTRAINT "condiciones_consulta_condicion_id_fkey" FOREIGN KEY ("condicion_id") REFERENCES "public"."condiciones"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."condiciones_consulta"
+    ADD CONSTRAINT "condiciones_consulta_confirmada_por_fkey" FOREIGN KEY ("confirmada_por") REFERENCES "public"."usuarios"("id");
+
+
+
+ALTER TABLE ONLY "public"."condiciones_consulta"
+    ADD CONSTRAINT "condiciones_consulta_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."consentimientos_plan"
+    ADD CONSTRAINT "consentimientos_plan_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "public"."planes_tratamiento"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."consentimientos_plan"
+    ADD CONSTRAINT "consentimientos_plan_registrado_por_fkey" FOREIGN KEY ("registrado_por") REFERENCES "public"."usuarios"("id");
 
 
 
@@ -4586,7 +8100,7 @@ ALTER TABLE ONLY "public"."consultas"
 
 
 ALTER TABLE ONLY "public"."consultas"
-    ADD CONSTRAINT "consultas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "consultas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -4646,7 +8160,7 @@ ALTER TABLE ONLY "public"."cuentas"
 
 
 ALTER TABLE ONLY "public"."cuentas"
-    ADD CONSTRAINT "cuentas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id");
+    ADD CONSTRAINT "cuentas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id") ON UPDATE CASCADE;
 
 
 
@@ -4695,6 +8209,21 @@ ALTER TABLE ONLY "public"."doctor_asistentes"
 
 
 
+ALTER TABLE ONLY "public"."doctor_paciente"
+    ADD CONSTRAINT "doctor_paciente_asignado_por_fkey" FOREIGN KEY ("asignado_por") REFERENCES "public"."usuarios"("id");
+
+
+
+ALTER TABLE ONLY "public"."doctor_paciente"
+    ADD CONSTRAINT "doctor_paciente_doctor_id_fkey" FOREIGN KEY ("doctor_id") REFERENCES "public"."doctores"("id");
+
+
+
+ALTER TABLE ONLY "public"."doctor_paciente"
+    ADD CONSTRAINT "doctor_paciente_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id");
+
+
+
 ALTER TABLE ONLY "public"."doctores"
     ADD CONSTRAINT "doctores_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."usuarios"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
@@ -4706,7 +8235,7 @@ ALTER TABLE ONLY "public"."documentos_clinicos"
 
 
 ALTER TABLE ONLY "public"."documentos_clinicos"
-    ADD CONSTRAINT "documentos_clinicos_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "documentos_clinicos_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -4736,7 +8265,7 @@ ALTER TABLE ONLY "public"."evaluaciones_clinicas"
 
 
 ALTER TABLE ONLY "public"."evaluaciones_clinicas"
-    ADD CONSTRAINT "evaluaciones_clinicas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE RESTRICT;
+    ADD CONSTRAINT "evaluaciones_clinicas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON UPDATE CASCADE ON DELETE RESTRICT;
 
 
 
@@ -4752,6 +8281,11 @@ ALTER TABLE ONLY "public"."contraindicaciones"
 
 ALTER TABLE ONLY "public"."items_cuenta"
     ADD CONSTRAINT "item_cuentas_cuenta_id_fkey" FOREIGN KEY ("cuenta_id") REFERENCES "public"."cuentas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."items_cuenta"
+    ADD CONSTRAINT "items_cuenta_tratamiento_aplicado_id_fkey" FOREIGN KEY ("tratamiento_aplicado_id") REFERENCES "public"."tratamientos_aplicados"("id") ON DELETE SET NULL;
 
 
 
@@ -4777,6 +8311,11 @@ ALTER TABLE ONLY "public"."items_plan_tratamiento"
 
 ALTER TABLE ONLY "public"."items_plan_tratamiento"
     ADD CONSTRAINT "items_plan_tratamiento_tratamiento_id_fkey" FOREIGN KEY ("tratamiento_id") REFERENCES "public"."tratamientos"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."items_receta"
+    ADD CONSTRAINT "items_receta_receta_id_fkey" FOREIGN KEY ("receta_id") REFERENCES "public"."recetas"("id") ON DELETE CASCADE;
 
 
 
@@ -4856,7 +8395,7 @@ ALTER TABLE ONLY "public"."planes_tratamiento"
 
 
 ALTER TABLE ONLY "public"."planes_tratamiento"
-    ADD CONSTRAINT "planes_tratamiento_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE RESTRICT;
+    ADD CONSTRAINT "planes_tratamiento_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON UPDATE CASCADE ON DELETE RESTRICT;
 
 
 
@@ -4876,7 +8415,7 @@ ALTER TABLE ONLY "public"."recetas"
 
 
 ALTER TABLE ONLY "public"."recetas"
-    ADD CONSTRAINT "recetas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id");
+    ADD CONSTRAINT "recetas_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."personas"("id") ON UPDATE CASCADE;
 
 
 
@@ -4896,7 +8435,27 @@ ALTER TABLE ONLY "public"."record_condicion"
 
 
 ALTER TABLE ONLY "public"."records"
-    ADD CONSTRAINT "records_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "records_paciente_id_fkey" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."reglas_clinicas"
+    ADD CONSTRAINT "reglas_clinicas_aprobada_por_fkey" FOREIGN KEY ("aprobada_por") REFERENCES "public"."usuarios"("id");
+
+
+
+ALTER TABLE ONLY "public"."signos_vitales_consulta"
+    ADD CONSTRAINT "signos_vitales_consulta_codigo_fkey" FOREIGN KEY ("codigo") REFERENCES "public"."catalogo_signos_vitales"("codigo");
+
+
+
+ALTER TABLE ONLY "public"."signos_vitales_consulta"
+    ADD CONSTRAINT "signos_vitales_consulta_consulta_id_fkey" FOREIGN KEY ("consulta_id") REFERENCES "public"."consultas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."signos_vitales_consulta"
+    ADD CONSTRAINT "signos_vitales_consulta_medido_por_fkey" FOREIGN KEY ("medido_por") REFERENCES "public"."usuarios"("id");
 
 
 
@@ -4974,6 +8533,13 @@ CREATE POLICY "admins_update" ON "public"."admins" FOR UPDATE TO "authenticated"
 
 
 
+ALTER TABLE "public"."alertas_clinicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "alertas_clinicas_select" ON "public"."alertas_clinicas" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
+
+
+
 ALTER TABLE "public"."asistentes" ENABLE ROW LEVEL SECURITY;
 
 
@@ -4996,7 +8562,9 @@ CREATE POLICY "asistentes_update" ON "public"."asistentes" FOR UPDATE TO "authen
 ALTER TABLE "public"."auditoria_clinica" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "auditoria_clinica_select" ON "public"."auditoria_clinica" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
+CREATE POLICY "auditoria_clinica_select" ON "public"."auditoria_clinica" FOR SELECT TO "authenticated" USING (((("consulta_id" IS NOT NULL) AND "public"."puede_ver_consulta"("consulta_id")) OR (("cita_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM "public"."citas" "c"
+  WHERE (("c"."id" = "auditoria_clinica"."cita_id") AND ("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("c"."doctor_id" = "auth"."uid"())))))))));
 
 
 
@@ -5007,6 +8575,9 @@ CREATE POLICY "auditoria_correcciones_select_admin" ON "public"."auditoria_corre
 
 
 
+ALTER TABLE "public"."auditoria_log" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."auditoria_operaciones_admin" ENABLE ROW LEVEL SECURITY;
 
 
@@ -5014,7 +8585,10 @@ CREATE POLICY "auditoria_operaciones_select_admin" ON "public"."auditoria_operac
 
 
 
-CREATE POLICY "authenticated_adjust_stock_consumible" ON "public"."movimientos_stock_consumible" FOR INSERT TO "authenticated" WITH CHECK (true);
+ALTER TABLE "public"."auditoria_reglas_clinicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "auditoria_reglas_clinicas_select" ON "public"."auditoria_reglas_clinicas" FOR SELECT TO "authenticated" USING ("public"."es_doctor"());
 
 
 
@@ -5065,6 +8639,13 @@ CREATE POLICY "cajas_diarias_select" ON "public"."cajas_diarias" FOR SELECT TO "
 
 
 CREATE POLICY "cajas_diarias_update" ON "public"."cajas_diarias" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
+
+
+
+ALTER TABLE "public"."catalogo_signos_vitales" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "catalogo_signos_vitales_select" ON "public"."catalogo_signos_vitales" FOR SELECT TO "authenticated" USING (true);
 
 
 
@@ -5126,6 +8707,13 @@ CREATE POLICY "compras_update" ON "public"."compras" FOR UPDATE TO "authenticate
 ALTER TABLE "public"."condiciones" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."condiciones_consulta" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "condiciones_consulta_select" ON "public"."condiciones_consulta" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
+
+
+
 CREATE POLICY "condiciones_delete" ON "public"."condiciones" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
 
 
@@ -5139,6 +8727,13 @@ CREATE POLICY "condiciones_select" ON "public"."condiciones" FOR SELECT TO "auth
 
 
 CREATE POLICY "condiciones_update" ON "public"."condiciones" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+ALTER TABLE "public"."consentimientos_plan" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "consentimientos_plan_select" ON "public"."consentimientos_plan" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
 
 
 
@@ -5191,7 +8786,7 @@ CREATE POLICY "consumibles_select" ON "public"."consumibles" FOR SELECT TO "auth
 
 
 
-CREATE POLICY "consumibles_update" ON "public"."consumibles" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
+CREATE POLICY "consumibles_update" ON "public"."consumibles" FOR UPDATE USING (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR "public"."es_doctor"()));
 
 
 
@@ -5244,7 +8839,7 @@ CREATE POLICY "cuenta_create" ON "public"."cuentas" FOR INSERT WITH CHECK (("pub
 
 
 
-CREATE POLICY "cuenta_select" ON "public"."cuentas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "cuenta_select" ON "public"."cuentas" FOR SELECT USING (((("paciente_id" IS NOT NULL) AND "public"."puede_ver_paciente"("paciente_id")) OR "public"."puede_ver_consulta"("consulta_id")));
 
 
 
@@ -5266,7 +8861,7 @@ CREATE POLICY "cuotas_insert" ON "public"."cuotas" FOR INSERT TO "authenticated"
 
 
 
-CREATE POLICY "cuotas_select" ON "public"."cuotas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "cuotas_select" ON "public"."cuotas" FOR SELECT USING ("public"."puede_ver_cuenta"("cuenta_id"));
 
 
 
@@ -5323,7 +8918,7 @@ CREATE POLICY "dientes_insert" ON "public"."dientes" FOR INSERT TO "authenticate
 
 
 
-CREATE POLICY "dientes_select" ON "public"."dientes" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "dientes_select" ON "public"."dientes" FOR SELECT USING ("public"."puede_ver_odontograma"("odontograma_id"));
 
 
 
@@ -5347,6 +8942,25 @@ CREATE POLICY "doctor_asistentes_select" ON "public"."doctor_asistentes" FOR SEL
 
 
 CREATE POLICY "doctor_asistentes_update" ON "public"."doctor_asistentes" FOR UPDATE TO "authenticated" USING ("public"."es_admin"()) WITH CHECK ("public"."es_admin"());
+
+
+
+ALTER TABLE "public"."doctor_paciente" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "doctor_paciente_delete" ON "public"."doctor_paciente" FOR DELETE USING ("public"."es_admin"());
+
+
+
+CREATE POLICY "doctor_paciente_insert" ON "public"."doctor_paciente" FOR INSERT WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
+
+
+
+CREATE POLICY "doctor_paciente_select" ON "public"."doctor_paciente" FOR SELECT USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("doctor_id" = "auth"."uid"())));
+
+
+
+CREATE POLICY "doctor_paciente_update" ON "public"."doctor_paciente" FOR UPDATE USING (("public"."es_admin"() OR "public"."es_asistente"())) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"()));
 
 
 
@@ -5437,7 +9051,7 @@ CREATE POLICY "evaluaciones_clinicas_insert" ON "public"."evaluaciones_clinicas"
 
 
 
-CREATE POLICY "evaluaciones_clinicas_select" ON "public"."evaluaciones_clinicas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "evaluaciones_clinicas_select" ON "public"."evaluaciones_clinicas" FOR SELECT USING ("public"."puede_ver_paciente"("paciente_id"));
 
 
 
@@ -5456,7 +9070,7 @@ CREATE POLICY "items_cuenta_insert" ON "public"."items_cuenta" FOR INSERT TO "au
 
 
 
-CREATE POLICY "items_cuenta_select" ON "public"."items_cuenta" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "items_cuenta_select" ON "public"."items_cuenta" FOR SELECT USING ("public"."puede_ver_cuenta"("cuenta_id"));
 
 
 
@@ -5475,12 +9089,15 @@ CREATE POLICY "items_plan_tratamiento_insert" ON "public"."items_plan_tratamient
 
 
 
-CREATE POLICY "items_plan_tratamiento_select" ON "public"."items_plan_tratamiento" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "items_plan_tratamiento_select" ON "public"."items_plan_tratamiento" FOR SELECT USING ("public"."puede_ver_plan"("plan_id"));
 
 
 
 CREATE POLICY "items_plan_tratamiento_update" ON "public"."items_plan_tratamiento" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
 
+
+
+ALTER TABLE "public"."items_receta" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."medicinas" ENABLE ROW LEVEL SECURITY;
@@ -5512,7 +9129,7 @@ CREATE POLICY "odontograma_insert" ON "public"."odontogramas" FOR INSERT TO "aut
 
 
 
-CREATE POLICY "odontograma_select" ON "public"."odontogramas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "odontograma_select" ON "public"."odontogramas" FOR SELECT USING ("public"."puede_ver_consulta"("consulta_id"));
 
 
 
@@ -5553,7 +9170,7 @@ CREATE POLICY "pacientes_insert" ON "public"."pacientes" FOR INSERT TO "authenti
 
 
 
-CREATE POLICY "pacientes_select" ON "public"."pacientes" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "pacientes_select" ON "public"."pacientes" FOR SELECT USING ("public"."puede_ver_paciente"("id"));
 
 
 
@@ -5569,7 +9186,7 @@ CREATE POLICY "pago_insert" ON "public"."pagos" FOR INSERT TO "authenticated" WI
 
 
 
-CREATE POLICY "pago_select" ON "public"."pagos" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "pago_select" ON "public"."pagos" FOR SELECT USING ("public"."puede_ver_cuenta"("cuenta_id"));
 
 
 
@@ -5607,7 +9224,9 @@ CREATE POLICY "persona_insert" ON "public"."personas" FOR INSERT TO "authenticat
 
 
 
-CREATE POLICY "persona_select" ON "public"."personas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()));
+CREATE POLICY "persona_select" ON "public"."personas" FOR SELECT USING ((("public"."es_admin"() OR "public"."es_doctor"() OR "public"."es_asistente"()) AND ((NOT (EXISTS ( SELECT 1
+   FROM "public"."pacientes" "p"
+  WHERE ("p"."id" = "personas"."id")))) OR "public"."puede_ver_paciente"("id"))));
 
 
 
@@ -5629,7 +9248,7 @@ CREATE POLICY "planes_tratamiento_insert" ON "public"."planes_tratamiento" FOR I
 
 
 
-CREATE POLICY "planes_tratamiento_select" ON "public"."planes_tratamiento" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "planes_tratamiento_select" ON "public"."planes_tratamiento" FOR SELECT USING ("public"."puede_ver_paciente"("paciente_id"));
 
 
 
@@ -5686,7 +9305,9 @@ CREATE POLICY "record_condicion_insert" ON "public"."record_condicion" FOR INSER
 
 
 
-CREATE POLICY "record_condicion_select" ON "public"."record_condicion" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "record_condicion_select" ON "public"."record_condicion" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."records" "r"
+  WHERE (("r"."id" = "record_condicion"."record_id") AND "public"."puede_ver_paciente"("r"."paciente_id")))));
 
 
 
@@ -5702,7 +9323,7 @@ CREATE POLICY "record_insert" ON "public"."records" FOR INSERT TO "authenticated
 
 
 
-CREATE POLICY "record_select" ON "public"."records" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "record_select" ON "public"."records" FOR SELECT USING ("public"."puede_ver_paciente"("paciente_id"));
 
 
 
@@ -5711,6 +9332,20 @@ CREATE POLICY "record_update" ON "public"."records" FOR UPDATE TO "authenticated
 
 
 ALTER TABLE "public"."records" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."reglas_clinicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "reglas_clinicas_select" ON "public"."reglas_clinicas" FOR SELECT TO "authenticated" USING (true);
+
+
+
+ALTER TABLE "public"."signos_vitales_consulta" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "signos_vitales_consulta_select" ON "public"."signos_vitales_consulta" FOR SELECT TO "authenticated" USING ("public"."puede_ver_consulta"("consulta_id"));
+
 
 
 ALTER TABLE "public"."superficies" ENABLE ROW LEVEL SECURITY;
@@ -5724,7 +9359,7 @@ CREATE POLICY "superficies_insert" ON "public"."superficies" FOR INSERT TO "auth
 
 
 
-CREATE POLICY "superficies_select" ON "public"."superficies" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "superficies_select" ON "public"."superficies" FOR SELECT USING ("public"."puede_ver_diente"("diente_id"));
 
 
 
@@ -5846,39 +9481,87 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey16_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey16_out"("public"."gbtreekey16") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_out"("public"."gbtreekey16") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_out"("public"."gbtreekey16") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey16_out"("public"."gbtreekey16") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey2_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey2_out"("public"."gbtreekey2") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_out"("public"."gbtreekey2") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_out"("public"."gbtreekey2") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey2_out"("public"."gbtreekey2") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey32_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey32_out"("public"."gbtreekey32") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_out"("public"."gbtreekey32") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_out"("public"."gbtreekey32") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey32_out"("public"."gbtreekey32") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey4_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey4_out"("public"."gbtreekey4") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_out"("public"."gbtreekey4") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_out"("public"."gbtreekey4") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey4_out"("public"."gbtreekey4") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey8_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey8_out"("public"."gbtreekey8") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_out"("public"."gbtreekey8") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_out"("public"."gbtreekey8") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey8_out"("public"."gbtreekey8") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_in"("cstring") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_in"("cstring") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_in"("cstring") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_in"("cstring") TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_out"("public"."gbtreekey_var") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_out"("public"."gbtreekey_var") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_out"("public"."gbtreekey_var") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbtreekey_var_out"("public"."gbtreekey_var") TO "service_role";
 
 
 
@@ -5999,6 +9682,48 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+REVOKE ALL ON FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."actualizar_paciente"("p_paciente_id" "uuid", "p_version" integer, "p_payload" "jsonb") TO "authenticated";
 
 
 
@@ -6020,6 +9745,13 @@ GRANT ALL ON FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() TO 
 
 REVOKE ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."cancelar_citas_paciente_inactivo"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."cash_dist"("money", "money") TO "postgres";
+GRANT ALL ON FUNCTION "public"."cash_dist"("money", "money") TO "anon";
+GRANT ALL ON FUNCTION "public"."cash_dist"("money", "money") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."cash_dist"("money", "money") TO "service_role";
 
 
 
@@ -6047,6 +9779,19 @@ GRANT ALL ON FUNCTION "public"."crear_consulta_completa"("p_paciente_id" "uuid",
 
 
 
+GRANT ALL ON FUNCTION "public"."date_dist"("date", "date") TO "postgres";
+GRANT ALL ON FUNCTION "public"."date_dist"("date", "date") TO "anon";
+GRANT ALL ON FUNCTION "public"."date_dist"("date", "date") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."date_dist"("date", "date") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."debe_ocultar_contacto_paciente"("p_persona_id" "uuid") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."es_admin"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."es_admin"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."es_admin"() TO "authenticated";
@@ -6070,14 +9815,1206 @@ GRANT ALL ON FUNCTION "public"."es_doctor"() TO "authenticated";
 
 
 
+REVOKE ALL ON FUNCTION "public"."es_doctor_no_admin"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."es_doctor_no_admin"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."finalizar_consulta"("p_consulta_id" "uuid", "p_metodo_pago" "text", "p_nota" "text") TO "authenticated";
 
 
 
+GRANT ALL ON FUNCTION "public"."float4_dist"(real, real) TO "postgres";
+GRANT ALL ON FUNCTION "public"."float4_dist"(real, real) TO "anon";
+GRANT ALL ON FUNCTION "public"."float4_dist"(real, real) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."float4_dist"(real, real) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."float8_dist"(double precision, double precision) TO "postgres";
+GRANT ALL ON FUNCTION "public"."float8_dist"(double precision, double precision) TO "anon";
+GRANT ALL ON FUNCTION "public"."float8_dist"(double precision, double precision) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."float8_dist"(double precision, double precision) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."fn_aplicar_movimiento_stock"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."fn_auditoria_log"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."fn_auditoria_log"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."fn_autoasignar_doctor_paciente"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."fn_autoasignar_doctor_paciente"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."fn_cascade_deleted_at_doctor"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."fn_cascade_deleted_at_doctor"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."fn_cascade_deleted_at_usuario"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."fn_cascade_deleted_at_usuario"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_consistent"("internal", bit, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bit_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bit_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bit_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bit_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_consistent"("internal", boolean, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_same"("public"."gbtreekey2", "public"."gbtreekey2", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_same"("public"."gbtreekey2", "public"."gbtreekey2", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_same"("public"."gbtreekey2", "public"."gbtreekey2", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_same"("public"."gbtreekey2", "public"."gbtreekey2", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bool_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bool_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bool_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bool_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bpchar_consistent"("internal", character, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_consistent"("internal", "bytea", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_bytea_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_bytea_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_consistent"("internal", "money", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_distance"("internal", "money", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_cash_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_cash_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_cash_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_cash_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_consistent"("internal", "date", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_distance"("internal", "date", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_date_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_date_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_date_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_date_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_decompress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_decompress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_decompress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_decompress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_consistent"("internal", "anyenum", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_enum_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_enum_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_enum_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_enum_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_consistent"("internal", real, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_distance"("internal", real, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float4_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float4_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float4_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float4_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_consistent"("internal", double precision, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_distance"("internal", double precision, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_float8_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_float8_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_float8_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_float8_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_consistent"("internal", "inet", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_inet_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_inet_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_inet_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_inet_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_consistent"("internal", smallint, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_distance"("internal", smallint, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_same"("public"."gbtreekey4", "public"."gbtreekey4", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_same"("public"."gbtreekey4", "public"."gbtreekey4", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_same"("public"."gbtreekey4", "public"."gbtreekey4", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_same"("public"."gbtreekey4", "public"."gbtreekey4", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int2_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int2_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int2_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int2_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_consistent"("internal", integer, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_distance"("internal", integer, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int4_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int4_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int4_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int4_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_consistent"("internal", bigint, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_distance"("internal", bigint, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_int8_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_int8_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_int8_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_int8_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_consistent"("internal", interval, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_decompress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_decompress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_decompress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_decompress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_distance"("internal", interval, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_intv_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_intv_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_intv_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_intv_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_consistent"("internal", "macaddr8", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad8_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad8_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_consistent"("internal", "macaddr", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_macad_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_macad_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_macad_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_macad_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_consistent"("internal", numeric, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_numeric_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_numeric_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_consistent"("internal", "oid", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_distance"("internal", "oid", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_same"("public"."gbtreekey8", "public"."gbtreekey8", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_oid_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_oid_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_oid_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_oid_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_consistent"("internal", "text", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_same"("public"."gbtreekey_var", "public"."gbtreekey_var", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_text_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_text_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_text_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_text_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_consistent"("internal", time without time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_distance"("internal", time without time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_time_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_time_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_time_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_time_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_timetz_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_timetz_consistent"("internal", time with time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_consistent"("internal", timestamp without time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_distance"("internal", timestamp without time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_same"("public"."gbtreekey16", "public"."gbtreekey16", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_ts_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_ts_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_ts_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_ts_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_tstz_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_consistent"("internal", timestamp with time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_tstz_distance"("internal", timestamp with time zone, smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_compress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_compress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_compress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_compress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_consistent"("internal", "uuid", smallint, "oid", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_fetch"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_penalty"("internal", "internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_penalty"("internal", "internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_penalty"("internal", "internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_penalty"("internal", "internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_picksplit"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_picksplit"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_picksplit"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_picksplit"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_same"("public"."gbtreekey32", "public"."gbtreekey32", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_uuid_union"("internal", "internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_union"("internal", "internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_union"("internal", "internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_uuid_union"("internal", "internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_var_decompress"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_var_decompress"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_var_decompress"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_var_decompress"("internal") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."gbt_var_fetch"("internal") TO "postgres";
+GRANT ALL ON FUNCTION "public"."gbt_var_fetch"("internal") TO "anon";
+GRANT ALL ON FUNCTION "public"."gbt_var_fetch"("internal") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."gbt_var_fetch"("internal") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."generar_codigo_receta"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."generar_codigo_receta"() TO "service_role";
 
 
 
@@ -6164,8 +11101,207 @@ GRANT ALL ON FUNCTION "public"."hfx_clin_002_resultado_cierre"("p_consulta_id" "
 
 
 
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_aplicar_extras"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_aplicar_extras"("p_consulta_id" "uuid", "p_actor_id" "uuid", "p_payload" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_barreras_de_cierre"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_barreras_de_cierre"("p_consulta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_coherencia_ejecucion"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_coherencia_ejecucion"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_conflictos_receta"("p_consulta_id" "uuid", "p_items" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_conflictos_receta"("p_consulta_id" "uuid", "p_items" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_edad_paciente"("p_paciente_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_edad_paciente"("p_paciente_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_evaluar_alertas"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_evaluar_alertas"("p_consulta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_exigir_consentimiento"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_exigir_consentimiento"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_incorporar_condiciones"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_incorporar_condiciones"("p_consulta_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_regla_aplica_edad"("p_parametros" "jsonb", "p_edad" numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_regla_aplica_edad"("p_parametros" "jsonb", "p_edad" numeric) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_validar_alcance"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_validar_alcance"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_validar_receta"("p_consulta_id" "uuid", "p_items" "jsonb", "p_estricto" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_validar_receta"("p_consulta_id" "uuid", "p_items" "jsonb", "p_estricto" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_validar_signo_vital"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_validar_signo_vital"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_003_versionar_plan"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_003_versionar_plan"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_calcular_fin_cita"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_estado_cita_canonico"("p_estado" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_estado_cita_canonico"("p_estado" "text") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_cedula"("p_cedula" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_cedula"("p_cedula" "text") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_email"("p_email" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_email"("p_email" "text") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_telefono"("p_telefono" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_normalizar_telefono"("p_telefono" "text") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_sincronizar_contactos"("p_persona_id" "uuid", "p_contactos" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_004_validar_transicion_cita"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_alerta"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_cita"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_consentimiento"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_consulta"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_correccion"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_diagnostico"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_plan"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_receta"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_auditar_tratamiento"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_005_registrar_evento"("p_evento" "text", "p_consulta_id" "uuid", "p_cita_id" "uuid", "p_metadata" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_005_registrar_evento"("p_evento" "text", "p_consulta_id" "uuid", "p_cita_id" "uuid", "p_metadata" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_006_validar_parametros_regla"("p_tipo" "text", "p_parametros" "jsonb") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_006_validar_signos_de_regla"("p_tipo" "text", "p_parametros" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_clin_008_completar_odontograma"("p_odontograma_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_clin_008_completar_odontograma"("p_odontograma_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_008_denticion_fdi"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "service_role";
+GRANT ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."int2_dist"(smallint, smallint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."int2_dist"(smallint, smallint) TO "anon";
+GRANT ALL ON FUNCTION "public"."int2_dist"(smallint, smallint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."int2_dist"(smallint, smallint) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."int4_dist"(integer, integer) TO "postgres";
+GRANT ALL ON FUNCTION "public"."int4_dist"(integer, integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."int4_dist"(integer, integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."int4_dist"(integer, integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."int8_dist"(bigint, bigint) TO "postgres";
+GRANT ALL ON FUNCTION "public"."int8_dist"(bigint, bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."int8_dist"(bigint, bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."int8_dist"(bigint, bigint) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."interval_dist"(interval, interval) TO "postgres";
+GRANT ALL ON FUNCTION "public"."interval_dist"(interval, interval) TO "anon";
+GRANT ALL ON FUNCTION "public"."interval_dist"(interval, interval) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."interval_dist"(interval, interval) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."limpiar_diagnosticos_superficie"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."linea_tiempo_consulta"("p_consulta_id" "uuid") TO "authenticated";
 
 
 
@@ -6185,9 +11321,22 @@ GRANT ALL ON FUNCTION "public"."marcar_item_plan_ejecutado"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."oid_dist"("oid", "oid") TO "postgres";
+GRANT ALL ON FUNCTION "public"."oid_dist"("oid", "oid") TO "anon";
+GRANT ALL ON FUNCTION "public"."oid_dist"("oid", "oid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."oid_dist"("oid", "oid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."perfil_actual"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") TO "authenticated";
 
 
 
@@ -6203,6 +11352,48 @@ GRANT ALL ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") TO "
 
 
 
+REVOKE ALL ON FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_cuenta"("p_cuenta_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_diente"("p_diente_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_evaluacion"("p_evaluacion_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_evaluacion"("p_evaluacion_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_evaluacion"("p_evaluacion_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_odontograma"("p_odontograma_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_paciente"("p_paciente_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_plan"("p_plan_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_plan"("p_plan_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_plan"("p_plan_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_ver_receta"("p_receta_id" "uuid") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."realinear_consulta_al_reprogramar_cita"() TO "service_role";
 
@@ -6214,9 +11405,33 @@ GRANT ALL ON FUNCTION "public"."recibir_compra"("p_compra_id" "uuid", "p_usuario
 
 
 
+REVOKE ALL ON FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_motivo" "text", "p_duracion_minutos" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_motivo" "text", "p_duracion_minutos" integer) TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_cita_emergencia"("p_paciente_id" "uuid", "p_doctor_id" "uuid", "p_motivo" "text", "p_duracion_minutos" integer) TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."registrar_consentimiento_plan"("p_plan_id" "uuid", "p_decision" "text", "p_persona" "text", "p_metodo" "text", "p_relacion" "text", "p_motivo" "text", "p_items" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."registrar_consentimiento_plan"("p_plan_id" "uuid", "p_decision" "text", "p_persona" "text", "p_metodo" "text", "p_relacion" "text", "p_motivo" "text", "p_items" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_consentimiento_plan"("p_plan_id" "uuid", "p_decision" "text", "p_persona" "text", "p_metodo" "text", "p_relacion" "text", "p_motivo" "text", "p_items" "jsonb") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_llegada_cita"("p_cita_id" "uuid") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."registrar_mantenimiento_equipo"("p_equipo_id" "uuid", "p_suplidor_id" "uuid", "p_costo" numeric, "p_fecha_mantenimiento" timestamp with time zone, "p_descripcion" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") TO "service_role";
+GRANT ALL ON FUNCTION "public"."registrar_paciente"("p_payload" "jsonb") TO "authenticated";
 
 
 
@@ -6231,8 +11446,47 @@ GRANT ALL ON FUNCTION "public"."registrar_pago_en_caja"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."reglas_clinicas_vigentes"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reglas_clinicas_vigentes"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."reglas_clinicas_vigentes"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."resolver_alerta_clinica"("p_alerta_id" "uuid", "p_estado" "text", "p_justificacion" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."resolver_alerta_clinica"("p_alerta_id" "uuid", "p_estado" "text", "p_justificacion" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."resolver_alerta_clinica"("p_alerta_id" "uuid", "p_estado" "text", "p_justificacion" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."retirar_regla_clinica"("p_codigo" "text", "p_motivo" "text") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."sync_disponibilidad_doctor"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."time_dist"(time without time zone, time without time zone) TO "postgres";
+GRANT ALL ON FUNCTION "public"."time_dist"(time without time zone, time without time zone) TO "anon";
+GRANT ALL ON FUNCTION "public"."time_dist"(time without time zone, time without time zone) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."time_dist"(time without time zone, time without time zone) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "postgres";
+GRANT ALL ON FUNCTION "public"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "anon";
+GRANT ALL ON FUNCTION "public"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."ts_dist"(timestamp without time zone, timestamp without time zone) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "postgres";
+GRANT ALL ON FUNCTION "public"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "anon";
+GRANT ALL ON FUNCTION "public"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."tstz_dist"(timestamp with time zone, timestamp with time zone) TO "service_role";
 
 
 
@@ -6253,11 +11507,6 @@ GRANT ALL ON FUNCTION "public"."validar_caja_abierta"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."validar_cita_item_plan"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."validar_cita_item_plan"() TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."validar_disponibilidad_doctor_simple"() TO "service_role";
 
 
 
@@ -6331,23 +11580,42 @@ GRANT ALL ON TABLE "public"."admins" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."alertas_clinicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."alertas_clinicas" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."asistentes" TO "authenticated";
 GRANT ALL ON TABLE "public"."asistentes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."auditoria_clinica" TO "authenticated";
+GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."auditoria_clinica" TO "authenticated";
 GRANT ALL ON TABLE "public"."auditoria_clinica" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."auditoria_correcciones_clinicas" TO "authenticated";
+GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."auditoria_correcciones_clinicas" TO "authenticated";
 GRANT ALL ON TABLE "public"."auditoria_correcciones_clinicas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."auditoria_operaciones_admin" TO "authenticated";
+GRANT ALL ON TABLE "public"."auditoria_log" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."auditoria_log_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."auditoria_log_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."auditoria_operaciones_admin" TO "authenticated";
 GRANT ALL ON TABLE "public"."auditoria_operaciones_admin" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."auditoria_reglas_clinicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."auditoria_reglas_clinicas" TO "service_role";
 
 
 
@@ -6358,6 +11626,11 @@ GRANT ALL ON TABLE "public"."cajas" TO "service_role";
 
 GRANT ALL ON TABLE "public"."cajas_diarias" TO "authenticated";
 GRANT ALL ON TABLE "public"."cajas_diarias" TO "service_role";
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,MAINTAIN ON TABLE "public"."catalogo_signos_vitales" TO "authenticated";
+GRANT ALL ON TABLE "public"."catalogo_signos_vitales" TO "service_role";
 
 
 
@@ -6381,8 +11654,65 @@ GRANT ALL ON TABLE "public"."condiciones" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consultas" TO "authenticated";
+GRANT ALL ON TABLE "public"."condiciones_consulta" TO "authenticated";
+GRANT ALL ON TABLE "public"."condiciones_consulta" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."consultas" TO "authenticated";
 GRANT ALL ON TABLE "public"."consultas" TO "service_role";
+
+
+
+GRANT UPDATE("fecha") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("motivo_consulta") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("temp_condiciones") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("deleted_at") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("updated_at") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("notas") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("signos_vitales") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT UPDATE("tipo_atencion") ON TABLE "public"."consultas" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."record_condicion" TO "authenticated";
+GRANT ALL ON TABLE "public"."record_condicion" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."records" TO "authenticated";
+GRANT ALL ON TABLE "public"."records" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."condiciones_activas_paciente" TO "authenticated";
+GRANT ALL ON TABLE "public"."condiciones_activas_paciente" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."consentimientos_plan" TO "authenticated";
+GRANT ALL ON TABLE "public"."consentimientos_plan" TO "service_role";
 
 
 
@@ -6391,8 +11721,40 @@ GRANT ALL ON TABLE "public"."consulta_resumen" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumibles" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."consumibles" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumibles" TO "service_role";
+
+
+
+GRANT UPDATE("nombre") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("descripcion") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("stock_minimo") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("deleted_at") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("updated_at") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("precio") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("suplidor_id") ON TABLE "public"."consumibles" TO "authenticated";
+
+
+
+GRANT UPDATE("activo") ON TABLE "public"."consumibles" TO "authenticated";
 
 
 
@@ -6436,8 +11798,33 @@ GRANT ALL ON TABLE "public"."diagnosticos_aplicados" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."pacientes" TO "authenticated";
+GRANT ALL ON TABLE "public"."pacientes" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."personas" TO "authenticated";
+GRANT ALL ON TABLE "public"."personas" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."directorio_pacientes" TO "authenticated";
+GRANT ALL ON TABLE "public"."directorio_pacientes" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "authenticated";
 GRANT ALL ON TABLE "public"."doctor_asistentes" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."doctor_paciente" TO "authenticated";
+GRANT ALL ON TABLE "public"."doctor_paciente" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."doctor_paciente_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."doctor_paciente_id_seq" TO "service_role";
 
 
 
@@ -6471,6 +11858,10 @@ GRANT ALL ON TABLE "public"."items_cuenta" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."items_receta" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."medicinas" TO "authenticated";
 GRANT ALL ON TABLE "public"."medicinas" TO "service_role";
 
@@ -6481,7 +11872,7 @@ GRANT ALL ON TABLE "public"."movimientos_caja" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."movimientos_stock_consumible" TO "authenticated";
+GRANT SELECT,TRIGGER,MAINTAIN ON TABLE "public"."movimientos_stock_consumible" TO "authenticated";
 GRANT ALL ON TABLE "public"."movimientos_stock_consumible" TO "service_role";
 
 
@@ -6496,11 +11887,6 @@ GRANT ALL ON TABLE "public"."ordenes_medicas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."pacientes" TO "authenticated";
-GRANT ALL ON TABLE "public"."pacientes" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."pagos" TO "authenticated";
 GRANT ALL ON TABLE "public"."pagos" TO "service_role";
 
@@ -6508,11 +11894,6 @@ GRANT ALL ON TABLE "public"."pagos" TO "service_role";
 
 GRANT ALL ON TABLE "public"."persona_contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."persona_contactos" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."personas" TO "authenticated";
-GRANT ALL ON TABLE "public"."personas" TO "service_role";
 
 
 
@@ -6526,18 +11907,33 @@ GRANT ALL ON TABLE "public"."recetas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."record_condicion" TO "authenticated";
-GRANT ALL ON TABLE "public"."record_condicion" TO "service_role";
+GRANT ALL ON TABLE "public"."reglas_clinicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."reglas_clinicas" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."records" TO "authenticated";
-GRANT ALL ON TABLE "public"."records" TO "service_role";
+GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "authenticated";
+GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."resumen_actividad_plan" TO "authenticated";
+GRANT ALL ON TABLE "public"."resumen_actividad_plan" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "authenticated";
 GRANT ALL ON TABLE "public"."resumen_actividades_cita" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."secuencia_codigo_receta" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."secuencia_codigo_receta" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."signos_vitales_consulta" TO "authenticated";
+GRANT ALL ON TABLE "public"."signos_vitales_consulta" TO "service_role";
 
 
 
@@ -6553,11 +11949,6 @@ GRANT ALL ON TABLE "public"."suplidores" TO "service_role";
 
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "authenticated";
 GRANT ALL ON TABLE "public"."suplidores_contactos" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "authenticated";
-GRANT ALL ON TABLE "public"."tratamientos_aplicados" TO "service_role";
 
 
 

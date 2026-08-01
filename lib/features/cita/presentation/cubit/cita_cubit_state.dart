@@ -33,6 +33,18 @@ class CitaCubitLoaded extends CitaCubitState {
   /// el caso del asistente al que nadie ha asignado un odontólogo.
   final bool sinDoctoresAsignados;
 
+  /// Doctor por el que el usuario está filtrando ahora mismo, o `null` para
+  /// «todos los que puedo ver».
+  ///
+  /// Es distinto del techo de seguridad (`doctorIdsPermitidos`, que decide qué
+  /// citas llegan siquiera): esto es una preferencia de vista. Antes no
+  /// existía, así que el admin veía la agenda de toda la clínica sin poder
+  /// quedarse con la suya (defecto D15).
+  final String? doctorIdFiltro;
+
+  /// Doctores presentes en el alcance del usuario, para poblar el selector.
+  final List<Cita> _todas;
+
   const CitaCubitLoaded({
     required this.citas,
     required this.focusedDay,
@@ -42,7 +54,29 @@ class CitaCubitLoaded extends CitaCubitState {
     this.errorMessage,
     this.consultasPorCitaId = const {},
     this.sinDoctoresAsignados = false,
-  });
+    this.doctorIdFiltro,
+    List<Cita>? todas,
+  }) : _todas = todas ?? citas;
+
+  /// Todas las citas del alcance, sin el filtro de doctor aplicado.
+  List<Cita> get citasSinFiltrar => _todas;
+
+  /// Los odontólogos que aparecen en el alcance, ordenados por nombre. Sale de
+  /// las propias citas para no pedir el catálogo entero de doctores sólo para
+  /// pintar un selector.
+  List<({String id, String nombre})> get doctoresDelAlcance {
+    final porId = <String, String>{};
+    for (final cita in _todas) {
+      final id = cita.doctor.id;
+      if (id == null) continue;
+      porId[id] = 'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}';
+    }
+    final lista = porId.entries
+        .map((e) => (id: e.key, nombre: e.value))
+        .toList();
+    lista.sort((a, b) => a.nombre.compareTo(b.nombre));
+    return lista;
+  }
 
   ConsultaDeCita? consultaDe(Cita cita) =>
       cita.id == null ? null : consultasPorCitaId[cita.id];
@@ -68,6 +102,8 @@ class CitaCubitLoaded extends CitaCubitState {
     String? Function()? errorMessage,
     Map<String, ConsultaDeCita>? consultasPorCitaId,
     bool? sinDoctoresAsignados,
+    String? Function()? doctorIdFiltro,
+    List<Cita>? todas,
   }) {
     return CitaCubitLoaded(
       citas: citas ?? this.citas,
@@ -79,6 +115,10 @@ class CitaCubitLoaded extends CitaCubitState {
       consultasPorCitaId: consultasPorCitaId ?? this.consultasPorCitaId,
       sinDoctoresAsignados:
           sinDoctoresAsignados ?? this.sinDoctoresAsignados,
+      doctorIdFiltro: doctorIdFiltro != null
+          ? doctorIdFiltro()
+          : this.doctorIdFiltro,
+      todas: todas ?? _todas,
     );
   }
 
@@ -92,6 +132,8 @@ class CitaCubitLoaded extends CitaCubitState {
     errorMessage,
     consultasPorCitaId,
     sinDoctoresAsignados,
+    doctorIdFiltro,
+    _todas,
   ];
 }
 

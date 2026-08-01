@@ -23,12 +23,25 @@ class ExpedientePage extends StatefulWidget {
   final List<Consulta> consultasConOdontograma;
   final HistorialPiezas? historialPiezas;
 
+  /// Con o sin odontograma, tal como se eligió en el modal.
+  ///
+  /// El modal ofrecía la elección y **no la pasaba**: `_opcionSeleccionada`
+  /// no llegaba nunca aquí y la pantalla arrancaba siempre en «con
+  /// odontograma». La opción era decorativa (defecto D17 de la jornada de QA
+  /// del 1 ago 2026).
+  final TipoFormatoExpediente formatoInicial;
+
+  /// Periodo que cubre el expediente. `null` = todo el historial.
+  final DateTimeRange? rango;
+
   const ExpedientePage({
     super.key,
     required this.paciente,
     this.odontogramaActual,
     this.consultasConOdontograma = const [],
     this.historialPiezas,
+    this.formatoInicial = TipoFormatoExpediente.conOdontograma,
+    this.rango,
   });
 
   static Future<void> navegar(
@@ -37,6 +50,8 @@ class ExpedientePage extends StatefulWidget {
     Odontograma? odontogramaActual,
     List<Consulta> consultasConOdontograma = const [],
     HistorialPiezas? historialPiezas,
+    TipoFormatoExpediente formatoInicial = TipoFormatoExpediente.conOdontograma,
+    DateTimeRange? rango,
   }) {
     return Navigator.push(
       context,
@@ -46,6 +61,8 @@ class ExpedientePage extends StatefulWidget {
           odontogramaActual: odontogramaActual,
           consultasConOdontograma: consultasConOdontograma,
           historialPiezas: historialPiezas,
+          formatoInicial: formatoInicial,
+          rango: rango,
         ),
       ),
     );
@@ -57,8 +74,34 @@ class ExpedientePage extends StatefulWidget {
 
 class _ExpedientePageState extends State<ExpedientePage> {
   bool _procesando = false;
-  TipoFormatoExpediente _formatoSeleccionado =
-      TipoFormatoExpediente.conOdontograma;
+  late TipoFormatoExpediente _formatoSeleccionado = widget.formatoInicial;
+
+  /// El paciente con su historial recortado al periodo elegido.
+  ///
+  /// Se recorta aquí y no dentro del constructor del PDF porque el corpus de
+  /// consultas ya venía decidido desde el detalle del paciente: filtrar en un
+  /// solo sitio evita que la portada diga un periodo y el contenido otro.
+  Paciente get _pacienteDelPeriodo {
+    final rango = widget.rango;
+    if (rango == null) return widget.paciente;
+
+    final desde = DateTime(rango.start.year, rango.start.month, rango.start.day);
+    // Inclusivo: quien elige «hasta el 31» espera que el 31 entre.
+    final hasta = DateTime(
+      rango.end.year,
+      rango.end.month,
+      rango.end.day,
+    ).add(const Duration(days: 1));
+
+    final record = widget.paciente.record;
+    return widget.paciente.copyWith(
+      record: record.copyWith(
+        consultas: record.consultas
+            .where((c) => !c.fecha.isBefore(desde) && c.fecha.isBefore(hasta))
+            .toList(),
+      ),
+    );
+  }
 
   // La precarga del logo vivía aquí y no se pasaba a ninguna parte:
   // `ExpedientePdfBuilder` ya lo carga solo cuando no se le entrega uno, así
@@ -102,7 +145,7 @@ class _ExpedientePageState extends State<ExpedientePage> {
     await Printing.layoutPdf(
       name: _nombreArchivo,
       onLayout: (_) => ExpedientePdfBuilder.buildPdf(
-        paciente: widget.paciente,
+        paciente: _pacienteDelPeriodo,
         options: ExpedientePrintOptions(
           incluirOdontograma: _formatoSeleccionado.incluirOdontograma,
         ),
@@ -121,7 +164,7 @@ class _ExpedientePageState extends State<ExpedientePage> {
   Future<void> _guardarPdf() => _ejecutar(() async {
     final historial = _obtenerHistorialOdontogramas();
     final bytes = await ExpedientePdfBuilder.buildPdf(
-      paciente: widget.paciente,
+      paciente: _pacienteDelPeriodo,
       options: ExpedientePrintOptions(
         incluirOdontograma: _formatoSeleccionado.incluirOdontograma,
       ),

@@ -51,7 +51,9 @@ class CitaCubit extends Cubit<CitaCubitState> {
       final now = DateTime.now();
       emit(
         CitaCubitLoaded(
-          citas: citasFiltradas,
+          citas: _aplicarFiltroDeVista(citasFiltradas),
+          todas: citasFiltradas,
+          doctorIdFiltro: _doctorIdFiltro,
           focusedDay: now,
           selectedDay: now,
           viewMode: CalendarioViewMode.mensual,
@@ -99,6 +101,29 @@ class CitaCubit extends Cubit<CitaCubitState> {
     final permitidos = _doctorIdsPermitidos;
     if (permitidos == null) return citas;
     return citas.where((c) => permitidos.contains(c.doctor.id)).toList();
+  }
+
+  /// Preferencia de vista, no techo de seguridad: sólo recorta lo que ya se
+  /// tenía derecho a ver. Los dos filtros son distintos a propósito (D15).
+  String? _doctorIdFiltro;
+
+  List<Cita> _aplicarFiltroDeVista(List<Cita> citas) {
+    final filtro = _doctorIdFiltro;
+    if (filtro == null) return citas;
+    return citas.where((c) => c.doctor.id == filtro).toList();
+  }
+
+  /// `null` para volver a «todos los odontólogos».
+  void filtrarPorDoctor(String? doctorId) {
+    _doctorIdFiltro = doctorId;
+    final actual = state;
+    if (actual is! CitaCubitLoaded) return;
+    emit(
+      actual.copyWith(
+        citas: _aplicarFiltroDeVista(actual.citasSinFiltrar),
+        doctorIdFiltro: () => doctorId,
+      ),
+    );
   }
 
   /// Aviso temprano de solapamiento, para no hacer ir al servidor a por un «no».

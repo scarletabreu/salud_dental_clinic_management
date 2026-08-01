@@ -516,6 +516,13 @@ class _ControlBar extends StatelessWidget {
                 ),
             ],
           ),
+          // Con más de un odontólogo en el alcance, poder quedarse con uno.
+          // El admin veía la agenda de toda la clínica sin forma de filtrar
+          // por «solo los míos» (defecto D15).
+          if (state.doctoresDelAlcance.length > 1) ...[
+            const SizedBox(height: 10),
+            _FiltroDoctores(state: state),
+          ],
         ],
       ),
     );
@@ -1949,6 +1956,46 @@ class _EstadoEtiqueta extends StatelessWidget {
           color: statusColor,
         ),
       ),
+    );
+  }
+}
+
+/// Chips para quedarse con la agenda de un odontólogo.
+///
+/// Recorta la **vista**, no el alcance: sólo ofrece los odontólogos que el rol
+/// ya puede ver, así que no es una vía para asomarse a agendas ajenas.
+class _FiltroDoctores extends StatelessWidget {
+  const _FiltroDoctores({required this.state});
+
+  final CitaCubitLoaded state;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final cubit = context.read<CitaCubit>();
+    final propioId = context.watch<AuthCubit>().state.usuario?.id;
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        ChoiceChip(
+          key: const Key('filtro_doctor_todos'),
+          label: const Text('Todos'),
+          selected: state.doctorIdFiltro == null,
+          onSelected: (_) => cubit.filtrarPorDoctor(null),
+        ),
+        for (final doctor in state.doctoresDelAlcance)
+          ChoiceChip(
+            key: Key('filtro_doctor_${doctor.id}'),
+            label: Text(
+              doctor.id == propioId ? 'Solo los míos' : doctor.nombre,
+              style: TextStyle(fontSize: 12, color: ac.textSecondary),
+            ),
+            selected: state.doctorIdFiltro == doctor.id,
+            onSelected: (_) => cubit.filtrarPorDoctor(doctor.id),
+          ),
+      ],
     );
   }
 }

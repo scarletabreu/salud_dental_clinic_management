@@ -23,11 +23,29 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
 
   @override
   Future<List<PersonaModel>> searchPersonas(String query) async {
-    if (query.trim().isEmpty) return [];
+    final termino = query.trim();
+    if (termino.isEmpty) return [];
+
+    // El campo prometía «Nombre, apellido o cédula» y sólo buscaba por los dos
+    // primeros: al agendar, escribir la cédula no encontraba a nadie (defecto
+    // D16 de la jornada de QA del 1 ago 2026).
+    //
+    // La cédula dominicana se escribe con guiones o sin ellos —`001-1391820-5`
+    // y `00113918205` son la misma— y en la base conviven ambas formas, así
+    // que se busca por las dos.
+    final soloDigitos = termino.replaceAll(RegExp(r'[^0-9]'), '');
+    final condiciones = <String>[
+      'nombre.ilike.%${_escaparPatron(termino)}%',
+      'apellido.ilike.%${_escaparPatron(termino)}%',
+      'cedula.ilike.%${_escaparPatron(termino)}%',
+      if (soloDigitos.isNotEmpty && soloDigitos != termino)
+        'cedula.ilike.%$soloDigitos%',
+    ];
+
     final response = await supabase
         .from('personas')
         .select('*, persona_contacto:persona_contactos(*, contactos(*))')
-        .or('nombre.ilike.%$query%,apellido.ilike.%$query%')
+        .or(condiciones.join(','))
         .eq('estatus', 'activo')
         .filter('deleted_at', 'is', null)
         .limit(10);
@@ -36,6 +54,19 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
         .map((json) => PersonaModel.fromJson(json as Map<String, dynamic>))
         .toList();
   }
+
+  /// Neutraliza lo que PostgREST interpreta dentro de un `or(...)`.
+  ///
+  /// Una coma parte la lista de condiciones y un paréntesis la cierra: un
+  /// nombre con `(` convertía la búsqueda en una petición malformada. `%` y `_`
+  /// son comodines de `ilike` y buscarlos literalmente es lo que espera quien
+  /// los escribe.
+  static String _escaparPatron(String termino) => termino
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_')
+      .replaceAll(',', ' ')
+      .replaceAll('(', ' ')
+      .replaceAll(')', ' ');
 
   @override
   Future<PersonaModel> fetchPersonaById(String id) async {

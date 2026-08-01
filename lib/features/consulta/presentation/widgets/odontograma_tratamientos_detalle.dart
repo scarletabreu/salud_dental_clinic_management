@@ -49,6 +49,17 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             // Odontodiagrama» en blanco (defecto D6c). Lo que describe la boca
             // es la proyección de los tres ejes.
             evaluacion: odontograma.evaluacionProyectada,
+            // La proyección solo conserva las siete claves del papel; las
+            // piezas traen además lo que el catálogo no supo clasificar, que
+            // es la mayor parte de lo que se ejecuta.
+            dientes: {
+              for (final diente in odontograma.dientes) diente.fdiCode: diente,
+            },
+            // Lo de arcada o cuadrante no cuelga de ninguna pieza: si la hoja
+            // no lo nombrara, una consulta de sola limpieza se imprimiría en
+            // blanco y parecería que no se registró nada. Sale del cubit y no
+            // de `consulta`, porque la del listado nunca trae los generales.
+            generales: listo?.generales ?? const [],
             nombrePaciente: nombrePaciente,
             fecha: consulta.fecha,
           ),

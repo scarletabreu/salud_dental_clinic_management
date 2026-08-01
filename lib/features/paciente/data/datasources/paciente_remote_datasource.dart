@@ -13,10 +13,6 @@ class PacienteRemoteDatasource {
 
   PacienteRemoteDatasource(this.client);
 
-  static const _selectPaciente =
-      '*, personas(nombre, apellido, fecha_nacimiento, cedula, estatus, '
-      'persona_contacto:persona_contactos(contactos(*)))';
-
   Future<String> uploadFotoPaciente({
     required String pacienteId,
     required Uint8List bytes,
@@ -37,15 +33,91 @@ class PacienteRemoteDatasource {
     return path;
   }
 
+  /// Nombres para listados, desde la vista de directorio (HFX-QA-100).
+  ///
+  /// `directorio_pacientes` sólo expone id, nombre y apellido y la lee todo el
+  /// personal clínico, así que resuelve el nombre incluso de un paciente cuya
+  /// ficha completa el rol no puede abrir.
+  Future<Map<String, String>> getNombresPacientes(List<String> ids) async {
+    if (ids.isEmpty) return {};
+
+    final res = await client
+        .from('directorio_pacientes')
+        .select('id, nombre, apellido')
+        .inFilter('id', ids);
+
+    return {
+      for (final fila in (res as List).whereType<Map<String, dynamic>>())
+        if (fila['id'] is String)
+          fila['id'] as String: [fila['nombre'], fila['apellido']]
+              .whereType<String>()
+              .join(' ')
+              .trim(),
+    };
+  }
+
+  /// El listado se arma con **consultas planas**, no con el embed anidado.
+  ///
+  /// `pacientes → personas → persona_contactos → contactos` depende de que
+  /// PostgREST infiera bien tres saltos de relación, y en producción no lo
+  /// hacía: el error salía nombrando `pacientes_seguro`, una vista creada a
+  /// mano que volvía ambigua la inferencia (defecto D3). `_fetchPacienteModel`
+  /// ya evitaba el embed a propósito para la ficha individual; aquí se aplica
+  /// el mismo patrón al listado, resolviendo cada nivel por su clave.
+  ///
+  /// El coste son tres viajes en vez de uno, todos por índice de clave
+  /// primaria o foránea.
   Future<List<PacienteModel>> getPacientes() async {
     final pacientesRes = await client
         .from('pacientes')
-        .select(_selectPaciente)
+        .select('*')
         .filter('deleted_at', 'is', null);
 
-    final lista = (pacientesRes as List)
-        .map((json) => PacienteModel.fromJson(json as Map<String, dynamic>))
+    final pacientes = (pacientesRes as List)
+        .whereType<Map<String, dynamic>>()
+        .map(Map<String, dynamic>.from)
         .toList();
+    if (pacientes.isEmpty) return [];
+
+    final ids = pacientes.map((p) => p['id'] as String).toList();
+
+    final personasRes = await client
+        .from('personas')
+        .select('*')
+        .inFilter('id', ids);
+    final personasPorId = {
+      for (final fila in (personasRes as List).whereType<Map<String, dynamic>>())
+        fila['id'] as String: Map<String, dynamic>.from(fila),
+    };
+
+    // Un solo salto de relación (`persona_contactos → contactos`), que es el
+    // que PostgREST sí resuelve sin ambigüedad.
+    final relacionesRes = await client
+        .from('persona_contactos')
+        .select('persona_id, contactos(*)')
+        .inFilter('persona_id', ids);
+    final relacionesPorPersona = <String, List<dynamic>>{};
+    for (final fila in (relacionesRes as List).whereType<Map<String, dynamic>>()) {
+      final personaId = fila['persona_id'] as String?;
+      if (personaId == null) continue;
+      relacionesPorPersona.putIfAbsent(personaId, () => []).add(fila);
+    }
+
+    final lista = <PacienteModel>[];
+    for (final paciente in pacientes) {
+      final id = paciente['id'] as String;
+      final persona = personasPorId[id];
+      // Sin persona no hay ficha que mostrar: la fila está incompleta en la
+      // base o el rol no puede leerla. Se omite en vez de romper el listado.
+      if (persona == null) continue;
+
+      final relaciones = relacionesPorPersona[id];
+      if (relaciones != null && relaciones.isNotEmpty) {
+        persona['persona_contacto'] = relaciones;
+      }
+      paciente['personas'] = persona;
+      lista.add(PacienteModel.fromJson(paciente));
+    }
 
     lista.sort((a, b) => a.nombre.compareTo(b.nombre));
     return lista;
@@ -200,23 +272,25 @@ class PacienteRemoteDatasource {
     }
 
     final now = DateTime.now().toIso8601String();
-    final creado = await client
-        .from('pacientes')
-        .insert({
-          'id': normalizedId,
-          'genero': Genero.otro.name,
-          'tipo_paciente': TipoPaciente.integrado.name,
-          'trabajo': '',
-          'referencia': '',
-          'created_at': now,
-          'updated_at': now,
-        })
-        .select(_selectPaciente)
-        .single();
+    await client.from('pacientes').insert({
+      'id': normalizedId,
+      'genero': Genero.otro.name,
+      'tipo_paciente': TipoPaciente.integrado.name,
+      'trabajo': '',
+      'referencia': '',
+      'created_at': now,
+      'updated_at': now,
+    });
 
-    final creadoModel = PacienteModel.fromJson(
-      Map<String, dynamic>.from(creado),
-    );
+    // Se relee por el camino plano en vez de con un `select` anidado sobre el
+    // propio insert: es el mismo motivo que en `getPacientes` (defecto D3).
+    final creadoModel = await _fetchPacienteModel(normalizedId);
+    if (creadoModel == null) {
+      throw StateError(
+        'La ficha del paciente se creó pero no se pudo releer. '
+        'Vuelve a abrirla desde el listado.',
+      );
+    }
     final record = await _loadOrCreateRecord(creadoModel.id!);
     return creadoModel.copyWithModel(record: record);
   }

@@ -62,6 +62,15 @@ Failure mapExceptionToFailure(Object error, {String? context}) {
       case 'CL019':
         return ConflictoVersionFailure(error.message);
     }
+    // RLS o una guardia de RPC dijeron que no. No es un fallo del servidor: es
+    // la respuesta correcta para ese rol, y su mensaje ya viene redactado.
+    if (error.code == '42501') {
+      return PermisoDenegadoFailure(
+        error.message.isEmpty
+            ? 'Tu rol no tiene permiso para realizar esta operación.'
+            : error.message,
+      );
+    }
     // El solapamiento lo rechaza una restricción de exclusión, y su mensaje
     // crudo nombra un índice de PostgreSQL. Quien agenda necesita saber qué
     // hacer, no cómo se llama la restricción.

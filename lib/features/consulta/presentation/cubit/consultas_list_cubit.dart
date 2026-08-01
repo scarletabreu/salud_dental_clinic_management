@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/usecases/eliminar_consulta_usecase.dart';
-import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
@@ -43,13 +42,15 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
       final consultas = restringidoADoctorId != null
           ? await _consultaRepository.getConsultasByDoctor(restringidoADoctorId)
           : await _consultaRepository.getConsultas();
-      final pacientes = await _cargarPacientes();
       final doctores = await _cargarDoctores();
 
-      final pacienteNombres = <String, String>{
-        for (final p in pacientes)
-          if (p.id != null) p.id!: p.fullName,
-      };
+      // Los nombres salen del directorio, no del listado de pacientes: con el
+      // modelo de permisos de producción un doctor ve consultas de pacientes
+      // cuya ficha no puede abrir, y antes esas filas caían al `Paciente
+      // #uuid` (defecto D4). Un fallo aquí **se propaga**: antes se tragaba
+      // con un `fold((_) => [])` y el usuario veía uuids sin saber por qué.
+      final ids = consultas.map((c) => c.pacienteId).toSet().toList();
+      final pacienteNombres = await _cargarNombresPacientes(ids);
       final doctorNombres = <String, String>{
         for (final d in doctores)
           if (d.id != null) d.id!: d.fullName,
@@ -153,9 +154,9 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
     }
   }
 
-  Future<List<Paciente>> _cargarPacientes() async {
-    final result = await _pacienteRepository.getPacientes();
-    return result.fold((_) => <Paciente>[], (list) => list);
+  Future<Map<String, String>> _cargarNombresPacientes(List<String> ids) async {
+    final result = await _pacienteRepository.getNombresPacientes(ids);
+    return result.fold((failure) => throw failure, (nombres) => nombres);
   }
 
   Future<List<Doctor>> _cargarDoctores() async {

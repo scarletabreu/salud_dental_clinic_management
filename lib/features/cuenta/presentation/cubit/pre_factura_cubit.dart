@@ -114,6 +114,11 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
         metodo: metodo,
         cuota: cuota,
       );
+      // Consolidar el estado «vencida» es una escritura contable y va aquí, en
+      // el flujo de cobro, no en la lectura del detalle: quien cobra tiene
+      // capacidad de caja por definición. Si no la tuviera, el repositorio lo
+      // ignora en silencio y el cobro sigue siendo válido.
+      await _cuotaRepository.marcarCuotasVencidas(actual.cuenta.id!);
       await cargar(actual.cuenta.id!);
       return null;
     } on Failure catch (e) {

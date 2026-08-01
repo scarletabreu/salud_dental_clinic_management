@@ -110,10 +110,16 @@ class _FakePagoRepository implements PagoRepository {
 
 class _FakeCuotaRepository implements CuotaRepository {
   final List<Cuota> cuotas;
+  final marcadas = <String>[];
   _FakeCuotaRepository({this.cuotas = const []});
 
   @override
   Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async => cuotas;
+
+  @override
+  Future<void> marcarCuotasVencidas(String cuentaId) async {
+    marcadas.add(cuentaId);
+  }
 
   @override
   Future<void> generarPlanDePagos(List<Cuota> cuotas) async {}

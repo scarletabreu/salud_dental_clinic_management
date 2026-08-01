@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/listado_perfiles.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/repositories/usuario_repository.dart';
@@ -22,8 +23,16 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
   static const _selectPerfilCompleto =
       '*, usuarios($_columnasUsuario, personas(*, persona_contactos(*, contactos(*))))';
 
+  // La pista de restricción no es opcional. Desde HFX-CLIN-001 existe
+  // `auditoria_correcciones_clinicas`, con FK a `doctores` y a `admins`:
+  // PostgREST la infiere como tabla puente y aparece un segundo camino
+  // `admins ↔ doctores`, así que un `doctores(...)` a secas responde «more
+  // than one relationship was found» (defecto D2). Nombrando la restricción se
+  // elige el camino directo. La clave del JSON sigue siendo `doctores`, de modo
+  // que `AdminModel.fromJson` no cambia.
   static const _selectPerfilAdmin =
-      '*, doctores(*, usuarios($_columnasUsuario, personas(*, persona_contactos(*, contactos(*)))))';
+      '*, doctores!admins_id_doctores_fkey('
+      '*, usuarios($_columnasUsuario, personas(*, persona_contactos(*, contactos(*)))))';
 
   @override
   String? getCurrentUserId() {
@@ -115,52 +124,132 @@ class UsuarioRepositoryImpl implements UsuarioRepository {
     return null;
   }
 
+  /// Las tres lecturas van por separado y **cada fila se deserializa aparte**.
+  ///
+  /// Antes las tres compartían un solo `runGuarded` y un solo `map`: bastaba
+  /// que fallara una lectura, o que una sola fila viniera incompleta, para que
+  /// la pantalla entera quedara en error y no se pudiera administrar a nadie
+  /// (defecto D2). Ahora lo que falla se convierte en un aviso y el resto del
+  /// personal se sigue listando.
   @override
-  Future<List<Usuario>> getUsuarios() {
-    return runGuarded(() async {
-      final List<Usuario> usuariosConsolidados = [];
+  Future<ListadoPerfiles> getUsuarios() async {
+    final perfiles = <Usuario>[];
+    final avisos = <AvisoPerfil>[];
 
-      final List<dynamic>? listDoctores = await remoteDataSource
-          .getPerfilesPorTabla(
-            tabla: 'doctores',
-            selectColumns: _selectPerfilCompleto,
-          );
-      if (listDoctores != null) {
-        usuariosConsolidados.addAll(
-          listDoctores.map(
-            (json) => DoctorModel.fromJson(json as Map<String, dynamic>),
+    await _cargarRol<DoctorModel>(
+      tabla: 'doctores',
+      rol: RolUsuario.doctor,
+      selectColumns: _selectPerfilCompleto,
+      desdeJson: DoctorModel.fromJson,
+      perfiles: perfiles,
+      avisos: avisos,
+    );
+
+    await _cargarRol<AdminModel>(
+      tabla: 'admins',
+      rol: RolUsuario.admin,
+      selectColumns: _selectPerfilAdmin,
+      desdeJson: AdminModel.fromJson,
+      perfiles: perfiles,
+      avisos: avisos,
+    );
+
+    await _cargarRol<AsistenteModel>(
+      tabla: 'asistentes',
+      rol: RolUsuario.asistente,
+      selectColumns: _selectPerfilCompleto,
+      desdeJson: AsistenteModel.fromJson,
+      perfiles: perfiles,
+      avisos: avisos,
+    );
+
+    return ListadoPerfiles(perfiles: perfiles, avisos: avisos);
+  }
+
+  Future<void> _cargarRol<T extends Usuario>({
+    required String tabla,
+    required RolUsuario rol,
+    required String selectColumns,
+    required T Function(Map<String, dynamic>) desdeJson,
+    required List<Usuario> perfiles,
+    required List<AvisoPerfil> avisos,
+  }) async {
+    final List<dynamic>? filas;
+    try {
+      filas = await runGuarded(
+        () => remoteDataSource.getPerfilesPorTabla(
+          tabla: tabla,
+          selectColumns: selectColumns,
+        ),
+        context: 'cargar los perfiles de $tabla',
+      );
+    } catch (e) {
+      avisos.add(
+        AvisoPerfil(
+          titulo: 'No se pudo cargar el personal de tipo ${rol.name}',
+          detalle: e.toString(),
+          rol: rol,
+          esSeccionCompleta: true,
+        ),
+      );
+      return;
+    }
+
+    if (filas == null) return;
+
+    for (final fila in filas) {
+      final mapa = fila is Map ? Map<String, dynamic>.from(fila) : null;
+      try {
+        if (mapa == null) throw const FormatException('La fila no es un objeto');
+        _exigirPersona(mapa, rol);
+        perfiles.add(desdeJson(mapa));
+      } catch (e) {
+        avisos.add(
+          AvisoPerfil(
+            id: mapa?['id'] as String?,
+            titulo: _tituloDeFila(mapa, rol),
+            detalle: e.toString(),
+            rol: rol,
           ),
         );
       }
+    }
+  }
 
-      final List<dynamic>? listAdmins = await remoteDataSource
-          .getPerfilesPorTabla(
-            tabla: 'admins',
-            selectColumns: _selectPerfilAdmin,
-          );
-      if (listAdmins != null) {
-        usuariosConsolidados.addAll(
-          listAdmins.map(
-            (json) => AdminModel.fromJson(json as Map<String, dynamic>),
-          ),
-        );
-      }
+  /// Los mappers de perfil son deliberadamente tolerantes: rellenan con valores
+  /// por defecto lo que falte, porque otros caminos (el perfil de la sesión,
+  /// la relectura tras un alta) prefieren un objeto incompleto a una excepción.
+  ///
+  /// En un **listado** esa tolerancia miente: una fila sin `personas` se pinta
+  /// como una persona llamada «nombre apellido» nacida hoy. Un administrador no
+  /// puede distinguir eso de un registro real mal escrito. Aquí se exige lo
+  /// mínimo para que la fila represente a alguien; lo que no lo cumpla acaba
+  /// como aviso, que es lo honesto.
+  static void _exigirPersona(Map<String, dynamic> mapa, RolUsuario rol) {
+    final persona = (mapa['usuarios'] as Map?)?['personas'] as Map?;
+    final nombre = persona?['nombre'];
+    if (nombre is! String || nombre.trim().isEmpty) {
+      throw const FormatException(
+        'El perfil no tiene datos de persona asociados.',
+      );
+    }
+  }
 
-      final List<dynamic>? listAsistentes = await remoteDataSource
-          .getPerfilesPorTabla(
-            tabla: 'asistentes',
-            selectColumns: _selectPerfilCompleto,
-          );
-      if (listAsistentes != null) {
-        usuariosConsolidados.addAll(
-          listAsistentes.map(
-            (json) => AsistenteModel.fromJson(json as Map<String, dynamic>),
-          ),
-        );
-      }
+  /// Lo más reconocible que se pueda rescatar de una fila que no deserializó.
+  static String _tituloDeFila(Map<String, dynamic>? mapa, RolUsuario rol) {
+    final persona = (mapa?['usuarios'] as Map?)?['personas'] as Map?;
+    final nombre = [persona?['nombre'], persona?['apellido']]
+        .whereType<String>()
+        .join(' ')
+        .trim();
+    if (nombre.isNotEmpty) return nombre;
 
-      return usuariosConsolidados;
-    }, context: 'consolidar el listado de perfiles');
+    final username = (mapa?['usuarios'] as Map?)?['username'] as String?;
+    if (username != null && username.isNotEmpty) return username;
+
+    final id = mapa?['id'] as String?;
+    final abreviado = id != null && id.length >= 8 ? id.substring(0, 8) : id;
+    return abreviado != null ? '${rol.name} #$abreviado' : 'Perfil sin datos';
   }
 
   @override

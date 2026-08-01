@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/listado_perfiles.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 
 abstract interface class UsuarioRepository {
@@ -8,7 +9,13 @@ abstract interface class UsuarioRepository {
   Future<void> signOut();
   String? getCurrentUserId();
   bool isSessionActive();
-  Future<List<Usuario>> getUsuarios();
+  /// Consolida doctores, admins y asistentes en un solo listado.
+  ///
+  /// No lanza por un fallo parcial: si una de las tres lecturas o una fila
+  /// suelta se cae, lo que sí cargó se devuelve igual y lo que falló viaja
+  /// como [AvisoPerfil]. La pantalla de Perfiles debe seguir siendo usable
+  /// aunque un registro esté corrupto.
+  Future<ListadoPerfiles> getUsuarios();
   Stream<supabase.AuthState> get onAuthStateChange;
 
   Future<Usuario> crearUsuario({

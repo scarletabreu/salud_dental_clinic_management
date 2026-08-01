@@ -50,6 +50,28 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
   TipoExpedienteImpresion _opcionSeleccionada =
       TipoExpedienteImpresion.conOdontograma;
 
+  /// `null` = todo el historial, que es lo que el expediente hacía siempre.
+  DateTimeRange? _rango;
+
+  static String _fechaCorta(DateTime f) =>
+      '${f.day.toString().padLeft(2, '0')}/'
+      '${f.month.toString().padLeft(2, '0')}/${f.year}';
+
+  Future<void> _elegirRango() async {
+    final ahora = DateTime.now();
+    final elegido = await showDateRangePicker(
+      context: context,
+      // El límite inferior cubre cualquier expediente real de la clínica; el
+      // superior es hoy, porque no se imprime lo que aún no ha ocurrido.
+      firstDate: DateTime(ahora.year - 20),
+      lastDate: ahora,
+      initialDateRange: _rango,
+      helpText: 'Periodo del expediente',
+      saveText: 'Aplicar',
+    );
+    if (elegido != null) setState(() => _rango = elegido);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -175,7 +197,38 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            // El expediente cubría siempre el historial entero: no había forma
+            // de imprimir «lo de este año» (defecto D17).
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _rango == null
+                          ? 'Todo el historial clínico'
+                          : 'Del ${_fechaCorta(_rango!.start)} al '
+                                '${_fechaCorta(_rango!.end)}',
+                      style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    ),
+                  ),
+                  if (_rango != null)
+                    TextButton(
+                      key: const Key('expediente_rango_limpiar'),
+                      onPressed: () => setState(() => _rango = null),
+                      child: const Text('Todo'),
+                    ),
+                  TextButton.icon(
+                    key: const Key('expediente_rango_fechas'),
+                    onPressed: _elegirRango,
+                    icon: const Icon(Icons.date_range_rounded, size: 18),
+                    label: const Text('Elegir periodo'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               child: Row(
@@ -219,6 +272,15 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                           consultasConOdontograma:
                               widget.consultasConOdontograma,
                           historialPiezas: widget.historialPiezas,
+                          // Lo que se eligió arriba: hasta ahora se quedaba en
+                          // el modal y la pantalla siempre abría «con
+                          // odontograma» y con el historial entero.
+                          formatoInicial:
+                              _opcionSeleccionada ==
+                                  TipoExpedienteImpresion.sinOdontograma
+                              ? TipoFormatoExpediente.sinOdontograma
+                              : TipoFormatoExpediente.conOdontograma,
+                          rango: _rango,
                         );
                       },
                       key: const Key('generar_expediente_pdf'),

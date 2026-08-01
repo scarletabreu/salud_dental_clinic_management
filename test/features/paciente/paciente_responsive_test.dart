@@ -360,7 +360,9 @@ void main() {
     expect(find.byKey(const Key('exportar_expediente_button')), findsOneWidget);
   });
 
-  testWidgets('no genera un expediente incompleto si falla el historial', (
+  // Antes el botón se pintaba igual y, al tocarlo, moría en un SnackBar. QA lo
+  // marcó como defecto D18 (1 ago 2026): no se ofrecen acciones imposibles.
+  testWidgets('no ofrece el expediente si falla el historial', (
     tester,
   ) async {
     _viewport(tester, const Size(900, 900));
@@ -372,13 +374,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('exportar_expediente_button')));
-    await tester.pump();
-
-    expect(
-      find.textContaining('el historial clínico no está disponible'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('exportar_expediente_button')), findsNothing);
     expect(find.text('Generar Expediente Clínico'), findsNothing);
   });
 

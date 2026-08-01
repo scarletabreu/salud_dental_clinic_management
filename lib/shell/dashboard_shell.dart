@@ -20,8 +20,6 @@ import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubi
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/cuentas_por_cobrar_page.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/domain/repositories/diagnosis_repository.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/presentation/pages/diagnosos_list_page.dart';
-import 'package:salud_dental_clinic_management/features/equipo/presentation/cubit/equipo_cubit.dart';
-import 'package:salud_dental_clinic_management/features/equipo/presentation/pages/equipo_list_page.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
 import 'package:salud_dental_clinic_management/features/inicio/presentation/pages/inicio_page.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
@@ -35,7 +33,6 @@ import 'package:salud_dental_clinic_management/features/personal/presentation/cu
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/presentarion/pages/procedimiento_list_page.dart';
-import 'package:salud_dental_clinic_management/features/suplidor/presentation/cubit/suplidor_cubit.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
 import 'package:salud_dental_clinic_management/shell/lazy_destination_stack.dart';
 import 'package:salud_dental_clinic_management/shell/responsive_shell_layout.dart';
@@ -211,19 +208,11 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         child: const CajaDiariaPage(),
       ),
     ),
-    ShellDestination(
-      id: ShellDestinationId.equipos,
-      icon: Icons.build_outlined,
-      selectedIcon: Icons.build_rounded,
-      label: 'Equipos',
-      builder: (_) => MultiBlocProvider(
-        providers: [
-          BlocProvider(create: (_) => sl<EquipoCubit>()),
-          BlocProvider(create: (_) => sl<SuplidorCubit>()),
-        ],
-        child: const EquipoListPage(),
-      ),
-    ),
+    // Equipos NO es un destino de primer nivel: vive como pestaña dentro de
+    // Inventario, que es donde se gestiona todo lo material de la clínica.
+    // Tenerlo en los dos sitios duplicaba la entrada en el menú (defecto D19
+    // de la jornada de QA del 1 ago 2026) y dejaba dos caminos con
+    // dependencias distintas hacia la misma pantalla.
     ShellDestination(
       id: ShellDestinationId.medicinas,
       icon: Icons.medication_outlined,
@@ -291,10 +280,7 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
     ),
     ShellSection(
       title: 'Administración',
-      destinations: _destinationsFor(const [
-        ShellDestinationId.perfiles,
-        ShellDestinationId.equipos,
-      ]),
+      destinations: _destinationsFor(const [ShellDestinationId.perfiles]),
     ),
   ];
 

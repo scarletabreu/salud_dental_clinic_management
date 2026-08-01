@@ -155,7 +155,13 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
             ),
             centerTitle: false,
             actions: [
-              if (paciente != null && puedeExportar)
+              // Con el historial no disponible el botón se pintaba igual y
+              // moría en un SnackBar: se ofrecía una acción imposible
+              // (defecto D18). Ahora no se ofrece.
+              if (paciente != null &&
+                  puedeExportar &&
+                  !(state is PacienteDetailLoaded &&
+                      state.historialNoDisponible))
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: IconButton(
@@ -166,18 +172,6 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                       color: ac.primaryGreen,
                     ),
                     onPressed: () {
-                      if (state is PacienteDetailLoaded &&
-                          state.historialNoDisponible) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'No se puede generar un expediente completo '
-                              'porque el historial clínico no está disponible.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
                       final consultasConOdontograma = paciente.record.consultas
                           .where((c) => c.odontograma != null)
                           .toList();

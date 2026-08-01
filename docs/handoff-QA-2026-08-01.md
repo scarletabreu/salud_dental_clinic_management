@@ -10,7 +10,7 @@ mergeado, y nada aplicado en producción**.
 
 | Fase | Rama | Commit | Estado |
 |---|---|---|---|
-| F0 · Esquema | `HFX-QA-100-esquema` | `34379dc` | Implementada y verificada en local. **Falta aplicarla en producción.** |
+| F0 · Esquema | `HFX-QA-100-esquema` | `34379dc` | Completa y **aplicada en producción** el 1 ago 2026 |
 | F1 · Pantallas bloqueadas | `HFX-QA-101-pantallas` | `4e7c040` | Completa |
 | F2 · Visibilidad clínica | `HFX-QA-102-visibilidad-clinica` | `d23f418` | Completa |
 | F3 · Matriz de permisos | `HFX-QA-103-permisos-roles` | `f790a28` | Completa |
@@ -129,19 +129,23 @@ importante de leer es la lista de lo NO cubierto.
 
 ## Lo que queda pendiente, y qué decisión requiere
 
-### 1. Aplicar F0 en producción — requiere autorización explícita
+### 1. Aplicar F2 y F3 en producción — requiere autorización explícita
 
-Procedimiento completo en `docs/HFX-QA-100-estado.md`. Sólo tres cosas cambian
-realmente allí; el resto de la migración son no-ops:
+F0 ya está aplicada (detalle y verificación en `docs/HFX-QA-100-estado.md`).
+Quedan pendientes en la instancia:
 
-- se retiran las vistas `pacientes_seguro`, `personas_seguro`, `contactos_seguro`
-  (con verificación previa que **aborta** el drop si algo dependiera de ellas);
-- se retira la FK redundante `admins_id_fkey`;
-- se crea la vista `directorio_pacientes`.
+- `20260812090000` (F2) · siembra `clave_odontograma` en el catálogo. **Sólo
+  toca datos del catálogo**, ningún esquema. Al aplicarse imprime cuántas filas
+  quedaron sin clave: hay que leer ese aviso.
+- `20260813090000` (F3) · la matriz de permisos. Esta **sí cambia lo que los
+  usuarios reales pueden hacer**: el doctor deja de poder escribir el catálogo,
+  la asistente queda acotada a los doctores que asiste, y se abre la lectura de
+  consultas ajenas (decisión temporal D11). Conviene aplicarla en una ventana
+  acordada con la clínica, no a mitad de jornada.
 
-Ninguna toca datos. La primera resuelve D3 por sí sola. Hasta que se aplique,
-`tool/produccion/deriva_esquema.sh` seguirá informando esas 19 diferencias:
-**son exactamente las que la migración va a cerrar**, no deriva nueva.
+Mientras no se apliquen, `tool/produccion/deriva_esquema.sh` informa 50
+diferencias que son **exactamente** las de F3 —18 objetos con su definición
+anterior en producción, 32 sentencias nuevas sólo en local—, no deriva nueva.
 
 ### 2. Leer el aviso de la migración de claves de odontograma (D6b)
 
@@ -159,7 +163,17 @@ quedó fuera, falta un patrón.
   y parece deriva accidental: un doctor actualizando inventario. Pendiente de
   decisión de negocio.
 
-### 4. Integración
+### 4. Integración — HECHA
 
-Las seis ramas están encadenadas y se preservan. Falta decidir si se integran
-por PR a `dev` en orden F0 → F5, que es lo que recomiendo.
+Las seis ramas se integraron por PR a `dev` en orden: #128, #129, #130, #131,
+#132, #133. Todas se conservan, local y remotamente.
+
+`dev` había avanzado mientras tanto: alguien arregló D9 en paralelo agrupando
+`cuentasPorCobrar` bajo `puedeGestionarCaja`. El auto-merge de git dejó un
+`case` **duplicado** —código que no compila— pese a fusionar «limpio». Se
+resolvió conservando la capacidad propia `verCuentasPorCobrar`, que hoy resuelve
+al mismo conjunto de roles y además dice por qué. Vale la pena recordarlo: un
+merge sin conflictos no garantiza que el resultado compile.
+
+Estado de `dev` tras integrar: 781 pruebas aprobadas, `flutter analyze` sin
+errores ni advertencias.

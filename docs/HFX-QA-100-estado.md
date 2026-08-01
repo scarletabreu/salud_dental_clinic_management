@@ -3,8 +3,7 @@
 Rama: `HFX-QA-100-esquema`, desde `dev`.
 Plan de origen: `docs/QA-2026-08-01-plan-correccion.md`, Fase 0.
 
-**Estado: implementado y verificado en local. Falta aplicarlo en producción**
-(requiere autorización explícita; ver «Aplicación en producción»).
+**Estado: APLICADO EN PRODUCCIÓN el 1 ago 2026.** Ver «Ejecución» al final.
 
 ---
 
@@ -130,7 +129,7 @@ gobernada por `puede_ver_paciente()`. F1 y F3 se apoyan en esto.
 
 ---
 
-## Aplicación en producción — PENDIENTE DE AUTORIZACIÓN
+## Aplicación en producción — EJECUTADA (1 ago 2026)
 
 Nada de `db push`: el registro de migraciones de ambas partes sigue siendo
 disjunto (ver `docs/PRODUCCION-plan-migracion.md`). El procedimiento es el
@@ -158,3 +157,53 @@ migración son no-ops allí:
 - se crea la vista `directorio_pacientes`.
 
 Ninguna toca datos. La primera es la que resuelve el defecto D3 por sí sola.
+
+
+---
+
+## Ejecución (1 ago 2026)
+
+Copia previa: `~/backups/salud_dental/20260801-preqa100` (esquema, datos y
+recuentos por tabla antes de tocar nada).
+
+El historial de migraciones quedó reconciliado el 31 jul, así que `db push`
+funcionó sin `migration repair`. Para que aplicara **sólo F0** se apartaron
+temporalmente las migraciones de F2 y F3, se comprobó el alcance con
+`--dry-run` —las tres de F0 y ninguna más— y se empujó.
+
+### Lo que cambió realmente
+
+- `pacientes_seguro`, `personas_seguro` y `contactos_seguro` retiradas. La
+  verificación de dependencias pasó limpia y cada drop quedó registrado.
+- FK redundante `admins_id_fkey` retirada. `admins` conserva **una sola**
+  relación con `doctores` (`admins_id_doctores_fkey`).
+- Vista `directorio_pacientes` creada.
+
+Todo lo demás de la migración fue no-op, como se esperaba: los avisos de
+`column ... already exists, skipping` confirman que las columnas que el
+repositorio versionó ya estaban allí.
+
+### Verificación posterior
+
+- **Recuentos idénticos** a la copia previa, tabla por tabla: 15 personas,
+  10 pacientes, 3 doctores, 82 citas, 49 consultas, 29 cuentas, 23 pagos,
+  11 recetas, 17 tratamientos, 2488 dientes, 30 filas de `doctor_paciente`.
+  Ninguna fila se perdió ni se creó.
+- Volcado posterior: cero apariciones de `*_seguro`, `directorio_pacientes`
+  presente, una sola FK de `admins` hacia `doctores`.
+- Gate de deriva: las 50 diferencias que quedan son **exactamente** las de
+  F3, que no se aplicó a propósito (18 objetos con su definición anterior en
+  producción, 32 sentencias nuevas sólo en local). Cero deriva imprevista.
+
+### Un aviso que no es un fallo
+
+`db push` terminó con un error de `pg-delta` al cachear catálogos:
+`Failed to read certificate file '.../pgdelta-target-ca.crt'`. Es el paso de
+**cacheo**, posterior a aplicar, y falla porque ese certificado se había
+borrado al limpiar la caché de pgdelta. Las migraciones se aplicaron; el
+`migration list` remoto lo confirma.
+
+### Lo que sigue sin verificarse
+
+Iniciar sesión con un usuario real y abrir una consulta de principio a fin
+contra producción. No está automatizado y no se hizo.

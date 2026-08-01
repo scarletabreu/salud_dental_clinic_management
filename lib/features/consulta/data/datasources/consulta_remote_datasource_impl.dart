@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/models/alcance_registro_clinico.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 typedef CrearConsultaRpc =
@@ -208,40 +209,71 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     return fila;
   }
 
-  /// Lo registrado en la consulta **sin pieza**: profilaxis, gingivitis
-  /// generalizada, fluorización de arcada.
+  /// Lo registrado en la consulta con alcance general o de arcada.
   ///
-  /// `_selectConsulta` cuelga todo de `dientes`, así que estas filas —que la
-  /// base guarda con `diente_id NULL` (HFX-CLIN-003)— no salían por ningún
-  /// lado: se escribían bien y nadie las volvía a ver, ni en el detalle, ni en
-  /// el expediente, ni en el PDF (defecto D5). Van en consulta aparte y no
-  /// como embed filtrado para que ningún otro `select` de consultas las
-  /// arrastre por accidente mezcladas con las de pieza.
+  /// Las filas nuevas llevan `diente_id NULL` (HFX-CLIN-003). Las anteriores
+  /// pueden seguir ligadas a una pieza o superficie aunque el catálogo diga
+  /// `arcada/global`; por eso la clasificación se hace además por el alcance
+  /// del catálogo. Van en consulta aparte para no mezclarlas con las de pieza.
   @override
   Future<Map<String, List<Map<String, dynamic>>>> fetchGeneralesConsulta(
     String consultaId,
   ) async {
+    final porConsulta = await fetchGeneralesConsultas([consultaId]);
+    return porConsulta[consultaId] ??
+        const {
+          'tratamientos': <Map<String, dynamic>>[],
+          'diagnosticos': <Map<String, dynamic>>[],
+        };
+  }
+
+  @override
+  Future<Map<String, Map<String, List<Map<String, dynamic>>>>>
+  fetchGeneralesConsultas(List<String> consultaIds) async {
+    if (consultaIds.isEmpty) return const {};
+
     final (tratamientos, diagnosticos) = await (
       supabaseClient
           .from('tratamientos_aplicados')
-          .select('*, tratamiento:tratamientos(nombre, clave_odontograma)')
-          .eq('consulta_id', consultaId)
-          .isFilter('diente_id', null)
+          .select(
+            '*, tratamiento:tratamientos(nombre, clave_odontograma, alcance)',
+          )
+          .inFilter('consulta_id', consultaIds)
           .isFilter('deleted_at', null)
           .order('created_at', ascending: true),
       supabaseClient
           .from('diagnosticos_aplicados')
-          .select('*, diagnosis:diagnosticos(nombre, clave_odontograma)')
-          .eq('consulta_id', consultaId)
-          .isFilter('diente_id', null)
+          .select(
+            '*, diagnosis:diagnosticos(nombre, clave_odontograma, alcance)',
+          )
+          .inFilter('consulta_id', consultaIds)
           .isFilter('deleted_at', null)
           .order('created_at', ascending: true),
     ).wait;
 
-    return {
-      'tratamientos': List<Map<String, dynamic>>.from(tratamientos as List),
-      'diagnosticos': List<Map<String, dynamic>>.from(diagnosticos as List),
+    final resultado = {
+      for (final id in consultaIds)
+        id: {
+          'tratamientos': <Map<String, dynamic>>[],
+          'diagnosticos': <Map<String, dynamic>>[],
+        },
     };
+
+    for (final raw in tratamientos as List) {
+      final fila = Map<String, dynamic>.from(raw as Map);
+      if (!registroClinicoEsGeneral(fila, catalogoKey: 'tratamiento')) {
+        continue;
+      }
+      final consultaId = fila['consulta_id'] as String?;
+      resultado[consultaId]?['tratamientos']?.add(fila);
+    }
+    for (final raw in diagnosticos as List) {
+      final fila = Map<String, dynamic>.from(raw as Map);
+      if (!registroClinicoEsGeneral(fila, catalogoKey: 'diagnosis')) continue;
+      final consultaId = fila['consulta_id'] as String?;
+      resultado[consultaId]?['diagnosticos']?.add(fila);
+    }
+    return resultado;
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/diente/domain/entities/d
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/superficie/data/models/superficie_model.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/models/alcance_registro_clinico.dart';
 
 class DienteModel extends Diente {
   DienteModel({
@@ -17,13 +18,42 @@ class DienteModel extends Diente {
   });
 
   factory DienteModel.fromJson(Map<String, dynamic> json) {
+    final tratamientos =
+        [
+              for (final raw in json['tratamientos'] as List? ?? const [])
+                if (raw is Map) Map<String, dynamic>.from(raw),
+            ]
+            .where(
+              (fila) =>
+                  !registroClinicoEsGeneral(fila, catalogoKey: 'tratamiento'),
+            )
+            .toList();
+    final diagnosticos =
+        [
+              for (final raw in json['diagnosis'] as List? ?? const [])
+                if (raw is Map) Map<String, dynamic>.from(raw),
+            ]
+            .where(
+              (fila) =>
+                  !registroClinicoEsGeneral(fila, catalogoKey: 'diagnosis'),
+            )
+            .toList();
+
     return DienteModel(
       id: json['id'] as String?,
       odontogramaId: (json['odontograma_id'] ?? '') as String,
       fdiCode: (json['fdi_code'] as num).toInt(),
       observaciones: json['observaciones'] as String?,
       estaAusente: json['esta_ausente'] as bool? ?? false,
-      tratamientosAplicadosIds: json['tratamientos_aplicados_ids'] != null
+      // Con la relación cargada, las filas normalizadas son la verdad. El
+      // arreglo auxiliar también contiene registros históricos de arcada que
+      // antes se pegaron a una pieza y haría reaparecerlos en su resumen.
+      tratamientosAplicadosIds: json.containsKey('tratamientos')
+          ? [
+              for (final fila in tratamientos)
+                if (fila['id'] is String) fila['id'] as String,
+            ]
+          : json['tratamientos_aplicados_ids'] != null
           ? (json['tratamientos_aplicados_ids'] as List)
                 .whereType<String>()
                 .toList()
@@ -34,16 +64,10 @@ class DienteModel extends Diente {
                 .map((e) => SuperficieModel.fromJson(e))
                 .toList()
           : [],
-      diagnosis: json['diagnosis'] != null
-          ? (json['diagnosis'] as List)
-                .map((e) => DiagnosticoAplicadoModel.fromJson(e))
-                .toList()
-          : [],
-      tratamientos: json['tratamientos'] != null
-          ? (json['tratamientos'] as List)
-                .map((e) => TratamientoAplicadoModel.fromJson(e))
-                .toList()
-          : [],
+      diagnosis: diagnosticos.map(DiagnosticoAplicadoModel.fromJson).toList(),
+      tratamientos: tratamientos
+          .map(TratamientoAplicadoModel.fromJson)
+          .toList(),
     );
   }
 

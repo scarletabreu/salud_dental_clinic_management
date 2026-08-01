@@ -66,6 +66,12 @@ abstract class ConsultaRemoteDatasource {
     String consultaId,
   );
 
+  /// Versión por lote para el historial y el PDF. Evita dos lecturas por cada
+  /// consulta del paciente y clasifica también las filas históricas según el
+  /// alcance vigente de su catálogo.
+  Future<Map<String, Map<String, List<Map<String, dynamic>>>>>
+  fetchGeneralesConsultas(List<String> consultaIds);
+
   /// Filas `id, cita_id, finalizada` de las consultas de esas citas. Sirve
   /// tanto para enlazar la agenda con su consulta como para saber si queda
   /// alguna abierta (SD-160). Una lista vacía no consulta la red.

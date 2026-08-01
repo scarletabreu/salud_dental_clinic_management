@@ -299,6 +299,8 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     List<TratamientoAplicado> tratamientosGenerales = const [],
     List<DiagnosticoAplicado> diagnosticosGenerales = const [],
   }) {
+    final signosVitalesJson = signosVitales?.toJson();
+    final signosVitalesMedidos = signosVitales?.toPayloadMediciones();
     final dientes = [
       for (final diente in odontograma.dientes)
         {
@@ -343,12 +345,11 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
 
     return {
       'version_payload': 1,
-      if (notas != null) 'notas': notas,
+      'notas': ?notas,
       // El resumen plano alimenta a los lectores antiguos; las mediciones son
       // la verdad y las valida el servidor una por una (HFX-CLIN-003).
-      if (signosVitales != null) 'signos_vitales': signosVitales.toJson(),
-      if (signosVitales != null)
-        'signos_vitales_medidos': signosVitales.toPayloadMediciones(),
+      'signos_vitales': ?signosVitalesJson,
+      'signos_vitales_medidos': ?signosVitalesMedidos,
       'condiciones_detectadas': [
         for (final condicion in condicionesDetectadas) condicion.toPayload(),
       ],
@@ -439,6 +440,15 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   Future<List<Consulta>> getHistorialPaciente(String pacienteId) {
     return runGuarded(() async {
       final data = await remoteDataSource.fetchConsultasByPaciente(pacienteId);
+      final ids = [
+        for (final fila in data)
+          if (fila['id'] is String) fila['id'] as String,
+      ];
+      final generales = await remoteDataSource.fetchGeneralesConsultas(ids);
+      for (final fila in data) {
+        final id = fila['id'] as String?;
+        if (id != null) fila['generales'] = generales[id];
+      }
       return data.map((json) => ConsultaModel.fromJson(json)).toList();
     }, context: 'obtener el historial clínico');
   }

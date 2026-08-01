@@ -544,6 +544,25 @@ $$;
 ALTER FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select exists (
+    select 1 from public.doctor_asistentes da
+     where da.asistente_id = auth.uid()
+       and da.doctor_id = p_doctor_id
+  );
+$$;
+
+
+ALTER FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") IS 'true si quien consulta es asistente asignado a ese doctor. Es el alcance de la agenda de una asistente: lo administrativo de los doctores a los que asiste, y de nadie más.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."bloquear_cancelacion_con_consulta_abierta"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
@@ -4228,6 +4247,179 @@ COMMENT ON FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) IS '
 
 
 
+CREATE OR REPLACE FUNCTION "public"."hfx_qa_103_transicion_estado_cita"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.estado is not distinct from old.estado then
+    return new;
+  end if;
+
+  if current_user in ('postgres', 'service_role', 'supabase_admin') then
+    return new;
+  end if;
+
+  if not public.puede_cambiar_estado_cita(new.doctor_id, new.estado::text) then
+    raise exception
+      'Tu rol no puede cambiar esta cita a «%».', new.estado
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_qa_103_transicion_estado_cita"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_tratamientos_generales integer := 0;
+  v_tratamientos_diente_inferidos integer := 0;
+  v_tratamientos_diente integer := 0;
+  v_diagnosticos_generales integer := 0;
+  v_diagnosticos_diente integer := 0;
+  v_arrays_reconstruidos integer := 0;
+  v_ambiguos_tratamiento integer := 0;
+  v_ambiguos_diagnostico integer := 0;
+begin
+  update tratamientos_aplicados ta
+     set diente_id = null,
+         superficie = null,
+         updated_at = now()
+    from tratamientos t
+   where t.id = ta.tratamiento_id
+     and ta.deleted_at is null
+     and t.alcance in ('arcada', 'global')
+     and (ta.diente_id is not null or ta.superficie is not null);
+  get diagnostics v_tratamientos_generales = row_count;
+
+  -- Un tratamiento de diente puede recuperar su pieza sin adivinar cuando la
+  -- actividad del plan está vinculada a un diagnóstico con pieza. No se copia
+  -- el `diente_id` histórico directamente: si la ejecución ocurrió en otra
+  -- consulta, se busca la pieza del odontograma ejecutor por su código FDI.
+  update tratamientos_aplicados ta
+     set diente_id = destino.id,
+         superficie = null,
+         updated_at = now()
+    from tratamientos t,
+         items_plan_tratamiento ip,
+         diagnosticos_aplicados da,
+         dientes origen,
+         odontogramas od_destino,
+         dientes destino
+   where t.id = ta.tratamiento_id
+     and t.alcance = 'diente'
+     and ta.deleted_at is null
+     and ta.diente_id is null
+     and ip.id = ta.item_plan_id
+     and da.id = ip.diagnostico_aplicado_id
+     and origen.id = da.diente_id
+     and od_destino.consulta_id = ta.consulta_id
+     and od_destino.deleted_at is null
+     and destino.odontograma_id = od_destino.id
+     and destino.deleted_at is null
+     and destino.fdi_code = origen.fdi_code;
+  get diagnostics v_tratamientos_diente_inferidos = row_count;
+
+  update tratamientos_aplicados ta
+     set superficie = null,
+         updated_at = now()
+    from tratamientos t
+   where t.id = ta.tratamiento_id
+     and ta.deleted_at is null
+     and t.alcance = 'diente'
+     and ta.diente_id is not null
+     and ta.superficie is not null;
+  get diagnostics v_tratamientos_diente = row_count;
+
+  update diagnosticos_aplicados da
+     set diente_id = null,
+         superficie = null,
+         updated_at = now()
+    from diagnosticos d
+   where d.id = da.diagnosis_id
+     and da.deleted_at is null
+     and d.alcance in ('arcada', 'global')
+     and (da.diente_id is not null or da.superficie is not null);
+  get diagnostics v_diagnosticos_generales = row_count;
+
+  update diagnosticos_aplicados da
+     set superficie = null,
+         updated_at = now()
+    from diagnosticos d
+   where d.id = da.diagnosis_id
+     and da.deleted_at is null
+     and d.alcance = 'diente'
+     and da.diente_id is not null
+     and da.superficie is not null;
+  get diagnostics v_diagnosticos_diente = row_count;
+
+  -- `dientes.tratamientos_aplicados_ids` es una proyección auxiliar. Al
+  -- desligar los generales se reconstruye desde la tabla normalizada para que
+  -- ningún lector antiguo los siga atribuyendo a la pieza anterior.
+  with esperados as (
+    select di.id,
+           coalesce(
+             array_agg(ta.id order by ta.created_at)
+               filter (where ta.id is not null),
+             '{}'::uuid[]
+           ) ids
+      from dientes di
+      left join tratamientos_aplicados ta
+        on ta.diente_id = di.id and ta.deleted_at is null
+     group by di.id
+  )
+  update dientes di
+     set tratamientos_aplicados_ids = e.ids,
+         updated_at = now()
+    from esperados e
+   where e.id = di.id
+     and di.tratamientos_aplicados_ids is distinct from e.ids;
+  get diagnostics v_arrays_reconstruidos = row_count;
+
+  select count(*) into v_ambiguos_tratamiento
+    from tratamientos_aplicados ta
+    join tratamientos t on t.id = ta.tratamiento_id
+   where ta.deleted_at is null
+     and ((t.alcance = 'puntual'
+           and (ta.diente_id is null or ta.superficie is null))
+       or (t.alcance = 'diente' and ta.diente_id is null));
+
+  select count(*) into v_ambiguos_diagnostico
+    from diagnosticos_aplicados da
+    join diagnosticos d on d.id = da.diagnosis_id
+   where da.deleted_at is null
+     and ((d.alcance = 'puntual'
+           and (da.diente_id is null or da.superficie is null))
+       or (d.alcance = 'diente' and da.diente_id is null));
+
+  return jsonb_build_object(
+    'tratamientos_generales_normalizados', v_tratamientos_generales,
+    'tratamientos_diente_inferidos', v_tratamientos_diente_inferidos,
+    'tratamientos_diente_normalizados', v_tratamientos_diente,
+    'diagnosticos_generales_normalizados', v_diagnosticos_generales,
+    'diagnosticos_diente_normalizados', v_diagnosticos_diente,
+    'arrays_diente_reconstruidos', v_arrays_reconstruidos,
+    'tratamientos_ambiguos_pendientes', v_ambiguos_tratamiento,
+    'diagnosticos_ambiguos_pendientes', v_ambiguos_diagnostico
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() IS 'HFX-QA-108. Normaliza aplicaciones históricas cuando el alcance del catálogo determina su ubicación sin ambigüedad; informa las que requieren revisión clínica.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb" DEFAULT '[]'::"jsonb", "p_documentos" "jsonb" DEFAULT '[]'::"jsonb", "p_temp_condiciones" "jsonb" DEFAULT '[]'::"jsonb", "p_motivo_consulta" "text" DEFAULT NULL::"text", "p_tipo_atencion" "public"."tipo_atencion_clinica" DEFAULT 'consulta'::"public"."tipo_atencion_clinica") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -4661,6 +4853,33 @@ COMMENT ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_para
 
 
 
+CREATE OR REPLACE FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") RETURNS boolean
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO 'public'
+    AS $$
+  select case
+    when public.es_admin() then true
+
+    when public.es_asistente() and public.asiste_a_doctor(p_doctor_id) then
+      p_destino in ('confirmada', 'en_espera', 'cancelada',
+                    'no_asistio', 'no_asistida')
+
+    when public.es_doctor() and p_doctor_id = auth.uid() then
+      -- Lo clínico de su propia cita: dar por presente al paciente y cancelar.
+      p_destino in ('en_espera', 'cancelada')
+
+    else false
+  end;
+$$;
+
+
+ALTER FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") IS 'Matriz de transiciones de estado de cita por rol (QA 1-ago-2026): el asistente maneja lo administrativo de la agenda de los doctores que asiste, el doctor lo clínico de sus propias citas, y el admin todo. Los estados en_consulta y completada no pasan por aquí: los producen las RPC de consulta, que corren como `postgres`.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."puede_editar_consulta_propia"("p_consulta_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -4683,12 +4902,12 @@ CREATE OR REPLACE FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-  select public.es_admin() or exists (
+  -- TEMPORAL (QA 1-ago): revertir cuando Isaac entregue el modelo definitivo.
+  select public.es_admin() or public.es_doctor() or exists (
     select 1 from public.consultas c
      where c.id = p_consulta_id
        and c.deleted_at is null
        and c.doctor_id = auth.uid()
-       and public.es_doctor()
   );
 $$;
 
@@ -4696,7 +4915,7 @@ $$;
 ALTER FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") IS 'Encadena hasta puede_ver_paciente() para tablas colgadas de consultas.';
+COMMENT ON FUNCTION "public"."puede_ver_consulta"("p_consulta_id" "uuid") IS 'Encadena hasta puede_ver_paciente() para tablas colgadas de consultas. TEMPORAL (QA 1-ago-2026): mientras dure la decisión D11, cualquier doctor pasa.';
 
 
 
@@ -7905,6 +8124,10 @@ CREATE OR REPLACE TRIGGER "trg_generar_codigo_receta" BEFORE INSERT ON "public".
 
 
 
+CREATE OR REPLACE TRIGGER "trg_hfx_qa_103_transicion_estado_cita" BEFORE UPDATE OF "estado" ON "public"."citas" FOR EACH ROW EXECUTE FUNCTION "public"."hfx_qa_103_transicion_estado_cita"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_item_plan_ejecutable" BEFORE INSERT OR UPDATE OF "item_plan_id" ON "public"."tratamientos_aplicados" FOR EACH ROW EXECUTE FUNCTION "public"."verificar_item_plan_ejecutable"();
 
 
@@ -8652,7 +8875,7 @@ CREATE POLICY "catalogo_signos_vitales_select" ON "public"."catalogo_signos_vita
 ALTER TABLE "public"."citas" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "citas_delete" ON "public"."citas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
+CREATE POLICY "citas_delete" ON "public"."citas" FOR DELETE USING (("public"."es_admin"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())) OR ("public"."es_asistente"() AND "public"."asiste_a_doctor"("doctor_id"))));
 
 
 
@@ -8677,11 +8900,11 @@ CREATE POLICY "citas_items_plan_select" ON "public"."citas_items_plan" FOR SELEC
 
 
 
-CREATE POLICY "citas_select" ON "public"."citas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
+CREATE POLICY "citas_select" ON "public"."citas" FOR SELECT USING (("public"."es_admin"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())) OR ("public"."es_asistente"() AND "public"."asiste_a_doctor"("doctor_id"))));
 
 
 
-CREATE POLICY "citas_update" ON "public"."citas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())))) WITH CHECK (("public"."es_admin"() OR "public"."es_asistente"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"()))));
+CREATE POLICY "citas_update" ON "public"."citas" FOR UPDATE USING (("public"."es_admin"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())) OR ("public"."es_asistente"() AND "public"."asiste_a_doctor"("doctor_id")))) WITH CHECK (("public"."es_admin"() OR ("public"."es_doctor"() AND ("doctor_id" = "auth"."uid"())) OR ("public"."es_asistente"() AND "public"."asiste_a_doctor"("doctor_id"))));
 
 
 
@@ -8741,7 +8964,11 @@ CREATE POLICY "consulta_insert" ON "public"."consultas" FOR INSERT TO "authentic
 
 
 
-CREATE POLICY "consulta_select" ON "public"."consultas" FOR SELECT TO "authenticated" USING (("public"."es_admin"() OR ("doctor_id" = "auth"."uid"())));
+CREATE POLICY "consulta_select" ON "public"."consultas" FOR SELECT USING (("public"."es_admin"() OR "public"."es_doctor"()));
+
+
+
+COMMENT ON POLICY "consulta_select" ON "public"."consultas" IS 'TEMPORAL (QA 1-ago-2026): cualquier doctor lee cualquier consulta. Revertir a (es_admin() OR doctor_id = auth.uid()) cuando se entregue el modelo definitivo de alcance clínico.';
 
 
 
@@ -8891,11 +9118,11 @@ CREATE POLICY "diagnosticos_aplicados_update" ON "public"."diagnosticos_aplicado
 
 
 
-CREATE POLICY "diagnosticos_delete" ON "public"."diagnosticos" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_delete" ON "public"."diagnosticos" FOR DELETE USING ("public"."es_admin"());
 
 
 
-CREATE POLICY "diagnosticos_insert" ON "public"."diagnosticos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_insert" ON "public"."diagnosticos" FOR INSERT WITH CHECK ("public"."es_admin"());
 
 
 
@@ -8903,7 +9130,7 @@ CREATE POLICY "diagnosticos_select" ON "public"."diagnosticos" FOR SELECT TO "au
 
 
 
-CREATE POLICY "diagnosticos_update" ON "public"."diagnosticos" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "diagnosticos_update" ON "public"."diagnosticos" FOR UPDATE USING ("public"."es_admin"()) WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9103,11 +9330,11 @@ ALTER TABLE "public"."items_receta" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."medicinas" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "medicinas_delete" ON "public"."medicinas" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "medicinas_delete" ON "public"."medicinas" FOR DELETE USING ("public"."es_admin"());
 
 
 
-CREATE POLICY "medicinas_insert" ON "public"."medicinas" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "medicinas_insert" ON "public"."medicinas" FOR INSERT WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9115,7 +9342,7 @@ CREATE POLICY "medicinas_select" ON "public"."medicinas" FOR SELECT TO "authenti
 
 
 
-CREATE POLICY "medicinas_update" ON "public"."medicinas" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "medicinas_update" ON "public"."medicinas" FOR UPDATE USING ("public"."es_admin"()) WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9259,11 +9486,11 @@ CREATE POLICY "planes_tratamiento_update" ON "public"."planes_tratamiento" FOR U
 ALTER TABLE "public"."procedimientos" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "procedimientos_delete" ON "public"."procedimientos" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "procedimientos_delete" ON "public"."procedimientos" FOR DELETE USING ("public"."es_admin"());
 
 
 
-CREATE POLICY "procedimientos_insert" ON "public"."procedimientos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "procedimientos_insert" ON "public"."procedimientos" FOR INSERT WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9271,7 +9498,7 @@ CREATE POLICY "procedimientos_select" ON "public"."procedimientos" FOR SELECT TO
 
 
 
-CREATE POLICY "procedimientos_update" ON "public"."procedimientos" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "procedimientos_update" ON "public"."procedimientos" FOR UPDATE USING ("public"."es_admin"()) WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9427,11 +9654,11 @@ CREATE POLICY "tratamientos_aplicados_update" ON "public"."tratamientos_aplicado
 
 
 
-CREATE POLICY "tratamientos_delete" ON "public"."tratamientos" FOR DELETE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_delete" ON "public"."tratamientos" FOR DELETE USING ("public"."es_admin"());
 
 
 
-CREATE POLICY "tratamientos_insert" ON "public"."tratamientos" FOR INSERT TO "authenticated" WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_insert" ON "public"."tratamientos" FOR INSERT WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9439,7 +9666,7 @@ CREATE POLICY "tratamientos_select" ON "public"."tratamientos" FOR SELECT TO "au
 
 
 
-CREATE POLICY "tratamientos_update" ON "public"."tratamientos" FOR UPDATE TO "authenticated" USING (("public"."es_admin"() OR "public"."es_doctor"())) WITH CHECK (("public"."es_admin"() OR "public"."es_doctor"()));
+CREATE POLICY "tratamientos_update" ON "public"."tratamientos" FOR UPDATE USING ("public"."es_admin"()) WITH CHECK ("public"."es_admin"());
 
 
 
@@ -9735,6 +9962,12 @@ GRANT ALL ON FUNCTION "public"."actualizar_stock_por_compra"() TO "service_role"
 REVOKE ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."ajustar_stock_consumible"("p_consumible_id" "uuid", "p_nuevo_stock" integer, "p_motivo" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."asiste_a_doctor"("p_doctor_id" "uuid") TO "authenticated";
 
 
 
@@ -11260,6 +11493,15 @@ GRANT ALL ON FUNCTION "public"."hfx_clin_008_superficies_de"("p_fdi" integer) TO
 
 
 
+GRANT ALL ON FUNCTION "public"."hfx_qa_103_transicion_estado_cita"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "service_role";
 GRANT ALL ON FUNCTION "public"."iniciar_consulta_de_cita"("p_cita_id" "uuid", "p_dientes" "jsonb", "p_documentos" "jsonb", "p_temp_condiciones" "jsonb", "p_motivo_consulta" "text", "p_tipo_atencion" "public"."tipo_atencion_clinica") TO "authenticated";
@@ -11337,6 +11579,12 @@ GRANT ALL ON FUNCTION "public"."perfil_actual"() TO "authenticated";
 REVOKE ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") TO "service_role";
 GRANT ALL ON FUNCTION "public"."publicar_regla_clinica"("p_codigo" "text", "p_parametros" "jsonb", "p_severidad" "text", "p_accion" "text", "p_nota" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."puede_cambiar_estado_cita"("p_doctor_id" "uuid", "p_destino" "text") TO "authenticated";
 
 
 

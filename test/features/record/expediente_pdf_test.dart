@@ -403,6 +403,87 @@ void _pruebasOdontodiagrama() {
     expect((await pdfDe(ausente)).length, isNot((await pdfDe(sano)).length));
   });
 
+  Future<Uint8List> soloDiagrama(Paciente paciente) async {
+    final odontograma = paciente.record.consultas.first.odontograma!;
+    return ExpedientePdfBuilder.buildPdf(
+      paciente: paciente,
+      options: const ExpedientePrintOptions(
+        incluirOdontograma: true,
+        incluirEvaluaciones: false,
+        incluirConsultas: false,
+        incluirTratamientos: false,
+        incluirRecetas: false,
+        incluirDocumentosReferenciados: false,
+      ),
+      odontograma: odontograma,
+      historialOdontogramas: [odontograma],
+      generadoEn: DateTime(2026, 7, 26),
+      theme: pw.ThemeData(),
+      compress: false,
+    );
+  }
+
+  test('el PDF pinta un procedimiento desconocido en su superficie', () async {
+    final sano = pacienteConOdontograma([
+      Diente(
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 16,
+      ),
+    ]);
+    final tratado = pacienteConOdontograma([
+      Diente(
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 16,
+        tratamientos: [
+          TratamientoAplicado(
+            tratamientoId: 'procedimiento-sin-clave',
+            esContinuo: false,
+            estaTerminado: true,
+            nombreTratamiento: 'Procedimiento especial',
+            superficie: TipoSuperficie.mesial,
+          ),
+        ],
+      ),
+    ]);
+
+    expect(
+      (await soloDiagrama(tratado)).length,
+      isNot((await soloDiagrama(sano)).length),
+      reason: 'todo procedimiento por superficie debe alterar el diagrama',
+    );
+  });
+
+  test('el PDF pinta la pieza completa y no solo su centro', () async {
+    Paciente conTratamiento(TipoSuperficie? superficie) =>
+        pacienteConOdontograma([
+          Diente(
+            odontogramaId: 'odontograma-marcas',
+            superficies: const [],
+            fdiCode: 36,
+            tratamientos: [
+              TratamientoAplicado(
+                tratamientoId: 'procedimiento-sin-clave',
+                esContinuo: false,
+                estaTerminado: true,
+                nombreTratamiento: 'Procedimiento especial',
+                superficie: superficie,
+              ),
+            ],
+          ),
+        ]);
+
+    expect(
+      (await soloDiagrama(conTratamiento(null))).length,
+      isNot(
+        (await soloDiagrama(conTratamiento(TipoSuperficie.oclusal))).length,
+      ),
+      reason:
+          'pieza completa y cara oclusal no pueden producir el mismo dibujo',
+    );
+  });
+
   test('lo registrado sin pieza aparece en el expediente', () async {
     final paciente = pacienteConOdontograma(const <Diente>[]);
     final conGeneral = Paciente(

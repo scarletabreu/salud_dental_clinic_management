@@ -900,13 +900,28 @@ class ExpedientePdfBuilder {
       res.colorSimbolo = PdfColors.red800;
     }
 
-    // Sin cara concreta la marca es de la pieza entera; se estampa en oclusal,
-    // que es donde el formulario en papel anota lo que no distingue cara.
-    _aplicarColorSuperficie(
-      superficie != null && superficie.isNotEmpty ? superficie : 'oclusal',
-      estadoStr,
-      res,
-    );
+    // Un procedimiento ejecutado siempre tiene tinta azul, aunque su nombre
+    // no coincida con las pocas palabras que conocía el formulario antiguo.
+    // Los diagnósticos conservan su semántica clínica (por ejemplo, caries en
+    // rojo) y no se inventa una marca para un hallazgo desconocido.
+    final tinta = esDiagnostico ? estadoStr : 'procedimiento ejecutado';
+
+    if (superficie != null && superficie.isNotEmpty) {
+      _aplicarColorSuperficie(superficie, tinta, res);
+      return;
+    }
+
+    // Sin cara concreta el alcance es la pieza completa. Pintar solo el centro
+    // hacía que una corona o implante pareciera una intervención oclusal.
+    for (final cara in const [
+      'vestibular',
+      'lingual',
+      'mesial',
+      'distal',
+      'oclusal',
+    ]) {
+      _aplicarColorSuperficie(cara, tinta, res);
+    }
   }
 
   static void _aplicarColorSuperficie(
@@ -920,7 +935,8 @@ class ExpedientePdfBuilder {
 
     if (v.contains('caries') || v.contains('cariada') || v.contains('rojo')) {
       col = PdfColors.red;
-    } else if (v.contains('restaurad') ||
+    } else if (v.contains('procedimiento ejecutado') ||
+        v.contains('restaurad') ||
         v.contains('restaura') ||
         v.contains('azul') ||
         v.contains('resina') ||

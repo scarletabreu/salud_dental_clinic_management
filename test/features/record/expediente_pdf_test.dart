@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -192,6 +193,7 @@ Paciente _pacienteCompleto({List<Consulta>? consultas}) {
 }
 
 void main() {
+  _pruebasOdontodiagrama();
   test(
     'genera el expediente completo, paginado y sin datos financieros',
     () async {
@@ -273,5 +275,196 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
+  });
+}
+
+/// Defecto D6a (QA 1 ago 2026). El odontodiagrama del expediente **nunca**
+/// pintó una marca: se armaba con un `_objToMap` que probaba `toJson()` sobre
+/// las entidades, y `OdontogramaModel.toJson()` no emite `dientes` mientras que
+/// `HistorialPiezas` ni siquiera tiene `toJson`. Las 52 piezas evaluaban a
+/// vacío siempre. Al ser todo `dynamic`, ningún test lo delataba.
+///
+/// La prueba es diferencial a propósito: los símbolos y los colores del
+/// diagrama son operadores de dibujo, no texto, así que lo que se afirma es que
+/// una boca con hallazgos **no** produce el mismo diagrama que una boca sana.
+void _pruebasOdontodiagrama() {
+  Paciente pacienteConOdontograma(List<Diente> dientes) {
+    final odontograma = Odontograma(
+      id: 'odontograma-marcas',
+      consultaId: 'consulta-marcas',
+      dientes: dientes,
+    );
+    final consulta = Consulta(
+      id: 'consulta-marcas',
+      pacienteId: _pacienteId,
+      doctorId: 'doctor-1',
+      fecha: DateTime(2026, 7, 20),
+      tipoAtencion: TipoAtencionClinica.consulta,
+      motivoConsulta: 'Revision',
+      odontograma: odontograma,
+    );
+    return Paciente(
+      id: _pacienteId,
+      nombre: 'Zoila',
+      apellido: 'Perez',
+      birthDate: DateTime(1995, 5, 5),
+      govID: '001-0000000-0',
+      contactos: const <Contacto>[],
+      estatus: EstatusPersona.activo,
+      genero: Genero.femenino,
+      tipoPaciente: TipoPaciente.integrado,
+      trabajo: '',
+      referencia: '',
+      record: Record(
+        pacienteId: _pacienteId,
+        tipoSangre: TipoSangre.oPositivo,
+        condiciones: const <Condicion>[],
+        cirugiasPrevias: const [],
+        historialFamiliar: '',
+        consultas: [consulta],
+      ),
+      citas: const [],
+    );
+  }
+
+  Future<Uint8List> pdfDe(Paciente paciente) async {
+    final odontograma = paciente.record.consultas.first.odontograma!;
+    return ExpedientePdfBuilder.buildPdf(
+      paciente: paciente,
+      options: const ExpedientePrintOptions(incluirOdontograma: true),
+      odontograma: odontograma,
+      historialOdontogramas: [odontograma],
+      generadoEn: DateTime(2026, 7, 26),
+      theme: pw.ThemeData(),
+      compress: false,
+    );
+  }
+
+  test('el odontodiagrama pinta las marcas de las piezas', () async {
+    final sano = pacienteConOdontograma([
+      Diente(
+        id: 'diente-sano',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 16,
+      ),
+    ]);
+    final conCaries = pacienteConOdontograma([
+      Diente(
+        id: 'diente-caries',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 16,
+        diagnosis: [
+          DiagnosticoAplicado(
+            id: 'dx-1',
+            diagnosisId: 'caries',
+            severidad: SeveridadDiagnosis.moderada,
+            fechaAplicacion: DateTime(2026, 7, 20),
+            notas: '',
+            nombreDiagnostico: 'Caries dental',
+            superficie: TipoSuperficie.oclusal,
+          ),
+        ],
+      ),
+    ]);
+
+    final bytesSano = await pdfDe(sano);
+    final bytesConCaries = await pdfDe(conCaries);
+
+    expect(
+      bytesConCaries.length,
+      isNot(bytesSano.length),
+      reason:
+          'una caries oclusal en la pieza 16 debe cambiar el diagrama; si los '
+          'dos PDF son idénticos es que el odontodiagrama sigue vacío',
+    );
+  });
+
+  test('una pieza ausente estampa su símbolo', () async {
+    final sano = pacienteConOdontograma([
+      Diente(
+        id: 'diente-presente',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 26,
+      ),
+    ]);
+    final ausente = pacienteConOdontograma([
+      Diente(
+        id: 'diente-ausente',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 26,
+        estaAusente: true,
+      ),
+    ]);
+
+    expect((await pdfDe(ausente)).length, isNot((await pdfDe(sano)).length));
+  });
+
+  test('lo registrado sin pieza aparece en el expediente', () async {
+    final paciente = pacienteConOdontograma(const <Diente>[]);
+    final conGeneral = Paciente(
+      id: paciente.id,
+      nombre: paciente.nombre,
+      apellido: paciente.apellido,
+      birthDate: paciente.birthDate,
+      govID: paciente.govID,
+      contactos: paciente.contactos,
+      estatus: paciente.estatus,
+      genero: paciente.genero,
+      tipoPaciente: paciente.tipoPaciente,
+      trabajo: paciente.trabajo,
+      referencia: paciente.referencia,
+      citas: paciente.citas,
+      record: Record(
+        pacienteId: _pacienteId,
+        tipoSangre: TipoSangre.oPositivo,
+        condiciones: const <Condicion>[],
+        cirugiasPrevias: const [],
+        historialFamiliar: '',
+        consultas: [
+          Consulta(
+            id: 'consulta-general',
+            pacienteId: _pacienteId,
+            doctorId: 'doctor-1',
+            fecha: DateTime(2026, 7, 20),
+            tipoAtencion: TipoAtencionClinica.consulta,
+            motivoConsulta: 'Limpieza',
+            tratamientosGenerales: [
+              TratamientoAplicado(
+                id: 'ta-general',
+                tratamientoId: 'profilaxis',
+                esContinuo: false,
+                estaTerminado: true,
+                nombreTratamiento: 'Profilaxis dental',
+                fechaEjecucion: DateTime(2026, 7, 20),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final bytes = await ExpedientePdfBuilder.buildPdf(
+      paciente: conGeneral,
+      options: const ExpedientePrintOptions(),
+      generadoEn: DateTime(2026, 7, 26),
+      theme: pw.ThemeData(),
+      compress: false,
+    );
+    final raw = latin1.decode(bytes, allowInvalid: true);
+
+    expect(raw, contains('Profilaxis'));
+    // El flujo de contenido del PDF emite una palabra por operador de texto,
+    // así que se buscan los tokens sueltos y no la frase completa.
+    expect(
+      raw,
+      allOf(contains('(Sin)'), contains('(pieza)')),
+      reason:
+          'un tratamiento sin pieza se guardaba con diente_id NULL y no salía '
+          'en ninguna lectura (defecto D5)',
+    );
   });
 }

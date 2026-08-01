@@ -195,12 +195,53 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
 
   @override
   Future<Map<String, dynamic>?> fetchConsultaById(String id) async {
-    return await supabaseClient
+    final consulta = await supabaseClient
         .from('consultas')
         .select(_selectConsulta)
         .eq('id', id)
         .isFilter('deleted_at', null)
         .maybeSingle();
+    if (consulta == null) return null;
+
+    final fila = Map<String, dynamic>.from(consulta);
+    fila['generales'] = await fetchGeneralesConsulta(id);
+    return fila;
+  }
+
+  /// Lo registrado en la consulta **sin pieza**: profilaxis, gingivitis
+  /// generalizada, fluorización de arcada.
+  ///
+  /// `_selectConsulta` cuelga todo de `dientes`, así que estas filas —que la
+  /// base guarda con `diente_id NULL` (HFX-CLIN-003)— no salían por ningún
+  /// lado: se escribían bien y nadie las volvía a ver, ni en el detalle, ni en
+  /// el expediente, ni en el PDF (defecto D5). Van en consulta aparte y no
+  /// como embed filtrado para que ningún otro `select` de consultas las
+  /// arrastre por accidente mezcladas con las de pieza.
+  @override
+  Future<Map<String, List<Map<String, dynamic>>>> fetchGeneralesConsulta(
+    String consultaId,
+  ) async {
+    final (tratamientos, diagnosticos) = await (
+      supabaseClient
+          .from('tratamientos_aplicados')
+          .select('*, tratamiento:tratamientos(nombre, clave_odontograma)')
+          .eq('consulta_id', consultaId)
+          .isFilter('diente_id', null)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: true),
+      supabaseClient
+          .from('diagnosticos_aplicados')
+          .select('*, diagnosis:diagnosticos(nombre, clave_odontograma)')
+          .eq('consulta_id', consultaId)
+          .isFilter('diente_id', null)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: true),
+    ).wait;
+
+    return {
+      'tratamientos': List<Map<String, dynamic>>.from(tratamientos as List),
+      'diagnosticos': List<Map<String, dynamic>>.from(diagnosticos as List),
+    };
   }
 
   @override

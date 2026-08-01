@@ -214,8 +214,40 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
           diagnosticosGenerales: diagnosticosGenerales,
         ),
       );
-      return ResultadoBorradorConsulta.fromRpc(respuesta);
+      final resultado = ResultadoBorradorConsulta.fromRpc(respuesta);
+      return _conGeneralesDelServidor(resultado, consultaId);
     }, context: 'guardar el resultado de la consulta');
+  }
+
+  /// Relee del servidor lo registrado sin pieza, para que el estado en memoria
+  /// adopte sus ids.
+  ///
+  /// Un fallo aquí no invalida el guardado —que ya ocurrió y es transaccional—,
+  /// así que se devuelve el resultado sin generales confirmados en vez de
+  /// propagar el error. El único coste es que el siguiente autoguardado vuelva
+  /// a reinsertarlos.
+  Future<ResultadoBorradorConsulta> _conGeneralesDelServidor(
+    ResultadoBorradorConsulta resultado,
+    String consultaId,
+  ) async {
+    try {
+      final generales = await remoteDataSource.fetchGeneralesConsulta(
+        consultaId,
+      );
+      return resultado.conGenerales(
+        tratamientos: [
+          for (final fila in generales['tratamientos'] ?? const [])
+            TratamientoAplicadoModel.fromJson(fila),
+        ],
+        diagnosticos: [
+          for (final fila in generales['diagnosticos'] ?? const [])
+            DiagnosticoAplicadoModel.fromJson(fila),
+        ],
+      );
+    } catch (e) {
+      AppLog.error('releer los registros generales de la consulta', e);
+      return resultado;
+    }
   }
 
   @override

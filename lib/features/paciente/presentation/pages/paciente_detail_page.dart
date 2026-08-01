@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/resumen_financiero_paciente.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
+import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontogram_arch_widget.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -72,6 +73,24 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
       'Nov',
       'Dic',
     ][m - 1];
+  }
+
+  /// Diagnósticos de la visita: los de cada pieza más los que se anotaron sin
+  /// pieza. Las filas anuladas no cuentan: el chip resume lo vigente.
+  static int _conteoDiagnosticos(Consulta c) {
+    var total = c.diagnosticosGenerales.where((d) => !d.estaAnulado).length;
+    for (final diente in c.odontograma?.dientes ?? const <Diente>[]) {
+      total += diente.diagnosis.where((d) => !d.estaAnulado).length;
+    }
+    return total;
+  }
+
+  static int _conteoTratamientos(Consulta c) {
+    var total = c.tratamientosGenerales.where((t) => !t.estaAnulado).length;
+    for (final diente in c.odontograma?.dientes ?? const <Diente>[]) {
+      total += diente.tratamientos.where((t) => !t.estaAnulado).length;
+    }
+    return total;
   }
 
   String? _getDoctorNombre(Consulta c) {
@@ -930,6 +949,8 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
     final notas = c.notas?.trim() ?? '';
     final hasNotas = notas.isNotEmpty;
     final docNombre = _getDoctorNombre(c);
+    // Se cuenta lo de las piezas y lo general en el mismo número: para quien
+    // repasa el historial es «cuánto se hizo ese día», no dos listas.
 
     Widget itemCard = InkWell(
       onTap: () => _abrirDetalleConsulta(c),
@@ -1011,6 +1032,22 @@ class _PacienteDetailPageState extends State<PacienteDetailPage> {
                     label: 'Odontograma',
                     icon: Icons.medical_services_outlined,
                     color: ac.amber,
+                  ),
+                // Lo clínico de la visita: hasta ahora la línea de tiempo sólo
+                // decía si hubo recetas o documentos, y lo que el doctor
+                // registró —los diagnósticos y tratamientos, con pieza o sin
+                // ella— no se veía por ningún lado (defecto D5).
+                if (_conteoDiagnosticos(c) case final n when n > 0)
+                  _MiniChip(
+                    label: '$n diagnóstico(s)',
+                    icon: Icons.search_rounded,
+                    color: ac.indigo,
+                  ),
+                if (_conteoTratamientos(c) case final n when n > 0)
+                  _MiniChip(
+                    label: '$n tratamiento(s)',
+                    icon: Icons.healing_outlined,
+                    color: ac.primaryGreen,
                   ),
               ],
             ),

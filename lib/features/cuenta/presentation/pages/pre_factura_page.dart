@@ -27,7 +27,19 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/present
 class PreFacturaPage extends StatelessWidget {
   final String cuentaId;
 
-  const PreFacturaPage({super.key, required this.cuentaId});
+  /// Se llegó aquí justo después de cerrar la consulta.
+  ///
+  /// Cambia lo que se dice cuando la pre-factura no carga: sin este dato, el
+  /// usuario que acaba de firmar el cierre veía una pantalla roja y concluía
+  /// «error al terminar consulta», aunque la consulta había cerrado bien y la
+  /// cita ya estaba completada (defecto D7 de la jornada de QA del 1 ago 2026).
+  final bool desdeCierreConsulta;
+
+  const PreFacturaPage({
+    super.key,
+    required this.cuentaId,
+    this.desdeCierreConsulta = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +83,11 @@ class PreFacturaPage extends StatelessWidget {
                   ),
                 PreFacturaError(:final mensaje) => _EstadoError(
                   mensaje: mensaje,
+                  aclaracion: desdeCierreConsulta
+                      ? 'La consulta sí quedó cerrada y la cita, completada. '
+                            'Lo que no se pudo mostrar es esta pre-factura; '
+                            'ábrela de nuevo desde Cuentas por Cobrar.'
+                      : null,
                   onReintentar: () =>
                       context.read<PreFacturaCubit>().recargar(cuentaId),
                 ),
@@ -112,9 +129,14 @@ class _EstadoCargando extends StatelessWidget {
 
 class _EstadoError extends StatelessWidget {
   final String mensaje;
+  final String? aclaracion;
   final VoidCallback onReintentar;
 
-  const _EstadoError({required this.mensaje, required this.onReintentar});
+  const _EstadoError({
+    required this.mensaje,
+    required this.onReintentar,
+    this.aclaracion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +161,37 @@ class _EstadoError extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: ac.textSecondary, fontSize: 14),
             ),
+            if (aclaracion case final texto?) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ac.green.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: ac.green,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        texto,
+                        style: TextStyle(
+                          color: ac.textSecondary,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onReintentar,

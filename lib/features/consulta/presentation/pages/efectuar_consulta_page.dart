@@ -279,7 +279,12 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
         // reemplaza: así los llamadores que esperaban ese `true` (p. ej.
         // consultas_list_page) refrescan su lista.
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => PreFacturaPage(cuentaId: cuentaId)),
+          MaterialPageRoute(
+            builder: (_) => PreFacturaPage(
+              cuentaId: cuentaId,
+              desdeCierreConsulta: true,
+            ),
+          ),
           result: true,
         );
       } else {

@@ -43,7 +43,12 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
           odontograma: odontograma,
           historialPiezas: listo?.historialPiezas,
           formularioPersonalizado: OdontodiagramaExpediente(
-            evaluacion: odontograma.evaluacion,
+            // `evaluacion` sólo guarda los tejidos blandos —así lo define
+            // `evaluacionToJson`—, de modo que pasarla dejaba el odontodiagrama
+            // de esta vista sin un solo hallazgo, y su «Imprimir
+            // Odontodiagrama» en blanco (defecto D6c). Lo que describe la boca
+            // es la proyección de los tres ejes.
+            evaluacion: odontograma.evaluacionProyectada,
             nombrePaciente: nombrePaciente,
             fecha: consulta.fecha,
           ),

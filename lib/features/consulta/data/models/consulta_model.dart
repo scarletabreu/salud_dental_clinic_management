@@ -2,7 +2,9 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
+import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/models/diagnostico_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/data/models/documento_clinico_model.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/models/odontograma_model.dart';
 import 'package:salud_dental_clinic_management/features/receta/data/models/receta_model.dart';
 
@@ -25,6 +27,8 @@ class ConsultaModel extends Consulta {
     super.tienePreFactura,
     super.version,
     super.insumosUtilizados,
+    super.tratamientosGenerales,
+    super.diagnosticosGenerales,
   });
 
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
@@ -72,7 +76,29 @@ class ConsultaModel extends Consulta {
               cantidad: (fila['cantidad'] as num?)?.toInt() ?? 0,
             ),
       ],
+      // Lo registrado sin pieza llega en una colección hermana, no colgando de
+      // `dientes` (defecto D5): la escritura ya lo guardaba y la lectura lo
+      // ignoraba, así que se veía desaparecer al recargar la consulta.
+      tratamientosGenerales: [
+        for (final fila in _generales(json, 'tratamientos'))
+          TratamientoAplicadoModel.fromJson(fila),
+      ],
+      diagnosticosGenerales: [
+        for (final fila in _generales(json, 'diagnosticos'))
+          DiagnosticoAplicadoModel.fromJson(fila),
+      ],
     );
+  }
+
+  static List<Map<String, dynamic>> _generales(
+    Map<String, dynamic> json,
+    String clave,
+  ) {
+    final generales = json['generales'];
+    if (generales is! Map) return const [];
+    final lista = generales[clave];
+    if (lista is! List) return const [];
+    return lista.whereType<Map<String, dynamic>>().toList();
   }
 
   static OdontogramaModel? _parseOdontograma(dynamic raw) {

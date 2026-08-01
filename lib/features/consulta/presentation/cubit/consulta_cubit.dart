@@ -117,6 +117,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     final sellada = vigente.copyWith(
       version: confirmado.version,
       alertas: confirmado.alertas,
+      // Los generales se adoptan enteros del servidor: es lo que les da id y
+      // evita que el siguiente autoguardado los anule y los reinserte.
+      tratamientosGenerales: confirmado.generalesConfirmados
+          ? confirmado.tratamientosGenerales
+          : null,
+      diagnosticosGenerales: confirmado.generalesConfirmados
+          ? confirmado.diagnosticosGenerales
+          : null,
     );
     final odonto = sellada.odontograma;
     if (odonto == null || confirmado.sinIdentidades) {
@@ -1183,6 +1191,20 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     } catch (e) {
       _guardando = false;
       AppLog.error('terminar evaluación', e);
+      // Mismo trato que en `terminarConsulta`: si el servidor dice que ya está
+      // cerrada, el cierre ocurrió —típicamente un reintento tras un tiempo de
+      // espera agotado—. Emitir un error genérico sobre algo que sí se guardó
+      // es el «error al terminar consulta (sale como completada)» del defecto
+      // D7: el usuario ve rojo y la cita ya está completada.
+      if (e is ConsultaCerradaFailure) {
+        emit(
+          ConsultaCerradaEnServidor(
+            mensaje: e.message,
+            consultaId: consultaId,
+          ),
+        );
+        return;
+      }
       emit(
         ConsultaError(
           _mensajeError(e, fallback: 'No se pudo cerrar la evaluación.'),

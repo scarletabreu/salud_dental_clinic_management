@@ -60,6 +60,12 @@ abstract class ConsultaRemoteDatasource {
   );
   Future<Map<String, dynamic>?> fetchConsultaById(String id);
 
+  /// Diagnósticos y tratamientos de la consulta que no cuelgan de una pieza
+  /// (`diente_id NULL`). Devuelve `{'tratamientos': [...], 'diagnosticos': [...]}`.
+  Future<Map<String, List<Map<String, dynamic>>>> fetchGeneralesConsulta(
+    String consultaId,
+  );
+
   /// Filas `id, cita_id, finalizada` de las consultas de esas citas. Sirve
   /// tanto para enlazar la agenda con su consulta como para saber si queda
   /// alguna abierta (SD-160). Una lista vacía no consulta la red.

@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/receta/domain/entities/receta.dart';
@@ -791,119 +792,97 @@ class ExpedientePdfBuilder {
     );
   }
 
-  static Map<String, dynamic>? _objToMap(dynamic obj) {
-    if (obj == null) return null;
-    if (obj is Map<String, dynamic>) return obj;
-    if (obj is Map) return Map<String, dynamic>.from(obj);
-    try {
-      final res = obj.toJson();
-      if (res is Map) return Map<String, dynamic>.from(res);
-    } catch (_) {}
-    try {
-      final res = obj.toMap();
-      if (res is Map) return Map<String, dynamic>.from(res);
-    } catch (_) {}
-    return null;
-  }
-
+  /// El odontodiagrama del PDF se arma **con los campos tipados** de las
+  /// entidades, no convirtiéndolas a mapas por pato.
+  ///
+  /// Antes esto pasaba por un `_objToMap` que probaba `toJson()`/`toMap()` y
+  /// luego leía `oMap['dientes']`. `OdontogramaModel.toJson()` nunca ha emitido
+  /// `dientes`, y `HistorialPiezas` ni siquiera tiene `toJson` —su campo es
+  /// `porFdi`—, así que las 52 piezas evaluaban a vacío **siempre**: el
+  /// odontodiagrama del expediente jamás pintó una sola marca (defecto D6a de
+  /// la jornada de QA del 1 ago 2026). Al ser todo `dynamic`, ni el compilador
+  /// ni ningún test lo delataban.
   static _EstadoPiezaResultado _evaluarEstadoPieza(
     int fdi,
     List<Odontograma> lista,
     HistorialPiezas? hp,
   ) {
     final res = _EstadoPiezaResultado();
-    final fdiStr = '$fdi';
-    if (hp != null) {
-      final mapHp = _objToMap(hp);
-      if (mapHp != null) {
-        final piezasList = mapHp['piezas'] ?? mapHp['historial'] ?? [];
-        if (piezasList is Iterable) {
-          for (final p in piezasList) {
-            final pMap = _objToMap(p);
-            if (pMap != null &&
-                '${pMap['fdiCode'] ?? pMap['fdi_code'] ?? pMap['fdi'] ?? pMap['numero']}' ==
-                    fdiStr) {
-              _procesarRelacionesDePieza(pMap, res);
-              return res;
-            }
-          }
-        }
+
+    // El historial consolidado, cuando lo hay, ya trae las tres capas
+    // (histórico, evaluado, planificado, ejecutado) de esa pieza.
+    final historial = hp?[fdi];
+    if (historial != null && !historial.estaVacio) {
+      for (final marca in historial.eventos) {
+        // Una fila anulada se conserva en la ficha como constancia, pero no
+        // describe el estado actual de la boca: no debe teñir la cara.
+        if (marca.anulada || !marca.vigente) continue;
+        _procesarMarca(
+          nombre: marca.titulo,
+          superficie: marca.superficie?.name,
+          esDiagnostico: marca.tipo == TipoMarcaClinica.hallazgo,
+          res: res,
+        );
       }
+      return res;
     }
 
-    for (final o in lista) {
-      final oMap = _objToMap(o);
-      if (oMap == null) continue;
-
-      final dientesList = oMap['dientes'] ?? oMap['piezas'] ?? [];
-
-      if (dientesList is Iterable) {
-        for (final diente in dientesList) {
-          final dMap = _objToMap(diente);
-          if (dMap != null &&
-              '${dMap['fdi_code'] ?? dMap['fdiCode'] ?? dMap['numero']}' ==
-                  fdiStr) {
-            _procesarRelacionesDePieza(dMap, res);
-            break;
-          }
-        }
+    for (final odontograma in lista) {
+      for (final diente in odontograma.dientes) {
+        if (diente.fdiCode != fdi) continue;
+        _procesarPieza(diente, res);
       }
     }
 
     return res;
   }
 
-  static void _procesarRelacionesDePieza(
-    Map<String, dynamic> pMap,
-    _EstadoPiezaResultado res,
-  ) {
-    if (pMap['esta_ausente'] == true || pMap['estaAusente'] == true) {
+  static void _procesarPieza(Diente diente, _EstadoPiezaResultado res) {
+    if (diente.estaAusente) {
       res.simbolo = 'X';
       res.colorSimbolo = PdfColors.red800;
     }
 
-    final diagnosticos =
-        pMap['diagnosis'] ??
-        pMap['diagnosticos'] ??
-        pMap['diagnosticos_aplicados'];
-    if (diagnosticos is Iterable) {
-      for (final d in diagnosticos) {
-        final dMap = _objToMap(d);
-        if (dMap != null) {
-          _procesarHallazgoRelacional(dMap, res, esDiagnostico: true);
-        }
-      }
+    // Lo de esta consulta y lo de las anteriores pintan igual: el expediente
+    // describe el estado de la boca, no en qué visita se anotó cada cosa.
+    for (final diagnostico in [
+      ...diente.diagnosis,
+      ...diente.diagnosticosHistoricos,
+    ]) {
+      if (diagnostico.anuladoEn != null) continue;
+      _procesarMarca(
+        nombre: diagnostico.nombreDiagnostico ?? '',
+        superficie: diagnostico.superficie?.name,
+        esDiagnostico: true,
+        res: res,
+      );
     }
 
-    final tratamientos = pMap['tratamientos'] ?? pMap['tratamientos_aplicados'];
-    if (tratamientos is Iterable) {
-      for (final t in tratamientos) {
-        final tMap = _objToMap(t);
-        if (tMap != null) {
-          _procesarHallazgoRelacional(tMap, res, esDiagnostico: false);
-        }
-      }
+    for (final tratamiento in [
+      ...diente.tratamientos,
+      ...diente.tratamientosHistoricos,
+    ]) {
+      if (tratamiento.anuladoEn != null) continue;
+      _procesarMarca(
+        nombre: tratamiento.nombreTratamiento ?? '',
+        superficie: tratamiento.superficie?.name,
+        esDiagnostico: false,
+        res: res,
+      );
     }
   }
 
-  static void _procesarHallazgoRelacional(
-    Map<String, dynamic> map,
-    _EstadoPiezaResultado res, {
+  static void _procesarMarca({
+    required String nombre,
+    required String? superficie,
     required bool esDiagnostico,
+    required _EstadoPiezaResultado res,
   }) {
-    String nombre = '${map['nombre'] ?? ''}';
+    final titulo = nombre.trim().isEmpty
+        ? (esDiagnostico ? 'caries' : 'restauración')
+        : nombre;
 
-    if (nombre.isEmpty && map['diagnosis'] is Map) {
-      nombre = '${_objToMap(map['diagnosis'])?['nombre'] ?? ''}';
-    }
-    if (nombre.isEmpty && map['tratamiento'] is Map) {
-      nombre = '${_objToMap(map['tratamiento'])?['nombre'] ?? ''}';
-    }
-    if (nombre.isEmpty) {
-      nombre = esDiagnostico ? 'caries' : 'restauración';
-    }
-
-    final estadoStr = nombre.toLowerCase();
+    final estadoStr = titulo.toLowerCase();
 
     if (estadoStr.contains('pulp') ||
         estadoStr.contains('endo') ||
@@ -921,12 +900,13 @@ class ExpedientePdfBuilder {
       res.colorSimbolo = PdfColors.red800;
     }
 
-    final superficie = map['superficie'];
-    if (superficie is String && superficie.isNotEmpty) {
-      _aplicarColorSuperficie(superficie, estadoStr, res);
-    } else {
-      _aplicarColorSuperficie('oclusal', estadoStr, res);
-    }
+    // Sin cara concreta la marca es de la pieza entera; se estampa en oclusal,
+    // que es donde el formulario en papel anota lo que no distingue cara.
+    _aplicarColorSuperficie(
+      superficie != null && superficie.isNotEmpty ? superficie : 'oclusal',
+      estadoStr,
+      res,
+    );
   }
 
   static void _aplicarColorSuperficie(
@@ -1480,6 +1460,17 @@ class ExpedientePdfBuilder {
           );
         }
       }
+      for (final diagnostico in evaluacion.diagnosticosGenerales) {
+        final nombre =
+            _textoNoVacio(diagnostico.nombreDiagnostico) ?? 'Diagnóstico';
+        final notas = diagnostico.notas.trim().isEmpty
+            ? ''
+            : ' · ${diagnostico.notas.trim()}';
+        hallazgos.add(
+          'Sin pieza (general): $nombre$notas'
+          '${diagnostico.estaAnulado ? ' · ANULADO' : ''}',
+        );
+      }
       final partes = <String>[
         if (_textoNoVacio(evaluacion.motivoConsulta) case final motivo?)
           'Motivo: $motivo',
@@ -1521,6 +1512,16 @@ class ExpedientePdfBuilder {
           }
         }
       }
+      // Lo ejecutado sin pieza cuelga de la consulta, no de un diente.
+      for (final tratamiento in consulta.tratamientosGenerales) {
+        final clave =
+            tratamiento.id ??
+            '${consulta.id}|general|${tratamiento.tratamientoId}|'
+                '${tratamiento.fechaEjecucion ?? tratamiento.fechaAplicacion}';
+        if (vistos.add(clave)) {
+          resultados.add(_TratamientoExpediente(consulta, null, tratamiento));
+        }
+      }
     }
     return resultados;
   }
@@ -1539,7 +1540,7 @@ class ExpedientePdfBuilder {
       pw.SizedBox(height: 4),
       for (final item in tratamientos)
         ..._clinicalCards(
-          '${fechaLargaEs(item.fecha)} · Pieza ${item.diente.fdiCode}',
+          '${fechaLargaEs(item.fecha)} · ${item.referenciaPieza}',
           [
             item.tratamiento.nombreTratamiento ?? 'Tratamiento',
             'Estado: ${item.tratamiento.estaAnulado ? 'Anulado' : _labelEnum(item.tratamiento.estado.dbValue)}',
@@ -1714,10 +1715,17 @@ class ExpedientePdfBuilder {
 
 class _TratamientoExpediente {
   final Consulta consulta;
-  final Diente diente;
+
+  /// `null` cuando el tratamiento no corresponde a una pieza concreta
+  /// (profilaxis, fluorización de arcada). La base los guarda con
+  /// `diente_id NULL` y antes el expediente no los recogía (defecto D5).
+  final Diente? diente;
   final TratamientoAplicado tratamiento;
 
   const _TratamientoExpediente(this.consulta, this.diente, this.tratamiento);
+
+  String get referenciaPieza =>
+      diente == null ? 'Sin pieza (general)' : 'Pieza ${diente!.fdiCode}';
 
   DateTime get fecha =>
       tratamiento.fechaEjecucion ??

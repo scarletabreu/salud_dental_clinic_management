@@ -30,7 +30,9 @@ y reconstruir una instancia idéntica desde cero.
 
 * **`supabase/schema.sql`**: dump de referencia regenerado desde la base migrada.
   Sirve para leer la estructura y para diffs; **ya no es el camino de bootstrap**.
-  Si queda desfasado se regenera con `supabase db dump --linked -f supabase/schema.sql`.
+  Si queda desfasado se regenera con `supabase db dump --local -f supabase/schema.sql`
+  después de un `db reset` (así refleja lo que describen las migraciones, no lo
+  que haya derivado en la instancia).
 
 * **`supabase/*.sql` (raíz)**: scripts históricos (`sd-81`, `sd-84`, `sd-96`, …) que se
   ejecutaron a mano antes de adoptar el CLI. Se conservan como registro. **No crear
@@ -41,6 +43,20 @@ y reconstruir una instancia idéntica desde cero.
 > Antes del próximo `db push` hay que hacer un `supabase migration repair`
 > marcando la línea base como aplicada. **No se ha tocado nada remoto**, y no debe
 > tocarse sin decisión explícita.
+
+> 🚨 **`supabase db diff --linked` no sirve como gate de deriva.** El 1 ago 2026
+> devolvió «No schema changes found» mientras producción tenía tres tablas,
+> cuatro vistas, diez triggers y catorce policies que la base local no tenía
+> (HFX-QA-100). El motor `pg-delta` cachea catálogos por hash del conjunto de
+> migraciones y, cuando el hash coincide a ambos lados, da la comparación por
+> buena sin mirar la estructura. Usa en su lugar:
+>
+> ```bash
+> tool/produccion/deriva_esquema.sh
+> ```
+>
+> que vuelca las dos bases y compara los conjuntos de sentencias. Sale con 1 si
+> hay deriva.
 
 ---
 

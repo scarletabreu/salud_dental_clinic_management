@@ -4280,6 +4280,7 @@ CREATE OR REPLACE FUNCTION "public"."hfx_qa_108_normalizar_alcance_historico"() 
     AS $$
 declare
   v_tratamientos_generales integer := 0;
+  v_tratamientos_diente_inferidos integer := 0;
   v_tratamientos_diente integer := 0;
   v_diagnosticos_generales integer := 0;
   v_diagnosticos_diente integer := 0;
@@ -4297,6 +4298,34 @@ begin
      and t.alcance in ('arcada', 'global')
      and (ta.diente_id is not null or ta.superficie is not null);
   get diagnostics v_tratamientos_generales = row_count;
+
+  -- Un tratamiento de diente puede recuperar su pieza sin adivinar cuando la
+  -- actividad del plan está vinculada a un diagnóstico con pieza. No se copia
+  -- el `diente_id` histórico directamente: si la ejecución ocurrió en otra
+  -- consulta, se busca la pieza del odontograma ejecutor por su código FDI.
+  update tratamientos_aplicados ta
+     set diente_id = destino.id,
+         superficie = null,
+         updated_at = now()
+    from tratamientos t,
+         items_plan_tratamiento ip,
+         diagnosticos_aplicados da,
+         dientes origen,
+         odontogramas od_destino,
+         dientes destino
+   where t.id = ta.tratamiento_id
+     and t.alcance = 'diente'
+     and ta.deleted_at is null
+     and ta.diente_id is null
+     and ip.id = ta.item_plan_id
+     and da.id = ip.diagnostico_aplicado_id
+     and origen.id = da.diente_id
+     and od_destino.consulta_id = ta.consulta_id
+     and od_destino.deleted_at is null
+     and destino.odontograma_id = od_destino.id
+     and destino.deleted_at is null
+     and destino.fdi_code = origen.fdi_code;
+  get diagnostics v_tratamientos_diente_inferidos = row_count;
 
   update tratamientos_aplicados ta
      set superficie = null,
@@ -4372,6 +4401,7 @@ begin
 
   return jsonb_build_object(
     'tratamientos_generales_normalizados', v_tratamientos_generales,
+    'tratamientos_diente_inferidos', v_tratamientos_diente_inferidos,
     'tratamientos_diente_normalizados', v_tratamientos_diente,
     'diagnosticos_generales_normalizados', v_diagnosticos_generales,
     'diagnosticos_diente_normalizados', v_diagnosticos_diente,

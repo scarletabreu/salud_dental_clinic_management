@@ -66,6 +66,24 @@ begin
   alter table public.tratamientos_aplicados enable trigger user;
   alter table public.diagnosticos_aplicados enable trigger user;
 
+  insert into public.planes_tratamiento (
+    id, paciente_id, consulta_origen_id, doctor_id, estado
+  ) values (
+    '10800000-0000-4000-8000-000000000501', v_paciente, v_consulta,
+    v_doc, 'borrador'
+  );
+  insert into public.items_plan_tratamiento (
+    id, plan_id, tratamiento_id, diagnostico_aplicado_id, estado
+  ) values (
+    '10800000-0000-4000-8000-000000000502',
+    '10800000-0000-4000-8000-000000000501',
+    '10800000-0000-4000-8000-000000000103',
+    '10800000-0000-4000-8000-000000000403', 'aceptado'
+  );
+  update public.tratamientos_aplicados
+     set item_plan_id = '10800000-0000-4000-8000-000000000502'
+   where id = '10800000-0000-4000-8000-000000000303';
+
   update public.dientes
      set tratamientos_aplicados_ids = array[
        '10800000-0000-4000-8000-000000000301'::uuid,
@@ -85,13 +103,14 @@ begin
   v_resultado := public.hfx_qa_108_normalizar_alcance_historico();
 
   if (v_resultado ->> 'tratamientos_generales_normalizados')::int <> 1
+     or (v_resultado ->> 'tratamientos_diente_inferidos')::int <> 1
      or (v_resultado ->> 'tratamientos_diente_normalizados')::int <> 1
      or (v_resultado ->> 'diagnosticos_generales_normalizados')::int <> 1
      or (v_resultado ->> 'diagnosticos_diente_normalizados')::int <> 1 then
     raise exception 'cantidades normalizadas inesperadas: %', v_resultado;
   end if;
 
-  if (v_resultado ->> 'tratamientos_ambiguos_pendientes')::int <> 1
+  if (v_resultado ->> 'tratamientos_ambiguos_pendientes')::int <> 0
      or (v_resultado ->> 'diagnosticos_ambiguos_pendientes')::int <> 1 then
     raise exception 'los casos ambiguos no fueron informados: %', v_resultado;
   end if;
@@ -108,6 +127,12 @@ begin
        and diente_id = v_diente and superficie is null
   ) then raise exception 'el tratamiento de diente no se normalizó'; end if;
 
+  if not exists (
+    select 1 from public.tratamientos_aplicados
+     where id = '10800000-0000-4000-8000-000000000303'
+       and diente_id = v_diente and superficie is null
+  ) then raise exception 'el plan no recuperó el diente desde su diagnóstico'; end if;
+
   if exists (
     select 1 from public.diagnosticos_aplicados
      where id = '10800000-0000-4000-8000-000000000401'
@@ -120,8 +145,14 @@ begin
        and diente_id = v_diente and superficie is null
   ) then raise exception 'el diagnóstico de diente no se normalizó'; end if;
 
-  if (select tratamientos_aplicados_ids from public.dientes where id = v_diente)
-     <> array['10800000-0000-4000-8000-000000000302'::uuid] then
+  if not (
+    select cardinality(tratamientos_aplicados_ids) = 2
+       and tratamientos_aplicados_ids @> array[
+         '10800000-0000-4000-8000-000000000302'::uuid,
+         '10800000-0000-4000-8000-000000000303'::uuid
+       ]
+      from public.dientes where id = v_diente
+  ) then
     raise exception 'la proyección auxiliar del diente no se reconstruyó';
   end if;
 
@@ -135,6 +166,7 @@ declare
 begin
   v_resultado := public.hfx_qa_108_normalizar_alcance_historico();
   if (v_resultado ->> 'tratamientos_generales_normalizados')::int <> 0
+     or (v_resultado ->> 'tratamientos_diente_inferidos')::int <> 0
      or (v_resultado ->> 'tratamientos_diente_normalizados')::int <> 0
      or (v_resultado ->> 'diagnosticos_generales_normalizados')::int <> 0
      or (v_resultado ->> 'diagnosticos_diente_normalizados')::int <> 0

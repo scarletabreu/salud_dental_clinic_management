@@ -71,13 +71,13 @@ class ShellDestinationAccess {
         return roles.puedeEjercerClinica;
       case ShellDestinationId.pacientes:
       case ShellDestinationId.citasDelDia:
-      case ShellDestinationId.cuentasPorCobrar:
         return _hasAnyRole(roles, const [
           RolUsuario.admin,
           RolUsuario.doctor,
           RolUsuario.asistente,
         ]);
       case ShellDestinationId.caja:
+      case ShellDestinationId.cuentasPorCobrar:
         return roles.puedeGestionarCaja;
       case ShellDestinationId.inicio:
         return true;

@@ -97,6 +97,39 @@ Future<void> escribirEnCampo(
   );
 }
 
+/// Inicia sesión con las credenciales del seed de certificación.
+Future<void> iniciarSesion(WidgetTester tester, String usuario) async {
+  await esperarPor(
+    tester,
+    find.text('Clínica Salud Dental Integral'),
+    descripcion: 'la pantalla de login',
+  );
+  expect(
+    find.textContaining('Revise la configuración'),
+    findsNothing,
+    reason: 'la app arrancó en la pantalla de fallo de configuración',
+  );
+
+  final campos = find.byType(TextFormField);
+  expect(campos, findsNWidgets(2));
+  await tester.enterText(campos.at(0), usuario);
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.enterText(campos.at(1), _clave);
+  await tester.pump(const Duration(milliseconds: 100));
+
+  // El botón de acceso no es un `ElevatedButton`: es un `InkWell` dentro de
+  // un `AnimatedContainer` pintado a mano, así que se busca por su texto.
+  await tester.tap(find.text('Iniciar sesión'), warnIfMissed: false);
+  await tester.pump(const Duration(milliseconds: 500));
+
+  await esperarPor(
+    tester,
+    find.text('Inicio'),
+    limite: const Duration(seconds: 45),
+    descripcion: 'el dashboard tras iniciar sesión',
+  );
+}
+
 /// Navega por el destino `etiqueta` del shell y comprueba que pinta algo.
 Future<void> abrirDestino(WidgetTester tester, String etiqueta) async {
   final destino = find.text(etiqueta);
@@ -146,47 +179,50 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     // -------------------------------------------------------------------
-    // 1 · La app arranca en el login, no en la pantalla de fallo de arranque
+    // 1-2 · Arranque e inicio de sesión
     // -------------------------------------------------------------------
-    await esperarPor(
-      tester,
-      find.text('Clínica Salud Dental Integral'),
-      descripcion: 'la pantalla de login',
-    );
-    expect(
-      find.textContaining('Revise la configuración'),
-      findsNothing,
-      reason: 'la app arrancó en la pantalla de fallo de configuración',
-    );
-
-    // -------------------------------------------------------------------
-    // 2 · Inicio de sesión con las credenciales del seed
-    // -------------------------------------------------------------------
-    final campos = find.byType(TextFormField);
-    expect(campos, findsNWidgets(2));
-    await tester.enterText(campos.at(0), _usuario);
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.enterText(campos.at(1), _clave);
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // El botón de acceso no es un `ElevatedButton`: es un `InkWell` dentro de
-    // un `AnimatedContainer` pintado a mano, así que se busca por su texto.
-    await tester.tap(find.text('Iniciar sesión'), warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 500));
-
-    await esperarPor(
-      tester,
-      find.text('Inicio'),
-      limite: const Duration(seconds: 45),
-      descripcion: 'el dashboard tras iniciar sesión',
-    );
+    await iniciarSesion(tester, _usuario);
 
     // -------------------------------------------------------------------
     // 3 · Recorrido por los destinos que el actor tiene a su alcance
     // -------------------------------------------------------------------
-    for (final destino in const ['Consultas', 'Pacientes', 'Inicio']) {
+    for (final destino in const [
+      'Consultas',
+      'Pacientes',
+      'Perfiles',
+      'Inicio',
+    ]) {
       await abrirDestino(tester, destino);
     }
+
+    // -------------------------------------------------------------------
+    // 3.b · Defecto D19 · Equipos aparece UNA sola vez en la navegación
+    // -------------------------------------------------------------------
+    // Antes era destino de primer nivel Y pestaña de Inventario: dos entradas
+    // para la misma pantalla.
+    expect(
+      find.text('Equipos'),
+      findsNothing,
+      reason:
+          'Equipos volvió a ser destino de primer nivel; su sitio es la '
+          'pestaña de Inventario (defecto D19)',
+    );
+    // La otra mitad —que Equipos siga estando como pestaña de Inventario— la
+    // fija `test/responsive_shell_test.dart` sobre la estructura de
+    // navegación. Aquí no se afirma: el `TabBar` de Inventario no se pinta de
+    // forma observable en este arnés headless y afirmarlo sólo añadía
+    // intermitencia, no seguridad.
+    await abrirDestino(tester, 'Inventario');
+
+    // -------------------------------------------------------------------
+    // 3.c · Defecto D8 (control positivo) · el admin sí edita el catálogo
+    // -------------------------------------------------------------------
+    await abrirDestino(tester, 'Tratamientos');
+    expect(
+      find.text('Nuevo servicio'),
+      findsWidgets,
+      reason: 'el admin debe poder crear tratamientos (control positivo D8)',
+    );
 
     // -------------------------------------------------------------------
     // 4 · Alta de un paciente, entera por la interfaz
@@ -285,4 +321,5 @@ void main() {
       reason: 'la interfaz lanzó excepciones durante el recorrido',
     );
   });
+
 }

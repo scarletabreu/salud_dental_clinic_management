@@ -1,0 +1,32 @@
+▶ Creando actores
+  ✓ actores autenticados
+▶ Sembrando paciente, cita y tratamiento
+  ✓ escenario sembrado
+
+▶ D8 · el doctor no escribe el catálogo
+OK    · el doctor no cambió el precio (HTTP 200, costo sigue en 1500.00)
+OK    · el doctor no crea tratamientos (HTTP 403)
+OK    · el doctor no borra del catálogo (HTTP 200)
+OK    · control positivo: el admin sí edita el catálogo
+
+▶ D12 · alcance y estados de la asistente
+OK    · la asistente no ve la cita de un doctor que no asiste
+OK    · control positivo: la asistente sí ve la del doctor que asiste
+OK    · la asistente sí registra la llegada (administrativo)
+OK    · la asistente no pone una cita en consulta (HTTP 403, sigue en en_espera)
+
+▶ D12 · estados que el doctor no cambia
+OK    · el doctor no marca la inasistencia (HTTP 403, sigue en en_espera)
+OK    · el doctor no toca la cita de otro doctor (HTTP 200, sigue en programada)
+
+▶ D11 (TEMPORAL) · la lectura de consultas ajenas está abierta
+OK    · el doctor lee la consulta de otro doctor (decisión D11, temporal)
+OK    · leer no es firmar: no escribió sobre la consulta ajena (HTTP 200)
+
+▶ D9/D13 · el doctor no llega al dinero
+OK    · el doctor no ejecuta marcar_cuotas_vencidas (HTTP 403)
+
+▶ HFX-CLIN-009 · la bitácora sigue cerrada al cliente
+OK    · ni el admin lee auditoria_log por la API (HTTP 403)
+
+✓ Todos los controles negativos se comportaron como debe.

@@ -64,25 +64,42 @@ echo "  ✓ chromedriver en :4444 (pid $CHROMEDRIVER_PID)"
 echo '▶ Conduciendo la aplicación (headless)'
 export CHROME_EXECUTABLE="${CHROME_EXECUTABLE:-/usr/bin/chromium}"
 
-flutter drive \
-  --driver=test_driver/integration_test.dart \
-  --target=integration_test/jornada_ui_test.dart \
-  -d web-server \
-  --browser-name=chrome \
-  --chrome-binary="$CHROME_EXECUTABLE" \
-  --headless \
-  --browser-dimension=1440x900 \
-  --dart-define=APP_ENVIRONMENT=development \
-  --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-  --dart-define=SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" \
-  2>&1 | tee "$EVIDENCIA/jornada_ui.log"
+# Cada jornada va en su propia invocación —y por tanto en su propio navegador—
+# porque `app.main()` no reinicia la sesión: Supabase la persiste y un segundo
+# arranque en el mismo proceso entraría ya autenticado, sin volver a ver el
+# login. Compartir proceso hacía que la segunda jornada fallara siempre.
+conducir() {
+  local objetivo="$1" registro="$2"
+  flutter drive \
+    --driver=test_driver/integration_test.dart \
+    --target="$objetivo" \
+    -d web-server \
+    --browser-name=chrome \
+    --chrome-binary="$CHROME_EXECUTABLE" \
+    --headless \
+    --browser-dimension=1440x900 \
+    --dart-define=APP_ENVIRONMENT=development \
+    --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+    --dart-define=SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" \
+    2>&1 | tee "$EVIDENCIA/$registro"
+  return "${PIPESTATUS[0]}"
+}
 
-ESTADO="${PIPESTATUS[0]}"
+conducir integration_test/jornada_ui_test.dart jornada_ui.log
+ESTADO=$?
 if [[ "$ESTADO" -ne 0 ]]; then
-  echo "  ✗ jornada por interfaz fallida (exit $ESTADO) → docs/qa/e2e-ui/jornada_ui.log"
+  echo "  ✗ jornada del admin fallida (exit $ESTADO) → docs/qa/e2e-ui/jornada_ui.log"
   exit "$ESTADO"
 fi
-echo "  ✓ jornada por interfaz superada → docs/qa/e2e-ui/jornada_ui.log"
+echo '  ✓ jornada del admin superada → docs/qa/e2e-ui/jornada_ui.log'
+
+conducir integration_test/jornada_ui_doctora_test.dart jornada_ui_doctora.log
+ESTADO=$?
+if [[ "$ESTADO" -ne 0 ]]; then
+  echo "  ✗ jornada de la doctora fallida (exit $ESTADO) → docs/qa/e2e-ui/jornada_ui_doctora.log"
+  exit "$ESTADO"
+fi
+echo '  ✓ jornada de la doctora superada → docs/qa/e2e-ui/jornada_ui_doctora.log'
 
 # El alta puede «parecer» correcta en pantalla y no haber escrito nada, así que
 # la última palabra la tiene la base: el paciente existe y su expediente nació

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/tarjeta_opcion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
@@ -163,36 +164,34 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  _OptionTile(
+                  TarjetaOpcion(
                     key: const Key('expediente_con_odontograma'),
                     titulo: 'Expediente con odontograma',
                     subtitulo:
                         'Incluye el odontograma clínico consolidado del paciente',
                     icono: Icons.layers_rounded,
-                    selected:
+                    seleccionada:
                         _opcionSeleccionada ==
                         TipoExpedienteImpresion.conOdontograma,
                     onTap: () => setState(
                       () => _opcionSeleccionada =
                           TipoExpedienteImpresion.conOdontograma,
                     ),
-                    ac: ac,
                   ),
                   const SizedBox(height: 10),
-                  _OptionTile(
+                  TarjetaOpcion(
                     key: const Key('expediente_sin_odontograma'),
                     titulo: 'Expediente sin odontograma',
                     subtitulo:
                         'Incluye todos los datos clínicos, sin el diagrama dental',
                     icono: Icons.description_rounded,
-                    selected:
+                    seleccionada:
                         _opcionSeleccionada ==
                         TipoExpedienteImpresion.sinOdontograma,
                     onTap: () => setState(
                       () => _opcionSeleccionada =
                           TipoExpedienteImpresion.sinOdontograma,
                     ),
-                    ac: ac,
                   ),
                 ],
               ),
@@ -290,106 +289,6 @@ class _GenerarExpedienteModalState extends State<GenerarExpedienteModal> {
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OptionTile extends StatelessWidget {
-  final String titulo;
-  final String subtitulo;
-  final IconData icono;
-  final bool selected;
-  final VoidCallback onTap;
-  final AppColors ac;
-
-  const _OptionTile({
-    super.key,
-    required this.titulo,
-    required this.subtitulo,
-    required this.icono,
-    required this.selected,
-    required this.onTap,
-    required this.ac,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: selected ? ac.primaryGreen.withValues(alpha: 0.08) : ac.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected
-                ? ac.primaryGreen
-                : colorScheme.outlineVariant.withValues(alpha: 0.4),
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icono,
-              color: selected
-                  ? ac.primaryGreen
-                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    titulo,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    subtitulo,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.75,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? ac.primaryGreen : Colors.transparent,
-                border: Border.all(
-                  color: selected
-                      ? ac.primaryGreen
-                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  width: 2,
-                ),
-              ),
-              child: selected
-                  ? const Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    )
-                  : null,
             ),
           ],
         ),

@@ -8,6 +8,8 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/
 import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/resumen_cita.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/iniciar_consulta_desde_cita.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 
 /// Valor centinela para iniciar el flujo clínico unificado.
 const _kEfectuarConsulta = 'efectuar_consulta';
@@ -450,13 +452,13 @@ class _CitaBlock extends StatelessWidget {
 
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    // Solo se efectúan citas en espera; al efectuarse pasan a EN_CONSULTA.
-    final esEfectuable = cita.estado == EstadoCita.enEspera;
-    final puedeEfectuar =
-        esEfectuable &&
-        pacienteId != null &&
-        doctorId != null &&
-        cita.id != null;
+    // Mismo criterio que la lista y que la tarjeta de siguiente paciente
+    // (defecto D14): esta vista sólo miraba el estado, así que ofrecía iniciar
+    // la consulta de una cita de otro doctor y la RPC la rechazaba con CL015.
+    final puedeEfectuar = PuedeIniciarConsulta.evaluar(
+      context.read<AuthCubit>().state,
+      cita,
+    ).permitido;
 
     // Enlace hacia la consulta que esta cita ya originó (SD-160): sin él, desde
     // la agenda no había forma de llegar al acto clínico que le corresponde.

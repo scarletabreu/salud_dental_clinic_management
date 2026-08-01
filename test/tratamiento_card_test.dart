@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_us
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_card.dart';
 import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
+import 'support/sesion_de_prueba.dart';
 
 final _tratamiento = Tratamiento(
   id: 't1',
@@ -20,11 +21,17 @@ Widget _card(double width) => MaterialApp(
   // The card reads AppColors off the theme extension, so the real theme is
   // required rather than the bare default.
   theme: AppTheme.light,
-  home: Scaffold(
-    body: Center(
-      child: SizedBox(
-        width: width,
-        child: TratamientoCard(tratamiento: _tratamiento, onEdit: () {}),
+  // La tarjeta ya depende de quién mira: el precio y los botones de edición
+  // sólo son del admin (defecto D8). Estas pruebas miden la maquetación en su
+  // caso más denso, así que montan la sesión de admin.
+  home: proveedorSesion(
+    RolUsuario.admin,
+    child: Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: width,
+          child: TratamientoCard(tratamiento: _tratamiento, onEdit: () {}),
+        ),
       ),
     ),
   ),

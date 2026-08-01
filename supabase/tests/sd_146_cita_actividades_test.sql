@@ -209,6 +209,11 @@ begin
   insert into asistentes (id, turno, updated_at)
   values (v_asistente_id, 'matutino', now());
 
+  -- Desde HFX-QA-103 el alcance de una asistente son los doctores que asiste
+  -- (defecto D12): sin esta asignación la cita le sería invisible.
+  insert into doctor_asistentes (doctor_id, asistente_id)
+  values (v_doctor_id, v_asistente_id);
+
   perform set_config('request.jwt.claims',
                      json_build_object('sub', v_asistente_id)::text, true);
   set local role authenticated;

@@ -81,7 +81,12 @@ void main() {
     expect(find.text('Iniciar consulta'), findsNothing);
   });
 
-  testWidgets('el doctor tiene la vía de urgencia y no la de agendar', (
+  // Antes esta prueba fijaba que el doctor sólo tenía la vía de urgencia. QA
+  // lo señaló como defecto (D10): degradar una cita normal a urgencia falsea
+  // el motivo y salta el control de solapamiento. La base ya le permitía
+  // insertar citas propias desde HFX-CLIN-001; ahora la pantalla también, con
+  // el selector de odontólogo fijo en él.
+  testWidgets('el doctor tiene ambas vías, y agenda sólo para sí mismo', (
     tester,
   ) async {
     _viewport(tester);
@@ -93,7 +98,10 @@ void main() {
       find.byTooltip('Registrar urgencia (paciente sin cita)'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FloatingActionButton, 'Nueva Cita'), findsNothing);
+    expect(
+      find.widgetWithText(FloatingActionButton, 'Nueva Cita'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('quien gestiona la agenda tiene ambas vías', (tester) async {

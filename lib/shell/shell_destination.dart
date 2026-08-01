@@ -54,12 +54,12 @@ class ShellDestinationAccess {
           RolUsuario.doctor,
           RolUsuario.asistente,
         ]);
-      // «Administrar personal» es capacidad sólo del admin, pero hoy el doctor
-      // entra a Perfiles para gestionar sus asistentes. Estrechar ese acceso
-      // cambia comportamiento y se decide en HFX-CLIN-001, con su prueba de
-      // autorización; aquí sólo se deja de comparar roles a mano.
+      // Deuda saldada en la jornada de QA del 1 ago 2026 (defecto D9):
+      // `administrarPersonal` siempre fue capacidad sólo del admin y Perfiles
+      // seguía abierto al doctor «por si gestiona sus asistentes». QA lo pidió
+      // cerrado; asignar asistentes es administración.
       case ShellDestinationId.perfiles:
-        return roles.puedeEjercerClinica;
+        return roles.puedeAdministrarPersonal;
       case ShellDestinationId.equipos:
       case ShellDestinationId.inventario:
       case ShellDestinationId.medicinas:
@@ -71,12 +71,15 @@ class ShellDestinationAccess {
         return roles.puedeEjercerClinica;
       case ShellDestinationId.pacientes:
       case ShellDestinationId.citasDelDia:
-      case ShellDestinationId.cuentasPorCobrar:
         return _hasAnyRole(roles, const [
           RolUsuario.admin,
           RolUsuario.doctor,
           RolUsuario.asistente,
         ]);
+      // Cobrar es de quien lleva la caja. Estaba agrupado con Pacientes y
+      // Citas del Día sólo por compartir la lista de roles (defecto D9).
+      case ShellDestinationId.cuentasPorCobrar:
+        return roles.puedeVerCuentasPorCobrar;
       case ShellDestinationId.caja:
         return roles.puedeGestionarCaja;
       case ShellDestinationId.inicio:

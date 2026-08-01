@@ -7,6 +7,8 @@ import 'package:salud_dental_clinic_management/features/contraindicacion/domain/
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
+import '../../support/sesion_de_prueba.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
 class _MedicinaRepositorioFalso implements IMedicinaRepository {
   _MedicinaRepositorioFalso(this._catalogo);
@@ -57,7 +59,7 @@ Widget _app(Widget pagina, {double textScale = 1}) => MaterialApp(
     child: inner!,
   ),
   // En la app la página vive dentro del Scaffold del shell.
-  home: Scaffold(body: pagina),
+  home: proveedorSesion(RolUsuario.admin, child: Scaffold(body: pagina)),
 );
 
 void _viewport(WidgetTester tester, Size tamano) {

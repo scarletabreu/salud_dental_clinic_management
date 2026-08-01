@@ -83,6 +83,15 @@ class NuevaCitaDialog extends StatefulWidget {
   /// un asistente llega sin nada preseleccionado y tiene que elegir responsable.
   final String? doctorPredeterminadoId;
 
+  /// El selector de odontólogo queda fijo en [doctorPredeterminadoId].
+  ///
+  /// Es lo que permite que un doctor agende una cita normal sin poder
+  /// agendársela a otro: la base ya se lo imponía desde HFX-CLIN-001
+  /// (`citas_insert` exige `doctor_id = auth.uid()` para el doctor), pero la
+  /// pantalla lo degradaba a urgencia en vez de dejarle usar su propia agenda
+  /// (defecto D10 de la jornada de QA del 1 ago 2026).
+  final bool doctorFijo;
+
   const NuevaCitaDialog._({
     required this.personaRepository,
     required this.doctorRepository,
@@ -91,6 +100,7 @@ class NuevaCitaDialog extends StatefulWidget {
     this.fechaInicial,
     this.emergencia = false,
     this.doctorPredeterminadoId,
+    this.doctorFijo = false,
   });
 
   /// Devuelve el id de la cita de urgencia creada cuando [emergencia] es cierto,
@@ -104,6 +114,7 @@ class NuevaCitaDialog extends StatefulWidget {
     DateTime? fechaInicial,
     bool emergencia = false,
     String? doctorPredeterminadoId,
+    bool doctorFijo = false,
   }) {
     return showDialog<String>(
       context: context,
@@ -118,6 +129,7 @@ class NuevaCitaDialog extends StatefulWidget {
           fechaInicial: fechaInicial,
           emergencia: emergencia,
           doctorPredeterminadoId: doctorPredeterminadoId,
+          doctorFijo: doctorFijo,
         ),
       ),
     );
@@ -1259,6 +1271,27 @@ class _NuevaCitaDialogState extends State<NuevaCitaDialog>
                   child: Padding(
                     padding: EdgeInsets.all(12),
                     child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : widget.doctorFijo && _doctorSeleccionado != null
+              // Sin desplegable: no hay nada que elegir, y un desplegable de un
+              // solo elemento invita a buscar el que falta.
+              ? InputDecorator(
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.medical_services_outlined,
+                      size: 18,
+                      color: ac.primaryGreen,
+                    ),
+                    filled: true,
+                    fillColor: ac.bgPage,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Dr. ${_doctorSeleccionado!.nombre} '
+                    '${_doctorSeleccionado!.apellido}',
                   ),
                 )
               : DropdownButtonFormField<Doctor>(

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/iniciar_consulta_desde_cita.dart';
 
 class SiguientePacienteCard extends StatelessWidget {
   final Cita? cita;
@@ -143,6 +146,14 @@ class _WithPatient extends StatelessWidget {
     final h = cita.date.hour.toString().padLeft(2, '0');
     final m = cita.date.minute.toString().padLeft(2, '0');
     final canAct = onCambiarEstado != null && cita.id != null;
+    // Mismo criterio que la lista de citas y la vista de línea de tiempo
+    // (defecto D14): esta tarjeta no miraba ni el estado ni el doctor
+    // asignado, así que ofrecía «Iniciar consulta» sobre citas ajenas o sobre
+    // pacientes que ni siquiera habían llegado.
+    final iniciable = PuedeIniciarConsulta.evaluar(
+      context.watch<AuthCubit>().state,
+      cita,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +295,7 @@ class _WithPatient extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: FilledButton.icon(
-                onPressed: canAct
+                onPressed: canAct && iniciable.permitido
                     ? () => onCambiarEstado!(EstadoCita.enConsulta)
                     : null,
                 style: FilledButton.styleFrom(

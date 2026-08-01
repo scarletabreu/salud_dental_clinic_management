@@ -46,6 +46,48 @@ enum EstadoCita {
     }
   }
 
+  /// Estados a los que un rol concreto puede llevar esta cita **desde el
+  /// desplegable**.
+  ///
+  /// Es la intersección del grafo de estados con la matriz de roles que fijó
+  /// QA el 1 ago 2026 (defecto D12). Antes el desplegable ofrecía el grafo
+  /// entero a cualquiera que gestionara la agenda, y la base tampoco lo
+  /// recortaba; ahora `puede_cambiar_estado_cita` lo impone en SQL y esto es
+  /// su reflejo en pantalla.
+  ///
+  /// `enConsulta` y `completada` nunca salen: los produce una RPC clínica al
+  /// iniciar y cerrar la consulta, no una elección de menú.
+  List<EstadoCita> transicionesParaRol({
+    required bool esAdmin,
+    required bool esDoctorDeLaCita,
+    required bool esAsistenteAsignada,
+  }) {
+    const clinicos = [EstadoCita.enConsulta, EstadoCita.completada];
+    final legales = transicionesPermitidas.where((e) => !clinicos.contains(e));
+
+    if (esAdmin) return legales.toList();
+
+    if (esAsistenteAsignada) {
+      // Reprogramar no aparece porque no es un estado: es mover la fecha y
+      // la hora de la cita, que sigue en el estado en que estaba.
+      const administrativos = [
+        EstadoCita.confirmada,
+        EstadoCita.enEspera,
+        EstadoCita.cancelada,
+        EstadoCita.noAsistio,
+      ];
+      return legales.where(administrativos.contains).toList();
+    }
+
+    if (esDoctorDeLaCita) {
+      // Lo clínico de su propia cita: dar por presente al paciente y cancelar.
+      const propios = [EstadoCita.enEspera, EstadoCita.cancelada];
+      return legales.where(propios.contains).toList();
+    }
+
+    return const [];
+  }
+
   /// Estados a los que esta cita puede transicionar legalmente.
   /// Los estados terminales (completada, cancelada, noAsistio) devuelven `[]`.
   List<EstadoCita> get transicionesPermitidas {

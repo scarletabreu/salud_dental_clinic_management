@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_expediente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/vistas_odontograma.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
+import 'package:salud_dental_clinic_management/features/record/presentation/pages/expediente_page.dart';
 
 class OdontogramaTratamientosDetalle extends StatelessWidget {
   final Consulta consulta;
@@ -36,6 +41,8 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             .toList()
           ..sort((a, b) => a.fdiCode.compareTo(b.fdiCode));
 
+    final historial = _historialImprimible(context);
+
     return BlocBuilder<ConsultaDetalleCubit, ConsultaDetalleState>(
       builder: (context, state) {
         final listo = state is ConsultaDetalleListo ? state : null;
@@ -62,6 +69,11 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
             generales: listo?.generales ?? const [],
             nombrePaciente: nombrePaciente,
             fecha: consulta.fecha,
+            // Imprimir desde aquí sacaba siempre la hoja de esta consulta y
+            // nada más: el historial entero solo se alcanzaba saliendo al
+            // expediente del paciente. Ahora se elige en el propio botón.
+            onImprimirHistorial: historial.accion,
+            avisoHistorial: historial.aviso,
           ),
           pie: dientesConTratamientos.isEmpty
               ? Text(
@@ -87,6 +99,67 @@ class OdontogramaTratamientosDetalle extends StatelessWidget {
                 ),
         );
       },
+    );
+  }
+
+  /// Si desde esta consulta se puede llevar al papel el expediente entero.
+  ///
+  /// Devuelve las dos caras de la misma pregunta: la acción cuando se puede, y
+  /// el motivo cuando todavía no. Sin motivo **ni** acción la opción no se
+  /// ofrece: quien no puede ver expedientes no debe verla ni siquiera apagada.
+  ({VoidCallback? accion, String? aviso}) _historialImprimible(
+    BuildContext context,
+  ) {
+    const nada = (accion: null, aviso: null);
+
+    // Ambos cubits son de la pantalla que monta este widget, no suyos: fuera de
+    // ella —o en un test que solo dibuja el odontograma— simplemente no hay
+    // historial que ofrecer.
+    final bool puedeVerExpedientes;
+    final PacienteState estado;
+    try {
+      puedeVerExpedientes = context.select(
+        (AuthCubit cubit) => cubit.state.puedeVerExpedientes,
+      );
+      estado = context.watch<PacienteCubit>().state;
+    } catch (_) {
+      return nada;
+    }
+    if (!puedeVerExpedientes) return nada;
+
+    if (estado is! PacienteDetailLoaded) {
+      return (
+        accion: null,
+        aviso: 'Todavía se está cargando el expediente del paciente.',
+      );
+    }
+    // Un historial que no cargó se ve igual que un paciente sin consultas: si
+    // se imprimiera, el expediente afirmaría en papel que no hay nada.
+    if (estado.historialNoDisponible) {
+      return (
+        accion: null,
+        aviso: 'El historial del paciente no se pudo cargar.',
+      );
+    }
+
+    final paciente = estado.paciente;
+    final historialPiezas = estado.historialPiezas;
+    final consultasConOdontograma = paciente.record.consultas
+        .where((c) => c.odontograma != null)
+        .toList();
+
+    return (
+      accion: () => ExpedientePage.navegar(
+        context,
+        paciente: paciente,
+        // La primera del historial es la más reciente: es la boca de hoy.
+        odontogramaActual: consultasConOdontograma.isNotEmpty
+            ? consultasConOdontograma.first.odontograma
+            : null,
+        consultasConOdontograma: consultasConOdontograma,
+        historialPiezas: historialPiezas,
+      ),
+      aviso: null,
     );
   }
 

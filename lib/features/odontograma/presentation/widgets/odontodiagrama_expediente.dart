@@ -7,6 +7,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/pdf/odontodiagrama_pdf.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/alcance_impresion_odontodiagrama.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 
 class OdontodiagramaExpediente extends StatefulWidget {
@@ -26,6 +27,19 @@ class OdontodiagramaExpediente extends StatefulWidget {
   final DateTime fecha;
   final bool permiteImprimir;
 
+  /// Lleva al expediente clínico entero del paciente. Cuando se entrega, el
+  /// botón deja de imprimir a ciegas la consulta abierta y pregunta primero
+  /// qué alcance se quiere en el papel.
+  ///
+  /// Vive como callback y no como navegación propia porque el odontodiagrama
+  /// no conoce —ni debe conocer— el expediente: quien lo monta sabe de qué
+  /// paciente cuelga.
+  final VoidCallback? onImprimirHistorial;
+
+  /// Motivo por el que el historial no se puede imprimir ahora. Con esto puesto
+  /// la opción se ofrece apagada y explicada en vez de desaparecer.
+  final String? avisoHistorial;
+
   const OdontodiagramaExpediente({
     super.key,
     required this.evaluacion,
@@ -34,7 +48,14 @@ class OdontodiagramaExpediente extends StatefulWidget {
     required this.nombrePaciente,
     required this.fecha,
     this.permiteImprimir = true,
+    this.onImprimirHistorial,
+    this.avisoHistorial,
   });
+
+  /// Hay algo que elegir: o se puede imprimir el historial, o hay que explicar
+  /// por qué hoy no.
+  bool get ofreceAlcance =>
+      onImprimirHistorial != null || avisoHistorial != null;
 
   static const lienzoKey = ValueKey('odontodiagrama-lienzo');
 
@@ -46,6 +67,26 @@ class OdontodiagramaExpediente extends StatefulWidget {
 class _OdontodiagramaExpedienteState extends State<OdontodiagramaExpediente> {
   final _lienzo = GlobalKey();
   bool _generando = false;
+
+  /// Pulsar el botón. Sin nada que elegir imprime la consulta directamente,
+  /// como hacía siempre; con historial disponible pregunta antes el alcance.
+  Future<void> _pulsarImprimir() async {
+    if (_generando) return;
+    if (!widget.ofreceAlcance) return _imprimir();
+
+    final alcance = await HojaAlcanceImpresion.elegir(
+      context,
+      nombrePaciente: widget.nombrePaciente,
+      avisoHistorial: widget.avisoHistorial,
+    );
+    if (alcance == null || !mounted) return;
+
+    if (alcance == AlcanceImpresionOdontodiagrama.consultaActual) {
+      await _imprimir();
+      return;
+    }
+    widget.onImprimirHistorial?.call();
+  }
 
   Future<void> _imprimir() async {
     if (_generando) return;
@@ -87,7 +128,7 @@ class _OdontodiagramaExpedienteState extends State<OdontodiagramaExpediente> {
             child: Align(
               alignment: Alignment.centerRight,
               child: OutlinedButton.icon(
-                onPressed: _generando ? null : _imprimir,
+                onPressed: _generando ? null : _pulsarImprimir,
                 icon: _generando
                     ? SizedBox(
                         width: 14,

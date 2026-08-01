@@ -4,12 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:printing/printing.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/pdf/odontodiagrama_pdf.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/presentation/widgets/odontodiagrama_widget.dart';
 
 class OdontodiagramaExpediente extends StatefulWidget {
   final EvaluacionOdontologica evaluacion;
+
+  /// Las piezas de la consulta, que es de donde salen las marcas sin clave del
+  /// formulario. La [evaluacion] sola solo puede pintar las siete claves
+  /// impresas: sin esto, imprimir una consulta de reconstrucciones o implantes
+  /// daba una hoja en blanco.
+  final Map<int, Diente> dientes;
+
+  /// Lo registrado sin pieza. Una consulta de sola limpieza no tiene nada que
+  /// dibujar, y sin esta lista su hoja sale en blanco sin explicar por qué.
+  final List<String> generales;
+
   final String nombrePaciente;
   final DateTime fecha;
   final bool permiteImprimir;
@@ -17,6 +29,8 @@ class OdontodiagramaExpediente extends StatefulWidget {
   const OdontodiagramaExpediente({
     super.key,
     required this.evaluacion,
+    this.dientes = const {},
+    this.generales = const [],
     required this.nombrePaciente,
     required this.fecha,
     this.permiteImprimir = true,
@@ -115,6 +129,8 @@ class _OdontodiagramaExpedienteState extends State<OdontodiagramaExpediente> {
           child: OdontodiagramaPapel(
             key: OdontodiagramaExpediente.lienzoKey,
             evaluacion: widget.evaluacion,
+            dientes: widget.dientes,
+            generales: widget.generales,
           ),
         ),
       ],

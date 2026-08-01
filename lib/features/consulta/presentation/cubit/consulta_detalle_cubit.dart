@@ -36,12 +36,28 @@ class ConsultaDetalleCubit extends Cubit<ConsultaDetalleState> {
     var tratamientos = <String, TratamientoAplicadoDetalle>{};
     var nombresMedicinas = <String, String>{};
     var historialPiezas = HistorialPiezas.vacio;
+    var generales = const <String>[];
+
+    // Lo registrado **sin pieza** (una profilaxis, un raspado de cuadrante) no
+    // viene en el listado de consultas: solo `getDetalleConsulta` lo adjunta.
+    // Sin esta relectura, esa consulta se abría sin rastro de lo que se hizo y
+    // su odontodiagrama salía impreso en blanco sin explicar por qué.
+    final consultaId = consulta.id;
+    if (consultaId != null && consultaId.isNotEmpty) {
+      try {
+        final completa = await _consultaRepository.getDetalleConsulta(
+          consultaId,
+        );
+        if (completa != null) generales = _nombresGenerales(completa);
+      } catch (_) {
+        generales = const [];
+      }
+    }
 
     if (ids.isNotEmpty) {
       try {
-        tratamientos = await _consultaRepository.getDetalleTratamientosAplicados(
-          ids,
-        );
+        tratamientos = await _consultaRepository
+            .getDetalleTratamientosAplicados(ids);
       } catch (_) {
         tratamientos = {};
       }
@@ -87,11 +103,23 @@ class ConsultaDetalleCubit extends Cubit<ConsultaDetalleState> {
         tratamientos: tratamientos,
         nombresMedicinas: nombresMedicinas,
         historialPiezas: historialPiezas,
+        generales: generales,
         citaOrigen: citaOrigen,
-        citaOrigenAusente: citaId != null && citaId.isNotEmpty && citaOrigen == null,
+        citaOrigenAusente:
+            citaId != null && citaId.isNotEmpty && citaOrigen == null,
       ),
     );
   }
+
+  /// Los nombres de lo anotado sin pieza, ya descartado lo anulado. Es lo único
+  /// que la hoja necesita: no cuelga de ningún diente, así que no se dibuja.
+  static List<String> _nombresGenerales(Consulta consulta) => [
+    for (final tratamiento in consulta.tratamientosGenerales)
+      if (!tratamiento.estaAnulado)
+        tratamiento.nombreTratamiento ?? 'Tratamiento',
+    for (final diagnostico in consulta.diagnosticosGenerales)
+      if (!diagnostico.estaAnulado) diagnostico.nombreDiagnostico ?? 'Hallazgo',
+  ];
 }
 
 abstract class ConsultaDetalleState extends Equatable {
@@ -115,6 +143,10 @@ class ConsultaDetalleListo extends ConsultaDetalleState {
   /// La línea de tiempo de cada pieza del paciente (SD-144).
   final HistorialPiezas historialPiezas;
 
+  /// Nombres de lo registrado sin pieza: no cuelga de ningún diente, así que el
+  /// odontodiagrama no puede dibujarlo y la hoja lo enuncia por escrito.
+  final List<String> generales;
+
   /// Cita de la que nació la consulta. `null` en una atención sin cita.
   final ReferenciaCita? citaOrigen;
 
@@ -126,6 +158,7 @@ class ConsultaDetalleListo extends ConsultaDetalleState {
     this.tratamientos = const {},
     this.nombresMedicinas = const {},
     this.historialPiezas = HistorialPiezas.vacio,
+    this.generales = const [],
     this.citaOrigen,
     this.citaOrigenAusente = false,
   });
@@ -144,6 +177,7 @@ class ConsultaDetalleListo extends ConsultaDetalleState {
     tratamientos,
     nombresMedicinas,
     historialPiezas.porFdi.length,
+    generales,
     citaOrigen?.id,
     citaOrigen?.estado,
     citaOrigen?.fechaHora,

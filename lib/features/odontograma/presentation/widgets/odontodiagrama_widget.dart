@@ -34,6 +34,12 @@ class OdontodiagramaWidget extends StatefulWidget {
   final Map<int, List<ItemPlanTratamiento>> itemsPlan;
   final HistorialPiezas? historialPiezas;
 
+  /// Lo registrado en la consulta **sin pieza**: una profilaxis, un raspado de
+  /// cuadrante, una fluorización de arcada. No cuelga de ningún diente, así que
+  /// no se puede dibujar; pero si la hoja lo callara, una consulta entera de
+  /// limpieza saldría impresa en blanco y parecería que se perdió.
+  final List<String> generales;
+
   final void Function(Diente, String)? onNotasPiezaChanged;
 
   final void Function(Diente, TipoSuperficie?)? onAddDiagnosis;
@@ -57,6 +63,7 @@ class OdontodiagramaWidget extends StatefulWidget {
     this.dientes = const {},
     this.itemsPlan = const {},
     this.historialPiezas,
+    this.generales = const [],
     this.onNotasPiezaChanged,
     this.onAddDiagnosis,
     this.onAddTratamiento,
@@ -144,16 +151,20 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     setState(() => _fdiSeleccionado = _fdiSeleccionado == fdi ? null : fdi);
   }
 
-  Map<TipoSuperficie, MarcaClinicaPieza> _superficiesDe(int fdi) {
+  /// Lo anotado en esta consulta sobre la pieza, sin antecedentes ni plan.
+  List<MarcaClinicaPieza> _marcasDeHoy(int fdi) {
     final diente = widget.dientes[fdi];
-    if (diente == null) return const {};
-
-    final deHoy = [
+    if (diente == null) return const [];
+    return [
       for (final marca in marcasDePieza(fdi: fdi, diente: diente))
         if (marca.procedencia == ProcedenciaMarca.evaluado ||
             marca.procedencia == ProcedenciaMarca.ejecutado)
           marca,
     ];
+  }
+
+  Map<TipoSuperficie, MarcaClinicaPieza> _superficiesDe(int fdi) {
+    final deHoy = _marcasDeHoy(fdi);
     if (deHoy.isEmpty) return const {};
 
     final porCara = <TipoSuperficie, MarcaClinicaPieza>{};
@@ -163,6 +174,17 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
     }
     return porCara;
   }
+
+  /// Lo anotado sobre la pieza entera que **no** tiene clave del papel.
+  ///
+  /// Lo que sí la tiene ya viaja por [OdontodiagramaWidget.evaluacion] y estampa
+  /// su símbolo. Esto es el resto del catálogo —un implante, una prótesis, una
+  /// reconstrucción sin clave sembrada—, que sin tinte no aparecía por ningún
+  /// lado del formulario aunque la arcada sí coloreara la pieza.
+  MarcaClinicaPieza? _piezaCompletaDe(int fdi) => marcaDominante([
+    for (final marca in _marcasDeHoy(fdi))
+      if (marca.esPiezaCompleta && marca.clave == null) marca,
+  ]);
 
   List<HallazgoDental> _historicoDe(int fdi) {
     if (!_hayHistorico) return const [];
@@ -215,6 +237,10 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
             ],
             const SizedBox(height: 14),
             _claves(context, compacto, paleta),
+            if (widget.modoImpresion) ...[
+              const SizedBox(height: 18),
+              _anotaciones(paleta),
+            ],
             const SizedBox(height: 18),
             _tejidosBlandos(context, compacto, paleta),
           ],
@@ -415,6 +441,7 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
       ),
       hallazgos: widget.evaluacion.de(fdi),
       superficies: _superficiesDe(fdi),
+      piezaCompleta: _piezaCompletaDe(fdi),
       historicos: _historicoDe(fdi),
       lado: lado,
       paleta: paleta,
@@ -467,6 +494,173 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
           )
         : null,
   );
+
+  /// Lo anotado en cada pieza, por escrito.
+  ///
+  /// Solo en la hoja que se archiva o se imprime. En pantalla se toca la pieza
+  /// y la ficha lo cuenta con su fecha y su doctor; en papel no se puede tocar
+  /// nada, así que una cara teñida sin nombre no le dice al doctor qué se hizo.
+  /// Sale de las mismas marcas que tiñen el dibujo, para que la lista y el
+  /// diagrama no puedan contradecirse.
+  Widget _anotaciones(PaletaOdontodiagrama paleta) {
+    final filas = <(int, MarcaClinicaPieza)>[];
+    for (final fdi in widget.dientes.keys.toList()..sort()) {
+      for (final marca in _marcasDeHoy(fdi)) {
+        if (marca.vigente) filas.add((fdi, marca));
+      }
+    }
+
+    // Sin piezas cargadas la hoja no sabe nada y no puede afirmar nada; con
+    // ellas, «no hay nada anotado» es una respuesta y no un hueco.
+    if (widget.dientes.isEmpty && widget.generales.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: paleta.papel,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: paleta.regla),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: paleta.regla)),
+            ),
+            child: Text(
+              'Anotado en esta consulta',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: paleta.textoFuerte,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          for (var i = 0; i < filas.length; i++)
+            _filaAnotacion(
+              filas[i].$1,
+              filas[i].$2,
+              paleta: paleta,
+              ultima: i == filas.length - 1 && widget.generales.isEmpty,
+            ),
+          for (var i = 0; i < widget.generales.length; i++)
+            _filaGeneral(
+              widget.generales[i],
+              paleta: paleta,
+              ultima: i == widget.generales.length - 1,
+            ),
+          if (filas.isEmpty && widget.generales.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              child: Text(
+                'No se anotó nada sobre ninguna pieza en esta consulta.',
+                style: TextStyle(
+                  color: paleta.textoVacio,
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Una anotación que no cuelga de ninguna pieza. Se rotula como tal para que
+  /// nadie la busque en el dibujo.
+  Widget _filaGeneral(
+    String titulo, {
+    required PaletaOdontodiagrama paleta,
+    required bool ultima,
+  }) => Container(
+    decoration: BoxDecoration(
+      border: ultima ? null : Border(bottom: BorderSide(color: paleta.regla)),
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 34,
+          child: Text(
+            '—',
+            style: TextStyle(color: paleta.textoVacio, fontSize: 11),
+          ),
+        ),
+        Container(width: 1, height: 16, color: paleta.regla),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            titulo,
+            style: TextStyle(
+              color: paleta.textoFuerte,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Sin pieza',
+          style: TextStyle(color: paleta.textoSuave, fontSize: 10.5),
+        ),
+      ],
+    ),
+  );
+
+  Widget _filaAnotacion(
+    int fdi,
+    MarcaClinicaPieza marca, {
+    required PaletaOdontodiagrama paleta,
+    required bool ultima,
+  }) {
+    final donde = marca.superficie?.name ?? 'Pieza completa';
+    return Container(
+      decoration: BoxDecoration(
+        border: ultima ? null : Border(bottom: BorderSide(color: paleta.regla)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 34,
+            child: Text(
+              '$fdi',
+              style: TextStyle(
+                color: paleta.textoFuerte,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Container(width: 1, height: 16, color: paleta.regla),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              marca.titulo,
+              style: TextStyle(
+                color: paleta.tintaClinica(marca.tintaClinica),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$donde · ${marca.procedencia.etiqueta}',
+            style: TextStyle(color: paleta.textoSuave, fontSize: 10.5),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _tejidosBlandos(
     BuildContext context,
@@ -593,12 +787,24 @@ class _OdontodiagramaWidgetState extends State<OdontodiagramaWidget> {
 class OdontodiagramaPapel extends StatelessWidget {
   final EvaluacionOdontologica evaluacion;
   final EvaluacionOdontologica historico;
+
+  /// Las piezas de la consulta. Sin ellas la hoja solo puede dibujar las siete
+  /// claves del formulario impreso, y todo lo demás del catálogo —la mayoría—
+  /// desaparece: es lo que dejaba el odontodiagrama en blanco pese a tener
+  /// tratamientos anotados.
+  final Map<int, Diente> dientes;
+
+  /// Lo registrado sin pieza (profilaxis, fluorización de arcada).
+  final List<String> generales;
+
   final EdgeInsetsGeometry padding;
 
   const OdontodiagramaPapel({
     super.key,
     required this.evaluacion,
     this.historico = EvaluacionOdontologica.vacia,
+    this.dientes = const {},
+    this.generales = const [],
     this.padding = const EdgeInsets.all(14),
   });
 
@@ -609,6 +815,8 @@ class OdontodiagramaPapel extends StatelessWidget {
     child: OdontodiagramaWidget(
       evaluacion: evaluacion,
       historico: historico,
+      dientes: dientes,
+      generales: generales,
       modoImpresion: true,
     ),
   );
@@ -618,6 +826,7 @@ class _PiezaDental extends StatefulWidget {
   final GlifoPieza glifo;
   final List<HallazgoDental> hallazgos;
   final Map<TipoSuperficie, MarcaClinicaPieza> superficies;
+  final MarcaClinicaPieza? piezaCompleta;
   final List<HallazgoDental> historicos;
   final double lado;
   final PaletaOdontodiagrama paleta;
@@ -630,6 +839,7 @@ class _PiezaDental extends StatefulWidget {
     required this.glifo,
     required this.hallazgos,
     required this.superficies,
+    required this.piezaCompleta,
     required this.historicos,
     required this.lado,
     required this.paleta,
@@ -664,6 +874,8 @@ class _PiezaDentalState extends State<_PiezaDental> {
     final porCara = _resumenSuperficies;
     final partes = [
       if (porCara.isNotEmpty) porCara,
+      if (widget.piezaCompleta case final marca?)
+        '${marca.titulo} (pieza completa)',
       if (widget.hallazgos.any((h) => h.esPiezaCompleta))
         _resumen(widget.hallazgos.where((h) => h.esPiezaCompleta)),
       if (widget.historicos.isNotEmpty) 'Antes: ${_resumen(widget.historicos)}',
@@ -681,6 +893,7 @@ class _PiezaDentalState extends State<_PiezaDental> {
           glifo: widget.glifo,
           hallazgos: widget.hallazgos,
           superficies: widget.superficies,
+          piezaCompleta: widget.piezaCompleta,
           paleta: widget.paleta,
           resalte: _hover || widget.seleccionada ? widget.paleta.resalte : null,
         ),

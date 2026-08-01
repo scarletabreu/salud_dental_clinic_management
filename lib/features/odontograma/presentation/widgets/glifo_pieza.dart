@@ -162,9 +162,11 @@ class GlifoPieza {
 /// estampan en tinta tenue sobre la pieza —con una boca muy tratada el papel
 /// se llenaba de marcas repetidas—; se leen en la ficha de la pieza al tocarla.
 ///
-/// Son dos dibujos distintos sobre el mismo glifo:
+/// Son tres dibujos distintos sobre el mismo glifo:
 /// - [superficies] tiñe cada cara con la tinta de lo que tiene. Es lo que hace
 ///   visible desde fuera un tratamiento por cara, tenga clave del papel o no.
+/// - [piezaCompleta] tiñe el glifo entero por lo mismo, cuando lo anotado no
+///   cuelga de una cara (un implante, una prótesis).
 /// - [hallazgos] estampa los símbolos de las claves que afectan a la pieza
 ///   entera (la `X` de pérdida, el `⊙` de un conducto).
 class GlifoPiezaPainter extends CustomPainter {
@@ -173,6 +175,11 @@ class GlifoPiezaPainter extends CustomPainter {
   /// Lo que tiñe cada cara, ya resuelto por quien dibuja: una cara solo puede
   /// mostrar una cosa y la elección de cuál es clínica, no del pintor.
   final Map<TipoSuperficie, MarcaClinicaPieza> superficies;
+
+  /// Lo anotado sobre la pieza entera **sin clave del papel**, ya resuelto a
+  /// una sola marca. Lo que sí tiene clave viaja por [hallazgos] y estampa su
+  /// símbolo; esto es el resto del catálogo, que sin tinte no se vería.
+  final MarcaClinicaPieza? piezaCompleta;
 
   final List<HallazgoDental> hallazgos;
   final PaletaOdontodiagrama paleta;
@@ -185,6 +192,7 @@ class GlifoPiezaPainter extends CustomPainter {
     required this.hallazgos,
     required this.paleta,
     this.superficies = const {},
+    this.piezaCompleta,
     this.resalte,
   });
 
@@ -200,6 +208,7 @@ class GlifoPiezaPainter extends CustomPainter {
       canvas.drawPath(exterior, Paint()..color = resalte!);
     }
 
+    _pintarPiezaCompleta(canvas, exterior);
     _pintarSuperficies(canvas, lado);
 
     final lapiz = Paint()
@@ -215,6 +224,18 @@ class GlifoPiezaPainter extends CustomPainter {
     }
 
     _pintarMarcasDePieza(canvas, lado, exterior, hallazgos);
+  }
+
+  /// Tiñe el glifo entero por lo anotado sobre la pieza sin clave del papel.
+  ///
+  /// Va debajo de las caras: si además hay algo anotado en una cara concreta,
+  /// esa cara manda, igual que en el mapa de superficies de la ficha.
+  void _pintarPiezaCompleta(Canvas canvas, Path exterior) {
+    final marca = piezaCompleta;
+    if (marca == null) return;
+    final estilo = paleta.estiloDe(marca.tintaClinica, marca.procedencia);
+    if (estilo.alfaRelleno <= 0) return;
+    canvas.drawPath(exterior, Paint()..color = estilo.relleno);
   }
 
   /// Tiñe cada cara anotada con la tinta de lo que tiene y la firmeza de su
@@ -250,7 +271,10 @@ class GlifoPiezaPainter extends CustomPainter {
       if (estado.marca == MarcaClinica.relleno) {
         // Una clave por superficie sin superficies anotadas cubre la pieza.
         if (hallazgo.esPiezaCompleta) {
-          canvas.drawPath(exterior, Paint()..color = tinta.withValues(alpha: alfa));
+          canvas.drawPath(
+            exterior,
+            Paint()..color = tinta.withValues(alpha: alfa),
+          );
         }
         continue;
       }
@@ -270,6 +294,7 @@ class GlifoPiezaPainter extends CustomPainter {
       old.paleta != paleta ||
       old.resalte != resalte ||
       old.glifo.fdi != glifo.fdi ||
+      old.piezaCompleta != piezaCompleta ||
       !listEquals(old.hallazgos, hallazgos) ||
       !mapEquals(old.superficies, superficies);
 }
@@ -296,7 +321,10 @@ void dibujarMarcaClinica(
     case MarcaClinica.relleno:
       final path =
           recorte ?? (Path()..addRect(Rect.fromLTWH(0, 0, lado, lado)));
-      canvas.drawPath(path, Paint()..color = tinta.withValues(alpha: alfaRelleno));
+      canvas.drawPath(
+        path,
+        Paint()..color = tinta.withValues(alpha: alfaRelleno),
+      );
 
     case MarcaClinica.rayado:
       canvas.save();

@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/features/auth/domain/entities/usu
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_aviso_card.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/widgets/perfil_card.dart';
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/crear_usuario_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
@@ -313,7 +314,9 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
     }
 
     if (state is PerfilLoaded) {
-      if (state.filtrados.isEmpty) {
+      final avisos = state.avisosVisibles;
+
+      if (state.filtrados.isEmpty && avisos.isEmpty) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -339,12 +342,20 @@ class _UsuariosListPageState extends State<UsuariosListPage> {
       return Column(
         children: [
           Expanded(
+            // Los avisos van primero: lo que falló es lo que necesita atención.
             child: ListView.separated(
               padding: context.pageInsets(top: 12, bottom: 24),
-              itemCount: state.filtrados.length,
+              itemCount: avisos.length + state.filtrados.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                final usuario = state.filtrados[index];
+                if (index < avisos.length) {
+                  return PerfilAvisoCard(
+                    aviso: avisos[index],
+                    onReintentar: () =>
+                        context.read<PersonalPerfilesCubit>().cargarUsuarios(),
+                  );
+                }
+                final usuario = state.filtrados[index - avisos.length];
                 return PerfilCard(
                   usuario: usuario,
                   onTap: () => _navegarAEditarUsuario(usuario),

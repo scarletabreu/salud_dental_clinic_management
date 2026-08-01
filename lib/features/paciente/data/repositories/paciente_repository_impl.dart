@@ -21,6 +21,17 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, String>>> getNombresPacientes(
+    List<String> ids,
+  ) {
+    if (ids.isEmpty) return Future.value(const Right(<String, String>{}));
+    return guard(
+      () => remoteDataSource.getNombresPacientes(ids),
+      context: 'resolver los nombres de los pacientes',
+    );
+  }
+
+  @override
   Future<Either<Failure, bool>> faltaRegistro(String id) {
     return guard(
       () => remoteDataSource.esPersonaSinFichaClinica(id),

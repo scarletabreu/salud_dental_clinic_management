@@ -19,6 +19,9 @@ class _FakeCuotaRepository implements CuotaRepository {
 
   @override
   Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async => const [];
+
+  @override
+  Future<void> marcarCuotasVencidas(String cuentaId) async {}
 }
 
 Cuenta _cuenta(double total) => Cuenta(

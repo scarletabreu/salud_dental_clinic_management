@@ -65,8 +65,11 @@ class ConsultasLoaded extends ConsultasListState {
       tieneTratamientos != null ||
       soloEmergencias != null;
 
+  /// Si el directorio no trae el nombre, el paciente ya no está ahí (ficha
+  /// borrada, o id huérfano). Enseñar el uuid no le dice nada a nadie; decirlo
+  /// en palabras sí.
   String nombrePaciente(String pacienteId) {
-    return pacienteNombres[pacienteId] ?? 'Paciente #$pacienteId';
+    return pacienteNombres[pacienteId] ?? 'Paciente no encontrado';
   }
 
   String nombreDoctor(String doctorId) {

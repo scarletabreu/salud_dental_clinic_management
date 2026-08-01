@@ -66,6 +66,19 @@ class ConsultaCerradaFailure extends Failure {
   ]);
 }
 
+/// La base rechazó la operación por falta de permisos (`42501`): una policy de
+/// RLS o una guardia `raise exception ... using errcode = '42501'` de una RPC.
+///
+/// Se distingue de [ServerFailure] porque no es un fallo, es la respuesta
+/// correcta a algo que ese rol no puede hacer. El mensaje que trae la base ya
+/// viene redactado («Capacidad de caja requerida.») y se muestra tal cual; la
+/// interfaz puede además decidir ignorarlo cuando la operación era accesoria.
+class PermisoDenegadoFailure extends Failure {
+  const PermisoDenegadoFailure([
+    super.message = 'Tu rol no tiene permiso para realizar esta operación.',
+  ]);
+}
+
 /// No hay inventario suficiente para el consumo declarado (`CL003`). El cierre
 /// completo se revirtió: no se descontó stock ni se creó cuenta.
 class StockInsuficienteFailure extends Failure {

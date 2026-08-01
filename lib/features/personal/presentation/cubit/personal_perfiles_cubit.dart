@@ -14,8 +14,17 @@ class PersonalPerfilesCubit extends Cubit<PersonalPerfilesState> {
   Future<void> cargarUsuarios() async {
     emit(const PerfilLoading());
     try {
-      final usuarios = await _usuarioRepository.getUsuarios();
-      emit(PerfilLoaded(todos: usuarios, filtrados: usuarios));
+      final listado = await _usuarioRepository.getUsuarios();
+      // `PerfilError` queda para el fallo total. Un fallo parcial —una lectura
+      // de rol o una fila corrupta— viaja como aviso y se pinta en su propia
+      // tarjeta, sin tumbar la administración del resto del personal.
+      emit(
+        PerfilLoaded(
+          todos: listado.perfiles,
+          filtrados: listado.perfiles,
+          avisos: listado.avisos,
+        ),
+      );
     } catch (e) {
       emit(PerfilError(e.toString()));
     }

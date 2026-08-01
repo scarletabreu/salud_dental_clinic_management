@@ -30,12 +30,14 @@ EvaluacionOdontologica proyectarEvaluacionOdontologica(
     }
 
     for (final diagnostico in diente.diagnosis) {
+      if (diagnostico.estaAnulado) continue;
       agregar(diagnostico.claveOdontograma, diagnostico.superficie);
     }
     // La capa tenue solo lleva diagnósticos: un tratamiento de otra consulta
     // se lee en la ficha de la pieza, no se estampa debajo del de hoy.
     if (!soloDiagnosticos) {
       for (final tratamiento in diente.tratamientos) {
+        if (tratamiento.estaAnulado) continue;
         // Sin clave no hay símbolo que estampar: las claves del papel son un
         // vocabulario cerrado y la mayoría del catálogo no cabe en ellas.
         // Caerlas en «Otro» llenaba de asteriscos cada pieza con una corona o

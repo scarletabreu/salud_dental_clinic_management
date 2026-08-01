@@ -207,3 +207,24 @@ borrado al limpiar la caché de pgdelta. Las migraciones se aplicaron; el
 
 Iniciar sesión con un usuario real y abrir una consulta de principio a fin
 contra producción. No está automatizado y no se hizo.
+
+
+---
+
+## Cierre del programa (1 ago 2026)
+
+F2 y F3 se aplicaron después, con su propia copia previa en
+`~/backups/salud_dental/20260801-preqa102-103`. Recuentos idénticos antes y
+después: ninguna fila se perdió ni se creó.
+
+Verificado en producción tras aplicarlas:
+
+- las 12 policies de escritura de catálogo (`tratamientos`, `diagnosticos`,
+  `medicinas`, `procedimientos`) son ahora `es_admin()`; ninguna conserva
+  `es_doctor()`;
+- `asiste_a_doctor()` y el trigger `trg_hfx_qa_103_transicion_estado_cita`
+  están presentes;
+- `consulta_select` es la versión **temporal** de la decisión D11.
+
+**El gate de deriva sale limpio por primera vez**: «Sin deriva: local y
+producción describen el mismo esquema».

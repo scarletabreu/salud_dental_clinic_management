@@ -10,10 +10,10 @@ mergeado, y nada aplicado en producción**.
 
 | Fase | Rama | Commit | Estado |
 |---|---|---|---|
-| F0 · Esquema | `HFX-QA-100-esquema` | `34379dc` | Completa y **aplicada en producción** el 1 ago 2026 |
+| F0 · Esquema | `HFX-QA-100-esquema` | `34379dc` | Completa y aplicada en producción |
 | F1 · Pantallas bloqueadas | `HFX-QA-101-pantallas` | `4e7c040` | Completa |
-| F2 · Visibilidad clínica | `HFX-QA-102-visibilidad-clinica` | `d23f418` | Completa |
-| F3 · Matriz de permisos | `HFX-QA-103-permisos-roles` | `f790a28` | Completa |
+| F2 · Visibilidad clínica | `HFX-QA-102-visibilidad-clinica` | `d23f418` | Completa y aplicada en producción |
+| F3 · Matriz de permisos | `HFX-QA-103-permisos-roles` | `f790a28` | Completa y aplicada en producción |
 | F4 · Funcionalidad y navegación | `HFX-QA-104-funcionalidad` | `e1da4e4` | Completa |
 | F5 · E2E | `HFX-QA-105-e2e` | `5e63db4` | Completa, con huecos de cobertura documentados |
 
@@ -25,7 +25,11 @@ Se integran en orden: F0 → F1 → F2 → F3 → F4 → F5.
 
 **Validación al cierre:** 781 pruebas Dart en verde (0 rojas), `flutter analyze`
 sin errores ni advertencias, 15 pruebas SQL en verde, 2 jornadas de interfaz
-headless superadas y 14 controles negativos por API rechazados como debe.
+headless superadas, 14 controles negativos por API rechazados como debe, y
+**gate de deriva limpio contra producción**.
+
+**Listo para desplegar.** `dev` contiene las seis fases y el esquema de
+producción coincide con el que describe el repositorio.
 
 ---
 
@@ -129,29 +133,35 @@ importante de leer es la lista de lo NO cubierto.
 
 ## Lo que queda pendiente, y qué decisión requiere
 
-### 1. Aplicar F2 y F3 en producción — requiere autorización explícita
+### 1. Producción — TODO APLICADO
 
-F0 ya está aplicada (detalle y verificación en `docs/HFX-QA-100-estado.md`).
-Quedan pendientes en la instancia:
+Las seis fases están en producción (1 ago 2026). Detalle y verificación en
+`docs/HFX-QA-100-estado.md`.
 
-- `20260812090000` (F2) · siembra `clave_odontograma` en el catálogo. **Sólo
-  toca datos del catálogo**, ningún esquema. Al aplicarse imprime cuántas filas
-  quedaron sin clave: hay que leer ese aviso.
-- `20260813090000` (F3) · la matriz de permisos. Esta **sí cambia lo que los
-  usuarios reales pueden hacer**: el doctor deja de poder escribir el catálogo,
-  la asistente queda acotada a los doctores que asiste, y se abre la lectura de
-  consultas ajenas (decisión temporal D11). Conviene aplicarla en una ventana
-  acordada con la clínica, no a mitad de jornada.
+**El gate de deriva sale limpio**: `tool/produccion/deriva_esquema.sh` →
+«Sin deriva: local y producción describen el mismo esquema». Es la primera vez
+desde que existe el gate.
 
-Mientras no se apliquen, `tool/produccion/deriva_esquema.sh` informa 50
-diferencias que son **exactamente** las de F3 —18 objetos con su definición
-anterior en producción, 32 sentencias nuevas sólo en local—, no deriva nueva.
+Queda **una decisión administrativa**, no técnica: `isaacpena` es asistente y
+no tiene ninguna fila en `doctor_asistentes`. Con la regla D12 ya aplicada, su
+agenda sale vacía. No es una rotura —la pantalla lo explica con «Todavía no
+tienes odontólogos asignados. Pide a administración que te asigne al menos
+uno»— pero alguien tiene que decidir a qué odontólogo asiste. No se asignó
+desde aquí porque eso es negocio, no migración.
 
-### 2. Leer el aviso de la migración de claves de odontograma (D6b)
+### 2. Claves de odontograma (D6b) — leído y cerrado
 
-Al aplicar `20260812090000` en producción, imprime cuántos tratamientos y
-diagnósticos quedaron sin `clave_odontograma`. Hay que mirarlo: si algo obvio
-quedó fuera, falta un patrón.
+El informe de `20260812090000` listó 9 tratamientos sin clave. Ocho quedan fuera
+con razón: flúor, limpieza, blanqueamiento y raspado son de arcada o cuadrante;
+brackets, implante y prótesis no caben en el vocabulario cerrado del formulario;
+«Tratamiento Prueba» es un dato de prueba. El noveno sí era un hueco real —
+«Reconstrucción dental» es trabajo restaurador sobre una pieza y el patrón
+buscaba `restaurac`, no `reconstrucc`—, y lo cierra `20260814090000`.
+
+Los diagnósticos mapearon todos.
+
+Justamente para esto se escribió el informe: para que un hueco así se vea al
+aplicar, en vez de descubrirse meses después por un odontodiagrama vacío.
 
 ### 3. Revisar dos decisiones marcadas
 

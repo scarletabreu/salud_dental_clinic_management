@@ -78,6 +78,12 @@ class ShellDestinationAccess {
         ]);
       // Cobrar es de quien lleva la caja. Estaba agrupado con Pacientes y
       // Citas del Día sólo por compartir la lista de roles (defecto D9).
+      //
+      // En `dev` se arregló en paralelo agrupándolo con Caja bajo
+      // `puedeGestionarCaja`. Se conserva la misma regla —hoy los dos
+      // resuelven a admin+asistente— con capacidad propia, porque no son lo
+      // mismo: una es entrar a Cuentas por Cobrar y la otra operar la caja, y
+      // el día que se separen no habrá que descubrirlo por un defecto.
       case ShellDestinationId.cuentasPorCobrar:
         return roles.puedeVerCuentasPorCobrar;
       case ShellDestinationId.caja:

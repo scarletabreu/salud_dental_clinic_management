@@ -61,9 +61,16 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     if (userId == null) throw Exception('Usuario no autenticado.');
 
     final balanceCalculado = await getBalanceActual();
-    if ((datosCierre['monto_esperado'] as num).toDouble() != balanceCalculado) {
+    final esperado = (datosCierre['monto_esperado'] as num).toDouble();
+    // Comparar dos `double` con `!=` hacía que un céntimo de error de
+    // redondeo —el que aparece en cuanto hay un pago fraccionado— abortara el
+    // cierre con «INCONSISTENCIA» y dejara la caja abierta (defecto D13). El
+    // dinero se lleva en centavos: la tolerancia es medio centavo.
+    if ((esperado - balanceCalculado).abs() > 0.005) {
       throw Exception(
-        'INCONSISTENCIA: El monto esperado ($balanceCalculado) no coincide con el balance calculado.',
+        'El monto esperado (RD\$ ${esperado.toStringAsFixed(2)}) no coincide '
+        'con el balance calculado (RD\$ ${balanceCalculado.toStringAsFixed(2)}). '
+        'Revisa los movimientos antes de cerrar.',
       );
     }
 
@@ -123,6 +130,13 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
         });
   }
 
+  /// La caja abierta, sea de hoy o de un día anterior.
+  ///
+  /// No filtra por fecha a propósito: el índice único `cajas_una_abierta_idx`
+  /// es **global**, así que una caja de ayer sin cerrar impide abrir la de hoy.
+  /// Esconderla haría que abrir la caja fallara sin decir por qué, que es
+  /// justamente el síntoma que reportó QA (defecto D13). Quien la reciba debe
+  /// mirar [esDeHoy] y ofrecer cerrarla.
   Future<Map<String, dynamic>?> _getCajaAbiertaActual() async {
     final response = await supabase
         .from('cajas')

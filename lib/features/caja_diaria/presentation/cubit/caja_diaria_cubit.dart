@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
@@ -53,9 +54,20 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
           }
         }
       }, onError: (_, _) {});
-    } catch (_) {
-      emit(const CajaDiariaError('No se pudo consultar la caja de hoy.'));
+    } catch (e) {
+      // Se propaga el motivo real. Un `catch (_)` que siempre decía lo mismo
+      // convertía cualquier fallo —permisos, red, una caja de ayer sin
+      // cerrar— en el mismo mensaje inútil, y no había forma de averiguar por
+      // qué no se podía trabajar con la caja (defecto D13).
+      emit(CajaDiariaError(_mensaje(e, 'No se pudo consultar la caja de hoy.')));
     }
+  }
+
+  /// El mensaje del `Failure` tipado si lo hay; si no, el genérico.
+  static String _mensaje(Object error, String generico) {
+    if (error is Failure) return error.message;
+    final texto = error.toString().replaceFirst('Exception: ', '').trim();
+    return texto.isEmpty ? generico : texto;
   }
 
   Future<String?> abrirCaja(double montoApertura) async {
@@ -65,16 +77,15 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
       await _repository.abrirCaja(montoApertura);
       await cargar();
       return null;
-    } catch (_) {
+    } catch (e) {
+      final mensaje = _mensaje(
+        e,
+        'No se pudo abrir la caja. Verifica tu conexión e inténtalo de nuevo.',
+      );
       if (!isClosed) {
-        emit(
-          const CajaDiariaSinAbrir(
-            error:
-                'No se pudo abrir la caja. Verifica tu conexión e inténtalo de nuevo.',
-          ),
-        );
+        emit(CajaDiariaSinAbrir(error: mensaje));
       }
-      return 'No se pudo abrir la caja. Inténtalo de nuevo.';
+      return mensaje;
     }
   }
 

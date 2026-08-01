@@ -197,10 +197,12 @@ void main() {
     expect(cubit.recargas, 1);
   });
 
-  // HFX-CLIN-004. El texto de la agenda vacía mandaba a todo el mundo a «Nueva
-  // Cita», un botón que el doctor no tiene: le pedía justo lo que no puede
-  // hacer. Cada rol lee ahora la acción que sí está a su alcance.
-  testWidgets('el doctor no ve instrucciones que no puede seguir', (
+  // HFX-CLIN-004 hizo que el texto de la agenda vacía dejara de mandar a todo
+  // el mundo a «Nueva Cita», un botón que el doctor no tenía. QA revisó esa
+  // decisión el 1 ago 2026 (defecto D10): el doctor sí agenda, en su propia
+  // agenda, así que ahora el texto le ofrece las dos vías. Lo que sigue en pie
+  // es la regla de fondo: cada rol lee la acción que está a su alcance.
+  testWidgets('el doctor lee las dos vías que sí puede seguir', (
     tester,
   ) async {
     _viewport(tester);
@@ -208,8 +210,8 @@ void main() {
     await tester.pumpWidget(_app(cubit));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Nueva Cita'), findsNothing);
-    expect(find.textContaining('Urgencia'), findsWidgets);
+    expect(find.textContaining('Nueva Cita'), findsWidgets);
+    expect(find.textContaining('urgencia'), findsWidgets);
   });
 
   testWidgets('quien gestiona la agenda sí ve «Nueva Cita»', (tester) async {

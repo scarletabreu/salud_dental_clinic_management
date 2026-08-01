@@ -29,6 +29,7 @@ import 'package:salud_dental_clinic_management/features/personal/presentation/cu
 import 'package:salud_dental_clinic_management/features/personal/presentation/pages/usuarios_list_page.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_card.dart';
+import 'support/sesion_de_prueba.dart';
 
 class _EquipoCubitDoble extends Cubit<EquipoState> implements EquipoCubit {
   _EquipoCubitDoble(super.initialState);
@@ -170,7 +171,9 @@ Widget _app(Widget pagina, {double textScale = 1}) => MaterialApp(
     ).copyWith(textScaler: TextScaler.linear(textScale)),
     child: inner!,
   ),
-  home: pagina,
+  // Estas pantallas son las del admin: es su maquetación la que se mide, y es
+  // el admin quien ve precios y botones de edición del catálogo.
+  home: proveedorSesion(RolUsuario.admin, child: pagina),
 );
 
 void _viewport(WidgetTester tester, Size tamano) {

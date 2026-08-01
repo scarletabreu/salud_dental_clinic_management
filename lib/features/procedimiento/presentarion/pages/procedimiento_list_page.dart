@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/procedimiento/domain/entities/procedimiento.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/domain/repositories/procedimiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/procedimiento/presentarion/pages/procedimiento_form_page.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/widgets/solo_si_puede.dart';
 
 class ProcedimientoListPage extends StatefulWidget {
   final ProcedimientoRepository repository;
@@ -171,18 +172,20 @@ class _ProcedimientoListPageState extends State<ProcedimientoListPage> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: () => _openForm(),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Nuevo'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ac.primaryGreen,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                SoloSiPuede.editarCatalogos(
+                  child: FilledButton.icon(
+                    onPressed: () => _openForm(),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Nuevo'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ac.primaryGreen,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -239,21 +242,30 @@ class _ProcedimientoListPageState extends State<ProcedimientoListPage> {
                                   ),
                                 ),
                               ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.edit_outlined,
-                                  size: 18,
-                                  color: ac.textMuted,
+                              SoloSiPuede.editarCatalogos(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: ac.textMuted,
+                                      ),
+                                      onPressed: () =>
+                                          _openForm(procedimiento: proc),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 18,
+                                        color: ac.red.withValues(alpha: 0.7),
+                                      ),
+                                      onPressed: () =>
+                                          _deleteProcedimiento(proc),
+                                    ),
+                                  ],
                                 ),
-                                onPressed: () => _openForm(procedimiento: proc),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.delete_outline_rounded,
-                                  size: 18,
-                                  color: ac.red.withValues(alpha: 0.7),
-                                ),
-                                onPressed: () => _deleteProcedimiento(proc),
                               ),
                             ],
                           ),

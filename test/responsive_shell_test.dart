@@ -183,22 +183,20 @@ void main() {
         .toList();
 
     expect(admin, _ids);
-    // El doctor ve todo menos Caja: gestionar caja es capacidad de admin y
-    // asistente. Perfiles, Equipos e Inventario siguen abiertos al doctor
-    // —así estaba antes de HFX-CLIN-000, que sólo sustituyó la comparación de
-    // roles por capacidades— y estrechar ese acceso se decide en HFX-CLIN-001.
+    // Matriz fijada por la jornada de QA del 1 ago 2026: el doctor no lleva
+    // dinero (Caja, Cuentas por Cobrar) ni administra personal (Perfiles).
+    // Los catálogos sí los ve —los necesita para trabajar—, pero sin botones
+    // de edición ni precios; eso lo comprueban las pruebas de catálogo.
     expect(doctor, [
       ShellDestinationId.inicio,
       ShellDestinationId.citasDelDia,
       ShellDestinationId.consultas,
       ShellDestinationId.pacientes,
-      ShellDestinationId.cuentasPorCobrar,
       ShellDestinationId.tratamientos,
       ShellDestinationId.procedimientos,
       ShellDestinationId.diagnosticos,
       ShellDestinationId.medicinas,
       ShellDestinationId.inventario,
-      ShellDestinationId.perfiles,
       ShellDestinationId.equipos,
       ShellDestinationId.configuracion,
     ]);
@@ -206,6 +204,16 @@ void main() {
       doctor,
       isNot(contains(ShellDestinationId.caja)),
       reason: 'gestionar caja no es capacidad clínica',
+    );
+    expect(
+      doctor,
+      isNot(contains(ShellDestinationId.cuentasPorCobrar)),
+      reason: 'cobrar es de quien lleva la caja (defecto D9)',
+    );
+    expect(
+      doctor,
+      isNot(contains(ShellDestinationId.perfiles)),
+      reason: 'administrar personal es capacidad sólo del admin (defecto D9)',
     );
     expect(assistant, [
       ShellDestinationId.inicio,
@@ -293,6 +301,9 @@ void main() {
       ],
       [ShellDestinationId.perfiles, ShellDestinationId.equipos],
     ]);
+    // Al doctor le desaparece la sección de Facturación entera: no ve
+    // Cuentas por Cobrar ni Caja (defecto D9). Y Administración le queda sólo
+    // con Equipos, porque Perfiles es del admin.
     expect(visibleFor(RolUsuario.doctor), [
       [
         ShellDestinationId.inicio,
@@ -300,13 +311,12 @@ void main() {
         ShellDestinationId.consultas,
         ShellDestinationId.pacientes,
       ],
-      [ShellDestinationId.cuentasPorCobrar],
       [
         ShellDestinationId.tratamientos,
         ShellDestinationId.medicinas,
         ShellDestinationId.inventario,
       ],
-      [ShellDestinationId.perfiles, ShellDestinationId.equipos],
+      [ShellDestinationId.equipos],
     ]);
     expect(visibleFor(RolUsuario.asistente), [
       [

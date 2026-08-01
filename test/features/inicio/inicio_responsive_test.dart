@@ -16,6 +16,7 @@ import 'package:salud_dental_clinic_management/features/paciente/domain/enums/ti
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
 import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
+import '../../support/sesion_de_prueba.dart';
 
 class _DashboardCubitDoble extends Cubit<DashboardState>
     implements DashboardCubit {
@@ -95,10 +96,13 @@ Widget _app(DashboardState estado, {double textScale = 1}) => MaterialApp(
     ).copyWith(textScaler: TextScaler.linear(textScale)),
     child: inner!,
   ),
-  home: Scaffold(
-    body: BlocProvider<DashboardCubit>(
-      create: (_) => _DashboardCubitDoble(estado),
-      child: const InicioPage(),
+  home: proveedorSesion(
+    RolUsuario.admin,
+    child: Scaffold(
+      body: BlocProvider<DashboardCubit>(
+        create: (_) => _DashboardCubitDoble(estado),
+        child: const InicioPage(),
+      ),
     ),
   ),
 );

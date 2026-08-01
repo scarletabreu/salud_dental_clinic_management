@@ -14,6 +14,7 @@ import 'package:salud_dental_clinic_management/features/medicina/presentation/pr
 import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/contraindicaciones_card.dart';
 import 'package:salud_dental_clinic_management/features/medicina/presentation/widgets/efectos_secundarios_card.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/widgets/solo_si_puede.dart';
 
 class MedicinaListPage extends StatefulWidget {
   final IMedicinaRepository repository;
@@ -345,23 +346,25 @@ class _MedicinaListPageState extends State<MedicinaListPage> {
                         ),
                     ],
                   ),
-                  FilledButton.icon(
-                    onPressed: () => _openForm(),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text(
-                      'Nueva medicina',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: ac.primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 16,
+                  SoloSiPuede.editarCatalogos(
+                    child: FilledButton.icon(
+                      onPressed: () => _openForm(),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text(
+                        'Nueva medicina',
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ac.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -1178,25 +1181,28 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                                       .toList(),
                                 ),
                         ),
-                        SizedBox(
-                          width: 72,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              _ActionIcon(
-                                icon: Icons.edit_outlined,
-                                tooltip: 'Editar',
-                                color: ac.textSecondary.withValues(alpha: 0.6),
-                                onTap: widget.onEdit,
-                              ),
-                              const SizedBox(width: 2),
-                              _ActionIcon(
-                                icon: Icons.delete_outline_rounded,
-                                tooltip: 'Eliminar',
-                                color: ac.red.withValues(alpha: 0.70),
-                                onTap: widget.onDelete,
-                              ),
-                            ],
+                        SoloSiPuede.editarCatalogos(
+                          alternativa: const SizedBox(width: 72),
+                          child: SizedBox(
+                            width: 72,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                _ActionIcon(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Editar',
+                                  color: ac.textSecondary.withValues(alpha: 0.6),
+                                  onTap: widget.onEdit,
+                                ),
+                                const SizedBox(width: 2),
+                                _ActionIcon(
+                                  icon: Icons.delete_outline_rounded,
+                                  tooltip: 'Eliminar',
+                                  color: ac.red.withValues(alpha: 0.70),
+                                  onTap: widget.onDelete,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1253,17 +1259,24 @@ class _MedicinaRowState extends State<_MedicinaRow> {
                 ),
               ),
             ),
-            _ActionIcon(
-              icon: Icons.edit_outlined,
-              tooltip: 'Editar',
-              color: ac.textSecondary.withValues(alpha: .6),
-              onTap: widget.onEdit,
-            ),
-            _ActionIcon(
-              icon: Icons.delete_outline_rounded,
-              tooltip: 'Eliminar',
-              color: ac.red.withValues(alpha: .7),
-              onTap: widget.onDelete,
+            SoloSiPuede.editarCatalogos(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ActionIcon(
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Editar',
+                    color: ac.textSecondary.withValues(alpha: .6),
+                    onTap: widget.onEdit,
+                  ),
+                  _ActionIcon(
+                    icon: Icons.delete_outline_rounded,
+                    tooltip: 'Eliminar',
+                    color: ac.red.withValues(alpha: .7),
+                    onTap: widget.onDelete,
+                  ),
+                ],
+              ),
             ),
           ],
         ),

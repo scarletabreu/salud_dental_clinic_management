@@ -20,6 +20,7 @@ import 'package:salud_dental_clinic_management/features/cita/presentation/pages/
 import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/iniciar_consulta_desde_cita.dart';
 
 const _kMonths = [
   'Enero',
@@ -115,7 +116,14 @@ class MisCitasDelDiaPage extends StatelessWidget {
           // urgencia lo puede hacer cualquiera que esté en la clínica cuando
           // llega alguien sin cita (HFX-CLIN-004).
           final authState = context.watch<AuthCubit>().state;
-          final puedeAgendar = authState.puedeGestionarAgendaCompleta;
+          // Agendar para cualquier doctor es de admin y asistente; agendar en
+          // la propia agenda lo puede hacer también el doctor. Antes se le
+          // degradaba a urgencia, que falsea el motivo de la cita y salta el
+          // control de solapamiento (defecto D10).
+          final puedeAgendarParaTodos = authState.puedeGestionarAgendaCompleta;
+          final puedeAgendarParaSi =
+              authState.puedeAgendarCitaPropia && authState.puedeEjercerClinica;
+          final puedeAgendar = puedeAgendarParaTodos || puedeAgendarParaSi;
           final puedeUrgencia = authState.puedeRegistrarEmergencia;
           if (!puedeAgendar && !puedeUrgencia) {
             return const SizedBox.shrink();
@@ -135,6 +143,8 @@ class MisCitasDelDiaPage extends StatelessWidget {
               doctorPredeterminadoId: authState.puedeEjercerClinica
                   ? authState.usuario?.id
                   : null,
+              // Quien sólo puede agendarse a sí mismo no elige odontólogo.
+              doctorFijo: !puedeAgendarParaTodos,
             );
             if (!context.mounted) return;
             context.read<CitaCubit>().load();
@@ -303,8 +313,11 @@ class _MensajeAgendaVacia {
     if (auth.puedeEjercerClinica) {
       return _MensajeAgendaVacia(
         deTodoElPeriodo ? 'No tienes citas asignadas' : 'Sin citas este día',
-        'Recepción agenda tus citas. Si llega alguien sin cita, regístralo con '
-            '«Urgencia» y podrás atenderlo enseguida.',
+        // Desde la jornada de QA del 1 ago 2026 el doctor sí puede agendar en
+        // su propia agenda (defecto D10), así que el texto deja de mandarle a
+        // recepción para todo.
+        'Crea la primera con «Nueva Cita» en tu agenda, o registra una '
+            'urgencia si el paciente ya está en la clínica.',
       );
     }
     return const _MensajeAgendaVacia(
@@ -1246,6 +1259,9 @@ class _CitaCard extends StatelessWidget {
 
     // Crear/editar/cancelar/cambiar estado: quien gestiona la agenda completa.
     final puedeGestionar = authState.puedeGestionarAgendaCompleta;
+    // Un solo criterio para las tres vistas que ofrecen «Iniciar consulta»
+    // (defecto D14): antes cada una decidía por su cuenta.
+    final iniciable = PuedeIniciarConsulta.evaluar(authState, cita);
     final puedeEfectuarConsulta = authState.puedeAtenderCitaDe(cita.doctor.id);
 
     return ResumenCitaAccesible(
@@ -1451,19 +1467,28 @@ class _CitaCard extends StatelessWidget {
                         ),
                         onPressed: () => mostrarResumenCita(context, cita),
                       ),
-                      // CAMBIO: el dropdown de estado solo aparece si el rol
-                      // puede gestionar la cita (asistente o admin).
-                      if (puedeGestionar && !context.appLayout.isCompact) ...[
+                      // El desplegable aparece para quien gestiona la agenda y
+                      // también para el doctor de la cita, que puede llevarla a
+                      // «en espera» o cancelarla (matriz de D12). Qué opciones
+                      // ofrece lo decide `transicionesParaRol`.
+                      if ((puedeGestionar || puedeEfectuarConsulta) &&
+                          !context.appLayout.isCompact) ...[
                         const SizedBox(width: 8),
-                        _EstadoDropdown(
-                          cita: cita,
-                          onCancelar: () =>
-                              _mostrarDialogoCancelacion(context, cita.id!),
+                        // Flexible: el estado ahora también se le muestra al
+                        // doctor, así que esta fila puede quedarse sin sitio en
+                        // tablet. Que ceda la etiqueta antes que desbordar.
+                        Flexible(
+                          child: _EstadoDropdown(
+                            cita: cita,
+                            onCancelar: () =>
+                                _mostrarDialogoCancelacion(context, cita.id!),
+                          ),
                         ),
                       ],
                     ],
                   ),
-                  if (puedeGestionar && context.appLayout.isCompact)
+                  if ((puedeGestionar || puedeEfectuarConsulta) &&
+                      context.appLayout.isCompact)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Padding(
@@ -1475,11 +1500,24 @@ class _CitaCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // CAMBIO: el botón de consulta ahora depende también de
-                  // puedeEfectuarConsulta, no solo del estado de la cita.
-                  if (puedeEfectuarConsulta) _botonEfectuar(context),
+                  if (iniciable.permitido) _botonEfectuar(context),
                   if (authState.puedeRegistrarLlegadaDe(cita.doctor.id))
                     _botonLlegada(context),
+                  // Decir por qué no se puede, en vez de no pintar nada. Un
+                  // botón ausente y mudo es lo que hacía pensar que la app
+                  // estaba rota (defecto D14). No se repite cuando lo único
+                  // que falta es la llegada y el botón de llegada ya está.
+                  if (!iniciable.permitido &&
+                      puedeEfectuarConsulta &&
+                      !(iniciable.faltaLlegada &&
+                          authState.puedeRegistrarLlegadaDe(cita.doctor.id)))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        iniciable.motivo!.mensaje,
+                        style: TextStyle(fontSize: 11.5, color: ac.textMuted),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1521,11 +1559,7 @@ class _CitaCard extends StatelessWidget {
     final ac = context.appColors;
     final pacienteId = cita.persona.id;
     final doctorId = cita.doctor.id;
-    final esEfectuable = cita.estado == EstadoCita.enEspera;
-    if (!esEfectuable ||
-        pacienteId == null ||
-        doctorId == null ||
-        cita.id == null) {
+    if (pacienteId == null || doctorId == null || cita.id == null) {
       return const SizedBox.shrink();
     }
     return Align(
@@ -1640,6 +1674,20 @@ class _EstadoDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = cita.estado.color;
+    final authState = context.watch<AuthCubit>().state;
+    // El desplegable ofrece sólo lo que el rol puede hacer con ESTA cita
+    // (defecto D12). La base lo impone además con
+    // `puede_cambiar_estado_cita`, así que ofrecer de menos no es la defensa:
+    // es no ofrecer algo que iba a fallar.
+    final disponibles = cita.estado.transicionesParaRol(
+      esAdmin: authState.puedeAdministrarPersonal,
+      esDoctorDeLaCita: authState.puedeAtenderCitaDe(cita.doctor.id),
+      esAsistenteAsignada:
+          authState.puedeGestionarAgendaCompleta &&
+          !authState.puedeAdministrarPersonal,
+    );
+
+    if (disponibles.isEmpty) return _EstadoEtiqueta(cita: cita);
 
     return PopupMenuButton<EstadoCita>(
       initialValue: cita.estado,
@@ -1662,12 +1710,15 @@ class _EstadoDropdown extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              cita.estado.label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: statusColor,
+            Flexible(
+              child: Text(
+                cita.estado.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: statusColor,
+                ),
               ),
             ),
             const SizedBox(width: 2),
@@ -1677,7 +1728,7 @@ class _EstadoDropdown extends StatelessWidget {
       ),
       itemBuilder: (BuildContext context) {
         final ac = context.appColors;
-        return cita.estado.transicionesPermitidas.map((e) {
+        return disponibles.map((e) {
           return PopupMenuItem<EstadoCita>(
             value: e,
             child: Row(
@@ -1870,6 +1921,32 @@ class _ViewModePill extends StatelessWidget {
               ),
             );
           }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+/// El estado de la cita cuando el rol no puede cambiarlo: se lee, no se toca.
+class _EstadoEtiqueta extends StatelessWidget {
+  const _EstadoEtiqueta({required this.cita});
+  final Cita cita;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = cita.estado.color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        cita.estado.label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: statusColor,
         ),
       ),
     );

@@ -19,6 +19,10 @@ extension CapacidadesDeSesion on AuthState {
   bool get puedeGestionarCaja => roles.puedeGestionarCaja;
   bool get puedeGestionarCatalogosClinicos =>
       roles.puedeGestionarCatalogosClinicos;
+  bool get puedeEditarCatalogosClinicos => roles.puedeEditarCatalogosClinicos;
+  bool get puedeVerPreciosTratamiento => roles.puedeVerPreciosTratamiento;
+  bool get puedeAgendarCitaPropia => roles.puedeAgendarCitaPropia;
+  bool get puedeVerCuentasPorCobrar => roles.puedeVerCuentasPorCobrar;
   bool get puedeCorregirRegistroAjeno => roles.puedeCorregirRegistroAjeno;
 
   /// Atender una cita exige ser clínico **y** ser el doctor asignado.

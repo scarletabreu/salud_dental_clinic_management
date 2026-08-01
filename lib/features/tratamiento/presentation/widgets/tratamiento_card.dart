@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
@@ -58,8 +60,10 @@ class TratamientoCard extends StatelessWidget {
         const SizedBox(width: 16),
         _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
         const SizedBox(width: 20),
-        _price(ac, CrossAxisAlignment.end),
-        const SizedBox(width: 16),
+        if (_puedeVerPrecios(context)) ...[
+          _price(ac, CrossAxisAlignment.end),
+          const SizedBox(width: 16),
+        ],
         ..._actions(context, ac),
       ],
     );
@@ -84,7 +88,10 @@ class TratamientoCard extends StatelessWidget {
           children: [
             _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
             const SizedBox(width: 12),
-            Expanded(child: _price(ac, CrossAxisAlignment.start)),
+            if (_puedeVerPrecios(context))
+              Expanded(child: _price(ac, CrossAxisAlignment.start))
+            else
+              const Spacer(),
             ..._actions(context, ac),
           ],
         ),
@@ -161,7 +168,20 @@ class TratamientoCard extends StatelessWidget {
     );
   }
 
+  /// El precio es de quien factura, no de quien trata (defecto D8 de la
+  /// jornada de QA del 1 ago 2026).
+  static bool _puedeVerPrecios(BuildContext context) => context.select(
+    (AuthCubit cubit) => cubit.state.puedeVerPreciosTratamiento,
+  );
+
+  /// El catálogo es de sólo lectura para el doctor: lo consulta para trabajar,
+  /// pero crearlo y retirarlo es administración. La RLS lo impone además en la
+  /// base, así que ocultar los botones no es la única defensa.
   List<Widget> _actions(BuildContext context, AppColors ac) {
+    final puedeEditar = context.select(
+      (AuthCubit cubit) => cubit.state.puedeEditarCatalogosClinicos,
+    );
+    if (!puedeEditar) return const [];
     return [
       _ActionIcon(
         icon: Icons.edit_outlined,

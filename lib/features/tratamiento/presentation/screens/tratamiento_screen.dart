@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/features/tratamiento/presentation
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_state.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_card.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/widgets/solo_si_puede.dart';
 
 class TratamientosScreen extends StatelessWidget {
   const TratamientosScreen({super.key});
@@ -156,23 +157,25 @@ class _TratamientosViewState extends State<_TratamientosView> {
                   ],
                 ],
               ),
-              FilledButton.icon(
-                onPressed: () => _abrirFormulario(),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text(
-                  'Nuevo servicio',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: ac.primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
+              SoloSiPuede.editarCatalogos(
+                child: FilledButton.icon(
+                  onPressed: () => _abrirFormulario(),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(
+                    'Nuevo servicio',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ac.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),

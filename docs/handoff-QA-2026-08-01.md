@@ -165,9 +165,12 @@ aplicar, en vez de descubrirse meses después por un odontodiagrama vacío.
 
 ### 3. Revisar dos decisiones marcadas
 
-- **`consulta_select` y `puede_ver_consulta` son TEMPORALES** (decisión D11).
-  Están marcadas en el SQL, en el comentario de la policy y en la prueba de
-  `hfx_clin_005`. Las tres se revierten juntas.
+- **`consulta_select` y `puede_ver_consulta` — REVERTIDAS el 3 ago 2026.** La
+  decisión D11 se cerró en su forma restrictiva: cada doctor ve sólo sus
+  consultas (y sus citas), el admin lo ve todo. Las tres marcas TEMPORAL —
+  policy, función y prueba de `hfx_clin_005`— se revirtieron juntas en
+  `supabase/migrations/20260816090000_d11_alcance_clinico_por_doctor.sql`.
+  Pendiente: aplicarla en producción.
 - **`consumibles_update` incluye `es_doctor()`** en producción. Se versionó tal
   cual para no cambiar producción en F0, pero no forma parte de la matriz de QA
   y parece deriva accidental: un doctor actualizando inventario. Pendiente de

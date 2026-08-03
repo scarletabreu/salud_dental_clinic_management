@@ -9,7 +9,7 @@
 --   1. D8 · El doctor lee el catálogo pero no lo escribe; el admin sí.
 --   2. D8 · Los `*_aplicados` siguen siendo del doctor: la regla es del
 --      catálogo, no de lo clínico.
---   3. D11 · TEMPORAL: cualquier doctor lee cualquier consulta.
+--   3. D11 · El doctor lee sólo las consultas que firmó; el admin, todas.
 --   4. D12 · La asistente sólo ve las citas de los doctores que asiste.
 --   5. D12 · La asistente cambia los estados administrativos y no los clínicos.
 --   6. D12 · El doctor sólo lleva su propia cita a en_espera o cancelada.
@@ -111,21 +111,45 @@ begin
   raise notice 'OK 1 · D8: el doctor lee el catálogo y no lo escribe.';
 
   -- --------------------------- 2. lo clínico sigue siendo del doctor
+  -- Un diagnóstico de alcance global: lo que se comprueba aquí es de quién es
+  -- la escritura, no la barrera de alcance de HFX-CLIN-003, que exige pieza y
+  -- superficie a los diagnósticos puntuales.
   insert into diagnosticos_aplicados (diagnosis_id, severidad, fecha_aplicacion,
                                       notas, consulta_id, origen, created_at, updated_at)
   select d.id, 'moderada', now(), '', v_consulta, 'preexistente', now(), now()
-    from diagnosticos d limit 1;
+    from diagnosticos d
+   where d.alcance::text = 'global'
+   order by d.nombre
+   limit 1;
   raise notice 'OK 2 · D8: los *_aplicados siguen siendo del doctor.';
 
-  -- ------------------------------- 3. D11 (TEMPORAL) · lectura abierta
+  -- ---------------------- 3. D11 (definitivo) · la consulta es de su doctor
+  -- La apertura temporal del 1 ago quedó derogada el 3 ago: el doctor lee lo
+  -- que firmó, el admin lo lee todo.
   perform set_config('request.jwt.claims',
                      json_build_object('sub', v_doctor_otro)::text, true);
   select count(*) into v_conteo from consultas where id = v_consulta;
+  if v_conteo <> 0 then
+    raise exception
+      'HFX-QA-103: un doctor leyó la consulta de otro (% filas).', v_conteo;
+  end if;
+
+  perform set_config('request.jwt.claims',
+                     json_build_object('sub', v_doctor)::text, true);
+  select count(*) into v_conteo from consultas where id = v_consulta;
   if v_conteo <> 1 then
     raise exception
-      'HFX-QA-103: D11 dice que cualquier doctor lee cualquier consulta (% filas).', v_conteo;
+      'HFX-QA-103: el doctor no lee su propia consulta (% filas).', v_conteo;
   end if;
-  raise notice 'OK 3 · D11 (TEMPORAL): el doctor lee consultas ajenas.';
+
+  perform set_config('request.jwt.claims',
+                     json_build_object('sub', v_admin)::text, true);
+  select count(*) into v_conteo from consultas where id = v_consulta;
+  if v_conteo <> 1 then
+    raise exception
+      'HFX-QA-103: el admin no lee la consulta de un doctor (% filas).', v_conteo;
+  end if;
+  raise notice 'OK 3 · D11 (definitivo): cada doctor lee sus consultas; el admin, todas.';
 
   -- ----------------------------- 4. D12 · alcance de la asistente
   perform set_config('request.jwt.claims',

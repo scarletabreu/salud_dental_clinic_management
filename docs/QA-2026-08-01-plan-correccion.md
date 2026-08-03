@@ -309,7 +309,19 @@ imponen. Cambios en dos capas siempre: la UI oculta, la BD impone.
 - **Solución:** `Capacidad.agendarCitaPropia` (los tres roles); el diálogo fija y
   bloquea el selector de doctor cuando solo puede agendarse a sí mismo.
 
-### D11 · Doctor y consultas ajenas — DECIDIDO (1 ago): acceso total TEMPORAL
+### D11 · Doctor y consultas ajenas — DEROGADO el 3 ago 2026
+
+> **Estado final.** La dirección de la clínica cerró el modelo definitivo el
+> 3 ago 2026: **cada doctor ve sólo sus citas y sus consultas; el administrador
+> es el único que lo ve todo**. La apertura temporal descrita abajo ya no está
+> vigente: la revierte
+> `supabase/migrations/20260816090000_d11_alcance_clinico_por_doctor.sql`, que
+> además cierra dos desvíos que la dejaban sin efecto (la vista
+> `consulta_resumen` sin `security_invoker` y `ordenes_medicas_select`, que
+> miraba el rol y no la autoría). El apartado se conserva como registro de por
+> qué la lectura estuvo abierta entre el 1 y el 3 de agosto.
+
+
 
 - **Dónde:** `consulta_select USING (es_admin() OR doctor_id = auth.uid())`
   (`hfx_clin_001:478-486`) + `puede_ver_consulta()` propagada a recetas, consumos,
@@ -458,8 +470,9 @@ la suite.
   `HFX-QA-102-visibilidad-clinica`, `HFX-QA-103-permisos-roles`,
   `HFX-QA-104-funcionalidad`, `HFX-QA-105-e2e`), integradas por PR a `dev`.
 - **Decisiones (estado al 1 ago):**
-  1. **D11 — decidido:** el doctor ve todas las consultas, temporal; Isaac hará
-     el modelo definitivo. Migración marcada como TEMPORAL.
+  1. **D11 — cerrado el 3 ago:** el modelo definitivo es el restrictivo — el
+     doctor ve sólo lo suyo, el admin todo. Deroga la apertura temporal del
+     1 ago (migración `20260816090000_d11_alcance_clinico_por_doctor.sql`).
   2. **D12 — decidido el principio** (cada rol cambia ciertos estados, admin
      todos); la matriz concreta propuesta está en D12 y se valida al arrancar F3.
   3. **Deriva de producción — decidido (1 ago):** el modelo de producción es el

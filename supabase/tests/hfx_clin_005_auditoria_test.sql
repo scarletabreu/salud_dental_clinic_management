@@ -442,16 +442,11 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 9 · La historia clínica ajena — alcance TEMPORAL de la decisión D11.
+-- 9 · La historia clínica ajena — alcance definitivo de la decisión D11.
 -- ---------------------------------------------------------------------------
--- TEMPORAL (QA 1-ago-2026): la clínica decidió que, por ahora, cualquier
--- doctor lee cualquier consulta. Antes esta prueba afirmaba lo contrario y era
--- correcta; se invierte junto con la policy `consulta_select` y
--- `puede_ver_consulta`, y las tres se revierten a la vez cuando llegue el
--- modelo definitivo de alcance clínico.
---
--- Lo que NO cambia y esta prueba sigue fijando: leer no es escribir. La doctora
--- ajena ve la línea de tiempo, pero no puede firmar nada sobre esa consulta.
+-- La apertura TEMPORAL del 1 ago 2026 quedó derogada el 3 ago: la consulta es
+-- de su doctor. La doctora ajena ni ve la línea de tiempo ni firma sobre ella,
+-- y tampoco alcanza los eventos sueltos de la tabla de auditoría.
 select set_config(
   'request.jwt.claims',
   json_build_object('sub', current_setting('hfx005.doc_ajena'), 'role', 'authenticated')::text,
@@ -461,15 +456,23 @@ select set_config(
 do $$
 declare
   v_consulta uuid := current_setting('hfx005.consulta')::uuid;
+  v_fallo    boolean := false;
 begin
-  perform public.linea_tiempo_consulta(v_consulta);
+  begin
+    perform public.linea_tiempo_consulta(v_consulta);
+    v_fallo := true;
+  exception when check_violation or insufficient_privilege then null;
+  end;
 
-  if not exists (select 1 from public.auditoria_clinica where consulta_id = v_consulta) then
-    raise exception
-      'la doctora ajena no vio los eventos: la decisión D11 abre la LECTURA a todo doctor';
+  if v_fallo then
+    raise exception 'una doctora ajena abrió la línea de tiempo de una consulta que no es suya';
   end if;
 
-  -- El límite sigue en pie: mirar no es firmar.
+  if exists (select 1 from public.auditoria_clinica where consulta_id = v_consulta) then
+    raise exception 'una doctora ajena leyó la auditoría de una consulta que no es suya';
+  end if;
+
+  -- El límite de siempre, que tampoco cambia: mirar no es firmar.
   begin
     update public.consultas set notas = 'intruso' where id = v_consulta;
     if found then
@@ -478,7 +481,7 @@ begin
   exception when insufficient_privilege or check_violation then null;
   end;
 
-  raise notice 'OK 9 · D11 (TEMPORAL): el doctor lee cualquier consulta, pero sólo firma la suya';
+  raise notice 'OK 9 · D11 (definitivo): la consulta ajena no se lee ni se firma';
 end;
 $$;
 

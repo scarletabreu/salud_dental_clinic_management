@@ -52,6 +52,14 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
 
   /// La consulta ya está cerrada en el servidor. No se sigue editando.
   String? _consultaCerrada;
+
+  /// Por qué no se pudo preparar la ficha del paciente.
+  ///
+  /// Sin este estado, que la lectura fallara dejaba la pantalla en un indicador
+  /// de carga permanente, sin un solo texto y sin salida. Es lo que mantuvo
+  /// invisible el defecto V-01: la interfaz no distinguía «estoy cargando» de
+  /// «no puedo cargar esto», y el usuario sólo veía una rueda girando.
+  String? _falloRegistro;
   Paciente?
   _pacienteParaForm; // <-- NUEVO: copia local, inmune a emits del cubit
   late final PacienteCubit _pacienteCubit;
@@ -65,18 +73,42 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
   }
 
   Future<void> _verificarRegistro() async {
-    final completo = await _pacienteCubit.isPaciente(widget.pacienteId);
+    _falloRegistro = null;
 
-    if (!completo) {
-      await _pacienteCubit.loadParaConsulta(widget.pacienteId);
-      final s = _pacienteCubit.state;
-      if (s is PacienteDetailLoaded) {
-        _pacienteParaForm = s.paciente;
+    try {
+      final completo = await _pacienteCubit.isPaciente(widget.pacienteId);
+
+      if (!completo) {
+        await _pacienteCubit.loadParaConsulta(widget.pacienteId);
+        final s = _pacienteCubit.state;
+        if (s is PacienteDetailLoaded) {
+          _pacienteParaForm = s.paciente;
+        } else {
+          // Ni la ficha existe ni se pudo leer la persona: sin esto la pantalla
+          // se quedaba pintando el indicador de carga para siempre.
+          if (mounted) {
+            setState(
+              () => _falloRegistro =
+                  'No se pudo abrir el expediente de este paciente. '
+                  'Puede que no tengas acceso a él o que la conexión haya '
+                  'fallado.',
+            );
+          }
+          return;
+        }
       }
-    }
 
-    if (mounted) {
-      setState(() => _registroIncompleto = !completo);
+      if (mounted) {
+        setState(() => _registroIncompleto = !completo);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => _falloRegistro =
+              'No se pudo preparar la consulta: '
+              '${e.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
     }
   }
 
@@ -108,6 +140,42 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
                 consultaId: widget.consultaId!,
               );
             });
+          }
+
+          if (_falloRegistro != null) {
+            return Scaffold(
+              backgroundColor: ac.bgPage,
+              appBar: AppBar(backgroundColor: ac.bgPage),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.lock_person_outlined,
+                        size: 40,
+                        color: ac.textMuted,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _falloRegistro!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: ac.textSecondary, height: 1.4),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () {
+                          setState(() => _falloRegistro = null);
+                          _verificarRegistro();
+                        },
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
           }
 
           if (_registroIncompleto == null) {

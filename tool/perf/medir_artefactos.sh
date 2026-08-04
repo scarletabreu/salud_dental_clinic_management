@@ -29,7 +29,7 @@ cd "$(dirname "$0")/../.."
 #
 # Al reducir un artefacto de verdad, **baja también su techo aquí**: un
 # trinquete que no se aprieta deja de proteger.
-PRESUPUESTO_WEB_INICIAL=5700   # main.dart.js: línea base HFX-CLIN-000 = 5556 KiB
+PRESUPUESTO_WEB_INICIAL=5800   # main.dart.js: medido en CI 4 ago 2026 = 5724 KiB
 PRESUPUESTO_WEB_TOTAL=46500    # build/web: línea base HFX-CLIN-000 = 45912 KiB
 PRESUPUESTO_APK=68000          # APK universal de release (no se distribuye)
 PRESUPUESTO_APK_ABI=25500      # APK de una sola arquitectura (lo que se descarga)

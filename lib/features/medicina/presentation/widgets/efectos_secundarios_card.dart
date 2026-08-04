@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/enums/efecto_secundario.dart';
 
 class EfectosSecundariosCard extends StatelessWidget {
@@ -8,85 +9,124 @@ class EfectosSecundariosCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
+    const activeColor = Color(0xFFB45309);
+    const activeBg = Color(0xFFFEF3C7);
+    const activeBorder = Color(0xFFD97706);
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.secondaryContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: colorScheme.secondary),
-                const SizedBox(width: 8),
-                Text(
-                  'Efectos secundarios',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSecondaryContainer,
-                  ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.divider, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: activeBg,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const Spacer(),
-                if (efectos.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.secondary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${efectos.length}',
-                      style: TextStyle(
-                        color: colorScheme.onSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (efectos.isEmpty)
-              Text(
-                'Ninguno registrado',
-                style: TextStyle(
-                  color: colorScheme.onSecondaryContainer.withAlpha(153),
-                  fontStyle: FontStyle.italic,
+                child: const Icon(
+                  Icons.warning_amber_outlined,
+                  size: 15,
+                  color: activeColor,
                 ),
-              )
-            else
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: efectos
-                    .map(
-                      (e) => Chip(
-                        label: Text(
-                          e.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                        backgroundColor: colorScheme.secondary.withAlpha(38),
-                        side: BorderSide(
-                          color: colorScheme.secondary.withAlpha(77),
-                        ),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    )
-                    .toList(),
               ),
-          ],
-        ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Efectos secundarios',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+              ),
+              if (efectos.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: activeColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${efectos.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: activeColor,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (efectos.isEmpty)
+            Text(
+              'Ninguno registrado',
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: ac.textMuted,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: efectos
+                  .map(
+                    (e) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: activeBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: activeBorder.withOpacity(0.40),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(
+                              color: activeColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            e.label,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: activeColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
       ),
     );
   }

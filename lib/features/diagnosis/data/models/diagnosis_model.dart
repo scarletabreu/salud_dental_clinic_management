@@ -11,6 +11,7 @@ class DiagnosisModel extends Diagnosis {
     required super.severidadDefault,
     required super.alcance,
     required super.categoria,
+    super.claveOdontograma,
   });
 
   factory DiagnosisModel.fromJson(Map<String, dynamic> json) {
@@ -22,7 +23,8 @@ class DiagnosisModel extends Diagnosis {
         json['severidad_default'] ?? json['severidadDefault'],
       ),
       alcance: Alcance.values.byName(json['alcance'] as String),
-      categoria: CategoriaDiagnosis.values.byName(json['categoria'] as String),
+      categoria: CategoriaDiagnosis.fromDb(json['categoria'] as String),
+      claveOdontograma: json['clave_odontograma'] ?? json['claveOdontograma'],
     );
   }
 
@@ -32,7 +34,8 @@ class DiagnosisModel extends Diagnosis {
       'descripcion': descripcion,
       'severidad_default': severidadDefault.name,
       'alcance': alcance.name,
-      'categoria': categoria.name,
+      'categoria': categoria.dbValue,
+      'clave_odontograma': claveOdontograma,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

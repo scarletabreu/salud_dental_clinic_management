@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/entities/diagnostico_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/domain/repositories/diagnostico_aplicado_repository.dart';
 import 'package:salud_dental_clinic_management/features/diagnostico_aplicado/data/datasources/diagnostico_aplicado_remote_datasource.dart';
@@ -10,45 +11,42 @@ class DiagnosticoAplicadoRepositoryImpl
   DiagnosticoAplicadoRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> aplicarDiagnostico(DiagnosticoAplicado diagnostico) async {
-    try {
+  Future<void> aplicarDiagnostico(DiagnosticoAplicado diagnostico) {
+    return runGuarded(() async {
       final model = DiagnosticoAplicadoModel(
         id: diagnostico.id,
         diagnosisId: diagnostico.diagnosisId,
         severidad: diagnostico.severidad,
         fechaAplicacion: diagnostico.fechaAplicacion,
         notas: diagnostico.notas,
+        consultaId: diagnostico.consultaId,
+        dienteId: diagnostico.dienteId,
+        superficie: diagnostico.superficie,
+        origen: diagnostico.origen,
+        nombreDiagnostico: diagnostico.nombreDiagnostico,
+        claveOdontograma: diagnostico.claveOdontograma,
       );
       await remoteDataSource.insertDiagnostico(model.toJson());
-    } catch (e) {
-      throw Exception('Error en el repositorio al aplicar diagnóstico: $e');
-    }
+    }, context: 'aplicar el diagnóstico');
   }
 
   @override
   Future<List<DiagnosticoAplicado>> getDiagnosticosDeConsulta(
     String consultaId,
-  ) async {
-    try {
+  ) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchByConsulta(consultaId);
       return data
           .map((json) => DiagnosticoAplicadoModel.fromJson(json))
           .toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener diagnósticos de la consulta: $e',
-      );
-    }
+    }, context: 'obtener los diagnósticos de la consulta');
   }
 
   @override
-  Future<void> eliminarDiagnostico(String id) async {
-    try {
-      await remoteDataSource.deleteDiagnostico(id);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al eliminar diagnóstico aplicado: $e',
-      );
-    }
+  Future<void> eliminarDiagnostico(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteDiagnostico(id),
+      context: 'eliminar el diagnóstico aplicado',
+    );
   }
 }

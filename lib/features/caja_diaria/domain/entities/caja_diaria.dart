@@ -1,3 +1,5 @@
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
+
 class CajaDiaria {
   final String? id;
   final DateTime fecha;
@@ -17,7 +19,8 @@ class CajaDiaria {
     this.cerrada = false,
   });
 
-  double get diferencia => montoReal - montoEsperado;
+  double get diferencia =>
+      BalanceCaja.diferencia(montoReal: montoReal, montoEsperado: montoEsperado);
 
   bool get tieneFaltante => diferencia < 0;
 

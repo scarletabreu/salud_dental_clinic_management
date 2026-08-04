@@ -1,0 +1,70 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run -d web-server --web-port 8080
+
+## exception
+
+RPCError: ext.flutter.profileWidgetBuilds: (-32603) Unexpected DWDS error for callServiceExtension: Bad state: No clients available for service extension
+
+```
+#0      new _OutstandingRequest (package:vm_service/src/vm_service.dart:268:34)
+#1      VmService._call.<anonymous closure> (package:vm_service/src/vm_service.dart:1950:25)
+#2      VmService._call (package:vm_service/src/vm_service.dart:1962:8)
+#3      VmService.callServiceExtension (package:vm_service/src/vm_service.dart:1901:14)
+#4      FlutterVmService._checkedCallServiceExtension (package:flutter_tools/src/vmservice.dart:771:28)
+#5      FlutterVmService.invokeFlutterExtensionRpcRaw (package:flutter_tools/src/vmservice.dart:790:49)
+#6      FlutterVmService._flutterToggle (package:flutter_tools/src/vmservice.dart:631:41)
+#7      FlutterVmService.flutterToggleProfileWidgetBuilds (package:flutter_tools/src/vmservice.dart:660:7)
+#8      ResidentHandlers.debugToggleProfileWidgetBuilds (package:flutter_tools/src/resident_runner.dart:888:33)
+<asynchronous suspension>
+#9      TerminalHandler.processTerminalInput (package:flutter_tools/src/resident_runner.dart:1906:7)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.41.6, on macOS 26.6 25G5052e darwin-arm64, locale en-DO) [286ms]
+    [32m•[39m Flutter version 3.41.6 on channel stable at /opt/homebrew/share/flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision db50e20168 (3 months ago), 2026-03-25 16:21:00 -0700
+    [32m•[39m Engine revision 425cfb54d0
+    [32m•[39m Dart version 3.11.4
+    [32m•[39m DevTools version 2.54.2
+    [32m•[39m Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations,
+      enable-native-assets, omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+
+[32m[✓][39m Android toolchain - develop for Android devices (Android SDK version 36.1.0) [3.0s]
+    [32m•[39m Android SDK at /Users/scarletabreu/Library/Android/sdk
+    [32m•[39m Emulator version 36.4.10.0 (build_id 15004761) (CL:N/A)
+    [32m•[39m Platform android-36, build-tools 36.1.0
+    [32m•[39m ANDROID_HOME = /Users/scarletabreu/Library/Android/sdk
+    [32m•[39m Java binary at: /Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version OpenJDK Runtime Environment (build 21.0.9+-14787801-b1163.94)
+    [32m•[39m All Android licenses accepted.
+
+[32m[✓][39m Xcode - develop for iOS and macOS (Xcode 26.2) [1,529ms]
+    [32m•[39m Xcode at /Applications/Xcode.app/Contents/Developer
+    [32m•[39m Build 17C52
+    [32m•[39m CocoaPods version 1.16.2
+
+[31m[✗][39m Chrome - develop for the web (Cannot find Chrome executable at /Applications/Google Chrome.app/Contents/MacOS/Google Chrome) [2ms]
+    [33m![39m Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+
+[32m[✓][39m Connected device (2 available) [3.7s]
+    [32m•[39m macOS (desktop)  • macos      • darwin-arm64   • macOS 26.6 25G5052e darwin-arm64
+    [32m•[39m Web Server (web) • web-server • web-javascript • Flutter Tools
+    [33m![39m Error: Browsing on the local area network for Scarlet. Ensure the device is unlocked and attached with a cable or associated with the same
+      local area network as this Mac.
+      The device must be opted into Developer Mode to connect wirelessly. (code -27)
+
+[32m[✓][39m Network resources [1,256ms]
+    [32m•[39m All expected network resources are available.
+
+[33m![39m Doctor found issues in 1 category.
+```

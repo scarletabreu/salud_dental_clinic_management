@@ -15,16 +15,19 @@ class DocumentoClinicoModel extends DocumentoClinico {
   factory DocumentoClinicoModel.fromJson(Map<String, dynamic> json) {
     return DocumentoClinicoModel(
       id: json['id'] as String?,
-      pacienteId: json['paciente_id'] ?? json['pacienteId'],
-      consultaId: json['consulta_id'] ?? json['consultaId'],
+      pacienteId: (json['paciente_id'] ?? json['pacienteId'] ?? '') as String,
+      consultaId: (json['consulta_id'] ?? json['consultaId'] ?? '') as String,
       descripcion: json['descripcion'] as String,
       tipoDocumento: TipoDocumento.values.byName(
         json['tipo_documento'] ?? json['tipoDocumento'],
       ),
+      // La tabla `documentos_clinicos` no tiene columna `fecha_creacion`:
+      // los embeds traen `created_at` (ver supabase/crear_consulta_completa.sql).
       fechaCreacion: DateTime.parse(
-        json['fecha_creacion'] ?? json['fechaCreacion'],
+        (json['fecha_creacion'] ?? json['fechaCreacion'] ?? json['created_at'])
+            as String,
       ),
-      urlArchivo: json['url_archivo'] ?? json['urlArchivo'] as String,
+      urlArchivo: (json['url_archivo'] ?? json['urlArchivo']) as String,
     );
   }
 

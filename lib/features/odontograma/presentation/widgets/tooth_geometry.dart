@@ -8,11 +8,22 @@ import 'package:path_drawing/path_drawing.dart';
 
 enum ToothType { incisor, canine, premolar, molar, wisdom }
 
+enum DenticionArcada { permanente, mixta, temporal }
+
+extension DenticionArcadaX on DenticionArcada {
+  String get label => switch (this) {
+    DenticionArcada.permanente => 'Permanente',
+    DenticionArcada.mixta => 'Mixta',
+    DenticionArcada.temporal => 'Temporal',
+  };
+}
+
 ToothType toothTypeFor(int fdi) {
+  final temporal = fdi >= 51 && fdi <= 85;
   return switch (fdi % 10) {
     1 || 2 => ToothType.incisor,
     3 => ToothType.canine,
-    4 || 5 => ToothType.premolar,
+    4 || 5 => temporal ? ToothType.molar : ToothType.premolar,
     6 || 7 => ToothType.molar,
     8 => ToothType.wisdom,
     _ => ToothType.molar,
@@ -56,6 +67,26 @@ const Map<int, String> kFdiNames = {
   46: 'Primer molar inferior derecho',
   47: 'Segundo molar inferior derecho',
   48: 'Tercer molar inferior derecho',
+  51: 'Incisivo central superior derecho temporal',
+  52: 'Incisivo lateral superior derecho temporal',
+  53: 'Canino superior derecho temporal',
+  54: 'Primer molar superior derecho temporal',
+  55: 'Segundo molar superior derecho temporal',
+  61: 'Incisivo central superior izquierdo temporal',
+  62: 'Incisivo lateral superior izquierdo temporal',
+  63: 'Canino superior izquierdo temporal',
+  64: 'Primer molar superior izquierdo temporal',
+  65: 'Segundo molar superior izquierdo temporal',
+  71: 'Incisivo central inferior izquierdo temporal',
+  72: 'Incisivo lateral inferior izquierdo temporal',
+  73: 'Canino inferior izquierdo temporal',
+  74: 'Primer molar inferior izquierdo temporal',
+  75: 'Segundo molar inferior izquierdo temporal',
+  81: 'Incisivo central inferior derecho temporal',
+  82: 'Incisivo lateral inferior derecho temporal',
+  83: 'Canino inferior derecho temporal',
+  84: 'Primer molar inferior derecho temporal',
+  85: 'Segundo molar inferior derecho temporal',
 };
 
 // ─────────────────────────────────────────────
@@ -64,13 +95,46 @@ const Map<int, String> kFdiNames = {
 
 /// Upper arch, left rim → top → right rim (viewer's perspective).
 const List<int> kUpperOrder = [
-  18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
+  18,
+  17,
+  16,
+  15,
+  14,
+  13,
+  12,
+  11,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
 ];
 
 /// Lower arch, left rim → bottom → right rim.
 const List<int> kLowerOrder = [
-  48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
+  48,
+  47,
+  46,
+  45,
+  44,
+  43,
+  42,
+  41,
+  31,
+  32,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
 ];
+
+const List<int> kUpperTemporalOrder = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
+const List<int> kLowerTemporalOrder = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
 // ─────────────────────────────────────────────
 //  Mesio-distal width weight per tooth type
@@ -79,7 +143,8 @@ const List<int> kLowerOrder = [
 
 double _widthWeight(int fdi) {
   return switch (toothTypeFor(fdi)) {
-    ToothType.incisor => fdi % 10 == 1 ? 1.05 : 0.85, // central wider than lateral
+    ToothType.incisor =>
+      fdi % 10 == 1 ? 1.05 : 0.85, // central wider than lateral
     ToothType.canine => 1.0,
     ToothType.premolar => 1.0,
     ToothType.molar => 1.45,
@@ -109,14 +174,18 @@ class ToothPlacement {
 /// the given [canvas]. Two half-ellipses (upper/lower) share one center,
 /// forming a horseshoe/mouth. Teeth are spaced by mesio-distal width and
 /// rotated so each crown points radially outward.
-Map<int, ToothPlacement> archLayout(Size canvas) {
+Map<int, ToothPlacement> archLayout(
+  Size canvas, {
+  DenticionArcada denticion = DenticionArcada.permanente,
+}) {
   final cx = canvas.width / 2;
   final cy = canvas.height / 2;
   final rx = canvas.width / 2 - canvas.width * 0.115;
   final ry = canvas.height / 2 - canvas.height * 0.085;
 
-  final baseW = canvas.width * 0.061;
-  final baseH = canvas.height * 0.104;
+  final esMixta = denticion == DenticionArcada.mixta;
+  final baseW = canvas.width * (esMixta ? 0.043 : 0.061);
+  final baseH = canvas.height * (esMixta ? 0.076 : 0.104);
   final labelMargin = canvas.width * 0.056;
 
   final result = <int, ToothPlacement>{};
@@ -169,8 +238,18 @@ Map<int, ToothPlacement> archLayout(Size canvas) {
     }
   }
 
-  layArc(kUpperOrder, true);
-  layArc(kLowerOrder, false);
+  final superiores = switch (denticion) {
+    DenticionArcada.permanente => kUpperOrder,
+    DenticionArcada.temporal => kUpperTemporalOrder,
+    DenticionArcada.mixta => [...kUpperOrder, ...kUpperTemporalOrder],
+  };
+  final inferiores = switch (denticion) {
+    DenticionArcada.permanente => kLowerOrder,
+    DenticionArcada.temporal => kLowerTemporalOrder,
+    DenticionArcada.mixta => [...kLowerOrder, ...kLowerTemporalOrder],
+  };
+  layArc(superiores, true);
+  layArc(inferiores, false);
   return result;
 }
 
@@ -220,6 +299,30 @@ final Map<String, Path> _baseCache = {};
 Path _parseCached(String svg) =>
     _baseCache.putIfAbsent(svg, () => parseSvgPathData(svg));
 
+/// Trazos ya ajustados a un tamaño concreto, indexados por trazo y tamaño.
+///
+/// El parseo del SVG ya estaba memorizado, pero el ajuste no: `_fit` corre
+/// dentro del bucle de `paint` de la arcada, una vez por pieza y por trazo.
+/// Con 32 piezas eso son ~64 `Path` nuevos en cada repintado, y la arcada
+/// repinta entera con solo mover el ratón por encima. Como la geometría
+/// depende únicamente de la forma y del tamaño, el resultado se puede guardar.
+///
+/// La caché se mantiene acotada porque los tamaños distintos son pocos —los
+/// que produzcan los breakpoints—, pero un `LayoutBuilder` con tamaños
+/// continuos podría generar muchos: al pasarse del tope se vacía entera en vez
+/// de crecer sin límite.
+final Map<(String, Size), Path> _fittedCache = {};
+const int _maxFitted = 128;
+
+Path _fitCached(String svg, Size size) {
+  final clave = (svg, size);
+  final memorizado = _fittedCache[clave];
+  if (memorizado != null) return memorizado;
+
+  if (_fittedCache.length >= _maxFitted) _fittedCache.clear();
+  return _fittedCache[clave] = _fit(_parseCached(svg), size);
+}
+
 /// Transform a 0–100 viewBox path to a [size]-sized path centered at origin.
 Path _fit(Path base, Size size) {
   final m = Matrix4.identity()
@@ -230,7 +333,7 @@ Path _fit(Path base, Size size) {
 
 /// Tooth outline path, centered at (0,0), sized to [size].
 Path buildToothPath(ToothType type, Size size) {
-  return _fit(_parseCached(_shapeSvgFor(type)), size);
+  return _fitCached(_shapeSvgFor(type), size);
 }
 
 /// Occlusal groove path for [type], or null if the tooth has no groove
@@ -243,7 +346,7 @@ Path? buildGroovePath(ToothType type, Size size, {required bool upper}) {
     ToothType.incisor || ToothType.canine => null,
   };
   if (svg == null) return null;
-  return _fit(_parseCached(svg), size);
+  return _fitCached(svg, size);
 }
 
 // ─────────────────────────────────────────────
@@ -251,7 +354,8 @@ Path? buildGroovePath(ToothType type, Size size, {required bool upper}) {
 // ─────────────────────────────────────────────
 
 /// True if the tooth belongs to the upper arch (FDI quadrant 1 or 2)
-bool isUpperTooth(int fdi) => fdi >= 11 && fdi <= 28;
+bool isUpperTooth(int fdi) =>
+    (fdi >= 11 && fdi <= 28) || (fdi >= 51 && fdi <= 68);
 
 /// True if the tooth is an anterior tooth (incisor or canine)
 bool isAnteriorTooth(int fdi) {

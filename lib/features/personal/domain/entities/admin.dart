@@ -1,8 +1,8 @@
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
-class Admin extends Usuario {
+class Admin extends Doctor {
   final String departamento;
 
   Admin({
@@ -14,14 +14,16 @@ class Admin extends Usuario {
     required super.contactos,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
+    required super.assistants,
+    required super.specialty,
+    super.isAvailable = true,
     required this.departamento,
   });
 
   @override
   RolUsuario get rol => RolUsuario.admin;
 
-  Admin copyWith({EstatusPersona? estatus, String? departamento}) {
+  Admin copyWithAdmin({EstatusPersona? estatus, String? departamento}) {
     return Admin(
       id: id,
       nombre: nombre,
@@ -31,8 +33,10 @@ class Admin extends Usuario {
       contactos: contactos,
       estatus: estatus ?? this.estatus,
       username: username,
-      passwordHash: passwordHash,
       departamento: departamento ?? this.departamento,
+      specialty: specialty,
+      assistants: assistants,
+      isAvailable: isAvailable,
     );
   }
 }

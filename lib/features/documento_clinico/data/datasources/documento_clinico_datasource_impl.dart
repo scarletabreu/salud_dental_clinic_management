@@ -8,16 +8,10 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
 
   @override
   Future<void> crearDocumento(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['created_at'] = DateTime.now().toIso8601String();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('documentos_clinicos').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar el documento clínico: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al crear documento: $e');
-    }
+    data.remove('id');
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
+    await supabaseClient.from('documentos_clinicos').insert(data);
   }
 
   @override
@@ -29,38 +23,24 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
   Future<List<Map<String, dynamic>>> fetchDocumentosPaciente(
     String pacienteId,
   ) async {
-    try {
-      final response = await supabaseClient
-          .from('documentos_clinicos')
-          .select()
-          .eq('paciente_id', pacienteId)
-          .filter('deleted_at', 'is', null)
-          .order('fecha_creacion', ascending: false);
+    final response = await supabaseClient
+        .from('documentos_clinicos')
+        .select()
+        .eq('paciente_id', pacienteId)
+        .filter('deleted_at', 'is', null)
+        .order('fecha_creacion', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception(
-        'Error al recuperar documentos del paciente: ${e.message}',
-      );
-    } catch (e) {
-      throw Exception('Error inesperado al buscar documentos: $e');
-    }
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override
   Future<void> eliminarDocumento(String id) async {
-    try {
-      await supabaseClient
-          .from('documentos_clinicos')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar el documento: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al eliminar: $e');
-    }
+    await supabaseClient
+        .from('documentos_clinicos')
+        .update({
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

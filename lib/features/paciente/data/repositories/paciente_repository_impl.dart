@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/errors/guard.dart';
 import '../../domain/entities/paciente.dart';
 import '../../domain/repositories/i_paciente_repository.dart';
 import '../datasources/paciente_remote_datasource.dart';
@@ -11,54 +13,88 @@ class PacienteRepositoryImpl implements IPacienteRepository {
   PacienteRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Either<Failure, List<Paciente>>> getPacientes() async {
-    try {
-      final remotePacientes = await remoteDataSource.getPacientes();
-      return Right(remotePacientes);
-    } catch (e) {
-      return Left(ServerFailure('Error al cargar pacientes: $e'));
-    }
+  Future<Either<Failure, List<Paciente>>> getPacientes() {
+    return guard(
+      () => remoteDataSource.getPacientes(),
+      context: 'cargar pacientes',
+    );
   }
 
   @override
-  Future<Either<Failure, void>> addPaciente(Paciente paciente) async {
-    try {
-      final pacienteModel = PacienteModel.fromEntity(paciente);
-      await remoteDataSource.addPaciente(pacienteModel);
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure('Error al agregar: $e'));
-    }
+  Future<Either<Failure, Map<String, String>>> getNombresPacientes(
+    List<String> ids,
+  ) {
+    if (ids.isEmpty) return Future.value(const Right(<String, String>{}));
+    return guard(
+      () => remoteDataSource.getNombresPacientes(ids),
+      context: 'resolver los nombres de los pacientes',
+    );
   }
 
   @override
-  Future<Either<Failure, void>> updatePaciente(Paciente paciente) async {
-    try {
-      final pacienteModel = PacienteModel.fromEntity(paciente);
-      await remoteDataSource.updatePaciente(pacienteModel);
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure('Error al actualizar: $e'));
-    }
+  Future<Either<Failure, bool>> faltaRegistro(String id) {
+    return guard(
+      () => remoteDataSource.esPersonaSinFichaClinica(id),
+      context: 'verificar si es paciente',
+    );
   }
 
   @override
-  Future<Either<Failure, Paciente>> getPacienteById(String id) async {
-    try {
-      final paciente = await remoteDataSource.getPacienteById(id);
-      return Right(paciente);
-    } catch (e) {
-      return Left(ServerFailure('Error al cargar paciente: $e'));
-    }
+  Future<Either<Failure, String>> addPaciente(Paciente paciente) {
+    return guard(
+      () => remoteDataSource.addPaciente(PacienteModel.fromEntity(paciente)),
+      context: 'agregar el paciente',
+    );
   }
 
   @override
-  Future<Either<Failure, void>> deletePaciente(String id) async {
-    try {
-      await remoteDataSource.deletePaciente(id);
-      return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure('Error al eliminar: $e'));
-    }
+  Future<Either<Failure, void>> updatePaciente(Paciente paciente) {
+    return guard(
+      () => remoteDataSource.updatePaciente(
+        PacienteModel.fromEntity(paciente),
+        version: paciente.version,
+      ),
+      context: 'actualizar el paciente',
+    );
+  }
+
+  @override
+  Future<Either<Failure, Paciente>> getPacienteById(String id) {
+    return guard(
+      () => remoteDataSource.getPacienteById(id),
+      context: 'cargar el paciente',
+    );
+  }
+
+  @override
+  Future<Either<Failure, Paciente>> getOrCreatePacienteByPersonaId(
+    String personaId,
+  ) {
+    return guard(
+      () => remoteDataSource.getOrCreateByPersonaId(personaId),
+      context: 'cargar el paciente',
+    );
+  }
+
+  @override
+  Future<Either<Failure, void>> deletePaciente(String id) {
+    return guard(
+      () => remoteDataSource.deletePaciente(id),
+      context: 'eliminar el paciente',
+    );
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadFotoPaciente({
+    required String pacienteId,
+    required Uint8List bytes,
+  }) {
+    return guard(
+      () => remoteDataSource.uploadFotoPaciente(
+        pacienteId: pacienteId,
+        bytes: bytes,
+      ),
+      context: 'subir la foto del paciente',
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/compra/domain/entities/compra.dart';
 import 'package:salud_dental_clinic_management/features/compra/domain/repositories/compra_repository.dart';
 import 'package:salud_dental_clinic_management/features/compra/data/datasources/compra_remote_datasource.dart';
@@ -10,30 +11,40 @@ class CompraRepositoryImpl implements CompraRepository {
   CompraRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Compra>> fetchCompras() async {
-    try {
+  Future<void> recibirCompra({
+    required String compraId,
+    required String usuarioId,
+    String metodoPago = 'efectivo',
+  }) {
+    return runGuarded(
+      () => remoteDataSource.recibirCompra(
+        compraId: compraId,
+        usuarioId: usuarioId,
+        metodoPago: metodoPago,
+      ),
+      context: 'recibir la compra y registrar el egreso en caja',
+    );
+  }
+
+  @override
+  Future<List<Compra>> fetchCompras() {
+    return runGuarded(() async {
       final comprasData = await remoteDataSource.fetchCompras();
       return comprasData.map((data) => CompraModel.fromJson(data)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener lista de compras: $e',
-      );
-    }
+    }, context: 'obtener la lista de compras');
   }
 
   @override
-  Future<Compra?> getCompraById(String id) async {
-    try {
+  Future<Compra?> getCompraById(String id) {
+    return runGuarded(() async {
       final compraData = await remoteDataSource.fetchCompraById(id);
       return (compraData != null) ? CompraModel.fromJson(compraData) : null;
-    } catch (e) {
-      throw Exception('Error en el repositorio al buscar compra: $e');
-    }
+    }, context: 'buscar la compra');
   }
 
   @override
-  Future<void> registrarCompra(Compra compra) async {
-    try {
+  Future<void> registrarCompra(Compra compra) {
+    return runGuarded(() async {
       final model = CompraModel(
         id: compra.id,
         fecha: compra.fecha,
@@ -41,29 +52,22 @@ class CompraRepositoryImpl implements CompraRepository {
         estado: compra.estado,
       );
       await remoteDataSource.createCompra(model);
-    } catch (e) {
-      throw Exception('Error en el repositorio al registrar compra: $e');
-    }
+    }, context: 'registrar la compra');
   }
 
   @override
-  Future<void> actualizarEstadoCompra(
-    String id,
-    EstadoCompra nuevoEstado,
-  ) async {
-    try {
-      await remoteDataSource.updateCompraEstado(id, nuevoEstado.name);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar estado: $e');
-    }
+  Future<void> actualizarEstadoCompra(String id, EstadoCompra nuevoEstado) {
+    return runGuarded(
+      () => remoteDataSource.updateCompraEstado(id, nuevoEstado.dbValue),
+      context: 'actualizar el estado de la compra',
+    );
   }
 
   @override
-  Future<void> cancelarCompra(String id) async {
-    try {
-      await remoteDataSource.deleteCompra(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al cancelar compra: $e');
-    }
+  Future<void> cancelarCompra(String id) {
+    return runGuarded(
+      () => remoteDataSource.deleteCompra(id),
+      context: 'cancelar la compra',
+    );
   }
 }

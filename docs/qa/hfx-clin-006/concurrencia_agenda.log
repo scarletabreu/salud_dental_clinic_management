@@ -1,0 +1,3 @@
+OK · dos reservas simultáneas del mismo intervalo producen una sola cita
+OK · dos inicios simultáneos producen una sola consulta y la cita queda en_consulta
+SMOKE HFX-CLIN-004 COMPLETO · concurrencia de agenda y de inicio de consulta.

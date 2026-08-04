@@ -1,4 +1,3 @@
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/entities/suplidor.dart';
 import 'package:salud_dental_clinic_management/features/suplidor/domain/enums/tipo_suplidor.dart';
 

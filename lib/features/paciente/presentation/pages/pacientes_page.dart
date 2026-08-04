@@ -1,375 +1,21 @@
-// lib/shell/dashboard_shell.dart
-// (PacientesPage permanece en su propio archivo; los cambios de null-safety
-//  se aplican directamente en _PacienteRow._buildDetail y el row principal)
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-// ── core ──────────────────────────────────────────────────────────────────────
-import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-
-// ── features ──────────────────────────────────────────────────────────────────
-import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
-import 'package:salud_dental_clinic_management/features/cita/presentation/pages/mis_citas_del_dia_page.dart';
-import 'package:salud_dental_clinic_management/features/configuracion/presentation/pages/configuracion_page.dart';
-import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/consultas_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
-import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
-import 'package:salud_dental_clinic_management/features/inicio/presentation/cubit/dashboard_cubit.dart';
-import 'package:salud_dental_clinic_management/features/inicio/presentation/pages/inicio_page.dart';
-import 'package:salud_dental_clinic_management/features/medicina/domain/repositories/i_medicina_repository.dart';
-import 'package:salud_dental_clinic_management/features/medicina/presentation/pages/medicina_list_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_detail_page.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/pages/paciente_form_page.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/screens/tratamiento_screen.dart';
-
-// ── shell ──────────────────────────────────────────────────────────────────────
-import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
-import 'package:salud_dental_clinic_management/shell/widgets/rail_user_card.dart';
-import 'package:salud_dental_clinic_management/shell/widgets/shell_app_bar.dart';
-import 'package:salud_dental_clinic_management/shell/widgets/shell_logo.dart';
-
-// ═════════════════════════════════════════════════════════════════════════════
-// DashboardShell
-// ═════════════════════════════════════════════════════════════════════════════
-
-class DashboardShell extends StatefulWidget {
-  const DashboardShell({super.key});
-
-  @override
-  State<DashboardShell> createState() => _DashboardShellState();
-}
-
-class _DashboardShellState extends State<DashboardShell> {
-  int _selectedIndex = 0;
-  DoctorAvailability _availability = DoctorAvailability.disponible;
-
-  // Cubits cacheados: se crean una sola vez y no se recrean en cada rebuild.
-  late final DashboardCubit _dashboardCubit;
-  late final CitaCubit _citaCubit;
-  late final PacienteCubit _pacienteCubit;
-
-  // Se inicializa en initState para poder referenciar _onDestinationSelected.
-  late final List<ShellDestination> _destinations;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _dashboardCubit = sl<DashboardCubit>();
-    _citaCubit      = sl<CitaCubit>()..load();
-    _pacienteCubit  = sl<PacienteCubit>()..load();
-
-    _destinations = [
-    ShellDestination(
-    icon: Icons.dashboard_outlined,
-    selectedIcon: Icons.dashboard_rounded,
-    label: 'Inicio',
-    builder: (_) => BlocProvider.value(
-      value: _dashboardCubit,
-      child: BlocListener<AuthCubit, AuthState>(
-        listenWhen: (prev, curr) => prev.usuario != curr.usuario,
-        listener: (context, authState) {
-          final usuario = authState.usuario;
-          if (usuario is Doctor && usuario.id != null) {
-            _dashboardCubit.load(
-              usuario.id!,
-              '${usuario.nombre} ${usuario.apellido}',
-            );
-          }
-      },
-      child: InicioPage(
-        onNavigateToCitas:     () => _onDestinationSelected(1),
-        onNavigateToPacientes: () => _onDestinationSelected(3),
-        onNavigateToMedicinas: () => _onDestinationSelected(4),
-      ),
-    ),
-  ),
-),
-      ShellDestination(
-        icon: Icons.today_outlined,
-        selectedIcon: Icons.today_rounded,
-        label: 'Mis Citas del Día',
-        builder: (_) => BlocProvider.value(
-          value: _citaCubit,
-          child: const MisCitasDelDiaPage(),
-        ),
-      ),
-      ShellDestination(
-        icon: Icons.medical_information_outlined,
-        selectedIcon: Icons.medical_information_rounded,
-        label: 'Consultas',
-        builder: (_) => const ConsultasPage(),
-      ),
-      ShellDestination(
-        icon: Icons.people_alt_outlined,
-        selectedIcon: Icons.people_alt_rounded,
-        label: 'Pacientes',
-        builder: (_) => BlocProvider.value(
-          value: _pacienteCubit,
-          child: const PacientesPage(),
-        ),
-      ),
-      ShellDestination(
-        icon: Icons.medication_outlined,
-        selectedIcon: Icons.medication_rounded,
-        label: 'Medicinas',
-        builder: (_) => MedicinaListPage(repository: sl<IMedicinaRepository>()),
-      ),
-      ShellDestination(
-        icon: Icons.medical_services_outlined,
-        selectedIcon: Icons.medical_services_rounded,
-        label: 'Tratamientos',
-        builder: (_) => const TratamientosScreen(),
-      ),
-      ShellDestination(
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings_rounded,
-        label: 'Configuración',
-        builder: (_) => const ConfiguracionPage(),
-      ),
-    ];
-  }
-
-  @override
-  void dispose() {
-    _dashboardCubit.close();
-    _citaCubit.close();
-    _pacienteCubit.close();
-    super.dispose();
-  }
-
-  void _onDestinationSelected(int index) {
-    if (_selectedIndex == index) return;
-    setState(() => _selectedIndex = index);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width       = MediaQuery.sizeOf(context).width;
-    final layout      = _ShellLayout.forWidth(width);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final content = IndexedStack(
-      index: _selectedIndex,
-      children: [for (final d in _destinations) Builder(builder: d.builder)],
-    );
-
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: ShellAppBar(
-        sectionTitle: _destinations[_selectedIndex].label,
-        availability: _availability,
-        onAvailabilityChanged: (v) => setState(() => _availability = v),
-        compact: layout == _ShellLayout.mobile,
-      ),
-      body: SafeArea(
-        top: false,
-        child: layout == _ShellLayout.mobile
-            ? content
-            : Row(
-                children: [
-                  _SideRail(
-                    extended: layout == _ShellLayout.desktop,
-                    destinations: _destinations,
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: _onDestinationSelected,
-                  ),
-                  Expanded(child: content),
-                ],
-              ),
-      ),
-      bottomNavigationBar: layout == _ShellLayout.mobile
-          ? NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-              destinations: [
-                for (final d in _destinations)
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: _shortLabel(d.label),
-                  ),
-              ],
-            )
-          : null,
-    );
-  }
-
-  String _shortLabel(String label) => switch (label) {
-    'Mis Citas del Día' => 'Citas',
-    'Configuración'     => 'Ajustes',
-    'Tratamientos'      => 'Servicios',
-    _                   => label,
-  };
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Layout helpers
-// ═════════════════════════════════════════════════════════════════════════════
-
-enum _ShellLayout {
-  desktop, tablet, mobile;
-
-  static _ShellLayout forWidth(double width) {
-    if (width >= 1024) return _ShellLayout.desktop;
-    if (width >= 600)  return _ShellLayout.tablet;
-    return _ShellLayout.mobile;
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// _SideRail
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _SideRail extends StatelessWidget {
-  final bool extended;
-  final List<ShellDestination> destinations;
-  final int selectedIndex;
-  final ValueChanged<int> onDestinationSelected;
-
-  const _SideRail({
-    required this.extended,
-    required this.destinations,
-    required this.selectedIndex,
-    required this.onDestinationSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = context.appColors;
-    return Container(
-      width: extended ? 248 : 88,
-      decoration: BoxDecoration(
-        color: ac.railBg,
-        border: Border(right: BorderSide(color: ac.railDivider, width: 1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ShellLogo(extended: extended),
-          Divider(height: 1, color: ac.railDivider),
-          const SizedBox(height: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Column(
-                children: [
-                  for (int i = 0; i < destinations.length; i++)
-                    _RailItem(
-                      destination: destinations[i],
-                      selected: selectedIndex == i,
-                      extended: extended,
-                      onTap: () => onDestinationSelected(i),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          Divider(height: 1, color: ac.railDivider),
-          RailUserCard(extended: extended),
-        ],
-      ),
-    );
-  }
-}
-
-class _RailItem extends StatelessWidget {
-  final ShellDestination destination;
-  final bool selected;
-  final bool extended;
-  final VoidCallback onTap;
-
-  const _RailItem({
-    required this.destination,
-    required this.selected,
-    required this.extended,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac       = context.appColors;
-    final textTheme = Theme.of(context).textTheme;
-    final bg = selected ? ac.railSelectedBg : Colors.transparent;
-    final fg = selected ? ac.railTextSelected : ac.railText;
-
-    final icon = Icon(
-      selected ? destination.selectedIcon : destination.icon,
-      size: 22,
-      color: fg,
-    );
-    final label = Text(
-      destination.label,
-      style: textTheme.labelLarge?.copyWith(
-        color: fg,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-      ),
-      overflow: TextOverflow.ellipsis,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Tooltip(
-            message: extended ? '' : destination.label,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: EdgeInsets.symmetric(
-                horizontal: extended ? 14 : 0,
-                vertical:   extended ? 12 : 14,
-              ),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: extended
-                  ? Row(children: [icon, const SizedBox(width: 14), Expanded(child: label)])
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        icon,
-                        const SizedBox(height: 6),
-                        Text(
-                          _shortRailLabel(destination.label),
-                          style: textTheme.labelSmall?.copyWith(
-                            color: fg,
-                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _shortRailLabel(String label) => switch (label) {
-    'Mis Citas del Día' => 'Citas',
-    'Configuración'     => 'Ajustes',
-    'Tratamientos'      => 'Servicios',
-    _                   => label,
-  };
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// PacientesPage
-// ═════════════════════════════════════════════════════════════════════════════
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/entities/record.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/enums/tipo_sangre.dart';
 
 class PacientesPage extends StatefulWidget {
   const PacientesPage({super.key});
@@ -396,7 +42,44 @@ class _PacientesPageState extends State<PacientesPage> {
     });
   }
 
-  Future<void> _openForm({Paciente? paciente}) async {
+  Future<void> _openNuevoPaciente() async {
+    final cubit = context.read<PacienteCubit>();
+
+    final nuevoPaciente = Paciente(
+      nombre: '',
+      apellido: '',
+      birthDate: DateTime.now(),
+      govID: '',
+      contactos: const [],
+      estatus: EstatusPersona.activo,
+      genero: Genero.masculino,
+      record: Record(
+        pacienteId: '',
+        tipoSangre: TipoSangre.oPositivo,
+        condiciones: const [],
+        cirugiasPrevias: const [],
+        historialFamiliar: '',
+        cantHijos: 0,
+      ),
+      trabajo: '',
+      referencia: '',
+      citas: const [],
+      tipoPaciente: TipoPaciente.emergencia,
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: PacienteFormPage(paciente: nuevoPaciente),
+        ),
+      ),
+    );
+    if (mounted) cubit.load();
+  }
+
+  Future<void> _openForm(Paciente paciente) async {
     final cubit = context.read<PacienteCubit>();
     await Navigator.push(
       context,
@@ -411,17 +94,24 @@ class _PacientesPageState extends State<PacientesPage> {
   }
 
   Future<void> _openDetalle(Paciente paciente) async {
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
     final cubit = context.read<PacienteCubit>();
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: cubit,
-          child: PacienteDetailPage(pacienteId: paciente.id!),
+          child: PacienteDetailPage(pacienteId: pacienteId),
         ),
       ),
     );
-    if (mounted) cubit.load();
+
+    if (context.mounted) {
+      cubit.load();
+    }
   }
 
   @override
@@ -441,88 +131,117 @@ class _PacientesPageState extends State<PacientesPage> {
     );
   }
 
+  Widget _botonNuevoPaciente(BuildContext context) {
+    final ac = context.appColors;
+
+    return FilledButton.icon(
+      onPressed: _openNuevoPaciente,
+      icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+      label: const Text('Nuevo Paciente'),
+      style: FilledButton.styleFrom(
+        backgroundColor: ac.primaryGreen,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Widget _buildHeaderAndSearch(BuildContext context, PacienteState state) {
     final colorScheme = Theme.of(context).colorScheme;
+    final ac = context.appColors;
+
+    final authState = context.watch<AuthCubit>().state;
+    final puedeCrear = authState.puedeGestionarAgendaCompleta;
+    // A 320 px el botón no cabe al lado del título: se baja a una fila propia
+    // en vez de desbordar la cabecera.
+    final accionEnLineaAparte = context.isCompactLayout;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
+      padding: context.pageInsets(top: 28, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Pacientes',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                            letterSpacing: -0.6,
-                          ),
-                    ),
-                    if (state is PacienteLoaded) ...[
-                      const SizedBox(width: 14),
-                      Builder(builder: (context) {
-                        final ac = context.appColors;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ac.primaryBlue.withValues(alpha: 0.07),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${state.todos.length}',
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: ac.primaryBlue,
-                                    ),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 14,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Pacientes',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                                letterSpacing: -0.6,
                               ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.people_alt_rounded,
-                                  color: ac.primaryBlue, size: 13),
-                            ],
+                        ),
+                        if (state is PacienteLoaded)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ac.primaryGreen.withValues(alpha: 0.07),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${state.todos.length}',
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: ac.primaryGreen,
+                                      ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.people_alt_rounded,
+                                  color: ac.primaryGreen,
+                                  size: 13,
+                                ),
+                              ],
+                            ),
                           ),
-                        );
-                      }),
-                    ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Listado completo de pacientes registrados en el sistema.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () => _openForm(),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Nuevo Paciente',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.appColors.primaryBlue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18, vertical: 16,
-                  ),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+
+              if (puedeCrear && !accionEnLineaAparte) ...[
+                const SizedBox(width: 12),
+                _botonNuevoPaciente(context),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Listado completo de pacientes registrados en el sistema.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+          if (puedeCrear && accionEnLineaAparte) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: _botonNuevoPaciente(context),
             ),
-          ),
+          ],
           const SizedBox(height: 20),
           TextField(
             controller: _searchController,
@@ -530,16 +249,21 @@ class _PacientesPageState extends State<PacientesPage> {
             decoration: InputDecoration(
               hintText: 'Buscar por nombre o cédula...',
               hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.45),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                 fontSize: 14,
               ),
-              prefixIcon: Icon(Icons.search_rounded,
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                  size: 20),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 20,
+              ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear_rounded,
-                          color: colorScheme.onSurfaceVariant, size: 18),
+                      icon: Icon(
+                        Icons.clear_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 18,
+                      ),
                       onPressed: () {
                         _searchController.clear();
                         context.read<PacienteCubit>().search('');
@@ -547,7 +271,7 @@ class _PacientesPageState extends State<PacientesPage> {
                     )
                   : null,
               filled: true,
-              fillColor: context.appColors.searchFill,
+              fillColor: ac.searchFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -555,18 +279,17 @@ class _PacientesPageState extends State<PacientesPage> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: colorScheme.outlineVariant.withOpacity(0.2),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: context.appColors.primaryBlue, width: 1.2,
-                ),
+                borderSide: BorderSide(color: ac.primaryGreen, width: 1.2),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14,
+                horizontal: 16,
+                vertical: 14,
               ),
             ),
           ),
@@ -584,13 +307,17 @@ class _PacientesPageState extends State<PacientesPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded,
-                size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 8),
-            Text(state.message,
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.error),
-                textAlign: TextAlign.center),
+            Text(
+              state.message,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: () => context.read<PacienteCubit>().load(),
@@ -602,21 +329,27 @@ class _PacientesPageState extends State<PacientesPage> {
       );
     }
     if (state is PacienteLoaded) {
+      final compact = MediaQuery.sizeOf(context).width < 600;
+
+      final authState = context.watch<AuthCubit>().state;
+      final verContacto = authState.puedeVerDatosDeContactoPaciente;
+
       return Column(
         children: [
-          _buildTableHeader(context),
+          if (!compact) _buildTableHeader(context, verContacto: verContacto),
           if (state.filtrados.isEmpty)
             Expanded(
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.people_alt_outlined,
-                        size: 56,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant
-                            .withAlpha(100)),
+                    Icon(
+                      Icons.people_alt_outlined,
+                      size: 56,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withAlpha(100),
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       _searchController.text.isEmpty
@@ -624,10 +357,8 @@ class _PacientesPageState extends State<PacientesPage> {
                           : 'Sin resultados para "${_searchController.text}".',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -636,12 +367,12 @@ class _PacientesPageState extends State<PacientesPage> {
           else ...[
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
+                padding: context.pageInsets(top: 4, bottom: 24),
                 itemCount: state.filtrados.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _PacienteRow(
                   paciente: state.filtrados[i],
-                  onEdit: () => _openForm(paciente: state.filtrados[i]),
+                  onEdit: () => _openForm(state.filtrados[i]),
                   onVerDetalle: () => _openDetalle(state.filtrados[i]),
                 ),
               ),
@@ -654,23 +385,23 @@ class _PacientesPageState extends State<PacientesPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildTableHeader(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(48, 8, 48, 12),
+  Widget _buildTableHeader(BuildContext context, {required bool verContacto}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(48, 8, 48, 12),
       child: Row(
         children: [
-          Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
-          Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
-          Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
-          SizedBox(width: 72),
+          const Expanded(flex: 3, child: _HeaderLabel(text: 'NOMBRE COMPLETO')),
+          if (verContacto) ...[
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'CÉDULA')),
+            const Expanded(flex: 2, child: _HeaderLabel(text: 'TELÉFONO')),
+          ],
+          const Expanded(flex: 1, child: _HeaderLabel(text: 'EDAD')),
+          const SizedBox(width: 108),
         ],
       ),
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _HeaderLabel extends StatelessWidget {
   final String text;
@@ -681,40 +412,83 @@ class _HeaderLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurfaceVariant
-                .withOpacity(0.65),
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-            fontSize: 10,
-          ),
+        color: Theme.of(
+          context,
+        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.2,
+        fontSize: 10,
+      ),
     );
   }
 }
 
 Widget _buildFooter(BuildContext context, PacienteLoaded state) {
-  final colorScheme = Theme.of(context).colorScheme;
+  final ac = context.appColors;
   final shown = state.filtrados.length;
   final total = state.todos.length;
-  return Container(
-    color: context.appColors.cardBg,
-    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-    child: Row(
-      children: [
-        Text(
-          'Mostrando $shown de $total paciente${total == 1 ? '' : 's'}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(
+          color: ac.divider.withValues(alpha: 0.5),
+          width: 0.5,
         ),
-      ],
+        boxShadow: [ac.cardShadow],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: shown == total ? ac.primaryGreen : ac.amber,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              shown == total
+                  ? '$total paciente${total == 1 ? '' : 's'} en total'
+                  : '$shown de $total paciente${total == 1 ? '' : 's'}',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ac.textSecondary,
+              ),
+            ),
+          ),
+          if (shown != total) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: ac.amber.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'filtrado',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: ac.amber,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     ),
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _PacienteRow extends StatefulWidget {
   final Paciente paciente;
@@ -734,21 +508,30 @@ class _PacienteRow extends StatefulWidget {
 class _PacienteRowState extends State<_PacienteRow> {
   bool _expanded = false;
 
-  // Helper: primer contacto o null de forma segura (sin `!`)
   dynamic get _contacto => widget.paciente.contactos.firstOrNull;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final p  = widget.paciente;
+    final p = widget.paciente;
     final ac = context.appColors;
 
+    // Por capacidad, no por rol: el administrador ejerce clínica, así que ve
+    // el expediente, y además gestiona la ficha administrativa del paciente.
+    final authState = context.watch<AuthCubit>().state;
+    final puedeVerExpediente = authState.puedeVerExpedientes;
+    final puedeGestionar = authState.puedeGestionarAgendaCompleta;
+    final puedeVerContacto = authState.puedeVerDatosDeContactoPaciente;
+
     final fondoTarjeta = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.04)
+        ? ac.primaryGreen.withValues(alpha: 0.04)
         : ac.cardBg;
     final colorBorde = _expanded
-        ? ac.primaryBlue.withValues(alpha: 0.25)
-        : colorScheme.outlineVariant.withOpacity(0.4);
+        ? ac.primaryGreen.withValues(alpha: 0.25)
+        : colorScheme.outlineVariant.withValues(alpha: 0.4);
+
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final permiteExpandir = puedeVerContacto;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -759,8 +542,9 @@ class _PacienteRowState extends State<_PacienteRow> {
         border: Border.all(color: colorBorde, width: 1.1),
         boxShadow: [
           BoxShadow(
-            color:
-                colorScheme.shadow.withOpacity(_expanded ? 0.03 : 0.01),
+            color: colorScheme.shadow.withValues(
+              alpha: _expanded ? 0.03 : 0.01,
+            ),
             blurRadius: _expanded ? 10 : 4,
             offset: const Offset(0, 4),
           ),
@@ -769,129 +553,236 @@ class _PacienteRowState extends State<_PacienteRow> {
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: permiteExpandir
+                ? () => setState(() => _expanded = !_expanded)
+                : null,
             borderRadius: BorderRadius.circular(14),
-            hoverColor: ac.primaryBlue.withValues(alpha: 0.02),
+            hoverColor: ac.primaryGreen.withValues(alpha: 0.02),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: compact
+                  ? _buildCompactRow(
+                      context,
+                      p,
+                      ac,
+                      puedeVerExpediente: puedeVerExpediente,
+                      puedeGestionar: puedeGestionar,
+                      puedeVerContacto: puedeVerContacto,
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: colorScheme.onSurface.withOpacity(0.04),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.person_outline_rounded,
-                              size: 18,
-                              color: colorScheme.onSurfaceVariant
-                                  .withOpacity(0.6)),
-                        ),
-                        const SizedBox(width: 14),
                         Expanded(
+                          flex: 3,
+                          child: Row(
+                            children: [
+                              PacienteAvatar(
+                                paciente: p,
+                                size: 36,
+                                backgroundColor: ac.primaryGreen,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  p.fullName,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                        fontSize: 15,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (puedeVerContacto) ...[
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              p.govID,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontFamily: 'monospace',
+                                    fontSize: 13,
+                                  ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              _contacto?.numeroTelefono.isNotEmpty == true
+                                  ? _contacto!.numeroTelefono
+                                  : '—',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 13,
+                                  ),
+                            ),
+                          ),
+                        ],
+                        Expanded(
+                          flex: 1,
                           child: Text(
-                            p.fullName,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            '${p.age} años',
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                  fontSize: 15,
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
                                 ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      p.govID,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant
-                                .withOpacity(0.8),
-                            fontFamily: 'monospace',
-                            fontSize: 13,
+                        SizedBox(
+                          width: 108,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (puedeVerExpediente)
+                                _ActionIcon(
+                                  icon: Icons.visibility_outlined,
+                                  tooltip: 'Ver expediente',
+                                  color: ac.primaryGreen,
+                                  onTap: widget.onVerDetalle,
+                                ),
+                              if (puedeGestionar) ...[
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Editar',
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                  onTap: widget.onEdit,
+                                ),
+                                const SizedBox(width: 6),
+                                _ActionIcon(
+                                  icon: Icons.delete_outline_rounded,
+                                  tooltip: 'Eliminar',
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  onTap: () => _showDeleteConfirmation(
+                                    context,
+                                    widget.paciente,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    // ✅ Sin `!`: si no hay contacto o el teléfono está vacío → '—'
-                    child: Text(
-                      _contacto?.numeroTelefono.isNotEmpty == true
-                          ? _contacto!.numeroTelefono
-                          : '—',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant
-                                .withOpacity(0.8),
-                            fontSize: 13,
-                          ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      '${p.age} años',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 72,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _ActionIcon(
-                          icon: Icons.visibility_outlined,
-                          tooltip: 'Ver expediente',
-                          color: ac.primaryBlue,
-                          onTap: widget.onVerDetalle,
-                        ),
-                        const SizedBox(width: 6),
-                        _ActionIcon(
-                          icon: Icons.edit_outlined,
-                          tooltip: 'Editar',
-                          color: colorScheme.onSurfaceVariant
-                              .withOpacity(0.5),
-                          onTap: widget.onEdit,
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
-          if (_expanded) _buildDetail(context, p),
+          if (_expanded && puedeVerContacto) _buildDetail(context, p),
         ],
       ),
     );
   }
 
+  Widget _buildCompactRow(
+    BuildContext context,
+    Paciente p,
+    AppColors ac, {
+    required bool puedeVerExpediente,
+    required bool puedeGestionar,
+    required bool puedeVerContacto,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            PacienteAvatar(
+              paciente: p,
+              size: 36,
+              backgroundColor: ac.primaryGreen,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                p.fullName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (puedeVerExpediente)
+              _ActionIcon(
+                icon: Icons.visibility_outlined,
+                tooltip: 'Ver expediente',
+                color: ac.primaryGreen,
+                onTap: widget.onVerDetalle,
+              ),
+            if (puedeGestionar)
+              _ActionIcon(
+                icon: Icons.edit_outlined,
+                tooltip: 'Editar',
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                onTap: widget.onEdit,
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 16,
+          runSpacing: 6,
+          children: [
+            if (puedeVerContacto) ...[
+              _compactField('Cédula', p.govID),
+              _compactField(
+                'Teléfono',
+                _contacto?.numeroTelefono.isNotEmpty == true
+                    ? _contacto!.numeroTelefono
+                    : '—',
+              ),
+            ],
+            _compactField('Edad', '${p.age} años'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _compactField(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+          letterSpacing: .5,
+        ),
+      ),
+      Text(
+        value,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+      ),
+    ],
+  );
+
   Widget _buildDetail(BuildContext context, Paciente p) {
     final colorScheme = Theme.of(context).colorScheme;
-    // ✅ Acceso seguro a todos los campos del contacto
-    final telefono  = _contacto?.numeroTelefono ?? '';
-    final email     = _contacto?.email     ?? '';
+    final telefono = _contacto?.numeroTelefono ?? '';
+    final email = _contacto?.email ?? '';
     final direccion = _contacto?.direccion ?? '';
 
     return Container(
       decoration: BoxDecoration(
         color: context.appColors.cardBg.withValues(alpha: 0.2),
         borderRadius: const BorderRadius.only(
-          bottomLeft:  Radius.circular(14),
+          bottomLeft: Radius.circular(14),
           bottomRight: Radius.circular(14),
         ),
       ),
@@ -900,26 +791,36 @@ class _PacienteRowState extends State<_PacienteRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(
-              color: colorScheme.outlineVariant.withOpacity(0.25), height: 1),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+            height: 1,
+          ),
           const SizedBox(height: 20),
           Wrap(
             spacing: 40,
             runSpacing: 16,
             children: [
-              _DetailItem(label: 'Género',
-                  value: _generoLabel(p.genero.name)),
-              _DetailItem(label: 'Tipo de Paciente',
-                  value: _capitalize(p.tipoPaciente.name)),
-              _DetailItem(label: 'Ocupación',
-                  value: p.trabajo.isEmpty ? '—' : p.trabajo),
-              _DetailItem(label: 'Referencia',
-                  value: p.referencia.isEmpty ? '—' : p.referencia),
-              _DetailItem(label: 'Teléfono',
-                  value: telefono.isEmpty  ? '—' : telefono),
-              _DetailItem(label: 'Email',
-                  value: email.isEmpty     ? '—' : email),
-              _DetailItem(label: 'Dirección Residencia',
-                  value: direccion.isEmpty ? '—' : direccion),
+              _DetailItem(label: 'Género', value: _generoLabel(p.genero.name)),
+              _DetailItem(
+                label: 'Tipo de Paciente',
+                value: _capitalize(p.tipoPaciente.name),
+              ),
+              _DetailItem(
+                label: 'Ocupación',
+                value: p.trabajo.isEmpty ? '—' : p.trabajo,
+              ),
+              _DetailItem(
+                label: 'Referencia',
+                value: p.referencia.isEmpty ? '—' : p.referencia,
+              ),
+              _DetailItem(
+                label: 'Teléfono',
+                value: telefono.isEmpty ? '—' : telefono,
+              ),
+              _DetailItem(label: 'Email', value: email.isEmpty ? '—' : email),
+              _DetailItem(
+                label: 'Dirección Residencia',
+                value: direccion.isEmpty ? '—' : direccion,
+              ),
             ],
           ),
         ],
@@ -928,18 +829,81 @@ class _PacienteRowState extends State<_PacienteRow> {
   }
 
   String _generoLabel(String name) => switch (name) {
-    'masculino'      => 'Masculino',
-    'femenino'       => 'Femenino',
-    'otro'           => 'Otro',
-    'noPrefiereDecir'=> 'No prefiere decir',
-    _                => name,
+    'masculino' => 'Masculino',
+    'femenino' => 'Femenino',
+    'otro' => 'Otro',
+    'noPrefiereDecir' => 'No prefiere decir',
+    _ => name,
   };
 
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
+  void _showDeleteConfirmation(BuildContext context, Paciente paciente) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final pacienteId = paciente.id;
+    if (pacienteId == null || pacienteId.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar Paciente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Está seguro de que deseas eliminar a ${paciente.fullName}?',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Esta acción eliminará el registro del paciente de forma lógica.',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<PacienteCubit>().deletePaciente(pacienteId);
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Eliminar'),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _DetailItem extends StatelessWidget {
   final String label;
@@ -956,20 +920,20 @@ class _DetailItem extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.bold,
-                fontSize: 9,
-              ),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.bold,
+            fontSize: 9,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
         ),
       ],
     );
@@ -977,17 +941,17 @@ class _DetailItem extends StatelessWidget {
 }
 
 class _ActionIcon extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final Color color;
-  final VoidCallback onTap;
-
   const _ActionIcon({
     required this.icon,
     required this.tooltip,
     required this.color,
     required this.onTap,
   });
+
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

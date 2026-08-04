@@ -7,4 +7,9 @@ abstract class CompraRepository {
   Future<void> registrarCompra(Compra compra);
   Future<void> actualizarEstadoCompra(String id, EstadoCompra nuevoEstado);
   Future<void> cancelarCompra(String id);
+  Future<void> recibirCompra({
+    required String compraId,
+    required String usuarioId,
+    String metodoPago,
+  });
 }

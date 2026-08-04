@@ -4,6 +4,20 @@ import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/cubit/cita_cubit_state.dart';
+import 'package:salud_dental_clinic_management/features/cita/presentation/widgets/resumen_cita.dart';
+import 'package:salud_dental_clinic_management/features/consulta/presentation/pages/efectuar_consulta_page.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/features/cita/domain/iniciar_consulta_desde_cita.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+
+/// Valor centinela para iniciar el flujo clínico unificado.
+const _kEfectuarConsulta = 'efectuar_consulta';
+const _kAbrirConsulta = 'abrir_consulta';
+
+/// Abre el resumen de la cita como diálogo. Es la vía sin ratón: en táctil no
+/// hay hover que dispare la ventana flotante (SD-146).
+const _kVerResumen = 'ver_resumen';
 
 const _kHourStart = 8;
 const _kHourEnd = 20;
@@ -58,57 +72,63 @@ class _TimelineScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: ac.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [ac.cardShadow],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final columnWidth = days.length == 1
-                ? (constraints.maxWidth - _kTimeAxisWidth)
-                : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
+    // El alto de cada franja lo fija el reloj, no la tipografía: por encima de
+    // 1.3 el texto dejaría de caber en su hueco, así que se acota aquí en vez
+    // de recortar el contenido.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: Padding(
+        padding: EdgeInsets.all(context.appLayout.isCompact ? 8 : 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: ac.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [ac.cardShadow],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columnWidth = days.length == 1
+                  ? (constraints.maxWidth - _kTimeAxisWidth)
+                  : (constraints.maxWidth - _kTimeAxisWidth) / days.length;
 
-            return Column(
-              children: [
-                _DayHeaders(days: days, columnWidth: columnWidth),
-                Divider(height: 1, color: ac.divider),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: SizedBox(
-                      height: (_kHourEnd - _kHourStart) * _kHourHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _HourAxis(),
-                          ...days.map((day) {
-                            final dayCitas = citas
-                                .where(
-                                  (c) =>
-                                      c.date.year == day.year &&
-                                      c.date.month == day.month &&
-                                      c.date.day == day.day,
-                                )
-                                .toList();
-                            return _DayColumn(
-                              day: day,
-                              citas: dayCitas,
-                              width: columnWidth,
-                              isLast: day == days.last,
-                            );
-                          }),
-                        ],
+              return Column(
+                children: [
+                  _DayHeaders(days: days, columnWidth: columnWidth),
+                  Divider(height: 1, color: ac.divider),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        height: (_kHourEnd - _kHourStart) * _kHourHeight,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _HourAxis(),
+                            ...days.map((day) {
+                              final dayCitas = citas
+                                  .where(
+                                    (c) =>
+                                        c.date.year == day.year &&
+                                        c.date.month == day.month &&
+                                        c.date.day == day.day,
+                                  )
+                                  .toList();
+                              return _DayColumn(
+                                day: day,
+                                citas: dayCitas,
+                                width: columnWidth,
+                                isLast: day == days.last,
+                              );
+                            }),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -138,34 +158,44 @@ class _DayHeaders extends StatelessWidget {
         children: [
           SizedBox(width: _kTimeAxisWidth),
           ...days.map((day) {
-            final isToday = day.year == today.year &&
+            final isToday =
+                day.year == today.year &&
                 day.month == today.month &&
                 day.day == today.day;
             final isWeekend = day.weekday >= 6;
+            // En una semana de 320 px cada columna baja de 40 px: el círculo
+            // del día se encoge para no romper la cabecera.
+            final diametro = columnWidth < 40 ? 28.0 : 36.0;
             return SizedBox(
               width: columnWidth,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     _kDayLabels[day.weekday - 1],
+                    // Con la columna estrecha la etiqueta se partía en dos
+                    // líneas y reventaba el alto fijo de la cabecera.
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    softWrap: false,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                       color: isToday
-                          ? ac.primaryBlue
+                          ? ac.primaryGreen
                           : isWeekend
-                              ? ac.red.withValues(alpha: 0.7)
-                              : ac.textMuted,
+                          ? ac.red.withValues(alpha: 0.7)
+                          : ac.textMuted,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: diametro,
+                    height: diametro,
                     decoration: BoxDecoration(
-                      color: isToday ? ac.primaryBlue : Colors.transparent,
+                      color: isToday ? ac.primaryGreen : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
@@ -177,8 +207,8 @@ class _DayHeaders extends StatelessWidget {
                         color: isToday
                             ? Colors.white
                             : isWeekend
-                                ? ac.red.withValues(alpha: 0.7)
-                                : ac.textPrimary,
+                            ? ac.red.withValues(alpha: 0.7)
+                            : ac.textPrimary,
                         height: 1,
                       ),
                     ),
@@ -252,9 +282,8 @@ class _DayColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final now = DateTime.now();
-    final isToday = day.year == now.year &&
-        day.month == now.month &&
-        day.day == now.day;
+    final isToday =
+        day.year == now.year && day.month == now.month && day.day == now.day;
 
     final totalHeight = (_kHourEnd - _kHourStart) * _kHourHeight;
 
@@ -320,13 +349,11 @@ class _DayColumn extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: ac.primaryBlue,
+                      color: ac.primaryGreen,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  Expanded(
-                    child: Container(height: 2, color: ac.primaryBlue),
-                  ),
+                  Expanded(child: Container(height: 2, color: ac.primaryGreen)),
                 ],
               ),
             ),
@@ -341,8 +368,10 @@ class _DayColumn extends StatelessWidget {
     for (final cita in sorted) {
       bool placed = false;
       for (final group in groups) {
-        final overlaps = group.any((c) =>
-            c.date.isBefore(cita.fechaFin) && cita.date.isBefore(c.fechaFin));
+        final overlaps = group.any(
+          (c) =>
+              c.date.isBefore(cita.fechaFin) && cita.date.isBefore(c.fechaFin),
+        );
         if (overlaps) {
           group.add(cita);
           placed = true;
@@ -421,7 +450,24 @@ class _CitaBlock extends StatelessWidget {
     final RenderBox box = context.findRenderObject() as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
 
-    showMenu<EstadoCita>(
+    final pacienteId = cita.persona.id;
+    final doctorId = cita.doctor.id;
+    // Mismo criterio que la lista y que la tarjeta de siguiente paciente
+    // (defecto D14): esta vista sólo miraba el estado, así que ofrecía iniciar
+    // la consulta de una cita de otro doctor y la RPC la rechazaba con CL015.
+    final puedeEfectuar = PuedeIniciarConsulta.evaluar(
+      context.read<AuthCubit>().state,
+      cita,
+    ).permitido;
+
+    // Enlace hacia la consulta que esta cita ya originó (SD-160): sin él, desde
+    // la agenda no había forma de llegar al acto clínico que le corresponde.
+    final estado = cubit.state;
+    final consulta = estado is CitaCubitLoaded ? estado.consultaDe(cita) : null;
+    final puedeAbrirConsulta =
+        consulta != null && pacienteId != null && doctorId != null;
+
+    showMenu<Object>(
       context: context,
       position: RelativeRect.fromLTRB(
         offset.dx,
@@ -430,40 +476,146 @@ class _CitaBlock extends StatelessWidget {
         0,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      items: EstadoCita.values.map((e) {
-        final isActive = e == cita.estado;
-        return PopupMenuItem<EstadoCita>(
-          value: e,
+      items: [
+        PopupMenuItem<Object>(
+          value: _kVerResumen,
           child: Row(
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: e.color,
-                  shape: BoxShape.circle,
-                ),
-              ),
+              Icon(Icons.event_note_rounded, size: 16, color: ac.textSecondary),
               const SizedBox(width: 10),
-              Text(
-                e.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  color: isActive ? e.color : ac.textSecondary,
+              Expanded(
+                child: Text(
+                  'Ver resumen',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
                 ),
               ),
             ],
           ),
-        );
-      }).toList(),
-    ).then((nuevoEstado) {
+        ),
+        const PopupMenuDivider(),
+        if (puedeAbrirConsulta) ...[
+          PopupMenuItem<Object>(
+            value: _kAbrirConsulta,
+            child: Row(
+              children: [
+                Icon(
+                  consulta.estaAbierta
+                      ? Icons.play_circle_outline_rounded
+                      : Icons.assignment_turned_in_outlined,
+                  size: 16,
+                  color: consulta.estaAbierta ? ac.amber : ac.indigo,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    consulta.estaAbierta
+                        ? 'Continuar consulta'
+                        : 'Ver consulta',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
+        if (puedeEfectuar) ...[
+          PopupMenuItem<Object>(
+            value: _kEfectuarConsulta,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.medical_services_outlined,
+                  size: 16,
+                  color: ac.primaryGreen,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: _AccionClinicaMenu(color: ac.primaryGreen)),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+        ],
+        ...cita.estado.transicionesPermitidas.map((e) {
+          return PopupMenuItem<Object>(
+            value: e,
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: e.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  e.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: ac.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    ).then((value) {
       if (!context.mounted) return;
-      if (nuevoEstado == null || nuevoEstado == cita.estado) return;
-      if (nuevoEstado == EstadoCita.cancelada) {
+      if (value == _kVerResumen) {
+        mostrarResumenCita(context, cita);
+        return;
+      }
+      if (value == _kAbrirConsulta && consulta != null) {
+        // Abierta: se reanuda donde quedó. Finalizada: se abre en modo lectura
+        // desde la misma pantalla, que ya distingue ambos casos por `finalizada`.
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id,
+                  pacienteId: pacienteId!,
+                  doctorId: doctorId!,
+                  consultaId: consulta.id,
+                  motivoCita: cita.motivo,
+                ),
+              ),
+            )
+            .then((_) => cubit.load());
+        return;
+      }
+      if (value == _kEfectuarConsulta) {
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => EfectuarConsultaPage(
+                  citaId: cita.id!,
+                  pacienteId: pacienteId!,
+                  doctorId: doctorId!,
+                  motivoCita: cita.motivo,
+                ),
+              ),
+            )
+            // Al volver, la cita pudo quedar completada.
+            .then((_) => cubit.load());
+        return;
+      }
+      if (value is! EstadoCita || value == cita.estado) return;
+      if (value == EstadoCita.cancelada) {
         _showCancelDialog(context, cubit);
       } else {
-        cubit.cambiarEstadoCita(cita.id!, nuevoEstado);
+        cubit.cambiarEstadoCita(cita.id!, value);
       }
     });
   }
@@ -474,8 +626,9 @@ class _CitaBlock extends StatelessWidget {
       builder: (dialogCtx) {
         final ac = dialogCtx.appColors;
         return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: ac.red),
@@ -534,23 +687,27 @@ class _CitaBlock extends StatelessWidget {
     final isCompact = height < 44;
     final isFull = height >= 56;
 
-    final nombreRow = Row(
-      children: [
-        Expanded(
-          child: Text(
-            cita.persona.fullName,
-            style: TextStyle(
-              fontSize: isCompact ? 10 : 11,
-              fontWeight: FontWeight.w700,
-              color: ac.textPrimary,
-              height: 1.1,
+    final nombreRow = LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              cita.persona.fullName,
+              style: TextStyle(
+                fontSize: isCompact ? 10 : 11,
+                fontWeight: FontWeight.w700,
+                color: ac.textPrimary,
+                height: 1.1,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        if (cita.esEmergencia)
-          Icon(Icons.priority_high_rounded, size: 10, color: ac.red),
-      ],
+          // Por debajo de 28 px el bloque no da ni para el nombre: el aviso
+          // de emergencia se apoya en el color del borde.
+          if (cita.esEmergencia && constraints.maxWidth >= 28)
+            Icon(Icons.priority_high_rounded, size: 10, color: ac.red),
+        ],
+      ),
     );
 
     final horaText = Text(
@@ -581,11 +738,7 @@ class _CitaBlock extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             'Dr. ${cita.doctor.nombre} ${cita.doctor.apellido}',
-            style: TextStyle(
-              fontSize: 10,
-              color: ac.textMuted,
-              height: 1.1,
-            ),
+            style: TextStyle(fontSize: 10, color: ac.textMuted, height: 1.1),
             overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),
@@ -594,28 +747,73 @@ class _CitaBlock extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: () => _showStatusMenu(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [ac.cardShadow],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(height: 3, color: color),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
-                child: content,
-              ),
+    // El bloque de la agenda no da para más que el nombre y la hora. El resumen
+    // completo se asoma al pasar el cursor o al recibir el foco del teclado, y
+    // en táctil se llega por «Ver resumen» del menú (SD-146).
+    return ResumenCitaAccesible(
+      cita: cita,
+      child: Semantics(
+        button: true,
+        label:
+            'Cita de ${cita.persona.fullName} a las $timeRange. '
+            'Toca para ver el resumen y las acciones.',
+        child: GestureDetector(
+          onTap: () => _showStatusMenu(context),
+          onLongPress: () => mostrarResumenCita(context, cita),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [ac.cardShadow],
             ),
-          ],
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(height: 3, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(8, isCompact ? 3 : 6, 6, 4),
+                    child: content,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _AccionClinicaMenu extends StatelessWidget {
+  const _AccionClinicaMenu({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Iniciar consulta',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        Text(
+          'Diagnostica, planifica y registra tratamientos sin salir.',
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.25,
+            color: context.appColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

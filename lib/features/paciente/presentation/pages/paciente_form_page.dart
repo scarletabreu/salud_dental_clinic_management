@@ -1,20 +1,30 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
-import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
+import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/entities/condicion.dart';
+import 'package:salud_dental_clinic_management/features/condicion/domain/repositories/condicion_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/data/services/paciente_foto_storage.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/tipo_paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_cubit.dart';
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
-import 'package:salud_dental_clinic_management/features/record/data/models/record_model.dart';
-import 'package:salud_dental_clinic_management/core/data/models/contacto_model.dart';
-import 'package:salud_dental_clinic_management/core/util/validators.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/paciente_avatar.dart';
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/recorte_foto_dialog.dart';
+import 'package:salud_dental_clinic_management/features/record/domain/repositories/record_repository.dart';
 
-// =============================================================================
-// Input formatter: auto-inserta guiones → 000-0000000-0
-// =============================================================================
+// Importación condicional del helper web si se ejecuta en navegador
+import 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/camera_web_helper.dart'
+    if (dart.library.io) 'package:salud_dental_clinic_management/features/paciente/presentation/widgets/camera_web_stub.dart';
+
+enum PacienteFormModo { editar, completarRegistro }
 
 class _CedulaInputFormatter extends TextInputFormatter {
   @override
@@ -25,7 +35,8 @@ class _CedulaInputFormatter extends TextInputFormatter {
     final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final buffer = StringBuffer();
     for (int i = 0; i < digits.length && i < 11; i++) {
-      if (i == 3 || i == 10) buffer.write('-');
+      if (i == 3) buffer.write('-');
+      if (i == 10) buffer.write('-');
       buffer.write(digits[i]);
     }
     final formatted = buffer.toString();
@@ -35,10 +46,6 @@ class _CedulaInputFormatter extends TextInputFormatter {
     );
   }
 }
-
-// =============================================================================
-// Modelo de trabajo para editar un contacto en memoria
-// =============================================================================
 
 class _ContactoEntry {
   final String? originalId;
@@ -53,9 +60,9 @@ class _ContactoEntry {
     String emailInitial = '',
     String direccionInitial = '',
     this.isExpanded = true,
-  })  : telefono = TextEditingController(text: telefonoInitial),
-        email = TextEditingController(text: emailInitial),
-        direccion = TextEditingController(text: direccionInitial);
+  }) : telefono = TextEditingController(text: telefonoInitial),
+       email = TextEditingController(text: emailInitial),
+       direccion = TextEditingController(text: direccionInitial);
 
   factory _ContactoEntry.fromContacto(Contacto c, {bool isExpanded = false}) =>
       _ContactoEntry(
@@ -66,37 +73,32 @@ class _ContactoEntry {
         isExpanded: isExpanded,
       );
 
-  ContactoModel toModel() => ContactoModel(
-        id: originalId,
-        numeroTelefono: telefono.text.trim(),
-        email: email.text.trim(),
-        direccion: direccion.text.trim(),
-      );
+  ContactoModel toModel({bool esEmergencia = false}) => ContactoModel(
+    id: originalId,
+    numeroTelefono: telefono.text.trim(),
+    email: email.text.trim(),
+    direccion: direccion.text.trim(),
+    esEmergencia: esEmergencia,
+  );
 
   void dispose() {
     telefono.dispose();
     email.dispose();
     direccion.dispose();
   }
-
-  /// Etiqueta de resumen para la tarjeta colapsada.
-  String get resumen {
-    final tel = telefono.text.trim();
-    final mail = email.text.trim();
-    if (tel.isNotEmpty) return tel;
-    if (mail.isNotEmpty) return mail;
-    return 'Nuevo contacto';
-  }
 }
 
-// =============================================================================
-// Page
-// =============================================================================
-
 class PacienteFormPage extends StatefulWidget {
-  final Paciente? paciente;
+  final Paciente paciente;
+  final PacienteFormModo modo;
+  final VoidCallback? onCompletado;
 
-  const PacienteFormPage({super.key, this.paciente});
+  const PacienteFormPage({
+    super.key,
+    required this.paciente,
+    this.modo = PacienteFormModo.editar,
+    this.onCompletado,
+  });
 
   @override
   State<PacienteFormPage> createState() => _PacienteFormPageState();
@@ -110,42 +112,94 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   late final TextEditingController _cedulaController;
   late final TextEditingController _trabajoController;
   late final TextEditingController _referenciaController;
-
+  late final TextEditingController _pesoController;
+  late final TextEditingController _alturaController;
+  late final TextEditingController _historialFamiliarController;
+  late final TextEditingController _cantHijosController;
   late final List<_ContactoEntry> _contactos;
 
   DateTime? _fechaNacimiento;
   Genero _genero = Genero.masculino;
   TipoPaciente _tipoPaciente = TipoPaciente.integrado;
 
-  bool get _isEditing => widget.paciente != null;
+  List<Condicion> _condicionesIniciales = [];
+  List<Condicion> _condicionesSeleccionadas = [];
+  List<Condicion> _condicionesDisponibles = [];
+  bool _cargandoCondiciones = true;
+  bool _guardandoCondiciones = false;
+  bool _isProcessingSave = false;
+
+  Uint8List? _fotoPendiente;
+  bool _eliminarFotoPendiente = false;
+  bool _procesandoFoto = false;
+
+  bool get _isCompletarRegistro =>
+      widget.modo == PacienteFormModo.completarRegistro;
+
+  /// La ficha se abrió para dar de alta a alguien que todavía no existe.
+  ///
+  /// El botón «Nuevo Paciente» del listado entra por aquí con un paciente sin
+  /// `id`, y hasta HFX-CLIN-007 el formulario guardaba siempre por la vía de
+  /// actualización: sin `id`, el datasource lanzaba «No se puede actualizar un
+  /// paciente sin ID», el aviso se desvanecía a los pocos segundos y la ficha
+  /// se quedaba abierta como si no hubiera pasado nada.
+  bool get _esAlta => widget.paciente.id == null;
 
   @override
   void initState() {
     super.initState();
     final p = widget.paciente;
-
-    _nombreController = TextEditingController(text: p?.nombre ?? '');
-    _apellidoController = TextEditingController(text: p?.apellido ?? '');
-    _cedulaController = TextEditingController(text: p?.govID ?? '');
-    _trabajoController = TextEditingController(text: p?.trabajo ?? '');
-    _referenciaController = TextEditingController(text: p?.referencia ?? '');
-    _fechaNacimiento = p?.birthDate;
-
-    if (p != null) {
-      _genero = p.genero;
-      _tipoPaciente = p.tipoPaciente;
-      _contactos = p.contactos.isEmpty
-          ? [_ContactoEntry(isExpanded: true)]
-          : p.contactos
+    _nombreController = TextEditingController(text: p.nombre);
+    _apellidoController = TextEditingController(text: p.apellido);
+    _cedulaController = TextEditingController(text: p.govID);
+    _trabajoController = TextEditingController(text: p.trabajo);
+    _referenciaController = TextEditingController(text: p.referencia);
+    _pesoController = TextEditingController(
+      text: p.peso != null ? p.peso.toString() : '',
+    );
+    _alturaController = TextEditingController(
+      text: p.altura != null ? p.altura.toString() : '',
+    );
+    _historialFamiliarController = TextEditingController(
+      text: p.record.historialFamiliar,
+    );
+    _cantHijosController = TextEditingController(
+      text: p.record.cantHijos.toString(),
+    );
+    _fechaNacimiento = p.birthDate;
+    _genero = p.genero;
+    _tipoPaciente = p.tipoPaciente;
+    _contactos = p.contactos.isEmpty
+        ? [_ContactoEntry(isExpanded: true)]
+        : p.contactos
               .asMap()
               .entries
-              .map((e) => _ContactoEntry.fromContacto(
-                    e.value,
-                    isExpanded: e.key == 0,
-                  ))
+              .map(
+                (e) => _ContactoEntry.fromContacto(
+                  e.value,
+                  isExpanded: e.key == 0,
+                ),
+              )
               .toList();
-    } else {
-      _contactos = [_ContactoEntry(isExpanded: true)];
+
+    _cargarCondiciones();
+  }
+
+  Future<void> _cargarCondiciones() async {
+    try {
+      final results = await Future.wait([
+        sl<RecordRepository>().getCondicionesDelPaciente(widget.paciente.id!),
+        sl<CondicionRepository>().getCondiciones(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _condicionesIniciales = results[0];
+        _condicionesSeleccionadas = List.of(results[0]);
+        _condicionesDisponibles = results[1];
+        _cargandoCondiciones = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cargandoCondiciones = false);
     }
   }
 
@@ -156,15 +210,17 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     _cedulaController.dispose();
     _trabajoController.dispose();
     _referenciaController.dispose();
+    _pesoController.dispose();
+    _alturaController.dispose();
+    _historialFamiliarController.dispose();
+    _cantHijosController.dispose();
     for (final c in _contactos) {
       c.dispose();
     }
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // Contactos helpers
-  // ---------------------------------------------------------------------------
+  static const int _maxFotoBytes = 10 * 1024 * 1024;
 
   void _addContacto() {
     setState(() {
@@ -176,123 +232,366 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   }
 
   void _removeContacto(int index) {
+    final removed = _contactos.removeAt(index);
     setState(() {
-      _contactos[index].dispose();
-      _contactos.removeAt(index);
       if (_contactos.isNotEmpty && _contactos.every((c) => !c.isExpanded)) {
         _contactos.first.isExpanded = true;
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
   }
 
   void _toggleContacto(int index) {
     setState(() {
-      final isNowExpanded = !_contactos[index].isExpanded;
+      final nowExpanded = !_contactos[index].isExpanded;
       for (final c in _contactos) {
         c.isExpanded = false;
       }
-      _contactos[index].isExpanded = isNowExpanded;
+      _contactos[index].isExpanded = nowExpanded;
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Guardar
-  // ---------------------------------------------------------------------------
+  void _toggleCondicion(Condicion condicion, bool selected) {
+    setState(() {
+      if (selected) {
+        _condicionesSeleccionadas = [..._condicionesSeleccionadas, condicion];
+      } else {
+        _condicionesSeleccionadas = _condicionesSeleccionadas
+            .where((c) => c.id != condicion.id)
+            .toList();
+      }
+    });
+  }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
+  void _save() async {
+    if (!_formKey.currentState!.validate() || _fechaNacimiento == null) {
+      if (_fechaNacimiento == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Debe seleccionar la fecha de nacimiento.'),
+          ),
+        );
+      }
+      return;
+    }
 
-    if (_contactos.isEmpty ||
-        _contactos.every((c) => c.telefono.text.trim().isEmpty)) {
+    if (_contactos.isEmpty || _contactos.first.telefono.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debe ingresar al menos un contacto con teléfono.'),
+          content: Text('Debe ingresar el teléfono del contacto principal.'),
         ),
       );
       return;
     }
 
-    final contactosFinal = _contactos.map((c) => c.toModel()).toList();
+    final pacienteId = widget.paciente.id;
+
+    final recordActualizado = widget.paciente.record.copyWith(
+      historialFamiliar: _historialFamiliarController.text.trim(),
+      cantHijos: int.tryParse(_cantHijosController.text.trim()) ?? 0,
+    );
 
     final paciente = Paciente(
-      id: widget.paciente?.id,
+      id: pacienteId,
       nombre: _nombreController.text.trim(),
       apellido: _apellidoController.text.trim(),
       birthDate: _fechaNacimiento!,
       govID: _cedulaController.text.trim(),
-      contactos: contactosFinal,
-      estatus: widget.paciente?.estatus ?? EstatusPersona.activo,
+      contactos: _contactos
+          .asMap()
+          .entries
+          .map((e) => e.value.toModel(esEmergencia: e.key > 0))
+          .toList(),
+      estatus: widget.paciente.estatus,
       genero: _genero,
       tipoPaciente: _tipoPaciente,
       trabajo: _trabajoController.text.trim(),
       referencia: _referenciaController.text.trim(),
-      record: widget.paciente?.record ?? RecordModel.empty(),
-      citas: widget.paciente?.citas ?? const [],
+      peso: double.tryParse(_pesoController.text.trim()),
+      altura: double.tryParse(_alturaController.text.trim()),
+      record: recordActualizado,
+      citas: widget.paciente.citas,
+      fotoRuta: widget.paciente.fotoRuta,
+      fotoMimeType: widget.paciente.fotoMimeType,
+      fotoTamanoBytes: widget.paciente.fotoTamanoBytes,
+      fotoActualizadaEn: widget.paciente.fotoActualizadaEn,
+      // La versión con la que se abrió el formulario: si otro actor guardó
+      // mientras tanto, la base rechaza esta edición en vez de pisar la suya.
+      version: widget.paciente.version,
     );
 
-    final cubit = context.read<PacienteCubit>();
-    if (_isEditing) {
-      cubit.updatePaciente(paciente);
+    // Alta y edición son dos operaciones distintas en el servidor: el alta pasa
+    // por `registrar_paciente`, que crea persona, paciente y expediente en una
+    // sola transacción.
+    if (_esAlta) {
+      context.read<PacienteCubit>().addPaciente(paciente);
     } else {
-      cubit.addPaciente(paciente);
+      context.read<PacienteCubit>().updatePaciente(paciente);
     }
   }
 
-  Future<void> _pickFechaNacimiento() async {
+  Future<void> _guardarDiffCondiciones() async {
+    final idsIniciales = _condicionesIniciales.map((c) => c.id).toSet();
+    final idsFinales = _condicionesSeleccionadas.map((c) => c.id).toSet();
+    final agregadas = idsFinales.difference(idsIniciales);
+    final quitadas = idsIniciales.difference(idsFinales);
+
+    if (agregadas.isEmpty && quitadas.isEmpty) return;
+
+    final pacienteId = widget.paciente.id;
+    if (pacienteId == null) return;
+
+    setState(() => _guardandoCondiciones = true);
+    final recordRepo = sl<RecordRepository>();
+    try {
+      for (final id in agregadas) {
+        await recordRepo.agregarCondicion(pacienteId, id!);
+      }
+      for (final id in quitadas) {
+        await recordRepo.quitarCondicion(pacienteId, id!);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: const Text('Error al actualizar condiciones médicas.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _guardandoCondiciones = false);
+    }
+  }
+
+  Future<void> _onPacienteGuardadoExitosamente() async {
+    if (_isProcessingSave) return;
+    _isProcessingSave = true;
+
+    try {
+      if (!await _guardarFotoPendiente() || !mounted) return;
+      await _guardarDiffCondiciones();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.teal,
+          content: Text(
+            _isCompletarRegistro
+                ? 'Ficha clínica completada'
+                : 'Paciente actualizado exitosamente',
+          ),
+        ),
+      );
+
+      if (_isCompletarRegistro) {
+        widget.onCompletado?.call();
+      } else {
+        Navigator.pop(context);
+      }
+    } finally {
+      _isProcessingSave = false;
+    }
+  }
+
+  Future<bool> _guardarFotoPendiente() async {
+    final pacienteId = widget.paciente.id;
+    if (pacienteId == null ||
+        (_fotoPendiente == null && !_eliminarFotoPendiente)) {
+      return true;
+    }
+
+    setState(() => _procesandoFoto = true);
+    try {
+      final storage = sl<PacienteFotoStorage>();
+      if (_fotoPendiente != null) {
+        await storage.guardar(pacienteId: pacienteId, bytes: _fotoPendiente!);
+      } else if (_eliminarFotoPendiente && widget.paciente.fotoRuta != null) {
+        await storage.eliminar(
+          pacienteId: pacienteId,
+          ruta: widget.paciente.fotoRuta!,
+        );
+      }
+      if (mounted) await context.read<PacienteCubit>().load();
+    } catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.appColors.red,
+          content: Text('No se pudo guardar la fotografía: $error'),
+        ),
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _procesandoFoto = false);
+    }
+    return true;
+  }
+
+  bool get _soportaCamara =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  Future<void> _elegirFoto() async {
+    ImageSource? source = ImageSource.gallery;
+    if (_soportaCamara) {
+      if (kIsWeb) {
+        final Uint8List? fotoCapturada = await mostrarDialogoCamaraWeb(context);
+        if (fotoCapturada != null) {
+          setState(() {
+            _fotoPendiente = fotoCapturada;
+            _eliminarFotoPendiente = false;
+          });
+        }
+        return;
+      }
+
+      source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Tomar fotografía'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (source == null || !mounted) return;
+
+    setState(() => _procesandoFoto = true);
+    try {
+      final storage = sl<PacienteFotoStorage>();
+      final selected = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 95,
+      );
+      if (selected == null) return;
+      final bytes = await selected.readAsBytes();
+
+      if (bytes.length > _maxFotoBytes) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.amber,
+            content: const Text(
+              'La imagen seleccionada es muy pesada. Debe pesar menos de 10 MB.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final decodificada = storage.decodificar(bytes);
+      if (!mounted) return;
+      final optimizada = await RecorteFotoDialog.mostrar(
+        context,
+        imagen: decodificada,
+        storage: storage,
+      );
+      if (optimizada == null) return;
+      if (mounted) {
+        setState(() {
+          _fotoPendiente = optimizada;
+          _eliminarFotoPendiente = false;
+        });
+      }
+    } on FormatoFotoInvalido catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: Text(error.message),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.appColors.red,
+            content: Text('No se pudo preparar la fotografía: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _procesandoFoto = false);
+    }
+  }
+
+  Future<void> _pickFecha() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _fechaNacimiento ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
       lastDate: now,
-      helpText: 'Fecha de Nacimiento',
-      confirmText: 'Seleccionar',
-      cancelText: 'Cancelar',
+      helpText: 'Fecha de nacimiento',
     );
     if (picked != null) setState(() => _fechaNacimiento = picked);
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/'
-      '${date.month.toString().padLeft(2, '0')}/'
-      '${date.year}';
-
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+    final ac = context.appColors;
     return BlocConsumer<PacienteCubit, PacienteState>(
       listener: (context, state) {
         if (state is PacienteError) {
+          _isProcessingSave = false;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
+            SnackBar(backgroundColor: ac.red, content: Text(state.message)),
           );
         }
         if (state is PacienteOperationSuccess) {
-          Navigator.pop(context);
+          _onPacienteGuardadoExitosamente();
         }
       },
       builder: (context, state) {
-        final isSaving = state is PacienteLoading;
+        final isSaving =
+            state is PacienteLoading ||
+            _guardandoCondiciones ||
+            _isProcessingSave;
 
         return Scaffold(
-          backgroundColor: colorScheme.surfaceContainerLowest,
-          body: SafeArea(
-            child: Form(
-              key: _formKey,
+          backgroundColor: ac.bgPage,
+          appBar: _buildAppBar(ac, isSaving),
+          body: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildHeader(context, isSaving: isSaving),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: _buildFormBody(context),
-                    ),
-                  ),
+                  if (_isCompletarRegistro) ...[
+                    _buildAvisoCompletarRegistro(ac),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildFotoCard(ac),
+                  const SizedBox(height: 16),
+                  _buildDatosPersonalesCard(ac),
+                  const SizedBox(height: 16),
+                  _buildContactosCard(ac),
+                  const SizedBox(height: 16),
+                  _buildInfoAdicionalCard(ac),
+                  const SizedBox(height: 16),
+                  _buildHistorialFamiliarCard(ac),
+                  const SizedBox(height: 16),
+                  _buildCondicionesCard(ac),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -302,559 +601,642 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, {required bool isSaving}) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      color: colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFotoCard(AppColors ac) {
+    final hasCurrent =
+        widget.paciente.fotoRuta != null && !_eliminarFotoPendiente;
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
+      icon: Icons.account_circle_outlined,
+      title: 'Fotografía de identificación',
+      child: Row(
         children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Text(
-                  'Pacientes',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: colorScheme.primary),
+          if (_fotoPendiente != null)
+            ClipOval(
+              child: Image.memory(
+                _fotoPendiente!,
+                width: 88,
+                height: 88,
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            PacienteAvatar(
+              paciente: widget.paciente,
+              size: 88,
+              forzarIniciales: !hasCurrent,
+            ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _procesandoFoto
+                      ? 'Preparando imagen…'
+                      : 'JPG, PNG o WebP · máximo 10 MB',
+                  style: TextStyle(fontSize: 12, color: ac.textSecondary),
                 ),
-              ),
-              Icon(Icons.chevron_right,
-                  size: 16, color: colorScheme.onSurfaceVariant),
-              Text(
-                _isEditing ? 'Editar Paciente' : 'Nuevo Paciente',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _procesandoFoto ? null : _elegirFoto,
+                      icon: const Icon(
+                        Icons.photo_camera_back_outlined,
+                        size: 16,
+                      ),
+                      label: Text(
+                        hasCurrent || _fotoPendiente != null
+                            ? 'Reemplazar'
+                            : 'Agregar foto',
+                      ),
+                    ),
+                    if (hasCurrent || _fotoPendiente != null)
+                      TextButton.icon(
+                        onPressed: _procesandoFoto
+                            ? null
+                            : () => setState(() {
+                                _fotoPendiente = null;
+                                _eliminarFotoPendiente =
+                                    widget.paciente.fotoRuta != null;
+                              }),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 16,
+                        ),
+                        label: const Text('Quitar'),
+                        style: TextButton.styleFrom(foregroundColor: ac.red),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvisoCompletarRegistro(AppColors ac) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ac.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.amber.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: ac.amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Completa la ficha clínica del paciente para habilitar consultas.',
+              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(AppColors ac, bool isSaving) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(72),
+      child: Container(
+        color: ac.cardBg,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
             children: [
+              if (!_isCompletarRegistro)
+                GestureDetector(
+                  onTap: isSaving ? null : () => Navigator.pop(context),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: ac.divider),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 18,
+                      color: ac.textSecondary,
+                    ),
+                  ),
+                ),
+              if (!_isCompletarRegistro) const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _isEditing
-                          ? 'Editar Paciente'
-                          : 'Registro de Paciente',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      _isEditing
-                          ? 'Modifica los datos del paciente.'
-                          : 'Complete los datos para registrar un nuevo paciente.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      _isCompletarRegistro
+                          ? 'Completar ficha clínica'
+                          : _esAlta
+                          ? 'Nuevo paciente'
+                          : 'Editar paciente',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: ac.textPrimary,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton(
-                onPressed: isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: isSaving ? null : _save,
                 icon: isSaving
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
+                        width: 14,
+                        height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.save_outlined, size: 18),
-                label: Text(
-                    _isEditing ? 'Guardar Cambios' : 'Guardar Paciente'),
+                    : const Icon(Icons.save_outlined, size: 16),
+                label: Text(isSaving ? 'Guardando...' : 'Guardar'),
                 style: FilledButton.styleFrom(
+                  backgroundColor: ac.primaryGreen,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatosPersonalesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withValues(alpha: 0.10),
+      icon: Icons.person_outline_rounded,
+      title: 'Datos personales',
+      child: Column(
+        children: [
+          const SizedBox(height: 18),
+          AppFormRow(
+            children: [
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Nombre *',
+                child: TextFormField(
+                  controller: _nombreController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ana'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Nombre obligatorio'
+                      : null,
+                ),
+              ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Apellido *',
+                child: TextFormField(
+                  controller: _apellidoController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'García'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Apellido obligatorio'
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.credit_card_outlined,
+            label: 'Cédula *',
+            child: TextFormField(
+              controller: _cedulaController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [_CedulaInputFormatter()],
+              decoration: _inputDeco(ac, hint: '000-0000000-0'),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Cédula obligatoria';
+                if (v.replaceAll('-', '').length != 11) {
+                  return 'Debe tener 11 dígitos';
+                }
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.calendar_today_outlined,
+            label: 'Fecha de nacimiento *',
+            child: GestureDetector(
+              onTap: _pickFecha,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: ac.bgPage,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ac.divider),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_month_rounded,
+                      size: 16,
+                      color: ac.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _fechaNacimiento != null
+                          ? _formatDate(_fechaNacimiento!)
+                          : 'Seleccionar fecha',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _fechaNacimiento != null
+                            ? ac.textPrimary
+                            : ac.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.wc_outlined,
+            label: 'Género',
+            child: _ChipSelector<Genero>(
+              ac: ac,
+              options: Genero.values,
+              selected: _genero,
+              labelOf: (g) => g.label,
+              activeColor: ac.primaryGreen,
+              onSelected: (g) => setState(() => _genero = g),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFormBody(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 600;
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
-                    _buildDatosPersonalesPanel(context),
-                    const SizedBox(height: 16),
-                    _buildContactosPanel(context),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 4,
-                child: _buildInfoAdicionalPanel(context),
-              ),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            _buildDatosPersonalesPanel(context),
-            const SizedBox(height: 16),
-            _buildContactosPanel(context),
-            const SizedBox(height: 16),
-            _buildInfoAdicionalPanel(context),
-          ],
-        );
-      },
+  Widget _buildContactosCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.teal,
+      iconBg: ac.teal.withValues(alpha: 0.10),
+      icon: Icons.phone_outlined,
+      title: 'Contactos',
+      action: TextButton.icon(
+        onPressed: _addContacto,
+        icon: Icon(Icons.add_rounded, size: 16, color: ac.primaryGreen),
+        label: Text(
+          'Agregar',
+          style: TextStyle(fontSize: 12, color: ac.primaryGreen),
+        ),
+      ),
+      child: Column(
+        children: List.generate(
+          _contactos.length,
+          (i) => Padding(
+            padding: EdgeInsets.only(
+              bottom: i < _contactos.length - 1 ? 12 : 0,
+            ),
+            child: _buildContactoCard(ac, i),
+          ),
+        ),
+      ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Panel: Datos Personales
-  // ---------------------------------------------------------------------------
+  Widget _buildContactoCard(AppColors ac, int index) {
+    final entry = _contactos[index];
+    final isFirst = index == 0;
 
-  Widget _buildDatosPersonalesPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.person_outline,
-      iconColor: colorScheme.primary,
-      iconBackground: colorScheme.primaryContainer,
-      title: 'Datos Personales',
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: ac.bgPage,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.divider),
+      ),
       child: Column(
         children: [
+          InkWell(
+            onTap: () => _toggleContacto(index),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Row(
+                children: [
+                  Icon(
+                    isFirst ? Icons.phone : Icons.contact_emergency,
+                    size: 16,
+                    color: isFirst ? ac.primaryGreen : ac.red,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isFirst
+                          ? 'Contacto principal *'
+                          : 'Contacto de emergencia #$index',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isFirst ? ac.textPrimary : ac.red,
+                      ),
+                    ),
+                  ),
+                  if (!isFirst)
+                    GestureDetector(
+                      onTap: () => _removeContacto(index),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: ac.red,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            crossFadeState: entry.isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Column(
+                children: [
+                  Divider(height: 16, color: ac.divider),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.phone_outlined,
+                    label: isFirst ? 'Teléfono *' : 'Teléfono de emergencia *',
+                    child: TextFormField(
+                      controller: entry.telefono,
+                      keyboardType: TextInputType.phone,
+                      decoration: _inputDeco(ac, hint: '809-000-0000'),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.email_outlined,
+                    label: 'Correo electrónico',
+                    child: TextFormField(
+                      controller: entry.email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: _inputDeco(ac, hint: 'correo@ejemplo.com'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _FormField(
+                    ac: ac,
+                    icon: Icons.home_outlined,
+                    label: 'Dirección',
+                    child: TextFormField(
+                      controller: entry.direccion,
+                      maxLines: 2,
+                      decoration: _inputDeco(ac, hint: 'Calle, ciudad…'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            secondChild: const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoAdicionalCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: const Color(0xFF534AB7),
+      iconBg: const Color(0xFFEEEDFE),
+      icon: Icons.info_outline_rounded,
+      title: 'Información adicional',
+      child: Column(
+        children: [
+          _FormField(
+            ac: ac,
+            icon: Icons.category_outlined,
+            label: 'Tipo de paciente',
+            child: _ChipSelector<TipoPaciente>(
+              ac: ac,
+              options: TipoPaciente.values,
+              selected: _tipoPaciente,
+              labelOf: (t) => t.label,
+              activeColor: ac.teal,
+              onSelected: (t) => setState(() => _tipoPaciente = t),
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: _nombreController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre *',
-                    prefixIcon:
-                        const Icon(Icons.badge_outlined, size: 20),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.monitor_weight_outlined,
+                  label: 'Peso (kg)',
+                  child: TextFormField(
+                    controller: _pesoController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: _inputDeco(ac, hint: 'Ej. 70.5'),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El nombre es obligatorio'
-                      : null,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextFormField(
-                  controller: _apellidoController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Apellido *',
-                    prefixIcon:
-                        const Icon(Icons.badge_outlined, size: 20),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                child: _FormField(
+                  ac: ac,
+                  icon: Icons.height_rounded,
+                  label: 'Altura (cm)',
+                  child: TextFormField(
+                    controller: _alturaController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: _inputDeco(ac, hint: 'Ej. 170'),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'El apellido es obligatorio'
-                      : null,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _cedulaController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [_CedulaInputFormatter()],
-            decoration: InputDecoration(
-              labelText: 'Cédula *',
-              hintText: '000-0000000-0',
-              prefixIcon:
-                  const Icon(Icons.credit_card_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.work_outline_rounded,
+            label: 'Ocupación',
+            child: TextFormField(
+              controller: _trabajoController,
+              decoration: _inputDeco(ac, hint: 'Ej. Ingeniero, estudiante...'),
             ),
-            validator: cedulaValidator,
           ),
-          const SizedBox(height: 16),
-          FormField<DateTime>(
-            initialValue: _fechaNacimiento,
-            validator: (_) => _fechaNacimiento == null
-                ? 'La fecha de nacimiento es obligatoria'
-                : null,
-            builder: (field) {
-              return InkWell(
-                onTap: _pickFechaNacimiento,
-                borderRadius: BorderRadius.circular(8),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Fecha de Nacimiento',
-                    prefixIcon: const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 20),
-                    suffixIcon: const Icon(Icons.arrow_drop_down),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: field.hasError
-                          ? BorderSide(
-                              color: Theme.of(context).colorScheme.error)
-                          : const BorderSide(),
-                    ),
-                    errorText: field.errorText,
-                  ),
-                  child: Text(
-                    _fechaNacimiento != null
-                        ? _formatDate(_fechaNacimiento!)
-                        : 'Seleccionar fecha',
-                    style:
-                        Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: _fechaNacimiento != null
-                                  ? null
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                            ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<Genero>(
-            value: _genero,
-            decoration: InputDecoration(
-              labelText: 'Género',
-              prefixIcon: const Icon(Icons.wc_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.share_outlined,
+            label: 'Referencia',
+            child: TextFormField(
+              controller: _referenciaController,
+              decoration: _inputDeco(ac, hint: '¿Cómo nos conoció?'),
             ),
-            items: Genero.values
-                .map((g) =>
-                    DropdownMenuItem(value: g, child: Text(g.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _genero = v);
-            },
           ),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Panel: Contactos (dinámico, expandible)
-  // ---------------------------------------------------------------------------
-
-  Widget _buildContactosPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.contact_phone_outlined,
-      iconColor: colorScheme.secondary,
-      iconBackground: colorScheme.secondaryContainer,
-      title: 'Información de Contacto',
-      action: TextButton.icon(
-        onPressed: _addContacto,
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('Agregar'),
-      ),
+  Widget _buildHistorialFamiliarCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.indigo,
+      iconBg: ac.indigo.withValues(alpha: 0.10),
+      icon: Icons.family_restroom_outlined,
+      title: 'Antecedentes y contexto familiar',
       child: Column(
         children: [
-          if (_contactos.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Sin contactos. Presiona "Agregar" para añadir uno.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+          _FormField(
+            ac: ac,
+            icon: Icons.child_care_outlined,
+            label: 'Cantidad de Hijos',
+            child: TextFormField(
+              controller: _cantHijosController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: _inputDeco(ac, hint: '0'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.notes_outlined,
+            label: 'Historial / Antecedentes Familiares',
+            child: TextFormField(
+              controller: _historialFamiliarController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _inputDeco(
+                ac,
+                hint: 'Ej. Padre con hipertensión, antecedentes de diabetes...',
+                alignLabelWithHint: true,
               ),
             ),
-          ...List.generate(
-            _contactos.length,
-            (index) => _buildContactoCard(context, index),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContactoCard(BuildContext context, int index) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final entry = _contactos[index];
-    final isFirst = index == 0;
-
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: index < _contactos.length - 1 ? 12 : 0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: entry.isExpanded
-                ? colorScheme.secondary
-                : colorScheme.outlineVariant,
-            width: entry.isExpanded ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            // Header de la tarjeta
-            InkWell(
-              onTap: () => _toggleContacto(index),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(10),
-                topRight: const Radius.circular(10),
-                bottomLeft: Radius.circular(entry.isExpanded ? 0 : 10),
-                bottomRight: Radius.circular(entry.isExpanded ? 0 : 10),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${index + 1}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
-                              color: colorScheme.onSecondaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isFirst ? 'Contacto principal' : entry.resumen,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_contactos.length > 1)
-                      IconButton(
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: colorScheme.error.withOpacity(0.8),
-                        ),
-                        tooltip: 'Eliminar contacto',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _removeContacto(index),
-                      ),
-                    Icon(
-                      entry.isExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
+  Widget _buildCondicionesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.red,
+      iconBg: ac.red.withValues(alpha: 0.10),
+      icon: Icons.health_and_safety_outlined,
+      title: 'Condiciones médicas generales',
+      child: _cargandoCondiciones
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          : _condicionesDisponibles.isEmpty
+          ? Text(
+              'Sin catálogo de condiciones.',
+              style: TextStyle(fontSize: 12, color: ac.textMuted),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _condicionesDisponibles.map((c) {
+                final isActive = _condicionesSeleccionadas.any(
+                  (s) => s.id == c.id,
+                );
+                return FilterChip(
+                  label: Text(c.nombre),
+                  selected: isActive,
+                  onSelected: (v) => _toggleCondicion(c, v),
+                  selectedColor: ac.red.withValues(alpha: 0.12),
+                  checkmarkColor: ac.red,
+                  backgroundColor: ac.bgPage,
+                  labelStyle: TextStyle(
+                    color: isActive ? ac.red : ac.textSecondary,
+                    fontSize: 12,
+                  ),
+                );
+              }).toList(),
             ),
-
-            // Cuerpo expandible
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 200),
-              crossFadeState: entry.isExpanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              firstChild: Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: Column(
-                  children: [
-                    const Divider(height: 16),
-                    TextFormField(
-                      controller: entry.telefono,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText:
-                            isFirst ? 'Teléfono *' : 'Teléfono',
-                        prefixIcon: const Icon(
-                            Icons.phone_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      validator: isFirst
-                          ? (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'El teléfono principal es obligatorio'
-                                  : null
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: entry.email,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Correo Electrónico',
-                        prefixIcon: const Icon(
-                            Icons.email_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      validator: (v) {
-                        if (v != null &&
-                            v.trim().isNotEmpty &&
-                            !RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                                .hasMatch(v.trim())) {
-                          return 'Formato de correo inválido';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: entry.direccion,
-                      textCapitalization:
-                          TextCapitalization.sentences,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Dirección',
-                        prefixIcon: const Icon(
-                            Icons.home_outlined,
-                            size: 20),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              secondChild: const SizedBox.shrink(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Panel: Info Adicional
-  // ---------------------------------------------------------------------------
-
-  Widget _buildInfoAdicionalPanel(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _Panel(
-      icon: Icons.info_outline,
-      iconColor: colorScheme.tertiary,
-      iconBackground: colorScheme.tertiaryContainer,
-      title: 'Información Adicional',
-      child: Column(
-        children: [
-          DropdownButtonFormField<TipoPaciente>(
-            value: _tipoPaciente,
-            decoration: InputDecoration(
-              labelText: 'Tipo de Paciente',
-              prefixIcon:
-                  const Icon(Icons.category_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            items: TipoPaciente.values
-                .map((t) =>
-                    DropdownMenuItem(value: t, child: Text(t.label)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _tipoPaciente = v);
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _trabajoController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Trabajo / Ocupación',
-              prefixIcon: const Icon(Icons.work_outline, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _referenciaController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Referencia',
-              prefixIcon:
-                  const Icon(Icons.share_outlined, size: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  InputDecoration _inputDeco(
+    AppColors ac, {
+    String? hint,
+    bool alignLabelWithHint = false,
+  }) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(fontSize: 13, color: ac.textMuted),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+    filled: true,
+    fillColor: ac.bgPage,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.divider, width: 0.5),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
+    ),
+    alignLabelWithHint: alignLabelWithHint,
+  );
 }
 
-// =============================================================================
-// _Panel: contenedor reutilizable con soporte de acción en el header
-// =============================================================================
-
-class _Panel extends StatelessWidget {
-  final IconData icon;
+class _FormCard extends StatelessWidget {
+  final AppColors ac;
   final Color iconColor;
-  final Color iconBackground;
+  final Color iconBg;
+  final IconData icon;
   final String title;
   final Widget child;
   final Widget? action;
 
-  const _Panel({
-    required this.icon,
+  const _FormCard({
+    required this.ac,
     required this.iconColor,
-    required this.iconBackground,
+    required this.iconBg,
+    required this.icon,
     required this.title,
     required this.child,
     this.action,
@@ -862,36 +1244,38 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ac.divider, width: 0.5),
+        boxShadow: [ac.cardShadow],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(6),
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
+                child: Icon(icon, size: 17, color: iconColor),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
                 ),
               ),
               if (action != null) action!,
@@ -901,6 +1285,102 @@ class _Panel extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final AppColors ac;
+  final IconData icon;
+  final String label;
+  final Widget child;
+
+  const _FormField({
+    required this.ac,
+    required this.icon,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 13, color: ac.primaryGreen),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: ac.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        child,
+      ],
+    );
+  }
+}
+
+class _ChipSelector<T> extends StatelessWidget {
+  final AppColors ac;
+  final List<T> options;
+  final T selected;
+  final String Function(T) labelOf;
+  final Color activeColor;
+  final void Function(T) onSelected;
+
+  const _ChipSelector({
+    required this.ac,
+    required this.options,
+    required this.selected,
+    required this.labelOf,
+    required this.activeColor,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((opt) {
+        final isActive = opt == selected;
+        return GestureDetector(
+          onTap: () => onSelected(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withValues(alpha: 0.10) : ac.bgPage,
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.50)
+                    : ac.divider,
+                width: isActive ? 1.0 : 0.5,
+              ),
+            ),
+            child: Text(
+              labelOf(opt),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? activeColor : ac.textSecondary,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

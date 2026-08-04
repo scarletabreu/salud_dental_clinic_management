@@ -8,77 +8,68 @@ class ConsumibleRemoteDatasourceImpl implements ConsumibleRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchConsumibles() async {
-    try {
-      final response = await supabaseClient
-          .from('consumibles')
-          .select()
-          .isFilter('deleted_at', null)
-          .order('nombre', ascending: true);
+    final response = await supabaseClient
+        .from('consumibles')
+        // El suplidor viaja en el mismo viaje: el listado lo muestra y pedirlo
+        // aparte era una consulta por fila.
+        .select('*, suplidor:suplidores(nombre)')
+        .filter('deleted_at', 'is', null)
+        .order('nombre', ascending: true);
 
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al obtener inventario: ${e.message}');
-    }
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
+  /// El ajuste va por la RPC, que es quien tiene capacidad para moverlo.
+  ///
+  /// Antes se leía el stock y se insertaba el movimiento a mano. Eso dejaba la
+  /// diferencia calculada en el cliente —dos ajustes simultáneos se pisaban— y
+  /// exigía que `movimientos_stock_consumible` fuese escribible por cualquier
+  /// usuario autenticado, que es el agujero que cierra HFX-CLIN-007.
+  /// `ajustar_stock_consumible` exige capacidad administrativa, toma el lock y
+  /// deja el estado del consumible recalculado.
   @override
-  Future<void> updateStock(String id, int nuevoStock) async {
-    try {
-      await supabaseClient
-          .from('consumibles')
-          .update({'stock_actual': nuevoStock})
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar stock: ${e.message}');
-    }
-  }
-
-  @override
-  Future<void> upsertConsumible(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('consumibles').upsert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al guardar consumible: ${e.message}');
-    }
+  Future<void> adjustStock(String id, int nuevoStock, String motivo) async {
+    await supabaseClient.rpc(
+      'ajustar_stock_consumible',
+      params: {
+        'p_consumible_id': id,
+        'p_nuevo_stock': nuevoStock,
+        'p_motivo': motivo,
+      },
+    );
   }
 
   @override
   Future<void> createConsumible(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['created_at'] = DateTime.now().toIso8601String();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('consumibles').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al crear nuevo consumible: ${e.message}');
-    }
+    final ahora = DateTime.now().toUtc().toIso8601String();
+    data.remove('id');
+    data['created_at'] = ahora;
+    data['updated_at'] = ahora;
+    await supabaseClient.from('consumibles').insert(data);
   }
 
+  /// `data` viene de `ConsumibleModel.toUpdateJson()`, que ya excluye las
+  /// columnas sin grant de UPDATE. Aquí se quitan además `id` y las que sólo
+  /// tienen sentido en el alta.
   @override
   Future<void> updateConsumible(String id, Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await supabaseClient.from('consumibles').update(data).eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al actualizar consumible: ${e.message}');
-    }
+    data
+      ..remove('id')
+      ..remove('created_at')
+      ..remove('stock_actual')
+      ..remove('estado');
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
+    await supabaseClient.from('consumibles').update(data).eq('id', id);
   }
 
   @override
   Future<void> deleteConsumible(String id) async {
-    try {
-      await supabaseClient
-          .from('consumibles')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar consumible: ${e.message}');
-    }
+    await supabaseClient
+        .from('consumibles')
+        .update({
+          'activo': false,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

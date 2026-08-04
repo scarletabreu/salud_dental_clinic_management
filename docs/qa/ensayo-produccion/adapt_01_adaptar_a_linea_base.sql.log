@@ -1,0 +1,2 @@
+psql:supabase/produccion/01_adaptar_a_linea_base.sql:69: NOTICE:  adaptador: recetas.estado convertida de enum a texto.
+psql:supabase/produccion/01_adaptar_a_linea_base.sql:86: NOTICE:  adaptador: enum estado_receta retirado (ya no lo usa nadie).

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 
 class RailUserCard extends StatelessWidget {
   final bool extended;
@@ -13,101 +13,155 @@ class RailUserCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = context.appColors;
     final textTheme = Theme.of(context).textTheme;
-
     final usuario = context.select((AuthCubit c) => c.state.usuario);
 
     String initials() {
-      if (usuario == null) return 'JM';
+      if (usuario == null) return 'SD';
       final n = usuario.nombre.isNotEmpty ? usuario.nombre[0] : '';
       final a = usuario.apellido.isNotEmpty ? usuario.apellido[0] : '';
       final s = (n + a).trim();
-      return s.isNotEmpty ? s.toUpperCase() : 'JM';
+      return s.isNotEmpty ? s.toUpperCase() : 'SD';
     }
 
-    final avatar = CircleAvatar(
-      radius: 18,
-      backgroundColor: ac.railSelectedBg,
-      child: Text(
-        initials(),
-        style: textTheme.labelLarge?.copyWith(
-          color: ac.railTextSelected,
-          fontWeight: FontWeight.w700,
+    final avatar = Container(
+      width: 36,
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: ac.primaryGreen.withValues(alpha: 0.08),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: ac.primaryGreen.withValues(alpha: 0.2),
+          width: 0.8,
+        ),
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/logo.png',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              alignment: Alignment.center,
+              color: ac.primaryGreen.withValues(alpha: 0.12),
+              child: Text(
+                initials(),
+                style: textTheme.labelLarge?.copyWith(
+                  color: ac.primaryGreen,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    final logoutBtn = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => context.read<AuthCubit>().logout(),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: ac.red.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(Icons.logout_rounded, size: 15, color: ac.red),
         ),
       ),
     );
 
     if (!extended) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            avatar,
-            const SizedBox(height: 8),
-            IconButton(
-              icon: Icon(
-                Icons.logout_rounded,
-                size: 20,
-                color: ac.railText,
-              ),
-              tooltip: 'Cerrar sesión',
-              onPressed: () => context.read<AuthCubit>().logout(),
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            color: ac.cardBg,
+            borderRadius: BorderRadius.circular(50),
+            border: Border.all(
+              color: ac.divider.withValues(alpha: 0.5),
+              width: 0.5,
             ),
-          ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              avatar,
+              const SizedBox(height: 6),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 4,
+                endIndent: 4,
+                color: ac.divider.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 6),
+              logoutBtn,
+            ],
+          ),
         ),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: ac.railTextSelected.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          avatar,
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  usuario != null
-                      ? (usuario is Doctor
-                          ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
-                          : '${usuario.nombre} ${usuario.apellido}')
-                      : 'Usuario',
-                  style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: ac.railTextSelected,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  usuario is Doctor
-                      ? usuario.specialty
-                      : '',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: ac.railText,
-                    letterSpacing: 0.8,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: ac.cardBg.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(
+            color: ac.divider.withValues(alpha: 0.5),
+            width: 0.5,
           ),
-          IconButton(
-            icon: Icon(
-              Icons.logout_rounded,
-              size: 20,
-              color: ac.railText,
+        ),
+        child: Row(
+          children: [
+            avatar,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    usuario != null
+                        ? (usuario is Doctor
+                              ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+                              : '${usuario.nombre} ${usuario.apellido}')
+                        : 'Usuario',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: ac.textPrimary,
+                      letterSpacing: -0.2,
+                      height: 1.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    usuario is Doctor ? usuario.specialty : 'Personal Clínico',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: ac.textMuted,
+                      height: 1.1,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            tooltip: 'Cerrar sesión',
-            onPressed: () => context.read<AuthCubit>().logout(),
-          ),
-        ],
+            const SizedBox(width: 4),
+            logoutBtn,
+          ],
+        ),
       ),
     );
   }

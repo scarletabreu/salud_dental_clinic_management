@@ -26,8 +26,18 @@ class DashboardHeaderCard extends StatelessWidget {
     final hoy = DateTime.now();
     const dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const meses = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
     ];
     return '${dias[hoy.weekday - 1]} ${hoy.day} ${meses[hoy.month - 1]}, ${hoy.year}';
   }
@@ -35,6 +45,7 @@ class DashboardHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
+    final narrow = MediaQuery.sizeOf(context).width < 360;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -53,14 +64,24 @@ class DashboardHeaderCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: ac.teal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.local_hospital_rounded,
-                  color: ac.teal,
-                  size: 22,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.local_hospital_rounded,
+                        color: ac.teal,
+                        size: 22,
+                      );
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -87,24 +108,14 @@ class DashboardHeaderCard extends StatelessWidget {
                         height: 1.1,
                       ),
                     ),
+                    if (narrow) ...[
+                      const SizedBox(height: 8),
+                      _DateChip(date: _fechaFormateada()),
+                    ],
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: ac.chipBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _fechaFormateada(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: ac.textMuted,
-                  ),
-                ),
-              ),
+              if (!narrow) _DateChip(date: _fechaFormateada()),
             ],
           ),
 
@@ -112,22 +123,25 @@ class DashboardHeaderCard extends StatelessWidget {
           Divider(height: 1, color: ac.divider),
           const SizedBox(height: 16),
 
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              if (citasHoy != null) ...[
-                _StatusChip(
-                  label: '$citasHoy citas hoy',
-                  color: ac.indigo,
-                ),
-              ],
-              if (citasEnEspera != null && citasEnEspera! > 0) ...[
-                const SizedBox(width: 8),
-                _StatusChip(
-                  label: '$citasEnEspera en espera',
-                  color: ac.amber,
-                ),
-              ],
-              const Spacer(),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (citasHoy != null)
+                    _StatusChip(label: '$citasHoy citas hoy', color: ac.indigo),
+                  if (citasEnEspera != null && citasEnEspera! > 0)
+                    _StatusChip(
+                      label: '$citasEnEspera en espera',
+                      color: ac.amber,
+                    ),
+                ],
+              ),
               if (onVerCitas != null)
                 GestureDetector(
                   onTap: onVerCitas,
@@ -140,14 +154,14 @@ class DashboardHeaderCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: ac.primaryBlue,
+                          color: ac.primaryGreen,
                         ),
                       ),
                       const SizedBox(width: 3),
                       Icon(
                         Icons.arrow_forward_rounded,
                         size: 14,
-                        color: ac.primaryBlue,
+                        color: ac.primaryGreen,
                       ),
                     ],
                   ),
@@ -155,6 +169,33 @@ class DashboardHeaderCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DateChip extends StatelessWidget {
+  const _DateChip({required this.date});
+  final String date;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: ac.chipBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        date,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: ac.textMuted,
+        ),
       ),
     );
   }

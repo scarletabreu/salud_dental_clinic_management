@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/personal/data/datasources/doctor_remote_datasource.dart';
@@ -9,48 +10,29 @@ class DoctorRepositoryImpl implements DoctorRepository {
   DoctorRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<void> createDoctor(String userId) async {
-    try {
-      await remoteDataSource.createDoctor(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al crear doctor: $e');
-    }
+  Future<List<Doctor>> getDoctores() {
+    return runGuarded(
+      () => remoteDataSource.fetchActiveDoctores(),
+      context: 'obtener los doctores',
+    );
   }
 
   @override
-  Future<void> deleteDoctor(String userId) async {
-    try {
-      await remoteDataSource.deactivateDoctor(userId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al desactivar doctor: $e');
-    }
-  }
-
-  @override
-  Future<void> updateDoctor(String userId, String newUserId) async {
-    try {
-      await remoteDataSource.updateDoctor(userId, newUserId);
-    } catch (e) {
-      throw Exception('Error en el repositorio al actualizar doctor: $e');
-    }
-  }
-
-    @override
-  Future<List<Doctor>> getDoctores() async {
-    try {
-      return await remoteDataSource.fetchActiveDoctores();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener doctores: $e');
-    }
-  }
-
-  @override
-  Future<Doctor?> getDoctorByUserId(String userId) async {
-    try {
+  Future<Doctor?> getDoctorByUserId(String userId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchDoctorById(userId);
       return data == null ? null : DoctorModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener doctor: $e');
-    }
+    }, context: 'obtener el doctor');
+  }
+
+  // data/repositories/doctor_repository_impl.dart
+  @override
+  Future<List<String>> getDoctorIdsAsignados(String asistenteId) {
+    return runGuarded(() async {
+      final rows = await remoteDataSource.fetchDoctorAsistentesByAsistenteId(
+        asistenteId,
+      );
+      return rows.map((row) => row['doctor_id'].toString()).toList();
+    }, context: 'obtener los doctores asignados al asistente');
   }
 }

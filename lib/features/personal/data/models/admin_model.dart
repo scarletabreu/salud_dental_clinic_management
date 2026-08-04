@@ -12,19 +12,25 @@ class AdminModel extends Admin {
     required super.govID,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required super.departamento,
+    required super.assistants,
+    required super.specialty,
+    super.isAvailable = true,
   });
 
   factory AdminModel.fromJson(Map<String, dynamic> json) {
-    final usuarioData = json['usuarios'] as Map<String, dynamic>? ?? {};
-    // 2. Entramos al segundo nivel (personas) desde usuarios
+    final doctorData = json['doctores'] as Map<String, dynamic>? ?? {};
+    final usuarioData = doctorData['usuarios'] as Map<String, dynamic>? ?? {};
     final personaData = usuarioData['personas'] as Map<String, dynamic>? ?? {};
 
     return AdminModel(
       id: json['id'] as String?,
-      
-      // Datos que vienen del fondo: de la tabla 'personas'
+
+      specialty: doctorData['especialidad'] as String? ?? '',
+      isAvailable: doctorData['esta_disponible'] as bool? ?? true,
+
+      assistants: [],
+
       nombre: personaData['nombre'] as String? ?? '',
       apellido: personaData['apellido'] as String? ?? '',
       birthDate: personaData['fecha_nacimiento'] != null
@@ -32,50 +38,45 @@ class AdminModel extends Admin {
           : DateTime.now(),
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
-      
-      // Datos que vienen del medio: de la tabla 'usuarios'
-      estatus: _parseEstatus(personaData['estatus'] as String?),
+
+      estatus: _calcularEstatus(json['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
-      passwordHash: usuarioData['password_hash'] as String? ?? '',
-      
-      // Datos de la raíz: de la tabla 'doctores'
+
       departamento: json['departamento'] as String? ?? '',
     );
   }
 
-    static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo; // Fallback por defecto
-    
-    return EstatusPersona.values.firstWhere(
-      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo, // Por si en DB guardas algo raro
-    );
+  static EstatusPersona _calcularEstatus(String? deletedAtStr) {
+    return deletedAtStr == null
+        ? EstatusPersona.activo
+        : EstatusPersona.inactivo;
   }
 
   static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
-    final raw = json['contactos'];
-
-    // Caso 1: Si viene como una Lista (lo ideal)
-    if (raw is List) {
-      return raw
-          .whereType<Map<String, dynamic>>() // Filtra y asegura que cada item sea un Map
+    final directos = json['contactos'];
+    if (directos is List) {
+      return directos
+          .whereType<Map<String, dynamic>>()
           .map((item) => ContactoModel.fromJson(item))
           .toList();
     }
-
-    // Caso 2: Por si acaso el backend viejo o un fallback envía un solo objeto Map
-    if (raw is Map<String, dynamic>) {
-      return [ContactoModel.fromJson(raw)];
+    if (directos is Map<String, dynamic>) {
+      return [ContactoModel.fromJson(directos)];
     }
 
-    // Caso 3: Si es nulo o no es un formato válido, devolvemos una lista vacía
+    final relaciones = json['persona_contactos'];
+    if (relaciones is List) {
+      return relaciones
+          .map((rel) => rel is Map ? rel['contactos'] : null)
+          .whereType<Map<String, dynamic>>()
+          .map(ContactoModel.fromJson)
+          .toList();
+    }
     return [];
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = {
-      'departamento': departamento,
-    };
+    final Map<String, dynamic> data = {'departamento': departamento};
 
     if (id != null && id!.contains('-') && id!.length == 36) {
       data['id'] = id;

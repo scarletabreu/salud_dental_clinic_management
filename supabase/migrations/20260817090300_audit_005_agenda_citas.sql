@@ -64,14 +64,18 @@ comment on constraint citas_estado_canonico on public.citas is
 -- entró por `PATCH` directo sin que nada la mirase. Media jornada es un techo
 -- generoso para una cita odontológica y sigue permitiendo cirugías largas.
 -- ---------------------------------------------------------------------------
-update public.citas
-   set duracion_minutos = 480, updated_at = now()
- where duracion_minutos > 480;
-
+-- El CHECK entra `NOT VALID`: acota lo que se escriba de ahora en adelante y
+-- **no toca una sola fila existente**. Recortar a 480 una cita ya agendada
+-- reescribiría en silencio la agenda real de la clínica para hacer pasar una
+-- migración, y una duración histórica rara es un dato, no un defecto que
+-- corregir a ciegas.
+--
+-- Para validarlo sobre el histórico, cuando alguien haya revisado esas filas:
+--   alter table public.citas validate constraint citas_duracion_posible;
 alter table public.citas drop constraint if exists citas_duracion_posible;
 alter table public.citas
   add constraint citas_duracion_posible
-  check (duracion_minutos >= 5 and duracion_minutos <= 480);
+  check (duracion_minutos >= 5 and duracion_minutos <= 480) not valid;
 
 -- ---------------------------------------------------------------------------
 -- F3-01 · Reprogramar una cita con consulta abierta reescribía la fecha clínica

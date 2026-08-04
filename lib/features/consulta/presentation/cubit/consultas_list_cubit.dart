@@ -42,7 +42,13 @@ class ConsultasListCubit extends Cubit<ConsultasListState> {
       final consultas = restringidoADoctorId != null
           ? await _consultaRepository.getConsultasByDoctor(restringidoADoctorId)
           : await _consultaRepository.getConsultas();
-      final doctores = await _cargarDoctores();
+      // La plantilla de odontólogos sólo alimenta el filtro por doctor, que es
+      // de quien gestiona la agenda completa. Pedirla en la sesión de un doctor
+      // era traerse a la memoria una lista que la pantalla no llega a pintar:
+      // `get_active_doctors` es SECURITY DEFINER y devuelve la clínica entera.
+      final doctores = restringidoADoctorId == null
+          ? await _cargarDoctores()
+          : <Doctor>[];
 
       // Los nombres salen del directorio, no del listado de pacientes: con el
       // modelo de permisos de producción un doctor ve consultas de pacientes

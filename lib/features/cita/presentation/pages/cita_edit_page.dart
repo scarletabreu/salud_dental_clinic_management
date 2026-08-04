@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/actividad_planificada.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/entities/cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
@@ -54,7 +56,22 @@ class _CitaEditPageState extends State<CitaEditPage> {
     super.dispose();
   }
 
+  /// Un doctor no reasigna citas: la suya es suya y las de otros no las ve.
+  ///
+  /// La base ya lo imponía —`citas_update` exige `doctor_id = auth.uid()` para
+  /// quien sólo ejerce—, pero la pantalla seguía pintando el desplegable con
+  /// **toda** la plantilla de odontólogos, que llega por `get_active_doctors`
+  /// (SECURITY DEFINER, así que la RLS no la recorta). Ofrecía una reasignación
+  /// que el servidor iba a rechazar y, de paso, enseñaba el listado entero.
+  bool get _puedeReasignarDoctor =>
+      context.read<AuthCubit>().state.puedeGestionarAgendaCompleta;
+
   Future<void> _cargarDoctores() async {
+    if (!_puedeReasignarDoctor) {
+      setState(() => _doctorSeleccionado = widget.cita.doctor);
+      return;
+    }
+
     setState(() => _cargandoDoctores = true);
     try {
       final lista = await sl<DoctorRepository>().getDoctores();
@@ -298,7 +315,26 @@ class _CitaEditPageState extends State<CitaEditPage> {
       iconColor: ac.teal,
       icon: Icons.medical_services_outlined,
       title: 'Odontólogo asignado',
-      child: _cargandoDoctores
+      child: !_puedeReasignarDoctor
+          ? _FieldGroup(
+              ac: ac,
+              icon: Icons.person_search_rounded,
+              label: 'Doctor',
+              child: Padding(
+                key: const Key('doctor_asignado_fijo'),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Dr. ${widget.cita.doctor.nombre} '
+                  '${widget.cita.doctor.apellido}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: ac.textPrimary,
+                  ),
+                ),
+              ),
+            )
+          : _cargandoDoctores
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(8),

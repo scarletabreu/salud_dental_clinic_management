@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/usecases/actualizar_existencia.dart';
@@ -17,18 +21,46 @@ class InventarioCubit extends Cubit<InventarioState> {
   final EliminarConsumible _eliminarConsumible;
   final GetDirectorioSuplidores _getDirectorioSuplidores;
 
+  StreamSubscription<void>? _senalInventario;
+
   InventarioCubit({
     required GetInventario getInventario,
     required GuardarConsumible guardarConsumible,
     required ActualizarExistencia actualizarExistencia,
     required EliminarConsumible eliminarConsumible,
     required GetDirectorioSuplidores getDirectorioSuplidores,
+    SenalesRealtime? senales,
   }) : _getInventario = getInventario,
        _guardarConsumible = guardarConsumible,
        _actualizarExistencia = actualizarExistencia,
        _eliminarConsumible = eliminarConsumible,
        _getDirectorioSuplidores = getDirectorioSuplidores,
-       super(const InventarioLoading());
+       super(const InventarioLoading()) {
+    // El consumo silencioso de las consultas llega a la pantalla (MU-4): la
+    // señal recarga las existencias conservando búsqueda y filtro activos.
+    _senalInventario = senales
+        ?.de(DominioSenal.inventario)
+        .listen((_) => _refrescarEnSilencio());
+  }
+
+  Future<void> _refrescarEnSilencio() async {
+    if (state is! InventarioLoaded) return;
+    try {
+      final list = await _getInventario();
+      final vigente = state;
+      if (isClosed || vigente is! InventarioLoaded) return;
+      emit(vigente.copyWith(consumibles: list));
+    } catch (e) {
+      // La pantalla conserva lo último que sí cargó.
+      AppLog.error('refrescar el inventario', e);
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _senalInventario?.cancel();
+    return super.close();
+  }
 
   Future<void> cargar() async {
     emit(const InventarioLoading());

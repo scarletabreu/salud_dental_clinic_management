@@ -29,6 +29,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   final AlertaOperativaGenerator _alertaGenerator;
   final SenalesRealtime? _senales;
   StreamSubscription<void>? _senalAgenda;
+  StreamSubscription<void>? _senalInventario;
 
   List<RolUsuario> _roles = const [];
   String? _doctorId;
@@ -166,6 +167,41 @@ class DashboardCubit extends Cubit<DashboardState> {
     _senalAgenda = senales
         .de(DominioSenal.agenda)
         .listen((_) => _refrescarCitas());
+    // La alerta de stock bajo salta cuando el consumo del día cruza el umbral
+    // (MU-4), no sólo al arrancar la app: la señal de inventario recalcula
+    // las alertas operativas con existencias frescas. Sólo aplica a quien
+    // carga inventario en su tablero (acceso operativo).
+    _senalInventario = senales
+        .de(DominioSenal.inventario)
+        .listen((_) => _refrescarInventario());
+  }
+
+  Future<void> _refrescarInventario() async {
+    final current = state;
+    if (current is! DashboardLoaded) return;
+    if (!_roles.puedeGestionarCaja) return;
+    try {
+      // El repositorio ya invalidó su caché con esta misma señal, así que
+      // esta lectura trae las existencias reales.
+      final consumibles = await _consumibleRepository.getInventario();
+      final vigente = state;
+      if (isClosed || vigente is! DashboardLoaded) return;
+      _consumiblesCache = consumibles;
+      emit(
+        _construirEstado(
+          roles: vigente.roles,
+          nombreDoctor: vigente.nombreDoctor,
+          citas: _citasCache,
+          consumibles: consumibles,
+          cajaActual: _cajaActualCache,
+          equipos: _equiposCache,
+          totalPacientes: vigente.totalPacientes,
+          totalMedicinas: vigente.totalMedicinas,
+        ),
+      );
+    } catch (e) {
+      AppLog.error('refrescar el inventario del inicio', e);
+    }
   }
 
   Future<void> _refrescarCitas() async {
@@ -209,6 +245,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   @override
   Future<void> close() async {
     await _senalAgenda?.cancel();
+    await _senalInventario?.cancel();
     return super.close();
   }
 

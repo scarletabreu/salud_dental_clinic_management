@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/core/data/cache_catalogo.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/entities/consumible.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/enums/motivo_ajuste_stock.dart';
 import 'package:salud_dental_clinic_management/features/consumible/domain/repositories/consumible_repository.dart';
@@ -22,7 +23,15 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
   ConsumibleRepositoryImpl({
     required this.remoteDataSource,
     CacheCatalogo? cache,
-  }) : _cache = cache ?? CacheCatalogo();
+    SenalesRealtime? senales,
+  }) : _cache = cache ?? CacheCatalogo() {
+    // El consumo de las consultas ajenas también invalida la copia local
+    // (MU-4): la próxima pantalla que pida el inventario —incluida la sección
+    // de insumos de una consulta— ve el stock real sin esperar la vigencia.
+    senales
+        ?.de(DominioSenal.inventario)
+        .listen((_) => _cache.invalidar(_clave));
+  }
 
   @override
   Future<List<Consumible>> getInventario() {

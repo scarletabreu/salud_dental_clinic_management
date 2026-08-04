@@ -33,7 +33,7 @@ void _recoger(WidgetTester tester, String etapa) {
   if (e != null) _excepciones.add('[$etapa] $e');
 }
 
-Future<void> _bombear(WidgetTester tester, [int veces = 12]) async {
+Future<void> _bombear(WidgetTester tester, [int veces = 6]) async {
   for (var i = 0; i < veces; i++) {
     await tester.pump(const Duration(milliseconds: 250));
   }
@@ -48,7 +48,7 @@ Future<void> _asentar(WidgetTester tester) async {
   // la binding ya anotó la excepción. El resultado era una jornada que hacía
   // todo bien y terminaba en «Multiple exceptions (3) were detected», que
   // parece un defecto de la aplicación y es del arnés.
-  await _bombear(tester, 8);
+  await _bombear(tester, 5);
 }
 
 Future<void> _escribirHint(
@@ -101,7 +101,7 @@ Future<void> _escribirClave(
 
 Future<void> _volver(WidgetTester tester) async {
   Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-  await _bombear(tester, 8);
+  await _bombear(tester, 5);
 }
 
 /// Vuelve al shell cerrando las rutas apiladas, sin contar `pop`s.
@@ -250,7 +250,7 @@ void main() {
       limite: const Duration(seconds: 90),
       descripcion: 'la vista previa del PDF con odontograma',
     );
-    await _bombear(tester, 20);
+    await _bombear(tester, 8);
     _recoger(tester, 'PDF del expediente');
     // Cierra la previsualización y el diálogo de exportación; el expediente
     // sigue debajo, que es donde vive el resumen financiero.
@@ -457,7 +457,7 @@ void main() {
     await tester.ensureVisible(registrar.first);
     await _bombear(tester, 2);
     await tester.tap(registrar.first);
-    await _bombear(tester, 24);
+    await _bombear(tester, 12);
     _recoger(tester, 'registrar la compra');
     expect(
       find.text('Registrar Compra'),

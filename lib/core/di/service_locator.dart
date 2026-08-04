@@ -346,6 +346,7 @@ Future<void> init() async {
     () => MedicinaRepositoryImpl(
       remoteDataSource: sl(),
       contraindicacionRepository: sl(),
+      senales: sl<SenalesRealtime>(),
     ),
   );
   sl.registerLazySingleton<CuentaRepository>(
@@ -599,7 +600,10 @@ Future<void> init() async {
     () => ConsumibleRemoteDatasourceImpl(supabaseClient: sl()),
   );
   sl.registerLazySingleton<ConsumibleRepository>(
-    () => ConsumibleRepositoryImpl(remoteDataSource: sl()),
+    () => ConsumibleRepositoryImpl(
+      remoteDataSource: sl(),
+      senales: sl<SenalesRealtime>(),
+    ),
   );
   sl.registerLazySingleton(() => GetInventario(sl()));
   sl.registerLazySingleton(() => GuardarConsumible(sl()));
@@ -614,6 +618,7 @@ Future<void> init() async {
       actualizarExistencia: sl(),
       eliminarConsumible: sl(),
       getDirectorioSuplidores: sl(),
+      senales: sl<SenalesRealtime>(),
     ),
   );
 

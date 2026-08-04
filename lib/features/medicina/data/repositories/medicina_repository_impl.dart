@@ -1,5 +1,6 @@
 import 'package:salud_dental_clinic_management/core/data/cache_catalogo.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/entities/contraindicacion.dart';
 import 'package:salud_dental_clinic_management/features/contraindicacion/domain/repositories/contraindicacion_repository.dart';
 import 'package:salud_dental_clinic_management/features/medicina/domain/entities/medicina.dart';
@@ -19,7 +20,15 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
     required this.remoteDataSource,
     required this.contraindicacionRepository,
     CacheCatalogo? cache,
-  }) : _cache = cache ?? CacheCatalogo();
+    SenalesRealtime? senales,
+  }) : _cache = cache ?? CacheCatalogo() {
+    // La señal de inventario delata que una consulta consumió existencias
+    // (MU-4); la copia local del catálogo se descarta para que la próxima
+    // receta vea el stock real sin esperar la vigencia.
+    senales
+        ?.de(DominioSenal.inventario)
+        .listen((_) => _cache.invalidar(_clave));
+  }
 
   @override
   Future<List<Medicina>> getCatalogoMedicinas() {

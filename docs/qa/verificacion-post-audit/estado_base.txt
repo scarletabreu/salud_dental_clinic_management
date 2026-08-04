@@ -1,10 +1,14 @@
-consulta.Hugo.finalizada|false
+consulta.Ana.finalizada|true
+consulta.Hugo.finalizada|true
 consulta.Sara.finalizada|true
+consulta.Ana.es_de_hoy|true
 consulta.Hugo.es_de_hoy|true
 consulta.Sara.es_de_hoy|true
+vitales.Ana.filas|8
 vitales.Hugo.filas|8
 vitales.Sara.filas|8
-tratamiento.Sara.b529789d-a969-4266-8b6d-6ddae9b9da9d|3200.00
+tratamiento.Sara.f5769d28-8154-4a86-8fb0-0023723c5df1|3200.00
+receta.Ana.renglones|1
 receta.Sara.renglones|1
 receta.tabla_normalizada|0
 cuenta.Sara.total|3200.00
@@ -16,15 +20,18 @@ caja.movimiento.egreso|1900.00 · Pago por recepción de compra #0255541a
 caja.movimiento.egreso|1900.00 · Pago por recepción de compra #5b390f04
 caja.movimiento.ingreso|3200.00 · Cobro a cuenta
 caja.movimiento.egreso|1900.00 · Pago por recepción de compra #916e23b6
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #a12baee9
+caja.movimiento.ingreso|3200.00 · Cobro a cuenta
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #a6c46c28
 compra.estado|recibida
-stock.Gutapercha punta F2|60
+stock.Gutapercha punta F2|80
+movimiento_stock.compra_recibida|70 → 80
+movimiento_stock.compra_recibida|60 → 70
 movimiento_stock.compra_recibida|50 → 60
-movimiento_stock.compra_recibida|40 → 50
-movimiento_stock.compra_recibida|30 → 40
-cita.Ana.estado|confirmada
+cita.Ana.estado|completada
 cita.Diana.estado|cancelada
 cita.Elena.estado|en_espera
-cita.Hugo.estado|en_consulta
+cita.Hugo.estado|completada
 cita.Nuria.estado|confirmada
 cita.Pablo.estado|confirmada
 cita.Sara.estado|completada

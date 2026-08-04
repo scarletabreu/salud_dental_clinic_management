@@ -879,12 +879,12 @@ class _HistorialPagos extends StatelessWidget {
                   if (i > 0) Divider(height: 1, color: ac.divider),
                   _FilaPago(
                     pago: pagos[i],
-                    habilitado: consulta != null && paciente != null,
+                    habilitado: paciente != null,
                     onVer: () => _abrirRecibo(
                       context,
                       cuenta: cuenta,
                       pago: pagos[i],
-                      consulta: consulta!,
+                      consulta: consulta,
                       paciente: paciente!,
                     ),
                   ),
@@ -1223,7 +1223,7 @@ Future<void> _mostrarDialogoPago(
         _rutaRecibo(
           cuenta: estado.cuenta,
           pago: pago,
-          consulta: estado.consulta!,
+          consulta: estado.consulta,
           paciente: estado.paciente!,
         ),
       );
@@ -1235,7 +1235,7 @@ Future<void> _abrirRecibo(
   BuildContext context, {
   required Cuenta cuenta,
   required Pago pago,
-  required Consulta consulta,
+  Consulta? consulta,
   required Paciente paciente,
 }) {
   return Navigator.of(context).push(
@@ -1251,7 +1251,7 @@ Future<void> _abrirRecibo(
 MaterialPageRoute<void> _rutaRecibo({
   required Cuenta cuenta,
   required Pago pago,
-  required Consulta consulta,
+  Consulta? consulta,
   required Paciente paciente,
 }) => MaterialPageRoute<void>(
   builder: (_) => ReciboPagoPage(

@@ -62,23 +62,33 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
       Paciente? paciente;
       String? errorDatosRecibo;
 
+      // La consulta es un extra y se lee aparte, sin poder estropear el recibo.
+      // Recepción no puede leerla —la RLS de consultas es del doctor firmante y
+      // del admin— y antes ese «no» tumbaba también al paciente, así que quien
+      // cobraba se quedaba sin poder imprimir lo que acababa de cobrar.
       try {
         consulta = await _consultaRepository.getDetalleConsulta(
           cuenta.consultaId,
         );
-        if (consulta == null) {
-          throw Exception('No se encontró la consulta asociada.');
-        }
-        final resultadoPaciente = await _pacienteRepository.getPacienteById(
-          consulta.pacienteId,
-        );
-        paciente = resultadoPaciente.fold(
-          (failure) => throw failure,
-          (value) => value,
-        );
       } catch (_) {
+        consulta = null;
+      }
+
+      // El paciente sale de la cuenta, que es de quien cobra; la consulta sólo
+      // se usa como respaldo cuando la cuenta es anterior a `paciente_id`.
+      final pacienteId = cuenta.pacienteId ?? consulta?.pacienteId;
+      if (pacienteId == null) {
         errorDatosRecibo =
-            'No se pudieron cargar los datos del paciente para el recibo.';
+            'Esta cuenta no tiene paciente asociado: no se puede emitir el '
+            'recibo.';
+      } else {
+        final resultadoPaciente = await _pacienteRepository.getPacienteById(
+          pacienteId,
+        );
+        paciente = resultadoPaciente.fold((failure) {
+          errorDatosRecibo = failure.message;
+          return null;
+        }, (value) => value);
       }
 
       emit(

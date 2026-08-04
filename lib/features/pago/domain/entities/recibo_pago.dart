@@ -26,14 +26,22 @@ class ReciboPago {
   final DatosClinica clinica;
   final Cuenta cuenta;
   final Pago pago;
-  final Consulta consulta;
+
+  /// La consulta es opcional a propósito.
+  ///
+  /// El recibo es un documento financiero y de ella sólo sacaba el número, que
+  /// la cuenta ya trae en `consultaId`. Exigirla obligaba a leer el expediente
+  /// clínico para imprimir un cobro, y eso el personal de recepción no puede
+  /// hacerlo: la RLS de consultas es del doctor firmante y del admin. Resultado:
+  /// quien cobraba era justo quien no podía emitir el recibo.
+  final Consulta? consulta;
   final Paciente paciente;
 
   const ReciboPago({
     this.clinica = DatosClinica.saludDental,
     required this.cuenta,
     required this.pago,
-    required this.consulta,
+    this.consulta,
     required this.paciente,
   });
 
@@ -44,7 +52,7 @@ class ReciboPago {
   }
 
   String get consultaNumero {
-    final id = consulta.id ?? cuenta.consultaId;
+    final id = consulta?.id ?? cuenta.consultaId;
     return id.length <= 8 ? id.toUpperCase() : id.substring(0, 8).toUpperCase();
   }
 

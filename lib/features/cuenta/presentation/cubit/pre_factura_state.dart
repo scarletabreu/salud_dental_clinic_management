@@ -30,7 +30,9 @@ class PreFacturaCargada extends PreFacturaState {
     this.errorDatosRecibo,
   });
 
-  bool get puedeEmitirRecibo => consulta != null && paciente != null;
+  /// Un recibo necesita a quién se le cobró y qué se le cobró. La consulta no
+  /// hace falta: su número vive en la cuenta.
+  bool get puedeEmitirRecibo => paciente != null;
 }
 
 class PreFacturaError extends PreFacturaState {

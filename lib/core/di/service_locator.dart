@@ -1,6 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/core/network/connectivity_check.dart';
+import 'package:salud_dental_clinic_management/core/realtime/fabrica_canales_supabase.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/core/presentation/connectivity_cubit.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/persona_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
@@ -232,6 +234,12 @@ Future<void> init() async {
 
   // --- Red / conectividad ---
   sl.registerLazySingleton<ConnectivityCheck>(() => ConnectivityCheckImpl());
+
+  // Señales de invalidación multiusuario (MU-0). Lazy: los canales se abren
+  // la primera vez que un cubit escucha, siempre con sesión autenticada.
+  sl.registerLazySingleton<SenalesRealtime>(
+    () => SenalesRealtime(fabrica: FabricaCanalesSupabase(sl())),
+  );
   guardConnectivityCheck = () => sl<ConnectivityCheck>().hasConnection;
   sl.registerFactory<ConnectivityCubit>(() => ConnectivityCubit(sl())..start());
 

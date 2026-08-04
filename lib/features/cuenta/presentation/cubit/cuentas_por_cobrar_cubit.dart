@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
@@ -14,8 +18,69 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
   /// filtros, que sólo recortan la lista ya traída.
   Map<String, String> _nombres = const {};
 
-  CuentasPorCobrarCubit(this._repository, this._pacienteRepository)
-    : super(const CuentasPorCobrarInitial());
+  StreamSubscription<void>? _senalCuentas;
+
+  CuentasPorCobrarCubit(
+    this._repository,
+    this._pacienteRepository, {
+    SenalesRealtime? senales,
+  }) : super(const CuentasPorCobrarInitial()) {
+    // El mostrador se entera solo (MU-2): `finalizar_consulta` crea la
+    // pre-factura en otra sesión y la cuenta aparece aquí sin refrescar; un
+    // cobro o una anulación ajenos actualizan saldo y estado.
+    _senalCuentas = senales
+        ?.de(DominioSenal.cuentas)
+        .listen((_) => _refrescarEnSilencio());
+  }
+
+  /// Recarga la lista sin pasar por `Loading` y sin perder lo que el usuario
+  /// tiene entre manos: la búsqueda y los filtros activos se re-aplican sobre
+  /// la lista fresca. Los nombres sólo se piden para los pacientes que aún no
+  /// están en el mapa (una cuenta nueva), no para toda la lista.
+  Future<void> _refrescarEnSilencio() async {
+    final current = state;
+    if (current is! CuentasPorCobrarLoaded ||
+        current is CuentasPorCobrarOperating) {
+      return;
+    }
+    try {
+      final cuentas = await _repository.getCuentasPorCobrar();
+      await _completarNombres(cuentas);
+      final vigente = state;
+      if (isClosed || vigente is! CuentasPorCobrarLoaded) return;
+      _evaluarYEmitir(
+        cuentas: cuentas,
+        query: vigente.searchQuery,
+        estado: vigente.filtroEstado,
+        orden: vigente.orden,
+        rangoCreacion: vigente.rangoCreacion,
+        rangoVencimiento: vigente.rangoVencimiento,
+        soloCuotasVencidas: vigente.soloCuotasVencidas,
+        montoMin: vigente.montoPendienteMin,
+      );
+    } catch (e) {
+      // La lista conserva lo último que sí cargó.
+      AppLog.error('refrescar cuentas por cobrar', e);
+    }
+  }
+
+  Future<void> _completarNombres(List<Cuenta> cuentas) async {
+    final faltantes = {
+      for (final cuenta in cuentas)
+        if (cuenta.pacienteId != null &&
+            !_nombres.containsKey(cuenta.pacienteId))
+          cuenta.pacienteId!,
+    }.toList();
+    if (faltantes.isEmpty) return;
+    final resultado = await _pacienteRepository.getNombresPacientes(faltantes);
+    resultado.fold((_) {}, (nuevos) => _nombres = {..._nombres, ...nuevos});
+  }
+
+  @override
+  Future<void> close() async {
+    await _senalCuentas?.cancel();
+    return super.close();
+  }
 
   Future<void> cargarCuentas() async {
     emit(const CuentasPorCobrarLoading());

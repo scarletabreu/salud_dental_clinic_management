@@ -491,7 +491,9 @@ Future<void> init() async {
   sl.registerFactory(() => GetResumenActividadPlan(sl()));
   sl.registerFactory(() => ResumenPlanCubit(sl()));
   sl.registerFactory<SettingsCubit>(() => SettingsCubit());
-  sl.registerFactory<CajaDiariaCubit>(() => CajaDiariaCubit(sl(), sl()));
+  sl.registerFactory<CajaDiariaCubit>(
+    () => CajaDiariaCubit(sl(), sl(), senales: sl<SenalesRealtime>()),
+  );
   sl.registerFactory<ConsultasListCubit>(
     () => ConsultasListCubit(
       consultaRepository: sl(),
@@ -525,6 +527,7 @@ Future<void> init() async {
     () => CuentasPorCobrarCubit(
       sl<CuentaRepository>(),
       sl<IPacienteRepository>(),
+      senales: sl<SenalesRealtime>(),
     ),
   );
 
@@ -542,6 +545,8 @@ Future<void> init() async {
       consultaRepository: sl(),
       pacienteRepository: sl(),
       cuentaRepository: sl(),
+      cajaRepository: sl<CajaDiariaRepository>(),
+      senales: sl<SenalesRealtime>(),
     ),
   );
 

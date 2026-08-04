@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
@@ -10,12 +11,24 @@ import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/e
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/repositories/movimiento_caja_repository.dart';
 
 class CajaDiariaCubit extends Cubit<CajaDiariaState> {
-  CajaDiariaCubit(this._repository, this._movimientoCajaRepository)
-    : super(const CajaDiariaLoading());
+  CajaDiariaCubit(
+    this._repository,
+    this._movimientoCajaRepository, {
+    SenalesRealtime? senales,
+  }) : super(const CajaDiariaLoading()) {
+    // El sobre también viaja (MU-2): los movimientos ya eran realtime, pero
+    // la apertura y el cierre no. Con la señal de `cajas`, el asistente abre
+    // con su fondo y la pantalla del admin pasa sola de «sin abrir» a
+    // abierta; el cierre se propaga igual.
+    _senalCaja = senales
+        ?.de(DominioSenal.caja)
+        .listen((_) => cargar(silencioso: true));
+  }
 
   final CajaDiariaRepository _repository;
   final MovimientoCajaRepository _movimientoCajaRepository;
   StreamSubscription<List<MovimientoCaja>>? _movimientosSubscription;
+  StreamSubscription<void>? _senalCaja;
   CajaDiaria? _cajaActual;
   List<CajaDiaria> _pendientes = const [];
 
@@ -29,10 +42,13 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
     }
   }
 
-  Future<void> cargar() async {
+  /// [silencioso] refresca sin pasar por `Loading`: lo usa la señal de caja
+  /// para que un cambio ajeno no haga parpadear una pantalla que ya muestra
+  /// datos. Si el refresh silencioso falla, se conserva lo que había.
+  Future<void> cargar({bool silencioso = false}) async {
     await _movimientosSubscription?.cancel();
     _movimientosSubscription = null;
-    emit(const CajaDiariaLoading());
+    if (!silencioso) emit(const CajaDiariaLoading());
 
     try {
       final caja = await _repository.getCajaActual();
@@ -76,11 +92,16 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
         }
       }, onError: (_, _) {});
     } catch (e) {
+      // Un refresh disparado por la señal no puede degradar la pantalla: si
+      // falla, se conserva lo que ya se mostraba.
+      if (silencioso && state is! CajaDiariaLoading) return;
       // Se propaga el motivo real. Un `catch (_)` que siempre decía lo mismo
       // convertía cualquier fallo —permisos, red, una caja de ayer sin
       // cerrar— en el mismo mensaje inútil, y no había forma de averiguar por
       // qué no se podía trabajar con la caja (defecto D13).
-      emit(CajaDiariaError(_mensaje(e, 'No se pudo consultar la caja de hoy.')));
+      emit(
+        CajaDiariaError(_mensaje(e, 'No se pudo consultar la caja de hoy.')),
+      );
     }
   }
 
@@ -202,6 +223,7 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
   @override
   Future<void> close() async {
     await _movimientosSubscription?.cancel();
+    await _senalCaja?.cancel();
     return super.close();
   }
 }

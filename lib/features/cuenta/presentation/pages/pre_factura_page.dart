@@ -73,6 +73,7 @@ class PreFacturaPage extends StatelessWidget {
                   :final consulta,
                   :final paciente,
                   :final errorDatosRecibo,
+                  :final cajaAbierta,
                 ) =>
                   _Contenido(
                     cuenta: cuenta,
@@ -80,6 +81,7 @@ class PreFacturaPage extends StatelessWidget {
                     consulta: consulta,
                     paciente: paciente,
                     errorDatosRecibo: errorDatosRecibo,
+                    cajaAbierta: cajaAbierta,
                   ),
                 PreFacturaError(:final mensaje) => _EstadoError(
                   mensaje: mensaje,
@@ -222,6 +224,7 @@ class _Contenido extends StatefulWidget {
   final Consulta? consulta;
   final Paciente? paciente;
   final String? errorDatosRecibo;
+  final bool? cajaAbierta;
 
   const _Contenido({
     required this.cuenta,
@@ -229,6 +232,7 @@ class _Contenido extends StatefulWidget {
     required this.consulta,
     required this.paciente,
     required this.errorDatosRecibo,
+    required this.cajaAbierta,
   });
 
   @override
@@ -313,6 +317,7 @@ class _ContenidoState extends State<_Contenido> {
           cuenta: cuenta,
           cuotas: widget.cuotas,
           pacienteId: widget.paciente?.id,
+          cajaAbierta: widget.cajaAbierta,
         ),
       ],
     );
@@ -979,10 +984,16 @@ class _Acciones extends StatelessWidget {
   final Cuenta cuenta;
   final List<Cuota> cuotas;
   final String? pacienteId;
+
+  /// `false` = la caja de hoy no está abierta; `null` = no se sabe (rol sin
+  /// lectura de caja) y la pantalla no afirma nada.
+  final bool? cajaAbierta;
+
   const _Acciones({
     required this.cuenta,
     required this.cuotas,
     required this.pacienteId,
+    required this.cajaAbierta,
   });
 
   @override
@@ -1004,8 +1015,39 @@ class _Acciones extends StatelessWidget {
     // clínico facturado y es de quien lo firmó.
     final puedeCobrar = context.watch<AuthCubit>().state.puedeGestionarCaja;
 
+    // Sin caja abierta el trigger de la base va a rechazar el cobro de todas
+    // formas (`tr_validar_pago_caja_abierta`); avisarlo aquí evita teclear el
+    // monto para nada. Cuando alguien abre la caja en otra sesión, la señal
+    // actualiza el estado y el botón se habilita solo (MU-2).
+    final sinCaja = puedeCobrar && cajaAbierta == false;
+
     return Column(
       children: [
+        if (sinCaja) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: ac.bgPage,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ac.divider),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_clock_rounded, size: 18, color: ac.amber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Caja cerrada: abre la caja del día para poder cobrar. '
+                    'En cuanto se abra, este botón se habilita solo.',
+                    style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         if (!puedeCobrar) ...[
           Container(
             width: double.infinity,
@@ -1036,7 +1078,7 @@ class _Acciones extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: FilledButton.icon(
-              onPressed: saldada
+              onPressed: (saldada || sinCaja)
                   ? null
                   : () => _mostrarDialogoPago(
                       context,

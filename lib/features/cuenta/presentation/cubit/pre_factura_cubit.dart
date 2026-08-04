@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart'
@@ -25,6 +30,10 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
   final ConsultaRepository _consultaRepository;
   final IPacienteRepository _pacienteRepository;
   final CuentaRepository _cuentaRepository;
+  final CajaDiariaRepository? _cajaRepository;
+  final SenalesRealtime? _senales;
+  StreamSubscription<void>? _senalCuentas;
+  StreamSubscription<void>? _senalCaja;
   String? _ultimoPagoId;
 
   PreFacturaCubit({
@@ -35,6 +44,8 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
     required ConsultaRepository consultaRepository,
     required IPacienteRepository pacienteRepository,
     required CuentaRepository cuentaRepository,
+    CajaDiariaRepository? cajaRepository,
+    SenalesRealtime? senales,
   }) : _getCuenta = getCuenta,
        _registrarPago = registrarPago,
        _cuotaRepository = cuotaRepository,
@@ -42,6 +53,8 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
        _consultaRepository = consultaRepository,
        _pacienteRepository = pacienteRepository,
        _cuentaRepository = cuentaRepository,
+       _cajaRepository = cajaRepository,
+       _senales = senales,
        super(const PreFacturaInicial());
 
   Pago? get ultimoPagoRegistrado {
@@ -56,56 +69,113 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
   Future<void> cargar(String cuentaId) async {
     emit(const PreFacturaCargando());
     try {
-      final cuenta = await _getCuenta(cuentaId);
-      final cuotas = await _cuotaRepository.getCuotasDeCuenta(cuentaId);
-      Consulta? consulta;
-      Paciente? paciente;
-      String? errorDatosRecibo;
-
-      // La consulta es un extra y se lee aparte, sin poder estropear el recibo.
-      // Recepción no puede leerla —la RLS de consultas es del doctor firmante y
-      // del admin— y antes ese «no» tumbaba también al paciente, así que quien
-      // cobraba se quedaba sin poder imprimir lo que acababa de cobrar.
-      try {
-        consulta = await _consultaRepository.getDetalleConsulta(
-          cuenta.consultaId,
-        );
-      } catch (_) {
-        consulta = null;
-      }
-
-      // El paciente sale de la cuenta, que es de quien cobra; la consulta sólo
-      // se usa como respaldo cuando la cuenta es anterior a `paciente_id`.
-      final pacienteId = cuenta.pacienteId ?? consulta?.pacienteId;
-      if (pacienteId == null) {
-        errorDatosRecibo =
-            'Esta cuenta no tiene paciente asociado: no se puede emitir el '
-            'recibo.';
-      } else {
-        final resultadoPaciente = await _pacienteRepository.getPacienteById(
-          pacienteId,
-        );
-        paciente = resultadoPaciente.fold((failure) {
-          errorDatosRecibo = failure.message;
-          return null;
-        }, (value) => value);
-      }
-
-      emit(
-        PreFacturaCargada(
-          cuenta,
-          cuotas: cuotas,
-          consulta: consulta,
-          paciente: paciente,
-          errorDatosRecibo: errorDatosRecibo,
-        ),
-      );
+      emit(await _cargarDatos(cuentaId));
+      _escucharSenales(cuentaId);
     } catch (e) {
       emit(PreFacturaError('No se pudo cargar la cuenta.\n$e'));
     }
   }
 
+  /// Lo que otras sesiones hacen con esta cuenta llega solo (MU-2): un cobro
+  /// o una anulación ajenos actualizan saldo y estado sin refrescar, y la
+  /// apertura de la caja habilita el cobro sin volver a entrar.
+  void _escucharSenales(String cuentaId) {
+    final senales = _senales;
+    if (senales == null) return;
+    _senalCuentas ??= senales
+        .de(DominioSenal.cuentas)
+        .listen((_) => _refrescarEnSilencio(cuentaId));
+    _senalCaja ??= senales
+        .de(DominioSenal.caja)
+        .listen((_) => _actualizarCajaAbierta());
+  }
+
+  Future<void> _refrescarEnSilencio(String cuentaId) async {
+    if (state is! PreFacturaCargada) return;
+    try {
+      final nuevo = await _cargarDatos(cuentaId);
+      if (!isClosed && state is PreFacturaCargada) emit(nuevo);
+    } catch (e) {
+      // La pantalla conserva lo último que sí cargó.
+      AppLog.error('refrescar la pre-factura', e);
+    }
+  }
+
+  Future<void> _actualizarCajaAbierta() async {
+    final actual = state;
+    if (actual is! PreFacturaCargada) return;
+    final abierta = await _hayCajaAbierta();
+    final vigente = state;
+    if (isClosed || vigente is! PreFacturaCargada) return;
+    emit(vigente.copyWith(cajaAbierta: () => abierta));
+  }
+
+  /// `null` si este rol no puede leer la caja o la consulta falló: en ese
+  /// caso la pantalla no afirma nada y la base sigue siendo la autoridad.
+  Future<bool?> _hayCajaAbierta() async {
+    final repo = _cajaRepository;
+    if (repo == null) return null;
+    try {
+      return await repo.isCajaAbierta();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<PreFacturaCargada> _cargarDatos(String cuentaId) async {
+    final cuenta = await _getCuenta(cuentaId);
+    final cuotas = await _cuotaRepository.getCuotasDeCuenta(cuentaId);
+    Consulta? consulta;
+    Paciente? paciente;
+    String? errorDatosRecibo;
+
+    // La consulta es un extra y se lee aparte, sin poder estropear el recibo.
+    // Recepción no puede leerla —la RLS de consultas es del doctor firmante y
+    // del admin— y antes ese «no» tumbaba también al paciente, así que quien
+    // cobraba se quedaba sin poder imprimir lo que acababa de cobrar.
+    try {
+      consulta = await _consultaRepository.getDetalleConsulta(
+        cuenta.consultaId,
+      );
+    } catch (_) {
+      consulta = null;
+    }
+
+    // El paciente sale de la cuenta, que es de quien cobra; la consulta sólo
+    // se usa como respaldo cuando la cuenta es anterior a `paciente_id`.
+    final pacienteId = cuenta.pacienteId ?? consulta?.pacienteId;
+    if (pacienteId == null) {
+      errorDatosRecibo =
+          'Esta cuenta no tiene paciente asociado: no se puede emitir el '
+          'recibo.';
+    } else {
+      final resultadoPaciente = await _pacienteRepository.getPacienteById(
+        pacienteId,
+      );
+      paciente = resultadoPaciente.fold((failure) {
+        errorDatosRecibo = failure.message;
+        return null;
+      }, (value) => value);
+    }
+
+    return PreFacturaCargada(
+      cuenta,
+      cuotas: cuotas,
+      consulta: consulta,
+      paciente: paciente,
+      errorDatosRecibo: errorDatosRecibo,
+      cajaAbierta: await _hayCajaAbierta(),
+    );
+  }
+
   Future<void> recargar(String cuentaId) => cargar(cuentaId);
+
+  @override
+  Future<void> close() async {
+    await _senalCuentas?.cancel();
+    await _senalCaja?.cancel();
+    return super.close();
+  }
 
   /// Registra un cobro sobre la cuenta actualmente cargada y la recarga para
   /// reflejar el nuevo saldo y estado. Devuelve `null` si el cobro fue exitoso o

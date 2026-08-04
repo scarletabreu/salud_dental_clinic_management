@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
 import 'package:salud_dental_clinic_management/core/data/datasources/supabase_storage_helper.dart';
 import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
@@ -13,6 +14,8 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_detalle_cubit.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/widgets/odontograma_tratamientos_detalle.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/documento_clinico/domain/entities/documento_clinico.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/enums/genero.dart';
@@ -970,6 +973,10 @@ class ConsultaDetallePage extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
+              if (facturada && consulta.id != null) ...[
+                const SizedBox(height: 14),
+                _AbrirCuentaDeLaConsulta(consultaId: consulta.id!),
+              ],
             ],
           ),
         );
@@ -1253,6 +1260,90 @@ class ConsultaDetallePage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Puente de la consulta a su cuenta.
+///
+/// El detalle de cuenta sólo se alcanzaba desde la ficha del paciente, así que
+/// para ver qué se le facturó a la consulta que se está mirando había que
+/// salir, buscar al paciente y volver a entrar. La cuenta se resuelve al
+/// pulsar y no al pintar la tarjeta: es una lectura más por consulta abierta, y
+/// la mayoría de las veces nadie la pide.
+class _AbrirCuentaDeLaConsulta extends StatefulWidget {
+  const _AbrirCuentaDeLaConsulta({required this.consultaId});
+
+  final String consultaId;
+
+  @override
+  State<_AbrirCuentaDeLaConsulta> createState() =>
+      _AbrirCuentaDeLaConsultaState();
+}
+
+class _AbrirCuentaDeLaConsultaState extends State<_AbrirCuentaDeLaConsulta> {
+  bool _buscando = false;
+
+  Future<void> _abrir() async {
+    setState(() => _buscando = true);
+    try {
+      final cuenta = await sl<CuentaRepository>().getCuentaByConsultaId(
+        widget.consultaId,
+      );
+      if (!mounted) return;
+      final cuentaId = cuenta?.id;
+      if (cuentaId == null) {
+        _avisar('Esta consulta todavía no tiene una cuenta creada.');
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PreFacturaPage(cuentaId: cuentaId),
+        ),
+      );
+    } on Failure catch (e) {
+      if (mounted) _avisar(e.message);
+    } catch (_) {
+      if (mounted) _avisar('No se pudo abrir la cuenta de esta consulta.');
+    } finally {
+      if (mounted) setState(() => _buscando = false);
+    }
+  }
+
+  void _avisar(String mensaje) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(mensaje)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return SizedBox(
+      width: double.infinity,
+      height: 44,
+      child: OutlinedButton.icon(
+        key: const Key('abrir_cuenta_de_la_consulta'),
+        onPressed: _buscando ? null : _abrir,
+        icon: _buscando
+            ? SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ac.textMuted,
+                ),
+              )
+            : const Icon(Icons.receipt_long_rounded, size: 18),
+        label: Text(_buscando ? 'Abriendo…' : 'Ver detalle de la cuenta'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: ac.primaryGreen,
+          side: BorderSide(color: ac.divider),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
   }

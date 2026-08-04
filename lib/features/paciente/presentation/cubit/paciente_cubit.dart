@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 import 'package:salud_dental_clinic_management/features/cita/domain/repositories/cita_repository.dart';
@@ -16,12 +17,27 @@ class PacienteCubit extends Cubit<PacienteState> {
   final IPacienteRepository _repository;
   final ConsultaRepository _consultaRepository;
   final CitaRepository _citaRepository;
+  StreamSubscription<void>? _senalPacientes;
+
+  /// Búsqueda activa del directorio. Vive aquí y no en el estado porque debe
+  /// sobrevivir a las recargas: si el doctor tiene «Gómez» tecleado cuando el
+  /// asistente crea una persona, la lista fresca se re-filtra con «Gómez» en
+  /// vez de resetear la pantalla (MU-3).
+  String _busqueda = '';
 
   PacienteCubit(
     this._repository,
     this._consultaRepository,
-    this._citaRepository,
-  ) : super(const PacienteLoading());
+    this._citaRepository, {
+    SenalesRealtime? senales,
+  }) : super(const PacienteLoading()) {
+    // Mecanismo B a propósito: la lista es grande y el cubit ya carga y
+    // filtra bien; la señal sólo dice «recarga». El eco propio es inocuo:
+    // quien crea ya recarga por su flujo y el debounce absorbe el resto.
+    _senalPacientes = senales
+        ?.de(DominioSenal.pacientes)
+        .listen((_) => _refrescarDirectorio());
+  }
 
   Future<void> load() async {
     emit(const PacienteLoading());
@@ -29,8 +45,42 @@ class PacienteCubit extends Cubit<PacienteState> {
 
     result.fold(
       (failure) => emit(PacienteError(failure.message)),
-      (list) => emit(PacienteLoaded(todos: list, filtrados: list)),
+      (list) => emit(
+        PacienteLoaded(todos: list, filtrados: _filtrar(list, _busqueda)),
+      ),
     );
+  }
+
+  /// Recarga silenciosa por señal: sólo cuando el directorio está en
+  /// pantalla. El detalle de un paciente abierto no se pisa, y un fallo deja
+  /// la lista como estaba (degradación = comportamiento previo).
+  Future<void> _refrescarDirectorio() async {
+    if (state is! PacienteLoaded) return;
+    final result = await _repository.getPacientes();
+    final vigente = state;
+    if (isClosed || vigente is! PacienteLoaded) return;
+    result.fold(
+      (failure) =>
+          AppLog.error('refrescar el directorio de pacientes', failure),
+      (list) => emit(
+        PacienteLoaded(todos: list, filtrados: _filtrar(list, _busqueda)),
+      ),
+    );
+  }
+
+  List<Paciente> _filtrar(List<Paciente> pacientes, String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return pacientes;
+    return pacientes.where((p) {
+      return p.fullName.toLowerCase().contains(q) ||
+          p.govID.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  @override
+  Future<void> close() async {
+    await _senalPacientes?.cancel();
+    return super.close();
   }
 
   Future<void> loadById(String id) async {
@@ -98,22 +148,16 @@ class PacienteCubit extends Cubit<PacienteState> {
   }
 
   void search(String query) {
+    _busqueda = query;
     final current = state;
     if (current is! PacienteLoaded) return;
 
-    final q = query.toLowerCase().trim();
-
-    if (q.isEmpty) {
-      emit(PacienteLoaded(todos: current.todos, filtrados: current.todos));
-      return;
-    }
-
-    final filtrados = current.todos.where((p) {
-      return p.fullName.toLowerCase().contains(q) ||
-          p.govID.toLowerCase().contains(q);
-    }).toList();
-
-    emit(PacienteLoaded(todos: current.todos, filtrados: filtrados));
+    emit(
+      PacienteLoaded(
+        todos: current.todos,
+        filtrados: _filtrar(current.todos, query),
+      ),
+    );
   }
 
   Future<void> addPaciente(Paciente paciente) async {

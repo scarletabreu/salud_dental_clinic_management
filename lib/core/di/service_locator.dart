@@ -466,7 +466,9 @@ Future<void> init() async {
   sl.registerSingleton<AuthSessionCubit>(AuthSessionCubit(sl())..initialize());
 
   // ── Cubits ───────────────────────────────────────────────────────────────
-  sl.registerFactory<PacienteCubit>(() => PacienteCubit(sl(), sl(), sl()));
+  sl.registerFactory<PacienteCubit>(
+    () => PacienteCubit(sl(), sl(), sl(), senales: sl<SenalesRealtime>()),
+  );
   sl.registerFactory<CitaCubit>(
     () => CitaCubit(sl(), sl<ConsultaAbiertaLookup>()),
   );

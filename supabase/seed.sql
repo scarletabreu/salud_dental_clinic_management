@@ -5,6 +5,8 @@
 --  SD-119 · Un día de caja completo, para poder abrir la app y ver la pantalla
 --  de caja con movimientos reales sin tener que cobrar a mano:
 --
+--    · Anteayer → caja ABIERTA que nadie cuadró: el arqueo pendiente de
+--                 SD-170. Esperado = 3000 + 7200 - 900 = RD$ 9300.00
 --    · Ayer  → caja CERRADA con un faltante de RD$ 120.00 (el caso que la
 --              clínica necesita ver bien pintado en el reporte de cierre).
 --    · Hoy   → caja ABIERTA con ingresos y egresos mezclados.
@@ -23,6 +25,7 @@ do $seed$
 declare
   v_zona constant text := 'America/Santo_Domingo';
   v_hoy  constant date := (now() at time zone v_zona)::date;
+  v_caja_anteayer uuid;
   v_caja_ayer uuid;
   v_caja_hoy  uuid;
 begin
@@ -33,6 +36,27 @@ begin
     raise notice 'SD-119 seed: ya hay una caja para hoy, no se inserta nada.';
     return;
   end if;
+
+  -- --------------------------------------------------------------------------
+  -- Anteayer: la jornada que nadie cuadró. Queda ABIERTA a propósito — es el
+  -- arqueo pendiente que la pantalla de caja tiene que ofrecer cerrar (SD-170).
+  -- Sin este fixture el flujo no se puede probar ni a mano ni por E2E: desde
+  -- `audit_002` la unicidad es por día civil, así que convive sin problema con
+  -- la caja abierta de hoy.
+  --   Esperado = 3000 + (5200 + 2000) - 900 = 9300.00
+  -- --------------------------------------------------------------------------
+  insert into public.cajas (
+    fecha, monto_apertura, monto_esperado, monto_real, monto_cierre, cerrada
+  ) values (
+    (v_hoy - 2)::timestamptz + time '08:30',
+    3000, 3000, 0, 0, false
+  ) returning id into v_caja_anteayer;
+
+  insert into public.movimientos_caja (caja_diaria_id, tipo, monto, descripcion, fecha)
+  values
+    (v_caja_anteayer, 'ingreso', 5200.00, 'Cobro de dos resinas',        (v_hoy - 2)::timestamptz + time '10:40'),
+    (v_caja_anteayer, 'ingreso', 2000.00, 'Abono a plan de cuotas',      (v_hoy - 2)::timestamptz + time '14:10'),
+    (v_caja_anteayer, 'egreso',   900.00, 'Compra de guantes y gasas',   (v_hoy - 2)::timestamptz + time '16:25');
 
   -- --------------------------------------------------------------------------
   -- Ayer: jornada cerrada con faltante. Apertura 5000, ingresos 12 300,
@@ -62,8 +86,9 @@ begin
    where id = v_caja_ayer;
 
   -- --------------------------------------------------------------------------
-  -- Hoy: jornada abierta. Sólo puede haber una caja con `cerrada = false`
-  -- (índice único `cajas_una_abierta_idx`), por eso la de ayer va cerrada.
+  -- Hoy: jornada abierta. La unicidad de caja abierta es por día civil
+  -- (`cajas_una_abierta_por_dia_idx`, audit_002), así que convive con el
+  -- arqueo pendiente de anteayer.
   -- --------------------------------------------------------------------------
   insert into public.cajas (
     fecha, monto_apertura, monto_esperado, monto_real, monto_cierre, cerrada
@@ -81,7 +106,7 @@ begin
     (v_caja_hoy, 'ingreso',  2400.25, 'Abono a plan de cuotas',                   v_hoy::timestamptz + time '16:30');
 
   raise notice
-    'SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).';
+    'SD-119 seed: arqueo pendiente de anteayer (esperado 9300.00), caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).';
 end;
 $seed$;
 

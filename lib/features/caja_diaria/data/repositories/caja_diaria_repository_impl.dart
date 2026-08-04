@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
@@ -20,11 +21,36 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
   }
 
   @override
-  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() {
+  Future<List<ArqueoPendiente>> getArqueosPendientes() {
     return runGuarded(() async {
       final filas = await remoteDataSource.fetchCajasSinCerrarDeOtrosDias();
-      return filas.map(CajaDiariaModel.fromJson).toList();
-    }, context: 'buscar cajas sin cerrar de días anteriores');
+      final cajas = filas
+          .map(CajaDiariaModel.fromJson)
+          .where((caja) => caja.id != null)
+          .toList();
+      if (cajas.isEmpty) return const <ArqueoPendiente>[];
+
+      // Una sola consulta para todos los arqueos. Son pocos, pero pedirlos de
+      // a uno convertiría cada refresco de la pantalla de caja en N viajes.
+      final movimientos = await remoteDataSource.fetchMovimientosDeCajas([
+        for (final caja in cajas) caja.id!,
+      ]);
+
+      final porCaja = <String, List<MovimientoCaja>>{};
+      for (final fila in movimientos) {
+        final movimiento = MovimientoCajaModel.fromJson(fila);
+        porCaja.putIfAbsent(movimiento.cajaDiariaId, () => []).add(movimiento);
+      }
+
+      return [
+        for (final caja in cajas)
+          ArqueoPendiente(
+            id: caja.id!,
+            caja: caja,
+            movimientos: porCaja[caja.id] ?? const [],
+          ),
+      ];
+    }, context: 'buscar los arqueos pendientes');
   }
 
   @override
@@ -62,6 +88,25 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
       };
       await remoteDataSource.cerrarCaja(datosCierre);
     }, context: 'cerrar la caja');
+  }
+
+  @override
+  Future<void> cerrarArqueoPendiente({
+    required String cajaId,
+    required double montoReal,
+    String? observaciones,
+  }) {
+    return runGuarded(() async {
+      // El esperado sale de los movimientos de *esa* caja, no de los de hoy ni
+      // del número que la pantalla tenía cargado cuando se abrió el aviso.
+      final montoEsperado = await remoteDataSource.getBalanceDeCaja(cajaId);
+      await remoteDataSource.cerrarCajaPorId(cajaId, {
+        'monto_real': montoReal,
+        'monto_cierre': montoReal,
+        'monto_esperado': montoEsperado,
+        'observaciones': observaciones ?? 'Arqueo cerrado en diferido.',
+      });
+    }, context: 'cerrar el arqueo pendiente');
   }
 
   @override

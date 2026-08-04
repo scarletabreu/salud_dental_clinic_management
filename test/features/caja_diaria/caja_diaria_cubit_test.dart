@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/models/caja_diaria_model.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -21,7 +22,14 @@ class _MovimientoRepositoryFake implements MovimientoCajaRepository {
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
   @override
-  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+  Future<List<ArqueoPendiente>> getArqueosPendientes() async => const [];
+
+  @override
+  Future<void> cerrarArqueoPendiente({
+    required String cajaId,
+    required double montoReal,
+    String? observaciones,
+  }) async {}
 
   CajaDiaria? caja;
   final movimientos = StreamController<List<MovimientoCaja>>.broadcast();

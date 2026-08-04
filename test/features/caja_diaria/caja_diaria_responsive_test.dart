@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -22,13 +23,31 @@ class _MovimientoRepositoryFake implements MovimientoCajaRepository {
 }
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
-  @override
-  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
-
-  _CajaRepositoryFake({this.caja});
+  _CajaRepositoryFake({this.caja, List<ArqueoPendiente>? pendientes})
+    : pendientes = pendientes ?? [];
 
   CajaDiaria? caja;
+  final List<ArqueoPendiente> pendientes;
+  final List<Map<String, Object?>> arqueosCerrados = [];
   final movimientos = StreamController<List<MovimientoCaja>>.broadcast();
+
+  @override
+  Future<List<ArqueoPendiente>> getArqueosPendientes() async =>
+      List.of(pendientes);
+
+  @override
+  Future<void> cerrarArqueoPendiente({
+    required String cajaId,
+    required double montoReal,
+    String? observaciones,
+  }) async {
+    arqueosCerrados.add({
+      'cajaId': cajaId,
+      'montoReal': montoReal,
+      'observaciones': observaciones,
+    });
+    pendientes.removeWhere((arqueo) => arqueo.id == cajaId);
+  }
 
   @override
   Future<void> abrirCaja(double montoApertura) async {
@@ -182,5 +201,133 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  group('arqueo pendiente de días anteriores', () {
+    ArqueoPendiente arqueoDeAnteayer() => ArqueoPendiente(
+      id: 'caja-anteayer',
+      caja: CajaDiaria(
+        id: 'caja-anteayer',
+        fecha: DateTime.now().subtract(const Duration(days: 2)),
+        montoApertura: 3000,
+        montoCierre: 0,
+        montoEsperado: 3000,
+        montoReal: 0,
+      ),
+      movimientos: [
+        MovimientoCaja(
+          cajaDiariaId: 'caja-anteayer',
+          tipo: TipoMovimiento.ingreso,
+          monto: 7200,
+          descripcion: 'Cobro de dos resinas',
+          fecha: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+        MovimientoCaja(
+          cajaDiariaId: 'caja-anteayer',
+          tipo: TipoMovimiento.egreso,
+          monto: 900,
+          descripcion: 'Compra de guantes y gasas',
+          fecha: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+      ],
+    );
+
+    testWidgets('el aviso ofrece cerrarlo y muestra lo que debería tener', (
+      tester,
+    ) async {
+      _viewport(tester, const Size(1280, 800));
+      final repositorio = _CajaRepositoryFake(
+        pendientes: [arqueoDeAnteayer()],
+      );
+
+      await tester.pumpWidget(_app(repositorio));
+      await tester.pumpAndSettle();
+
+      // 3000 + 7200 - 900 = 9300. El aviso ya no es sólo una fecha.
+      expect(find.textContaining('9,300.00'), findsOneWidget);
+      expect(find.text('Cerrar arqueo'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('la hoja muestra el desglose antes de pedir el conteo', (
+      tester,
+    ) async {
+      _viewport(tester, const Size(1280, 800));
+      final repositorio = _CajaRepositoryFake(
+        pendientes: [arqueoDeAnteayer()],
+      );
+
+      await tester.pumpWidget(_app(repositorio));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar arqueo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fondo de apertura'), findsOneWidget);
+      expect(find.text('Debería haber en caja'), findsOneWidget);
+      expect(find.text('Ver los 2 movimientos'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('un conteo que no cuadra no se cierra sin nota', (
+      tester,
+    ) async {
+      _viewport(tester, const Size(1280, 900));
+      final repositorio = _CajaRepositoryFake(
+        pendientes: [arqueoDeAnteayer()],
+      );
+
+      await tester.pumpWidget(_app(repositorio));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar arqueo'));
+      await tester.pumpAndSettle();
+
+      // La página de fondo (caja sin abrir) también tiene un campo de monto:
+      // el conteo hay que escribirlo en el de la hoja, no en el de la apertura.
+      final monto = find
+          .descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextFormField),
+          )
+          .first;
+      await tester.enterText(monto, '8900');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Faltan'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirmar cierre'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repositorio.arqueosCerrados,
+        isEmpty,
+        reason: 'sin nota, un arqueo descuadrado no se puede cerrar',
+      );
+      expect(find.textContaining('Explica la diferencia'), findsOneWidget);
+    });
+
+    testWidgets('con el conteo cuadrado el arqueo se cierra', (tester) async {
+      _viewport(tester, const Size(1280, 900));
+      final repositorio = _CajaRepositoryFake(
+        pendientes: [arqueoDeAnteayer()],
+      );
+
+      await tester.pumpWidget(_app(repositorio));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar arqueo'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirmar cierre'));
+      // Sin `pumpAndSettle`: al cerrar se abre el reporte, cuya vista previa de
+      // PDF se repinta sin parar y nunca deja quieto el árbol.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(repositorio.arqueosCerrados, hasLength(1));
+      expect(repositorio.arqueosCerrados.single['cajaId'], 'caja-anteayer');
+      expect(repositorio.arqueosCerrados.single['montoReal'], 9300.0);
+    });
   });
 }

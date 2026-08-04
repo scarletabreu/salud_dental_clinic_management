@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/datasources/caja_diaria_datasource.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/data/repositories/caja_diaria_repository_impl.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
@@ -51,13 +52,32 @@ class _FakeDatasource implements CajaDiariaDatasource {
       (cajaAbierta?['monto_apertura'] as num?)?.toDouble() ?? 0;
 
   @override
+  Future<double> getBalanceDeCaja(String cajaId) async => getBalanceActual();
+
+  @override
   Future<void> cerrarCaja(Map<String, dynamic> datosCierre) async {
     cierres.add(datosCierre);
     cajaAbierta = null;
   }
 
   @override
+  Future<void> cerrarCajaPorId(
+    String cajaId,
+    Map<String, dynamic> datosCierre,
+  ) async => cerrarCaja(datosCierre);
+
+  @override
   Future<List<Map<String, dynamic>>> fetchMovimientosDelDia() async => [];
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMovimientosDeCaja(
+    String cajaId,
+  ) async => const [];
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMovimientosDeCajas(
+    List<String> cajaIds,
+  ) async => const [];
 
   @override
   Future<void> registrarMovimiento(Map<String, dynamic> movimientoData) async {}
@@ -69,7 +89,14 @@ class _FakeDatasource implements CajaDiariaDatasource {
 
 class _FakeCajaRepository implements CajaDiariaRepository {
   @override
-  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+  Future<List<ArqueoPendiente>> getArqueosPendientes() async => const [];
+
+  @override
+  Future<void> cerrarArqueoPendiente({
+    required String cajaId,
+    required double montoReal,
+    String? observaciones,
+  }) async {}
 
   CajaDiaria? caja;
   final movimientos = StreamController<List<MovimientoCaja>>.broadcast();

@@ -53,6 +53,22 @@ class SeccionPlanTratamiento extends StatelessWidget {
   /// que ya usa el odontograma en vez de duplicarlo.
   final Future<Tratamiento?> Function() onElegirTratamiento;
 
+  /// Registra la ejecución de una actividad del plan.
+  ///
+  /// La sección vive dentro del workspace clínico, así que la ejecución tiene
+  /// que entrar por el mismo sitio que todo lo demás de la consulta: el
+  /// `ConsultaCubit`. Antes esta pantalla insertaba directo en
+  /// `tratamientos_aplicados` y el siguiente autoguardado anulaba la fila —el
+  /// contrato del payload es «lo que no viene, se anula»—, así que el
+  /// procedimiento desaparecía del expediente y no se cobraba (F1-01).
+  final Future<void> Function(
+    ItemPlanTratamiento item,
+    EstadoItemPlan destino,
+    double cantidadRealizada,
+    String? notas,
+  )
+  onEjecutarActividad;
+
   const SeccionPlanTratamiento({
     super.key,
     required this.dientes,
@@ -60,6 +76,7 @@ class SeccionPlanTratamiento extends StatelessWidget {
     required this.doctorId,
     required this.consultaId,
     required this.onElegirTratamiento,
+    required this.onEjecutarActividad,
     this.evaluacionId,
   });
 
@@ -213,8 +230,7 @@ class SeccionPlanTratamiento extends StatelessWidget {
                   item: item,
                   habilitado: !cargado.guardando,
                   fdiCode: _fdiDe(item.dienteId),
-                  consultaId: consultaId,
-                  doctorId: doctorId,
+                  onEjecutar: onEjecutarActividad,
                 ),
               const SizedBox(height: 14),
               _ResumenPlan(plan: plan!, habilitado: !cargado.guardando),
@@ -330,15 +346,19 @@ class _FilaActividad extends StatelessWidget {
   final ItemPlanTratamiento item;
   final bool habilitado;
   final int? fdiCode;
-  final String consultaId;
-  final String doctorId;
+  final Future<void> Function(
+    ItemPlanTratamiento item,
+    EstadoItemPlan destino,
+    double cantidadRealizada,
+    String? notas,
+  )
+  onEjecutar;
 
   const _FilaActividad({
     required this.item,
     required this.habilitado,
+    required this.onEjecutar,
     this.fdiCode,
-    required this.consultaId,
-    required this.doctorId,
   });
 
   String get _descripcion {
@@ -438,18 +458,13 @@ class _FilaActividad extends StatelessWidget {
 
     // Ejecutar (no solo etiquetar) es lo que genera el cargo real (SD-135 /
     // ticket de sesiones): se pide cantidad y notas antes de tocar el estado.
+    // La ejecución la registra el workspace a través del `ConsultaCubit`, que es
+    // quien manda el conjunto completo al servidor.
     if (destino == EstadoItemPlan.enProceso ||
         destino == EstadoItemPlan.completado) {
       final datos = await _pedirDatosEjecucion(context);
       if (datos == null) return;
-      await cubit.registrarEjecucion(
-        item,
-        destinoEstado: destino,
-        cantidadRealizada: datos.cantidad,
-        consultaId: consultaId,
-        doctorId: doctorId,
-        notas: datos.notas,
-      );
+      await onEjecutar(item, destino, datos.cantidad, datos.notas);
       return;
     }
 

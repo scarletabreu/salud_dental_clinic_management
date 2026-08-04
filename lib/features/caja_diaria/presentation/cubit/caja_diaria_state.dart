@@ -11,16 +11,28 @@ class CajaDiariaLoading extends CajaDiariaState {
 }
 
 class CajaDiariaSinAbrir extends CajaDiariaState {
-  const CajaDiariaSinAbrir({this.error});
+  const CajaDiariaSinAbrir({this.error, this.pendientes = const []});
 
   final String? error;
+
+  /// Cajas de días anteriores que quedaron sin cerrar.
+  final List<CajaDiaria> pendientes;
 }
 
 class CajaDiariaAbierta extends CajaDiariaState {
-  const CajaDiariaAbierta({required this.caja, this.movimientos = const []});
+  const CajaDiariaAbierta({
+    required this.caja,
+    this.movimientos = const [],
+    this.pendientes = const [],
+  });
 
   final CajaDiaria caja;
   final List<MovimientoCaja> movimientos;
+
+  /// Cajas de días anteriores que quedaron sin cerrar. Ya no impiden cobrar
+  /// —la unicidad pasó a ser por día civil—, pero siguen siendo un arqueo
+  /// pendiente que alguien debe cerrar.
+  final List<CajaDiaria> pendientes;
 
   double get ingresos => BalanceCaja.ingresos(movimientos);
 

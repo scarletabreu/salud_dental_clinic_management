@@ -43,7 +43,7 @@ class OdontogramaRepositoryImpl implements OdontogramaRepository {
       );
 
       final data = model.toJson();
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
       await remoteDataSource.actualizarOdontograma(data);
     }, context: 'guardar los cambios del odontograma');

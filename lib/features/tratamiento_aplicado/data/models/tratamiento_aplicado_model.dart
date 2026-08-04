@@ -93,7 +93,7 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'item_plan_id': itemPlanId,
       'justificacion_no_planificada': justificacionNoPlanificada,
       'doctor_ejecuta_id': doctorEjecutaId,
-      'fecha_ejecucion': fechaEjecucion?.toIso8601String(),
+      'fecha_ejecucion': fechaEjecucion?.toUtc().toIso8601String(),
       'cantidad_realizada': cantidadRealizada,
     };
 

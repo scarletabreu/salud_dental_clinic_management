@@ -498,11 +498,14 @@ do $$
 declare
   v_cita uuid;
 begin
+  -- La cita de la llegada es de HOY, no del día base del resto del fichero:
+  -- desde `audit_005` `registrar_llegada_cita` rechaza registrar la llegada de
+  -- una cita de otro día (§1.5 del audit del 2 ago 2026).
   insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, estado)
   values (
     current_setting('hfx004.paciente')::uuid,
     current_setting('hfx004.doc_a')::uuid,
-    current_setting('hfx004.base')::timestamptz + interval '10 hours',
+    now(),
     30, 'confirmada'
   )
   returning id into v_cita;

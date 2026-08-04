@@ -227,7 +227,7 @@ class PacienteRemoteDatasource {
   }
 
   Future<void> deletePaciente(String id) async {
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     await client
         .from('pacientes')
         .update({'deleted_at': now, 'updated_at': now})
@@ -271,7 +271,7 @@ class PacienteRemoteDatasource {
       return pacienteModel.copyWithModel(record: record);
     }
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     await client.from('pacientes').insert({
       'id': normalizedId,
       'genero': Genero.otro.name,

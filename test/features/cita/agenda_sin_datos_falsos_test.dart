@@ -34,7 +34,7 @@ class _DataSourceDoble extends Fake implements CitaRemoteDataSource {
   final List<(String, EstadoCita)> estadosEscritos = [];
 
   @override
-  Future<List<CitaModel>> fetchCitas() async {
+  Future<List<CitaModel>> fetchCitas({DateTime? desde, DateTime? hasta}) async {
     if (errorAlLeer != null) throw errorAlLeer!;
     return citas;
   }

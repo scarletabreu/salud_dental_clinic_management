@@ -34,8 +34,8 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
     Map<String, dynamic> condicionData,
   ) async {
     condicionData.remove('id');
-    condicionData['created_at'] = DateTime.now().toIso8601String();
-    condicionData['updated_at'] = DateTime.now().toIso8601String();
+    condicionData['created_at'] = DateTime.now().toUtc().toIso8601String();
+    condicionData['updated_at'] = DateTime.now().toUtc().toIso8601String();
     final inserted = await supabaseClient
         .from('condiciones')
         .insert(condicionData)
@@ -49,8 +49,8 @@ class CondicionRemoteDatasourceImpl implements CondicionRemoteDatasource {
     await supabaseClient
         .from('condiciones')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

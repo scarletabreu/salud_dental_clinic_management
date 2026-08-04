@@ -6,6 +6,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/resumen_cierre_page.dart';
@@ -89,24 +90,86 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
       backgroundColor: ac.bgPage,
       body: SafeArea(
         child: BlocBuilder<CajaDiariaCubit, CajaDiariaState>(
-          builder: (context, state) => switch (state) {
-            CajaDiariaLoading() => const Center(
-              child: CircularProgressIndicator(),
-            ),
-            CajaDiariaSinAbrir() => _AperturaView(
-              formKey: _formKey,
-              montoController: _montoController,
-              abriendo: _abriendo,
-              error: state.error,
-              onConfirmar: _confirmarApertura,
-            ),
-            CajaDiariaAbierta() => _CajaAbiertaView(state: state),
-            CajaDiariaError() => _ErrorView(
-              mensaje: state.mensaje,
-              onRetry: () => context.read<CajaDiariaCubit>().cargar(),
-            ),
-          },
+          builder: (context, state) => Column(
+            children: [
+              _AvisoCajasPendientes(
+                pendientes: switch (state) {
+                  CajaDiariaSinAbrir() => state.pendientes,
+                  CajaDiariaAbierta() => state.pendientes,
+                  _ => const [],
+                },
+              ),
+              Expanded(
+                child: switch (state) {
+                  CajaDiariaLoading() => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  CajaDiariaSinAbrir() => _AperturaView(
+                    formKey: _formKey,
+                    montoController: _montoController,
+                    abriendo: _abriendo,
+                    error: state.error,
+                    onConfirmar: _confirmarApertura,
+                  ),
+                  CajaDiariaAbierta() => _CajaAbiertaView(state: state),
+                  CajaDiariaError() => _ErrorView(
+                    mensaje: state.mensaje,
+                    onRetry: () => context.read<CajaDiariaCubit>().cargar(),
+                  ),
+                },
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Arqueos de días anteriores que nadie cerró.
+///
+/// Desde `audit_002` ya no bloquean el trabajo de hoy —la unicidad de caja
+/// abierta pasó a ser por día civil—, pero siguen siendo dinero sin cuadrar.
+/// Antes la pantalla mostraba directamente el saldo de esa caja como si fuera
+/// la de hoy, y al cobrar la base respondía que no había caja abierta.
+class _AvisoCajasPendientes extends StatelessWidget {
+  const _AvisoCajasPendientes({required this.pendientes});
+
+  final List<CajaDiaria> pendientes;
+
+  @override
+  Widget build(BuildContext context) {
+    if (pendientes.isEmpty) return const SizedBox.shrink();
+    final ac = context.appColors;
+    final fechas = pendientes
+        .map((caja) => fechaCortaEs(caja.fecha))
+        .join(', ');
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ac.amber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ac.amber.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_toggle_off_rounded, color: ac.amber, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              pendientes.length == 1
+                  ? 'La caja del $fechas quedó sin cerrar. Puedes trabajar '
+                        'normalmente hoy, pero ese arqueo sigue pendiente.'
+                  : 'Hay ${pendientes.length} cajas sin cerrar ($fechas). '
+                        'Puedes trabajar normalmente hoy, pero esos arqueos '
+                        'siguen pendientes.',
+              style: TextStyle(color: ac.textSecondary, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }

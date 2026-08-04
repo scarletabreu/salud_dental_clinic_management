@@ -34,7 +34,7 @@ class ConsumibleCompraRemoteDatasourceImpl
       consumibleData.remove('id');
     }
 
-    consumibleData['updated_at'] = DateTime.now().toIso8601String();
+    consumibleData['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('consumibles_compra').upsert(consumibleData);
   }
 
@@ -43,8 +43,8 @@ class ConsumibleCompraRemoteDatasourceImpl
     await supabaseClient
         .from('consumibles_compra')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

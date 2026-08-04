@@ -2,8 +2,9 @@ abstract class ConsumibleRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchConsumibles();
   Future<void> deleteConsumible(String id);
   Future<void> createConsumible(Map<String, dynamic> data);
+  /// [data] sólo puede traer columnas con grant de UPDATE: `stock_actual` y
+  /// `estado` no lo tienen y su presencia rechaza la petición entera (`42501`).
   Future<void> updateConsumible(String id, Map<String, dynamic> data);
-  Future<void> upsertConsumible(Map<String, dynamic> data);
 
   /// Mueve el stock a [nuevoStock] dejando el asiento correspondiente.
   ///

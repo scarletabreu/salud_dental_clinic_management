@@ -20,7 +20,7 @@ class SuplidorRemoteDatasourceImpl implements SuplidorRemoteDatasource {
   @override
   Future<void> upsertSuplidor(Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('suplidores').upsert(data);
   }
 
@@ -28,7 +28,7 @@ class SuplidorRemoteDatasourceImpl implements SuplidorRemoteDatasource {
   Future<void> createSuplidor(Map<String, dynamic> data) async {
     data.remove('id');
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -38,7 +38,7 @@ class SuplidorRemoteDatasourceImpl implements SuplidorRemoteDatasource {
   @override
   Future<void> updateSuplidor(String id, Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabaseClient.from('suplidores').update(data).eq('id', id);
   }
@@ -47,7 +47,7 @@ class SuplidorRemoteDatasourceImpl implements SuplidorRemoteDatasource {
   Future<void> softDeleteSuplidor(String id) async {
     await supabaseClient
         .from('suplidores')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
         .eq('id', id);
   }
 }

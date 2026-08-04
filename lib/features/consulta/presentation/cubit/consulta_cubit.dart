@@ -76,8 +76,17 @@ class ConsultaCubit extends Cubit<ConsultaState> {
 
   static const esperaAutoguardado = Duration(seconds: 3);
 
+  /// Cuánto se espera antes de reintentar un guardado que falló por red o por
+  /// un fallo del servidor. Más largo que [esperaAutoguardado]: reintentar cada
+  /// tres segundos contra una red caída sólo gasta batería.
+  static const esperaReintento = Duration(seconds: 10);
+
   Timer? _autoguardado;
-  bool _guardando = false;
+
+  /// El guardado que sigue viajando, si lo hay. Quien necesite el estado
+  /// consolidado —el cierre, el abandono de la pantalla— lo espera en vez de
+  /// sondear un booleano.
+  Future<void>? _guardadoEnVuelo;
 
   /// Identifica el intento lógico de cierre en curso. Se conserva mientras el
   /// cierre no se confirme: si la respuesta se perdió por red, reintentar con
@@ -128,7 +137,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     );
     final odonto = sellada.odontograma;
     if (odonto == null || confirmado.sinIdentidades) {
-      return _sellarRecetas(sellada, enviada, confirmado.recetaIds);
+      return _sellarRecetas(sellada, enviada, confirmado);
     }
 
     final enviadaPorFdi = {
@@ -150,7 +159,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ),
       ),
       enviada,
-      confirmado.recetaIds,
+      confirmado,
     );
   }
 
@@ -159,8 +168,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   Consulta _sellarRecetas(
     Consulta vigente,
     Consulta enviada,
-    List<String> ids,
+    ResultadoBorradorConsulta confirmado,
   ) {
+    final ids = confirmado.recetaIds;
     if (ids.isEmpty) return vigente;
     final actuales = vigente.recetas;
     if (actuales.length != enviada.recetas.length ||
@@ -170,12 +180,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     for (var i = 0; i < actuales.length; i++) {
       if (!identical(actuales[i], enviada.recetas[i])) return vigente;
     }
+    final versiones = confirmado.recetaVersiones;
     return vigente.copyWith(
       recetas: [
         for (var i = 0; i < actuales.length; i++)
-          actuales[i].id == null && ids[i].isNotEmpty
-              ? actuales[i].copyWith(id: ids[i])
-              : actuales[i],
+          actuales[i].copyWith(
+            id: actuales[i].id ?? (ids[i].isEmpty ? null : ids[i]),
+            version: i < versiones.length ? versiones[i] : null,
+          ),
       ],
     );
   }
@@ -340,9 +352,9 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }).toList(),
     );
 
-    // Se emite como cambio pendiente a propósito: el primer autoguardado es el
-    // que lleva las mediciones y las condiciones detectadas a sus tablas, donde
-    // el servidor las valida y el motor de alertas las evalúa.
+    // Se emite como cambio pendiente a propósito: el primer guardado es el que
+    // lleva las mediciones y las condiciones detectadas a sus tablas, donde el
+    // servidor las valida y el motor de alertas las evalúa.
     _emitirCambio(
       consultaInicial.copyWith(
         id: consultaId,
@@ -350,6 +362,11 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         finalizada: false,
       ),
     );
+
+    // Y se dispara ya, sin esperar los tres segundos del temporizador: hasta
+    // que ocurre, la consulta existe sin ninguna de sus mediciones y las alertas
+    // todavía no se han evaluado.
+    await guardarParcial();
   }
 
   /// Cita de la que nace la consulta, ya validada. `null` para una atención sin
@@ -468,16 +485,20 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     Tratamiento tratamiento, {
     String? justificacionClinica,
     String? itemPlanId,
+    double cantidadRealizada = 1,
+    EstadoTratamientoAplicado estado = EstadoTratamientoAplicado.aplicado,
   }) {
     if (state is! ConsultaIniciada) return;
     final actual = (state as ConsultaIniciada).consulta;
     final aplicado = TratamientoAplicado(
       tratamientoId: tratamiento.id ?? '',
       esContinuo: false,
-      estaTerminado: false,
+      estaTerminado: estado == EstadoTratamientoAplicado.completado,
       precioAplicado: tratamiento.costo,
       notas: justificacionClinica,
       itemPlanId: itemPlanId,
+      estado: estado,
+      cantidadRealizada: cantidadRealizada,
       nombreTratamiento: tratamiento.nombre,
       claveOdontograma: tratamiento.claveOdontograma,
       fechaAplicacion: DateTime.now(),
@@ -591,6 +612,8 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     String? justificacionClinica,
     String? itemPlanId,
     String? justificacionNoPlanificada,
+    double cantidadRealizada = 1,
+    EstadoTratamientoAplicado estado = EstadoTratamientoAplicado.aplicado,
   }) {
     if (state is ConsultaIniciada) {
       final actual = (state as ConsultaIniciada).consulta;
@@ -600,12 +623,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       final aplicado = TratamientoAplicado(
         tratamientoId: tratamiento.id ?? '',
         esContinuo: false,
-        estaTerminado: false,
+        estaTerminado: estado == EstadoTratamientoAplicado.completado,
         superficie: tratamiento.alcance == Alcance.puntual ? superficie : null,
         precioAplicado: tratamiento.costo,
         notas: justificacionClinica,
         itemPlanId: itemPlanId,
         justificacionNoPlanificada: justificacionNoPlanificada,
+        estado: estado,
+        cantidadRealizada: cantidadRealizada,
         nombreTratamiento: tratamiento.nombre,
         claveOdontograma: tratamiento.claveOdontograma,
         fechaAplicacion: DateTime.now(),
@@ -884,11 +909,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         return;
       }
 
-      final consultaRehidratada = await _rehidratarTratamientos(consulta);
-
-      emit(
-        ConsultaIniciada(consulta: await _conHistorial(consultaRehidratada)),
-      );
+      emit(ConsultaIniciada(consulta: await _conHistorial(consulta)));
     } catch (e) {
       AppLog.error('reanudar consulta', e);
       emit(
@@ -930,34 +951,51 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     );
   }
 
-  Future<Consulta> _rehidratarTratamientos(Consulta consulta) async {
-    final odonto = consulta.odontograma;
-    if (odonto == null) return consulta;
+  // Aquí vivía `_rehidratarTratamientos`, que al reanudar sustituía la lista de
+  // tratamientos de cada pieza por lo que resolviera `tratamientos_aplicados_ids`
+  // y descartaba el embed que sí trae las filas reales (F4-01 del audit). Ese
+  // arreglo sólo lo mantiene `hfx_clin_002_aplicar_borrador`: cualquier fila
+  // escrita por otra vía quedaba fuera del estado en memoria y el siguiente
+  // autoguardado la anulaba, porque el contrato del payload es «lo que no
+  // viene, se anula». El embed `tratamientos:tratamientos_aplicados(*)` de
+  // `_selectConsulta` ya trae las filas con su catálogo, así que la vuelta por
+  // los ids no aportaba nada y sí podía perder trabajo.
 
-    final ids = <String>{
-      for (final diente in odonto.dientes) ...diente.tratamientosAplicadosIds,
-    };
-
-    if (ids.isEmpty) return consulta;
-
-    final detallePorId = await _consultaRepository
-        .getDetalleTratamientosAplicados(ids.toList());
-
-    final dientes = odonto.dientes.map((diente) {
-      final tratamientos = diente.tratamientosAplicadosIds
-          .map((id) => detallePorId[id]?.tratamiento)
-          .whereType<TratamientoAplicado>()
-          .toList();
-      return diente.copyWith(tratamientos: tratamientos);
-    }).toList();
-
-    return consulta.copyWith(odontograma: odonto.copyWith(dientes: dientes));
+  /// Guarda el borrador y **espera** a que un guardado en vuelo termine.
+  ///
+  /// Devolver el mismo futuro en vez de salir de vacío es lo que permite a
+  /// `terminarConsulta` y al cierre de la pantalla esperar de verdad al trabajo
+  /// que sigue viajando, en lugar de sondear un booleano y rendirse.
+  Future<void> guardarParcial() async {
+    final enVuelo = _guardadoEnVuelo;
+    if (enVuelo != null) {
+      await enVuelo;
+      return;
+    }
+    final trabajo = _ejecutarGuardadoParcial();
+    _guardadoEnVuelo = trabajo;
+    try {
+      await trabajo;
+    } finally {
+      _guardadoEnVuelo = null;
+    }
   }
 
-  Future<void> guardarParcial() async {
+  /// Vacía lo pendiente antes de abandonar la pantalla.
+  ///
+  /// Al hacer *pop*, `BlocProvider` cerraba el cubit y `close()` cancelaba el
+  /// temporizador del autoguardado sin vaciarlo: hasta tres segundos de trabajo
+  /// clínico se iban sin aviso (F1-07).
+  Future<void> guardarPendiente() async {
     final actual = state;
     if (actual is! ConsultaIniciada) return;
-    if (_guardando) return;
+    if (identical(actual.consulta, _ultimaConfirmada)) return;
+    await guardarParcial();
+  }
+
+  Future<void> _ejecutarGuardadoParcial() async {
+    final actual = state;
+    if (actual is! ConsultaIniciada) return;
 
     final consulta = actual.consulta;
     final consultaId = consulta.id;
@@ -978,7 +1016,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
 
     _autoguardado?.cancel();
-    _guardando = true;
     emit(actual.copyWith(guardado: EstadoGuardado.guardando));
     try {
       final confirmado = await MetricasClinicas.medir(
@@ -997,7 +1034,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ),
         codigoDeError: _codigoDeError,
       );
-      _guardando = false;
       if (isClosed) return;
 
       final vigente = state;
@@ -1018,7 +1054,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         _autoguardado = Timer(esperaAutoguardado, guardarParcial);
       }
     } catch (e) {
-      _guardando = false;
       AppLog.error('guardado parcial', e);
       if (isClosed) return;
       if (e is ConsultaCerradaFailure) {
@@ -1033,12 +1068,26 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       }
       final vigente = state;
       if (vigente is! ConsultaIniciada) return;
+
+      // El aviso prometía «se reintentará solo» y no había reintento alguno:
+      // el `catch` no reprogramaba el temporizador, así que sólo una edición
+      // nueva o el botón «Guardar ahora» volvían a intentarlo. Con el WiFi
+      // caído, el doctor terminaba de anotar, cerraba la pantalla confiando en
+      // el mensaje, y el trabajo se iba (F1-07).
+      //
+      // Ahora se reintenta lo que tiene sentido reintentar. Un conflicto de
+      // versión o un rechazo de validación no se arreglan repitiendo: ahí el
+      // mensaje dice la verdad y pide una acción.
+      final reintentable = e is NetworkFailure || e is ServerFailure;
+      if (reintentable) {
+        _autoguardado = Timer(esperaReintento, guardarParcial);
+      }
       emit(
         vigente.copyWith(
           guardado: e is ConflictoVersionFailure
               ? EstadoGuardado.conflicto
               : EstadoGuardado.fallido,
-          detalleFallo: _detalleFallo(e),
+          detalleFallo: _detalleFallo(e, reintentable: reintentable),
         ),
       );
     }
@@ -1062,36 +1111,49 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
 
     _autoguardado?.cancel();
-    for (var espera = 0; _guardando && espera < 50; espera++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    _guardando = true;
+    // Se espera al borrador en vuelo hasta que termine, sin límite.
+    //
+    // El bucle anterior se rendía a los 5 s y tomaba el turno igual: con la red
+    // lenta, el borrador terminaba después, subía `consultas.version`, y el
+    // cierre viajaba con la versión anterior. El servidor respondía `CL001 · La
+    // consulta cambió en otra sesión`, culpando a una sesión que no existía
+    // (F1-08). Un fallo del borrador no impide cerrar: el cierre reenvía el
+    // mismo conjunto.
+    try {
+      await _guardadoEnVuelo;
+    } catch (_) {}
+    if (isClosed) return;
+
+    // Tras la espera, el estado puede traer una versión nueva: se relee.
+    final vigente = state;
+    final consultaVigente = vigente is ConsultaIniciada
+        ? vigente.consulta
+        : consulta;
 
     // La clave sobrevive al fallo a propósito: reintentar el mismo cierre es
     // el mismo intento lógico, no uno nuevo.
     final clave = _claveCierre ??= _nuevaClaveCierre(consultaId);
 
-    emit(ConsultaGuardando(consulta: consulta));
+    emit(ConsultaGuardando(consulta: consultaVigente));
     try {
       final cierre = await MetricasClinicas.medir(
         OperacionClinica.consultaCerrada,
         () => _consultaRepository.cerrarConsulta(
           consultaId: consultaId,
-          version: consulta.version,
-          odontograma: odontograma,
-          recetas: consulta.recetas,
-          insumos: consulta.insumosUtilizados,
-          notas: consulta.notas,
-          signosVitales: consulta.signosVitales,
-          condicionesDetectadas: consulta.condicionesDetectadas,
-          tratamientosGenerales: consulta.tratamientosGenerales,
-          diagnosticosGenerales: consulta.diagnosticosGenerales,
+          version: consultaVigente.version,
+          odontograma: consultaVigente.odontograma ?? odontograma,
+          recetas: consultaVigente.recetas,
+          insumos: consultaVigente.insumosUtilizados,
+          notas: consultaVigente.notas,
+          signosVitales: consultaVigente.signosVitales,
+          condicionesDetectadas: consultaVigente.condicionesDetectadas,
+          tratamientosGenerales: consultaVigente.tratamientosGenerales,
+          diagnosticosGenerales: consultaVigente.diagnosticosGenerales,
           idempotenciaKey: clave,
         ),
         codigoDeError: _codigoDeError,
       );
 
-      _guardando = false;
       _claveCierre = null;
       emit(
         ConsultaTerminada(
@@ -1101,7 +1163,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ),
       );
     } catch (e) {
-      _guardando = false;
       AppLog.error('terminar consulta', e);
       if (e is ConsultaCerradaFailure) {
         emit(
@@ -1118,7 +1179,7 @@ class ConsultaCubit extends Cubit<ConsultaState> {
       // cierre se cayera. El motivo se queda en pantalla hasta que se resuelva.
       emit(
         ConsultaIniciada(
-          consulta: consulta,
+          consulta: consultaVigente,
           guardado: e is ConflictoVersionFailure
               ? EstadoGuardado.conflicto
               : EstadoGuardado.fallido,
@@ -1158,10 +1219,10 @@ class ConsultaCubit extends Cubit<ConsultaState> {
     }
 
     _autoguardado?.cancel();
-    for (var espera = 0; _guardando && espera < 50; espera++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    _guardando = true;
+    try {
+      await _guardadoEnVuelo;
+    } catch (_) {}
+    if (isClosed) return;
     final clave = _claveCierre ??= _nuevaClaveCierre(consultaId);
 
     emit(ConsultaGuardando(consulta: consulta));
@@ -1179,7 +1240,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         diagnosticosGenerales: consulta.diagnosticosGenerales,
         idempotenciaKey: clave,
       );
-      _guardando = false;
       _claveCierre = null;
       emit(
         ConsultaTerminada(
@@ -1189,7 +1249,6 @@ class ConsultaCubit extends Cubit<ConsultaState> {
         ),
       );
     } catch (e) {
-      _guardando = false;
       AppLog.error('terminar evaluación', e);
       // Mismo trato que en `terminarConsulta`: si el servidor dice que ya está
       // cerrada, el cierre ocurrió —típicamente un reintento tras un tiempo de
@@ -1243,11 +1302,14 @@ class ConsultaCubit extends Cubit<ConsultaState> {
   /// Siempre devuelve un motivo. Antes callaba ante un fallo genérico y el
   /// aviso quedaba con un título de alarma y ningún texto debajo, que es
   /// exactamente la duda que HFX-CLIN-005 vino a quitar.
-  String _detalleFallo(Object e) => _mensajeError(
+  String _detalleFallo(Object e, {required bool reintentable}) => _mensajeError(
     e,
-    fallback:
-        'No se pudo guardar el trabajo de esta consulta. Los cambios siguen '
-        'en pantalla y se reintentará solo.',
+    fallback: reintentable
+        ? 'No se pudo guardar el trabajo de esta consulta. Los cambios siguen '
+              'en pantalla y se reintentará solo en unos segundos.'
+        : 'No se pudo guardar el trabajo de esta consulta. Los cambios siguen '
+              'en pantalla, pero no se reintentará solo: corrige lo que indica '
+              'el aviso y pulsa «Guardar ahora».',
   );
 
   String _mensajeError(

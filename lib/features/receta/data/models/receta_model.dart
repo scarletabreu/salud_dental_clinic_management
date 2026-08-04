@@ -17,6 +17,7 @@ class RecetaModel extends Receta {
     super.estado,
     super.motivoAnulacion,
     super.recetaReemplazadaId,
+    super.version,
   });
 
   /// Lee una fila de `recetas` sin asumir que trae las columnas del formato
@@ -89,7 +90,7 @@ class RecetaModel extends Receta {
       fechaEmision: DateTime.parse(
         json['fecha_emision'] ??
             json['created_at'] ??
-            DateTime.now().toIso8601String(),
+            DateTime.now().toUtc().toIso8601String(),
       ).toLocal(),
       items: itemsList,
       indicacionesGenerales: json['indicaciones_generales'] as String?,
@@ -98,6 +99,7 @@ class RecetaModel extends Receta {
       estado: _parseEstado(json['estado']),
       motivoAnulacion: json['motivo_anulacion'] as String?,
       recetaReemplazadaId: json['receta_reemplazada_id'] as String?,
+      version: (json['version'] as num?)?.toInt(),
     );
   }
 
@@ -115,7 +117,15 @@ class RecetaModel extends Receta {
       'consulta_id': consultaId,
       'paciente_id': pacienteId,
       'doctor_id': doctorId,
-      'fecha_emision': fechaEmision.toIso8601String(),
+      // Sin `.toUtc()` la cadena viaja sin zona y Postgres la lee como UTC: en
+      // Santo Domingo la receta quedaba fechada cuatro horas antes de emitirse
+      // (F1-10).
+      'fecha_emision': fechaEmision.toUtc().toIso8601String(),
+      // Sin la versión, el bloqueo optimista de la receta era código muerto:
+      // `hfx_clin_002_aplicar_borrador` sólo compara si la clave está presente,
+      // así que dos pestañas editando la misma receta se pisaban sin aviso
+      // (F1-09).
+      if (version != null) 'version': version,
       'indicaciones_generales': indicacionesGenerales,
       'justificacion_contraindicaciones': justificacionContraindicaciones,
       'estado': estado.name,
@@ -139,6 +149,7 @@ class RecetaModel extends Receta {
       estado: receta.estado,
       motivoAnulacion: receta.motivoAnulacion,
       recetaReemplazadaId: receta.recetaReemplazadaId,
+      version: receta.version,
     );
   }
 }

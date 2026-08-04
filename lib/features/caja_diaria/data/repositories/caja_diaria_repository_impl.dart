@@ -20,14 +20,24 @@ class CajaDiariaRepositoryImpl implements CajaDiariaRepository {
   }
 
   @override
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() {
+    return runGuarded(() async {
+      final filas = await remoteDataSource.fetchCajasSinCerrarDeOtrosDias();
+      return filas.map(CajaDiariaModel.fromJson).toList();
+    }, context: 'buscar cajas sin cerrar de días anteriores');
+  }
+
+  @override
   Future<void> abrirCaja(double montoApertura) async {
+    // «Abierta» significa abierta HOY: desde `audit_002` la unicidad es por día
+    // civil, así que una caja olvidada de otro día ya no impide trabajar.
     final estaAbierta = await runGuarded(
       () => remoteDataSource.isCajaAbierta(),
       context: 'verificar la caja',
     );
     if (estaAbierta) {
       throw Exception(
-        'Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.',
+        'Ya existe una caja abierta hoy. Debe cerrarla antes de abrir otra.',
       );
     }
     await runGuarded(

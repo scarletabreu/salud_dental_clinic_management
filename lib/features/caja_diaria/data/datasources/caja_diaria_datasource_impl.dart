@@ -8,6 +8,10 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
 
   CajaDiariaDatasourceImpl(this.supabase);
 
+  /// Zona civil de la clínica. Es la misma que usan el trigger de pagos y la
+  /// recepción de compras para decidir cuál es «la caja de hoy».
+  static const _zonaClinica = Duration(hours: -4);
+
   @override
   Future<void> abrirCaja(double montoInicial) async {
     final userId = supabase.auth.currentUser?.id;
@@ -16,7 +20,10 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     await supabase.from('cajas').insert({
       'monto_apertura': montoInicial,
       'cerrada': false,
-      'fecha': DateTime.now().toIso8601String(),
+      // Sin `.toUtc()` la cadena no llevaba zona y Postgres la interpretaba
+      // como UTC: una caja abierta entre las 00:00 y las 04:00 nacía fechada el
+      // día anterior y el trigger de pagos no la encontraba nunca.
+      'fecha': DateTime.now().toUtc().toIso8601String(),
       'abierta_por': userId,
       'monto_esperado': montoInicial,
       'monto_real': 0,
@@ -82,7 +89,7 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
           'monto_esperado': datosCierre['monto_esperado'],
           'cerrada': true,
           'cerrada_por': userId,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', caja['id']);
   }
@@ -130,23 +137,48 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
         });
   }
 
-  /// La caja abierta, sea de hoy o de un día anterior.
+  /// Cajas abiertas de días anteriores a hoy.
   ///
-  /// No filtra por fecha a propósito: el índice único `cajas_una_abierta_idx`
-  /// es **global**, así que una caja de ayer sin cerrar impide abrir la de hoy.
-  /// Esconderla haría que abrir la caja fallara sin decir por qué, que es
-  /// justamente el síntoma que reportó QA (defecto D13). Quien la reciba debe
-  /// mirar [esDeHoy] y ofrecer cerrarla.
+  /// Desde `audit_002` la unicidad es por día civil, así que una caja olvidada
+  /// ya no impide abrir la de hoy ni cobrar. Pero sigue siendo un pendiente
+  /// contable real, y la pantalla tiene que poder decirlo en vez de mostrar el
+  /// saldo de otro día como si fuera el de hoy.
+  @override
+  Future<List<Map<String, dynamic>>> fetchCajasSinCerrarDeOtrosDias() async {
+    final response = await supabase
+        .from('cajas')
+        .select()
+        .eq('cerrada', false)
+        .lt('fecha_civil', _hoyCivil())
+        .order('fecha_civil', ascending: true);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  /// La caja abierta **de hoy**, con la misma definición de «hoy» que usa la
+  /// base: el día civil en hora de Santo Domingo.
+  ///
+  /// Antes no filtraba por fecha: devolvía la caja del viernes como «la caja
+  /// abierta», la pantalla pintaba su saldo, y al cobrar la base respondía «No
+  /// hay una caja abierta para hoy» — la pantalla y la base decían cosas
+  /// distintas sobre el mismo hecho.
   Future<Map<String, dynamic>?> _getCajaAbiertaActual() async {
     final response = await supabase
         .from('cajas')
         .select()
         .eq('cerrada', false)
-        .order('created_at', ascending: false)
+        .eq('fecha_civil', _hoyCivil())
         .limit(1);
 
     final list = response as List;
     if (list.isEmpty) return null;
     return Map<String, dynamic>.from(list.first as Map);
+  }
+
+  static String _hoyCivil() {
+    final civil = DateTime.now().toUtc().add(_zonaClinica);
+    final mes = civil.month.toString().padLeft(2, '0');
+    final dia = civil.day.toString().padLeft(2, '0');
+    return '${civil.year}-$mes-$dia';
   }
 }

@@ -23,7 +23,7 @@ class ProcedimientoRemoteDatasourceImpl
     Map<String, dynamic> data,
   ) async {
     data.remove('id');
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -43,7 +43,7 @@ class ProcedimientoRemoteDatasourceImpl
         !data['id'].toString().contains('-')) {
       data.remove('id');
     }
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('procedimientos').upsert(data);
   }
 
@@ -52,8 +52,8 @@ class ProcedimientoRemoteDatasourceImpl
     await supabaseClient
         .from('procedimientos')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

@@ -98,7 +98,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     String personaId,
     Map<String, dynamic> data,
   ) async {
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabase.from('personas').update(data).eq('id', personaId);
   }
 
@@ -140,7 +140,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
     String usuarioId,
     Map<String, dynamic> data,
   ) async {
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabase.from('usuarios').update(data).eq('id', usuarioId);
   }
 
@@ -173,7 +173,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
   Future<void> desactivarUsuarioRemoto(String usuarioId) async {
     await supabase
         .from('usuarios')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
         .eq('id', usuarioId);
   }
 

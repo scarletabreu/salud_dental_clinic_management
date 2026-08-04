@@ -17,6 +17,17 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
   final MovimientoCajaRepository _movimientoCajaRepository;
   StreamSubscription<List<MovimientoCaja>>? _movimientosSubscription;
   CajaDiaria? _cajaActual;
+  List<CajaDiaria> _pendientes = const [];
+
+  /// Un fallo consultando los pendientes no puede impedir trabajar con la caja
+  /// de hoy: es información complementaria, no un requisito.
+  Future<List<CajaDiaria>> _cajasPendientes() async {
+    try {
+      return await _repository.getCajasSinCerrarDeOtrosDias();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   Future<void> cargar() async {
     await _movimientosSubscription?.cancel();
@@ -25,14 +36,19 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
 
     try {
       final caja = await _repository.getCajaActual();
+      // Un arqueo olvidado ya no bloquea el día, pero tampoco puede quedar
+      // invisible: la pantalla lo nombra en vez de mostrar el saldo de otro día
+      // como si fuera el de hoy.
+      _pendientes = await _cajasPendientes();
+
       if (caja == null) {
         _cajaActual = null;
-        emit(const CajaDiariaSinAbrir());
+        emit(CajaDiariaSinAbrir(pendientes: _pendientes));
         return;
       }
 
       _cajaActual = caja;
-      emit(CajaDiariaAbierta(caja: caja));
+      emit(CajaDiariaAbierta(caja: caja, pendientes: _pendientes));
 
       _movimientosSubscription = _repository.watchMovimientos(caja.id!).listen((
         movimientos,
@@ -45,11 +61,16 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
               CajaDiariaAbierta(
                 caja: cajaActualizada,
                 movimientos: movimientos,
+                pendientes: _pendientes,
               ),
             );
           } else if (_cajaActual != null) {
             emit(
-              CajaDiariaAbierta(caja: _cajaActual!, movimientos: movimientos),
+              CajaDiariaAbierta(
+                caja: _cajaActual!,
+                movimientos: movimientos,
+                pendientes: _pendientes,
+              ),
             );
           }
         }

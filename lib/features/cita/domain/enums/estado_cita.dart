@@ -25,23 +25,48 @@ enum EstadoCita {
     }
   }
 
+  /// Traduce lo que devuelve la base. Cubre las **nueve** etiquetas reales del
+  /// enum `estado_cita`, incluidas las tres heredadas.
+  ///
+  /// Antes cualquier etiqueta no contemplada caía en `programada`, y el enum de
+  /// Postgres tiene `no_asistida` además de `no_asistio`: una cita marcada como
+  /// inasistencia reaparecía en la agenda como **Programada**, se podía
+  /// confirmar, registrar llegada e iniciar consulta sobre ella, y contaba como
+  /// pendiente en cualquier recuento. Convertir un dato desconocido en uno
+  /// plausible es la peor forma de fallar (F3-02).
+  ///
+  /// Una etiqueta que no esté aquí ya no se disimula: lanza. Hoy es
+  /// inalcanzable —la migración `audit_005` normalizó los datos y un CHECK
+  /// impide escribir las legadas—, así que sólo puede saltar si alguien añade
+  /// un estado en la base sin pasar por aquí, que es exactamente cuando hay que
+  /// enterarse.
   static EstadoCita fromDb(String? valor) {
     switch (valor) {
+      case 'programada':
+        return EstadoCita.programada;
+      case 'confirmada':
+        return EstadoCita.confirmada;
       case 'en_espera':
         return EstadoCita.enEspera;
       case 'en_consulta':
         return EstadoCita.enConsulta;
+      case 'completada':
+        return EstadoCita.completada;
+      case 'cancelada':
+        return EstadoCita.cancelada;
       case 'no_asistio':
         return EstadoCita.noAsistio;
-      // Valores heredados (antes de la migración SD-81), por si quedan filas.
+      // Etiquetas heredadas que el enum de Postgres todavía admite y que
+      // `hfx_clin_004_estado_cita_canonico` traduce del mismo modo.
+      case 'no_asistida':
+        return EstadoCita.noAsistio;
       case 'pendiente':
         return EstadoCita.programada;
       case 'atendida':
         return EstadoCita.completada;
       default:
-        return EstadoCita.values.firstWhere(
-          (e) => e.name == valor,
-          orElse: () => EstadoCita.programada,
+        throw FormatException(
+          'La cita tiene un estado que la aplicación no conoce: "$valor".',
         );
     }
   }
@@ -95,6 +120,14 @@ enum EstadoCita {
       case EstadoCita.programada:
         return const [
           EstadoCita.confirmada,
+          // La base permite `programada → en_espera` desde HFX-CLIN-004. Sin
+          // esta arista, el desplegable no ofrecía «En Espera» y
+          // `_resolverCitaDeOrigen` rechazaba iniciar la consulta con «La cita
+          // está Programada y no puede pasar a consulta»: había que pasar antes
+          // por Confirmada aunque el paciente ya estuviera delante. Dos
+          // definiciones de la misma regla en dos sitios, y una desactualizada
+          // (F3-03).
+          EstadoCita.enEspera,
           EstadoCita.cancelada,
           EstadoCita.noAsistio,
         ];

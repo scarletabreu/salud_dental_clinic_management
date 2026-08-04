@@ -1,3 +1,6 @@
+import 'package:salud_dental_clinic_management/features/condicion/data/models/condicion_model.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/alerta_clinica.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/condicion_detectada.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/insumo_utilizado.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/signos_vitales.dart';
@@ -29,6 +32,8 @@ class ConsultaModel extends Consulta {
     super.insumosUtilizados,
     super.tratamientosGenerales,
     super.diagnosticosGenerales,
+    super.condicionesDetectadas,
+    super.alertas,
   });
 
   factory ConsultaModel.fromJson(Map<String, dynamic> json) {
@@ -44,11 +49,9 @@ class ConsultaModel extends Consulta {
       tipoAtencion: TipoAtencionClinica.fromDb(
         json['tipo_atencion'] as String?,
       ),
-      signosVitales: json['signos_vitales'] != null
-          ? SignosVitales.fromJson(
-              json['signos_vitales'] as Map<String, dynamic>,
-            )
-          : null,
+      signosVitales: _parseSignosVitales(json),
+      condicionesDetectadas: _parseCondiciones(json),
+      alertas: _parseAlertas(json),
       recetas: json['recetas'] != null
           ? (json['recetas'] as List)
                 .map((x) => RecetaModel.fromJson(x))
@@ -88,6 +91,71 @@ class ConsultaModel extends Consulta {
           DiagnosticoAplicadoModel.fromJson(fila),
       ],
     );
+  }
+
+  /// Filas vivas de una colección embebida.
+  static List<Map<String, dynamic>> _vivas(Map<String, dynamic> json, String c) {
+    final lista = json[c];
+    if (lista is! List) return const [];
+    return [
+      for (final fila in lista)
+        if (fila is Map)
+          if (fila['deleted_at'] == null) Map<String, dynamic>.from(fila),
+    ];
+  }
+
+  /// La tabla `signos_vitales_consulta` es la verdad; `consultas.signos_vitales`
+  /// es sólo su resumen plano `{codigo: valor}`.
+  ///
+  /// Al reanudar se leía el resumen, y `SignosVitales.fromJson` reconstruía cada
+  /// medición con los valores por defecto: origen «medido en consulta», sin
+  /// hora, sin quién la tomó, sin observación y con estado «válido». El
+  /// siguiente guardado reenviaba esa reconstrucción y el servidor la escribía
+  /// encima. Una presión de 190/110 marcada como referida por el paciente, con
+  /// su nota y confirmada por el doctor, volvía como una medición de consulta
+  /// sin contexto: la cifra sobrevivía y lo que la hacía interpretable, no
+  /// (F1-04).
+  static SignosVitales? _parseSignosVitales(Map<String, dynamic> json) {
+    final medidos = _vivas(json, 'signos_medidos');
+    if (medidos.isNotEmpty) return SignosVitales.fromMediciones(medidos);
+
+    final resumen = json['signos_vitales'];
+    if (resumen is Map<String, dynamic>) return SignosVitales.fromJson(resumen);
+    return null;
+  }
+
+  /// Sin esto, `Consulta.condicionesDetectadas` volvía vacía al reanudar y el
+  /// siguiente guardado anulaba las condiciones —el payload las manda siempre,
+  /// y lo que no viene en la lista se borra—. La diabetes anotada hace diez
+  /// minutos desaparecía al volver de la agenda, y con ella las
+  /// contraindicaciones que sostenía (F1-02).
+  static List<CondicionDetectada> _parseCondiciones(Map<String, dynamic> json) {
+    return [
+      for (final fila in _vivas(json, 'condiciones'))
+        CondicionDetectada.fromJson(
+          fila,
+          condicion: fila['condicion'] is Map
+              ? CondicionModel.fromJson(
+                  Map<String, dynamic>.from(fila['condicion'] as Map),
+                )
+              : null,
+        ),
+    ];
+  }
+
+  /// Las alertas las decide el servidor y sólo llegaban en la respuesta del
+  /// guardado. Al reanudar volvían vacías, así que `alertasBloqueantes` daba
+  /// cero y el botón «Terminar consulta» se ofrecía habilitado; el servidor lo
+  /// rechazaba después con «Alerta clínica sin resolver» (F1-03).
+  static List<AlertaClinica> _parseAlertas(Map<String, dynamic> json) {
+    final lista = json['alertas'];
+    if (lista is! List) return const [];
+    return [
+      for (final fila in lista)
+        if (fila is Map)
+          if (fila['estado'] != 'obsoleta')
+            AlertaClinica.fromJson(Map<String, dynamic>.from(fila)),
+    ];
   }
 
   static List<Map<String, dynamic>> _generales(

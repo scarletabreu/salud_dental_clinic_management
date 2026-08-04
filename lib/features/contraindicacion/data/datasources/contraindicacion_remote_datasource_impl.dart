@@ -67,7 +67,7 @@ class ContraindicacionRemoteDatasourceImpl
     try {
       final Map<String, dynamic> payload = Map<String, dynamic>.from(data);
 
-      payload['updated_at'] = DateTime.now().toIso8601String();
+      payload['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
       if (payload['medicina_id'] == null ||
           payload['medicina_id'].toString().isEmpty ||
@@ -94,7 +94,7 @@ class ContraindicacionRemoteDatasourceImpl
 
       if (esNuevoId) {
         payload.remove('id');
-        payload['created_at'] = DateTime.now().toIso8601String();
+        payload['created_at'] = DateTime.now().toUtc().toIso8601String();
 
         final response = await supabaseClient
             .from('contraindicaciones')
@@ -123,8 +123,8 @@ class ContraindicacionRemoteDatasourceImpl
     await supabaseClient
         .from('contraindicaciones')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

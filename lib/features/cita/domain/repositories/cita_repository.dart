@@ -4,9 +4,19 @@ import 'package:salud_dental_clinic_management/features/cita/domain/entities/ref
 import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado_cita.dart';
 
 abstract class CitaRepository {
-  Future<List<Cita>> getCitas();
-  Future<List<Cita>> getCitasByPaciente(String pacienteId);
-  Future<List<Cita>> getCitasByDoctor(String doctorId);
+  /// [desde] y [hasta] acotan el rango en el servidor. Sin ellos se traen
+  /// todas las citas de la historia de la clínica.
+  Future<List<Cita>> getCitas({DateTime? desde, DateTime? hasta});
+  Future<List<Cita>> getCitasByPaciente(
+    String pacienteId, {
+    DateTime? desde,
+    DateTime? hasta,
+  });
+  Future<List<Cita>> getCitasByDoctor(
+    String doctorId, {
+    DateTime? desde,
+    DateTime? hasta,
+  });
 
   /// Datos programados de una cita (fecha, estado, doctor) sin ensamblar sus
   /// relaciones. `null` si la cita no existe o fue eliminada.

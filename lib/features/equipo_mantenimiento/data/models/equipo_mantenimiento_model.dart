@@ -32,7 +32,7 @@ class EquipoMantenimientoModel extends EquipoMantenimiento {
       'descripcion': descripcion,
       'suplidor_id': suplidorId,
       'costo': costo,
-      'fecha_mantenimiento': fechaMantenimiento.toIso8601String(),
+      'fecha_mantenimiento': fechaMantenimiento.toUtc().toIso8601String(),
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

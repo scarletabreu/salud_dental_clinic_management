@@ -10,8 +10,8 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
   @override
   Future<void> insertDiagnostico(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('diagnosticos_aplicados').insert(data);
   }
 
@@ -31,8 +31,8 @@ class DiagnosticoAplicadoRemoteDatasourceImpl
     await supabaseClient
         .from('diagnosticos_aplicados')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

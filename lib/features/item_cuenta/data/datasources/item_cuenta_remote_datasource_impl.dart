@@ -20,15 +20,15 @@ class ItemCuentaDatasourceImpl implements ItemCuentaDatasource {
   @override
   Future<void> insertItem(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('items_cuenta').insert(data);
   }
 
   @override
   Future<void> updateItem(String id, Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabaseClient.from('items_cuenta').update(data).eq('id', id);
   }
@@ -38,8 +38,8 @@ class ItemCuentaDatasourceImpl implements ItemCuentaDatasource {
     await supabaseClient
         .from('items_cuenta')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

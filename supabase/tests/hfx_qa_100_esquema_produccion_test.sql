@@ -191,13 +191,30 @@ begin
   end if;
   raise notice 'OK 8 · admins tiene una sola relación con doctores.';
 
-  -- --------------------------- 9. bitácora y tabla legada cerradas al cliente
+  -- ------------------- 9. bitácora y tabla legada: sólo lectura, y con guardia
+  --
+  -- Antes ninguna de las dos tenía política, así que RLS las cerraba a todo el
+  -- mundo: la auditoría genérica no se podía consultar desde la aplicación ni
+  -- siquiera con el admin (F5-01 del audit del 2 ago 2026). Ahora tienen SELECT
+  -- con guardia —admin para la bitácora, pertenencia de la consulta para la
+  -- tabla legada— y ninguna admite escritura.
   foreach v_nombre in array array['auditoria_log', 'items_receta'] loop
-    if has_table_privilege('authenticated', 'public.' || v_nombre, 'select') then
-      raise exception 'HFX-QA-100: authenticated puede leer %.', v_nombre;
+    if has_table_privilege('authenticated', 'public.' || v_nombre, 'insert')
+       or has_table_privilege('authenticated', 'public.' || v_nombre, 'update')
+       or has_table_privilege('authenticated', 'public.' || v_nombre, 'delete') then
+      raise exception 'HFX-QA-100: authenticated puede escribir %.', v_nombre;
+    end if;
+    if not exists (
+      select 1 from pg_policy p
+        join pg_class c on c.oid = p.polrelid
+       where c.relname = v_nombre and p.polcmd = 'r'
+    ) then
+      raise exception
+        'HFX-QA-100: % no tiene política de lectura; RLS la cierra a todos.',
+        v_nombre;
     end if;
   end loop;
-  raise notice 'OK 9 · auditoria_log e items_receta quedan cerradas al cliente.';
+  raise notice 'OK 9 · auditoria_log e items_receta: lectura con guardia, sin escritura.';
 end;
 $$;
 

@@ -70,9 +70,27 @@ class DashboardCubit extends Cubit<DashboardState> {
 
       // Quien gestiona la agenda completa la ve entera; el clínico que no la
       // gestiona ve la suya.
+      //
+      // El rango se acota en el servidor: el tablero sólo mide hoy, esta semana
+      // y este mes, y traer toda la historia de la clínica para contar tres
+      // números degradaba con cada año de operación (§1.3). La ventana empieza
+      // en el primero de la semana o del mes —lo que caiga antes— para que
+      // ninguna de las tres cifras quede corta.
+      final ahora = DateTime.now();
+      final inicioMes = DateTime(ahora.year, ahora.month, 1);
+      final inicioDeSemana = _inicioSemana(ahora);
+      final desde = inicioDeSemana.isBefore(inicioMes)
+          ? inicioDeSemana
+          : inicioMes;
+      final hasta = DateTime(ahora.year, ahora.month + 1, 1);
+
       final citas = (esClinico && !gestionaAgendaCompleta && doctorId != null)
-          ? await _citaRepository.getCitasByDoctor(doctorId)
-          : await _citaRepository.getCitas();
+          ? await _citaRepository.getCitasByDoctor(
+              doctorId,
+              desde: desde,
+              hasta: hasta,
+            )
+          : await _citaRepository.getCitas(desde: desde, hasta: hasta);
 
       final pacientesResult = await _pacienteRepository.getPacientes();
       final totalPacientes = pacientesResult.fold(

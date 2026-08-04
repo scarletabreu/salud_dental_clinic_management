@@ -1,5 +1,8 @@
 -- ============================================================================
---  SD-119 · Prueba del trigger `pagos_registrar_ingreso_caja` (SD-111 / S4-02).
+--  SD-119 · Prueba del trigger de caja de `pagos` (SD-111 / S4-02).
+--  Desde `audit_002` se llama `pagos_sincronizar_caja` y actúa también en
+--  UPDATE: un pago que nacía pendiente y se completaba después nunca entraba
+--  en el arqueo, y anular uno completado no revertía su ingreso.
 --
 --  Contrato que se verifica:
 --    1. Un pago `completado` inserta exactamente UN ingreso en la caja abierta,
@@ -203,7 +206,7 @@ begin
   -- Caso 5: un solo trigger de caja sobre `pagos`.
   --
   -- El drift ya metió una vez `tr_pago_a_movimiento_caja` conviviendo con
-  -- `pagos_registrar_ingreso_caja`; dos triggers duplican cada cobro del día.
+  -- `pagos_sincronizar_caja`; dos triggers duplican cada cobro del día.
   -- --------------------------------------------------------------------------
   -- Se cuentan sólo los triggers que ESCRIBEN en `movimientos_caja`. `pagos`
   -- tiene legítimamente otros (p. ej. `tr_validar_exceso_pago`, que valida el
@@ -226,20 +229,24 @@ begin
 
   if not exists (
     select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
-     where c.relname = 'pagos' and t.tgname = 'pagos_registrar_ingreso_caja'
+     where c.relname = 'pagos' and t.tgname = 'pagos_sincronizar_caja'
   ) then
-    raise exception 'FALLO (5): falta el trigger `pagos_registrar_ingreso_caja`.';
+    raise exception 'FALLO (5): falta el trigger `pagos_sincronizar_caja`.';
   end if;
 
+  -- El nombre anterior tampoco puede revivir: conviviendo con el nuevo,
+  -- duplicaría cada cobro en la caja.
   if exists (
     select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
-     where c.relname = 'pagos' and t.tgname = 'tr_pago_a_movimiento_caja'
+     where c.relname = 'pagos'
+       and t.tgname in ('tr_pago_a_movimiento_caja',
+                        'pagos_registrar_ingreso_caja')
   ) then
     raise exception
-      'FALLO (5): revivió `tr_pago_a_movimiento_caja`: cada cobro se registraría dos veces en la caja.';
+      'FALLO (5): revivió un trigger de caja retirado: cada cobro se registraría dos veces.';
   end if;
 
-  raise notice 'OK (5) sólo `pagos_registrar_ingreso_caja` alimenta la caja.';
+  raise notice 'OK (5) sólo `pagos_sincronizar_caja` alimenta la caja.';
 
   -- --------------------------------------------------------------------------
   -- Comprobación de zona horaria: la caja se busca por fecha en la zona de la

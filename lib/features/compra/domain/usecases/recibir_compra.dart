@@ -5,7 +5,15 @@ class RecibirCompra {
 
   const RecibirCompra(this._repository);
 
-  Future<void> call({required String compraId, required String usuarioId}) {
-    return _repository.recibirCompra(compraId: compraId, usuarioId: usuarioId);
+  Future<void> call({
+    required String compraId,
+    required String usuarioId,
+    String metodoPago = 'efectivo',
+  }) {
+    return _repository.recibirCompra(
+      compraId: compraId,
+      usuarioId: usuarioId,
+      metodoPago: metodoPago,
+    );
   }
 }

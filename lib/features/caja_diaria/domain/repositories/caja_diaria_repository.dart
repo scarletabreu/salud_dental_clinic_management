@@ -11,5 +11,8 @@ abstract class CajaDiariaRepository {
   });
   Future<bool> isCajaAbierta();
   Future<double> getMontoEsperado();
+
+  /// Cajas de días anteriores que quedaron sin cerrar.
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias();
   Stream<List<MovimientoCaja>> watchMovimientos(String cajaDiariaId);
 }

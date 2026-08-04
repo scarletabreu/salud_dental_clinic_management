@@ -9,7 +9,7 @@ class SuperficieRemoteDatasourceImpl implements SuperficieRemoteDatasource {
   @override
   Future<void> actualizarSuperficie(Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('superficies').upsert(data);
   }
 
@@ -18,8 +18,8 @@ class SuperficieRemoteDatasourceImpl implements SuperficieRemoteDatasource {
     await supabaseClient
         .from('superficies')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

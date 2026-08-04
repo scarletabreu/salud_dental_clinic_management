@@ -10,14 +10,14 @@ class MovimientoCajaRemoteDatasourceImpl
   @override
   Future<void> registrarMovimiento(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('movimientos_caja').insert(data);
   }
 
   @override
   Future<void> actualizarMovimiento(Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('movimientos_caja').upsert(data);
   }
 
@@ -26,8 +26,8 @@ class MovimientoCajaRemoteDatasourceImpl
     await supabaseClient
         .from('movimientos_caja')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

@@ -11,8 +11,8 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
     await supabase.from('asistentes').insert({
       'user_id': userId,
       'estatus': 'activo',
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -48,7 +48,7 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
         .from('asistentes')
         .update({
           'user_id': newUserId,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('user_id', userId);
   }
@@ -59,8 +59,8 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
         .from('asistentes')
         .update({
           'estatus': 'inactivo',
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('user_id', userId);
   }
@@ -72,7 +72,7 @@ class AsistenteRemoteDatasourceImpl implements AsistenteRemoteDatasource {
         .update({
           'estatus': 'activo',
           'deleted_at': null,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('user_id', userId);
   }

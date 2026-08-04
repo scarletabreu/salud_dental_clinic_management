@@ -9,5 +9,6 @@ abstract class CompraRemoteDatasource {
   Future<void> recibirCompra({
     required String compraId,
     required String usuarioId,
+    String metodoPago,
   });
 }

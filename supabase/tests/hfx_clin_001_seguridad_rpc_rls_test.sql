@@ -82,7 +82,7 @@ begin
   end if;
   if has_function_privilege(
     'anon',
-    'public.crear_consulta_completa(uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb)',
+    'public.crear_consulta_completa(uuid,uuid,uuid,timestamptz,text,jsonb,jsonb,jsonb,tipo_atencion_clinica)',
     'execute'
   ) then
     raise exception 'anon conserva crear_consulta_completa';
@@ -204,7 +204,8 @@ begin
     perform public.crear_consulta_completa(
       '20000000-0000-4000-8000-000000000001',
       current_setting('hfx001.doc_b')::uuid,
-      gen_random_uuid(), now(), null, '[]', '[]', '[]'
+      gen_random_uuid(), now(), null, '[]', '[]', '[]',
+      'consulta'::tipo_atencion_clinica
     );
     raise exception 'doctor pudo firmar con UUID ajeno';
   exception when insufficient_privilege then null;

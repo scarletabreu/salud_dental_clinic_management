@@ -363,6 +363,7 @@ void _pruebasOdontodiagrama() {
             fechaAplicacion: DateTime(2026, 7, 20),
             notas: '',
             nombreDiagnostico: 'Caries dental',
+            claveOdontograma: 'cariada',
             superficie: TipoSuperficie.oclusal,
           ),
         ],
@@ -378,6 +379,48 @@ void _pruebasOdontodiagrama() {
       reason:
           'una caries oclusal en la pieza 16 debe cambiar el diagrama; si los '
           'dos PDF son idénticos es que el odontodiagrama sigue vacío',
+    );
+  });
+
+  test('un hallazgo que no es caries también pinta (P1)', () async {
+    // El motor de marcas del PDF decidía el color por coincidencia de subcadena
+    // sobre el nombre libre: rojo sólo si el texto contenía «caries». Todo lo
+    // demás —periodontitis, fractura, absceso— salía en blanco y desaparecía
+    // del diagrama, mientras el texto de la hoja siguiente sí lo listaba.
+    final sano = pacienteConOdontograma([
+      Diente(
+        id: 'diente-sano',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 26,
+      ),
+    ]);
+    final conHallazgo = pacienteConOdontograma([
+      Diente(
+        id: 'diente-hallazgo',
+        odontogramaId: 'odontograma-marcas',
+        superficies: const [],
+        fdiCode: 26,
+        diagnosis: [
+          DiagnosticoAplicado(
+            id: 'dx-perio',
+            diagnosisId: 'periodontitis',
+            severidad: SeveridadDiagnosis.moderada,
+            fechaAplicacion: DateTime(2026, 7, 20),
+            notas: '',
+            nombreDiagnostico: 'Periodontitis crónica',
+            claveOdontograma: 'extraccion_indicada',
+          ),
+        ],
+      ),
+    ]);
+
+    expect(
+      (await pdfDe(conHallazgo)).length,
+      isNot((await pdfDe(sano)).length),
+      reason:
+          'un hallazgo con clave del catálogo debe pintar aunque su nombre no '
+          'contenga «caries»',
     );
   });
 

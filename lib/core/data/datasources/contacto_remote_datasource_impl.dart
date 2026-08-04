@@ -24,7 +24,7 @@ class ContactoRemoteDataSourceImpl implements ContactoRemoteDataSource {
   Future<void> createContacto(String personaId, ContactoModel contacto) async {
     final data = contacto.toJson();
     data['persona_id'] = personaId;
-    data['created_at'] = DateTime.now().toIso8601String();
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabase.from('contactos').insert(data);
   }
@@ -36,7 +36,7 @@ class ContactoRemoteDataSourceImpl implements ContactoRemoteDataSource {
     }
 
     final data = contacto.toJson();
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     data.remove('id');
 
     await supabase.from('contactos').update(data).eq('id', contacto.id!);
@@ -46,7 +46,7 @@ class ContactoRemoteDataSourceImpl implements ContactoRemoteDataSource {
   Future<void> deleteContacto(String id) async {
     await supabase
         .from('contactos')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
         .eq('id', id);
   }
 }

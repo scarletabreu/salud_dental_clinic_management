@@ -74,18 +74,14 @@ class ConsumibleModel extends Consumible {
     }
   }
 
+  /// Payload de alta. `authenticated` tiene INSERT sobre todas las columnas de
+  /// `consumibles`, así que el stock inicial y su estado derivado sí pueden
+  /// viajar aquí.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'nombre': nombre,
-      'descripcion': descripcion,
-      'precio': precio,
+      ...toUpdateJson(),
       'stock_actual': stockActual,
-      'stock_minimo': stockMinimo,
       'estado': _estadoToPg(estado),
-      // Sin estas dos, guardar un consumible desvinculaba su suplidor y lo
-      // reactivaba: el formulario las recoge y aquí se perdían.
-      'suplidor_id': suplidorId,
-      'activo': activo,
     };
 
     if (id != null && id!.trim().isNotEmpty && id!.contains('-')) {
@@ -94,4 +90,23 @@ class ConsumibleModel extends Consumible {
 
     return data;
   }
+
+  /// Payload de edición, limitado a las columnas con grant de UPDATE.
+  ///
+  /// `consumibles` es una de las dos únicas tablas del esquema con permisos por
+  /// columna: `stock_actual` y `estado` quedan fuera a propósito para que el
+  /// stock sólo se mueva por `ajustar_stock_consumible` (HFX-CLIN-007). Como
+  /// `toJson()` los mandaba siempre, Postgres rechazaba la petición entera con
+  /// `42501` y era imposible corregir el nombre, el precio, el mínimo o el
+  /// suplidor de un artículo desde la aplicación.
+  Map<String, dynamic> toUpdateJson() => {
+    'nombre': nombre,
+    'descripcion': descripcion,
+    'precio': precio,
+    'stock_minimo': stockMinimo,
+    // Sin estas dos, guardar un consumible desvinculaba su suplidor y lo
+    // reactivaba: el formulario las recoge y aquí se perdían.
+    'suplidor_id': suplidorId,
+    'activo': activo,
+  };
 }

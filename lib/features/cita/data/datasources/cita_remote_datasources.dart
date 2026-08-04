@@ -15,33 +15,69 @@ class CitaRemoteDataSource {
   /// Citas reales de la base. Un fallo de red, de RLS o de esquema se propaga
   /// para que el guard del repositorio lo convierta en un `Failure` tipado y la
   /// agenda pinte su estado de error: nunca se sustituye por datos inventados.
-  Future<List<CitaModel>> fetchCitas() async {
-    final citasRes = await supabase
-        .from('citas')
-        .select('*')
-        .filter('deleted_at', 'is', null);
-
+  ///
+  /// [desde] y [hasta] acotan el rango **en el servidor**. Sin ellos la consulta
+  /// traía TODAS las citas de la historia de la clínica y después resolvía sus
+  /// pacientes una por una: con decenas de citas no se nota, con dos años de
+  /// operación la agenda degrada linealmente en transferencia, memoria y render
+  /// (§1.3 del audit). La agenda pide la ventana que está mirando y la recarga
+  /// al navegar fuera de ella.
+  Future<List<CitaModel>> fetchCitas({DateTime? desde, DateTime? hasta}) async {
+    final citasRes = await _enRango(
+      supabase.from('citas').select('*').filter('deleted_at', 'is', null),
+      desde,
+      hasta,
+    );
     return _assembleCitas(citasRes as List);
   }
 
-  Future<List<CitaModel>> fetchCitasByPaciente(String pacienteId) async {
-    final citasRes = await supabase
-        .from('citas')
-        .select('*')
-        .eq('persona_id', pacienteId)
-        .filter('deleted_at', 'is', null);
-
+  Future<List<CitaModel>> fetchCitasByPaciente(
+    String pacienteId, {
+    DateTime? desde,
+    DateTime? hasta,
+  }) async {
+    final citasRes = await _enRango(
+      supabase
+          .from('citas')
+          .select('*')
+          .eq('persona_id', pacienteId)
+          .filter('deleted_at', 'is', null),
+      desde,
+      hasta,
+    );
     return _assembleCitas(citasRes as List);
   }
 
-  Future<List<CitaModel>> fetchCitasByDoctor(String doctorId) async {
-    final citasRes = await supabase
-        .from('citas')
-        .select('*')
-        .eq('doctor_id', doctorId)
-        .filter('deleted_at', 'is', null);
-
+  Future<List<CitaModel>> fetchCitasByDoctor(
+    String doctorId, {
+    DateTime? desde,
+    DateTime? hasta,
+  }) async {
+    final citasRes = await _enRango(
+      supabase
+          .from('citas')
+          .select('*')
+          .eq('doctor_id', doctorId)
+          .filter('deleted_at', 'is', null),
+      desde,
+      hasta,
+    );
     return _assembleCitas(citasRes as List);
+  }
+
+  Future<dynamic> _enRango(
+    PostgrestFilterBuilder<dynamic> consulta,
+    DateTime? desde,
+    DateTime? hasta,
+  ) {
+    var q = consulta;
+    if (desde != null) {
+      q = q.gte('fecha_hora', desde.toUtc().toIso8601String());
+    }
+    if (hasta != null) {
+      q = q.lt('fecha_hora', hasta.toUtc().toIso8601String());
+    }
+    return q;
   }
 
   Future<List<CitaModel>> _assembleCitas(List rawCitas) async {
@@ -54,18 +90,21 @@ class CitaRemoteDataSource {
         .toList();
 
     // 1. OBTENER DOCTORES USANDO EL RPC SEGURO (Bypass / Respeta RLS correctamente)
+    //
+    // El fallo se propaga en vez de tragarse. Antes iba en un `try/catch` que
+    // sólo escribía en el log y seguía: con la red o el RPC caídos la agenda
+    // «cargaba» y las citas salían huérfanas de doctor, sin ningún estado de
+    // error, contradiciendo el contrato declarado en la cabecera de este mismo
+    // archivo —«nunca se sustituye por datos inventados»—, que sí se cumplía
+    // para las citas pero no para sus doctores (§1.2 del audit).
     final Map<String, Map<String, dynamic>> doctorMaps = {};
-    try {
-      final responseDoctores = await supabase.rpc('get_active_doctors');
-      for (final docJson in (responseDoctores as List)) {
-        final m = docJson as Map<String, dynamic>;
-        final id = m['doctor_id'] as String?;
-        if (id != null) {
-          doctorMaps[id] = m;
-        }
+    final responseDoctores = await supabase.rpc('get_active_doctors');
+    for (final docJson in (responseDoctores as List)) {
+      final m = docJson as Map<String, dynamic>;
+      final id = m['doctor_id'] as String?;
+      if (id != null) {
+        doctorMaps[id] = m;
       }
-    } catch (e) {
-      AppLog.error('Error cargando doctores en _assembleCitas', e);
     }
 
     // 2. Obtener pacientes (esto suele tener menos restricciones o permisos distintos)
@@ -221,7 +260,7 @@ class CitaRemoteDataSource {
       data.remove('id');
     }
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -327,10 +366,13 @@ class CitaRemoteDataSource {
       'persona_id': cita.persona.id,
       'fecha_hora': cita.date.toUtc().toIso8601String(),
       'duracion_minutos': cita.duracionMinutos,
-      'es_emergencia': cita.esEmergencia,
+      // `es_emergencia` no viaja: encenderla al editar saca la cita del control
+      // de solapes sin dejar constancia del motivo, y desde `audit_005` la base
+      // lo rechaza. Una urgencia se declara al registrarla, por
+      // `registrar_cita_emergencia` (F3-04).
       'estado': cita.estado.dbValue,
       'motivo': CitaModel.normalizarMotivo(cita.motivo),
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     await supabase.from('citas').update(data).eq('id', cita.id!);
     await _sincronizarActividades(cita.id!, cita.actividades);
@@ -340,8 +382,8 @@ class CitaRemoteDataSource {
     await supabase
         .from('citas')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }
@@ -392,7 +434,7 @@ class CitaRemoteDataSource {
         .from('citas')
         .update({
           'estado': nuevoEstado.dbValue,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

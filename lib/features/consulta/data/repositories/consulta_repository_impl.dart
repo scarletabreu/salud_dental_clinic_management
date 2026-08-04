@@ -1,6 +1,7 @@
 import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/datasources/consulta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/consulta/data/models/alcance_registro_clinico.dart';
 import 'package:salud_dental_clinic_management/features/consulta/data/models/consulta_model.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta_de_cita.dart';
@@ -94,6 +95,27 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
   bool _isValidUuid(String? id) =>
       id != null && id.length == 36 && id.contains('-');
 
+  /// Agrupa por pieza lo que **pertenece** a una pieza.
+  ///
+  /// Una fila de alcance `arcada`/`global` pegada a un diente por historia se
+  /// lee además por el canal de «generales»: incluirla aquí la contaba dos veces
+  /// en el historial, en el detalle y en el PDF (F4-02). El reparto usa la misma
+  /// regla en todas partes, incluido el servidor.
+  Map<int, List<T>> _porFdi<T>(
+    List<Map<String, dynamic>> filas, {
+    required String catalogoKey,
+    required T Function(Map<String, dynamic>) construir,
+  }) {
+    final porFdi = <int, List<T>>{};
+    for (final fila in filas) {
+      final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
+      if (fdi == null) continue;
+      if (registroClinicoEsGeneral(fila, catalogoKey: catalogoKey)) continue;
+      porFdi.putIfAbsent(fdi, () => []).add(construir(fila));
+    }
+    return porFdi;
+  }
+
   @override
   Future<String> crearConsultaCompleta(Consulta consulta) {
     if (!_isValidUuid(consulta.pacienteId)) {
@@ -118,14 +140,14 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         'p_tipo_atencion': consulta.tipoAtencion.name,
       };
 
-      final id = await remoteDataSource.crearConsultaCompleta(params);
-      if (consulta.signosVitales != null &&
-          !consulta.signosVitales!.estaVacia) {
-        await remoteDataSource.updateConsulta(id, {
-          'signos_vitales': consulta.signosVitales!.toJson(),
-        });
-      }
-      return id;
+      // Los signos vitales NO se escriben aquí. Antes iban en una segunda
+      // llamada `update` directa a `consultas`, con dos consecuencias: si la red
+      // se caía entre las dos, la consulta ya existía y el usuario veía un error
+      // de creación; y sólo se guardaba el resumen plano, sin las filas de
+      // `signos_vitales_consulta`, así que el servidor no validaba los rangos ni
+      // el motor de alertas los veía (F1-06). Ahora los lleva el primer
+      // guardado, que es transaccional y sí manda las mediciones completas.
+      return await remoteDataSource.crearConsultaCompleta(params);
     }, context: 'crear la consulta completa');
   }
 
@@ -174,15 +196,9 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         'p_tipo_atencion': consulta.tipoAtencion.name,
       });
 
-      final inicio = InicioConsulta.fromJson(respuesta);
-      if (inicio.estado == EstadoInicioConsulta.creada &&
-          consulta.signosVitales != null &&
-          !consulta.signosVitales!.estaVacia) {
-        await remoteDataSource.updateConsulta(inicio.consultaId, {
-          'signos_vitales': consulta.signosVitales!.toJson(),
-        });
-      }
-      return inicio;
+      // Ver `crearConsultaCompleta`: los signos vitales los lleva el primer
+      // guardado del borrador, no un `update` suelto fuera de la transacción.
+      return InicioConsulta.fromJson(respuesta);
     }, context: 'iniciar la consulta de la cita');
   }
 
@@ -316,6 +332,10 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
                 'esta_terminado': t.estaTerminado,
                 'superficie': t.superficie?.name.toLowerCase(),
                 'precio_aplicado': t.precioAplicado,
+                // Sin esta clave la cantidad que pide la UI del plan no tenía
+                // camino hasta el servidor: la factura cobraba tres sesiones
+                // como una (F2-02).
+                'cantidad_realizada': t.cantidadRealizada,
                 'notas': t.notas,
                 'estado': t.estado.dbValue,
                 'item_plan_id': t.itemPlanId,
@@ -382,6 +402,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
     if (t.id != null) 'id': t.id,
     'tratamiento_id': t.tratamientoId,
     'precio_aplicado': t.precioAplicado,
+    'cantidad_realizada': t.cantidadRealizada,
     'notas': t.notas,
     'estado': t.estado.dbValue,
     'item_plan_id': t.itemPlanId,
@@ -465,15 +486,11 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         excluyendoConsultaId: excluyendoConsultaId,
       );
 
-      final porFdi = <int, List<TratamientoAplicado>>{};
-      for (final fila in filas) {
-        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
-        if (fdi == null) continue;
-        porFdi
-            .putIfAbsent(fdi, () => [])
-            .add(TratamientoAplicadoModel.fromJson(fila));
-      }
-      return porFdi;
+      return _porFdi(
+        filas,
+        catalogoKey: 'tratamiento',
+        construir: TratamientoAplicadoModel.fromJson,
+      );
     }, context: 'obtener los tratamientos históricos');
   }
 
@@ -489,15 +506,11 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         excluyendoConsultaId: excluyendoConsultaId,
       );
 
-      final porFdi = <int, List<DiagnosticoAplicado>>{};
-      for (final fila in filas) {
-        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
-        if (fdi == null) continue;
-        porFdi
-            .putIfAbsent(fdi, () => [])
-            .add(DiagnosticoAplicadoModel.fromJson(fila));
-      }
-      return porFdi;
+      return _porFdi(
+        filas,
+        catalogoKey: 'diagnosis',
+        construir: DiagnosticoAplicadoModel.fromJson,
+      );
     }, context: 'obtener los hallazgos anteriores');
   }
 
@@ -525,23 +538,17 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
         AppLog.error('plan del historial de piezas', e);
       }
 
-      final diagnosticos = <int, List<DiagnosticoAplicado>>{};
-      for (final fila in filasDiagnosticos) {
-        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
-        if (fdi == null) continue;
-        diagnosticos
-            .putIfAbsent(fdi, () => [])
-            .add(DiagnosticoAplicadoModel.fromJson(fila));
-      }
+      final diagnosticos = _porFdi(
+        filasDiagnosticos,
+        catalogoKey: 'diagnosis',
+        construir: DiagnosticoAplicadoModel.fromJson,
+      );
 
-      final tratamientos = <int, List<TratamientoAplicado>>{};
-      for (final fila in filasTratamientos) {
-        final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
-        if (fdi == null) continue;
-        tratamientos
-            .putIfAbsent(fdi, () => [])
-            .add(TratamientoAplicadoModel.fromJson(fila));
-      }
+      final tratamientos = _porFdi(
+        filasTratamientos,
+        catalogoKey: 'tratamiento',
+        construir: TratamientoAplicadoModel.fromJson,
+      );
 
       final itemsPlan = <int, List<ItemPlanTratamiento>>{};
       for (final fila in filasItemsPlan) {
@@ -642,6 +649,7 @@ class ConsultaRepositoryImpl implements ConsultaRepository {
       for (final fila in diagnosticos) {
         final fdi = (fila['diente']?['fdi_code'] as num?)?.toInt();
         if (fdi == null) continue;
+        if (registroClinicoEsGeneral(fila, catalogoKey: 'diagnosis')) continue;
         final diagnostico = DiagnosticoAplicadoModel.fromJson(fila);
         final estado = EstadoClinicoDentalX.fromDb(
           diagnostico.claveOdontograma,

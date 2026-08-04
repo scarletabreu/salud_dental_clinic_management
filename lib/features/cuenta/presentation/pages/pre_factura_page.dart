@@ -254,6 +254,27 @@ class _ContenidoState extends State<_Contenido> {
 
   Cuenta get cuenta => widget.cuenta;
 
+  /// La elección se persiste: antes vivía sólo en el estado del widget y
+  /// `cuentas.metodo_pago` seguía siendo «contado» aunque la cuenta se hubiera
+  /// pactado a crédito y tuviera su plan de cuotas configurado.
+  Future<void> _cambiarModalidad(MetodoPago modo) async {
+    final anterior = _modalidad;
+    setState(() => _modalidad = modo);
+
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await context.read<PreFacturaCubit>().fijarModoPago(modo);
+    if (!mounted || error == null) return;
+
+    setState(() => _modalidad = anterior);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(error),
+        backgroundColor: context.appColors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -265,7 +286,7 @@ class _ContenidoState extends State<_Contenido> {
         const SizedBox(height: 16),
         _SelectorModalidad(
           seleccionada: _modalidad,
-          onChanged: (m) => setState(() => _modalidad = m),
+          onChanged: _cambiarModalidad,
         ),
         const SizedBox(height: 16),
         _Desglose(items: cuenta.itemCuentas),

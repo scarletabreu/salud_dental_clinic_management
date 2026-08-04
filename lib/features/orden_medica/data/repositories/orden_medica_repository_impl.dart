@@ -22,7 +22,7 @@ class OrdenMedicaRepositoryImpl implements OrdenMedicaRepository {
   Future<void> editarOrden(OrdenMedica orden) {
     return runGuarded(() async {
       final data = OrdenMedicaModel.fromEntity(orden).toJson();
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
       await remoteDataSource.actualizarOrden(data);
     }, context: 'editar la orden médica');
   }

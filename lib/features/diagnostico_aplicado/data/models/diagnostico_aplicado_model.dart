@@ -59,7 +59,7 @@ class DiagnosticoAplicadoModel extends DiagnosticoAplicado {
     final Map<String, dynamic> data = {
       'diagnosis_id': diagnosisId,
       'severidad': severidad.name,
-      'fecha_aplicacion': fechaAplicacion.toIso8601String(),
+      'fecha_aplicacion': fechaAplicacion.toUtc().toIso8601String(),
       'notas': notas,
       'consulta_id': consultaId,
       'diente_id': dienteId,

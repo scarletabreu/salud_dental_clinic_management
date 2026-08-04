@@ -148,7 +148,7 @@ class PersonaRemoteDataSourceImpl implements PersonaRemoteDataSource {
         .from('personas')
         .update({
           'estatus': 'inactivo',
-          'deleted_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

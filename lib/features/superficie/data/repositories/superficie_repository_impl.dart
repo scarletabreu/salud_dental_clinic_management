@@ -15,7 +15,7 @@ class SuperficieRepositoryImpl implements SuperficieRepository {
     return runGuarded(() async {
       final data = SuperficieModel.fromEntity(superficie).toJson();
       data['deleted_at'] = null;
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
       await remoteDataSource.actualizarSuperficie(data);
     }, context: 'guardar el estado de la superficie');
   }

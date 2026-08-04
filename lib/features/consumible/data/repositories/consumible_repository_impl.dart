@@ -49,7 +49,7 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
       );
     }
     return runGuarded(() async {
-      await remoteDataSource.adjustStock(id, nuevoStock, motivo.name);
+      await remoteDataSource.adjustStock(id, nuevoStock, motivo.dbValue);
       _cache.invalidar(_clave);
     }, context: 'actualizar la existencia');
   }
@@ -70,11 +70,15 @@ class ConsumibleRepositoryImpl implements ConsumibleRepository {
         activo: consumible.activo,
       );
 
-      final data = model.toJson();
+      // El alta puede fijar el stock inicial; la edición no toca el stock ni su
+      // estado derivado, que sólo se mueven por `ajustar_stock_consumible`.
       if (consumible.id == null) {
-        await remoteDataSource.createConsumible(data);
+        await remoteDataSource.createConsumible(model.toJson());
       } else {
-        await remoteDataSource.updateConsumible(consumible.id!, data);
+        await remoteDataSource.updateConsumible(
+          consumible.id!,
+          model.toUpdateJson(),
+        );
       }
       _cache.invalidar(_clave);
     }, context: 'guardar el consumible');

@@ -36,6 +36,8 @@ import 'package:salud_dental_clinic_management/features/paciente/presentation/cu
 import 'package:salud_dental_clinic_management/features/paciente/presentation/cubit/paciente_state.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/repositories/doctor_repository.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/item_plan_tratamiento.dart';
+import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
@@ -437,6 +439,105 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
       itemPlan.superficie,
       tratamiento,
       itemPlan: itemPlan,
+    );
+  }
+
+  /// Registra la ejecución de una actividad del plan **dentro** de la consulta.
+  ///
+  /// La sección del plan pedía la cantidad y las notas y después insertaba
+  /// directo en `tratamientos_aplicados`. Nadie avisaba al `ConsultaCubit`, así
+  /// que la fila no viajaba en el siguiente payload y el servidor la anulaba
+  /// —el contrato es «lo que la clave declara es el conjunto completo»—: el
+  /// procedimiento desaparecía del expediente y la pre-factura salía en cero
+  /// (F1-01, reproducido en vivo: RD$12,000 → RD$0).
+  ///
+  /// Ahora la ejecución entra por el mismo sitio que cualquier otra anotación
+  /// de la consulta y el estado del plan se mueve después.
+  Future<void> _ejecutarActividadPlan(
+    ItemPlanTratamiento item,
+    EstadoItemPlan destino,
+    double cantidadRealizada,
+    String? notas,
+  ) async {
+    final consultaCubit = context.read<ConsultaCubit>();
+    final planCubit = context.read<PlanTratamientoCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    final tratamiento = _catalogo.cast<Tratamiento?>().firstWhere(
+      (candidato) => candidato?.id == item.tratamientoId,
+      orElse: () => null,
+    );
+    if (tratamiento == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El tratamiento del plan ya no está disponible en el catálogo.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final estado = destino == EstadoItemPlan.completado
+        ? EstadoTratamientoAplicado.completado
+        : EstadoTratamientoAplicado.enProceso;
+
+    final estadoConsulta = consultaCubit.state;
+    final dientes = estadoConsulta is ConsultaIniciada
+        ? estadoConsulta.consulta.odontograma?.dientes ?? const <Diente>[]
+        : const <Diente>[];
+
+    final diente = item.dienteId == null
+        ? null
+        : dientes.cast<Diente?>().firstWhere(
+            (candidato) => candidato?.id == item.dienteId,
+            orElse: () => null,
+          );
+
+    if (item.dienteId != null && diente == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se encontró la pieza de la actividad en este odontograma.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (diente == null) {
+      consultaCubit.aplicarTratamientoGeneral(
+        tratamiento,
+        justificacionClinica: notas,
+        itemPlanId: item.id,
+        cantidadRealizada: cantidadRealizada,
+        estado: estado,
+      );
+    } else {
+      consultaCubit.aplicarTratamiento(
+        diente,
+        item.superficie,
+        tratamiento,
+        justificacionClinica: notas,
+        itemPlanId: item.id,
+        cantidadRealizada: cantidadRealizada,
+        estado: estado,
+      );
+    }
+
+    // El estado del plan se mueve después de que la ejecución ya está en el
+    // estado de la consulta: si esto falla, el trabajo clínico no se pierde.
+    await planCubit.cambiarEstadoActividad(item, destino);
+
+    if (!mounted) return;
+    setState(() => _itemsEjecutables.removeWhere((i) => i.id == item.id));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('"${tratamiento.nombre}" registrado en la consulta.'),
+        backgroundColor: context.appColors.teal,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
@@ -901,6 +1002,7 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
                 evaluacionId: _evaluacionId,
                 onElegirTratamiento: () =>
                     seleccionarTratamiento(context, _catalogo),
+                onEjecutarActividad: _ejecutarActividadPlan,
               ),
             ),
             TarjetaConsulta(

@@ -34,3 +34,4 @@ The web-server device requires the Dart Debug Chrome extension for debugging. Co
 Debug service listening on ws://127.0.0.1:33083/zaysu3Z31Pw=/ws
 A Dart VM Service on Web Server is available at: http://127.0.0.1:33083/zaysu3Z31Pw=
 The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:33083/zaysu3Z31Pw=/devtools/?uri=ws://127.0.0.1:33083/zaysu3Z31Pw=/ws
+Application finished.

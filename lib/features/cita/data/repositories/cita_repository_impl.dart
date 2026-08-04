@@ -25,9 +25,9 @@ class CitaRepositoryImpl implements CitaRepository {
   });
 
   @override
-  Future<List<Cita>> getCitas() {
+  Future<List<Cita>> getCitas({DateTime? desde, DateTime? hasta}) {
     return runGuarded(
-      () => remoteDataSource.fetchCitas(),
+      () => remoteDataSource.fetchCitas(desde: desde, hasta: hasta),
       context: 'obtener las citas',
     );
   }
@@ -79,17 +79,33 @@ class CitaRepositoryImpl implements CitaRepository {
   }
 
   @override
-  Future<List<Cita>> getCitasByPaciente(String pacienteId) {
+  Future<List<Cita>> getCitasByPaciente(
+    String pacienteId, {
+    DateTime? desde,
+    DateTime? hasta,
+  }) {
     return runGuarded(
-      () => remoteDataSource.fetchCitasByPaciente(pacienteId),
+      () => remoteDataSource.fetchCitasByPaciente(
+        pacienteId,
+        desde: desde,
+        hasta: hasta,
+      ),
       context: 'obtener las citas del paciente',
     );
   }
 
   @override
-  Future<List<Cita>> getCitasByDoctor(String doctorId) {
+  Future<List<Cita>> getCitasByDoctor(
+    String doctorId, {
+    DateTime? desde,
+    DateTime? hasta,
+  }) {
     return runGuarded(
-      () => remoteDataSource.fetchCitasByDoctor(doctorId),
+      () => remoteDataSource.fetchCitasByDoctor(
+        doctorId,
+        desde: desde,
+        hasta: hasta,
+      ),
       context: 'obtener las citas del doctor',
     );
   }

@@ -26,7 +26,7 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
       data['costo'] = data.remove('precio_base');
     }
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -42,7 +42,7 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
       data['costo'] = data.remove('precio_base');
     }
 
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabaseClient.from('tratamientos').update(data).eq('id', id);
   }
@@ -50,7 +50,7 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   @override
   Future<void> upsertTratamiento(Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('tratamientos').upsert(data);
   }
 
@@ -58,7 +58,7 @@ class TratamientoRemoteDatasourceImpl implements TratamientoRemoteDatasource {
   Future<void> deleteTratamiento(String id) async {
     await supabaseClient
         .from('tratamientos')
-        .update({'deleted_at': DateTime.now().toIso8601String()})
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
         .eq('id', id);
   }
 }

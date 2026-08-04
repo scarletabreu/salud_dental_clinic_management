@@ -11,28 +11,10 @@ class PagoRepositoryImpl implements PagoRepository {
   PagoRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> procesarPago(Pago pago) {
-    return runGuarded(() async {
-      final data = PagoModel.fromEntity(pago).toJson();
-      data['deleted_at'] = null;
-      await remoteDataSource.registrarPago(data);
-    }, context: 'procesar el pago');
-  }
-
-  @override
-  Future<void> editarPago(Pago pago) {
-    return runGuarded(() async {
-      final data = PagoModel.fromEntity(pago).toJson();
-      data['updated_at'] = DateTime.now().toIso8601String();
-      await remoteDataSource.actualizarPago(data);
-    }, context: 'editar el pago');
-  }
-
-  @override
-  Future<void> cancelarPago(String id) {
+  Future<void> cancelarPago(String id, {String? motivo}) {
     return runGuarded(
-      () => remoteDataSource.anularPago(id),
-      context: 'cancelar el pago',
+      () => remoteDataSource.anularPago(id, motivo: motivo),
+      context: 'anular el cobro',
     );
   }
 

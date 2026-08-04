@@ -28,7 +28,7 @@ class EquipoModel extends Equipo {
     final Map<String, dynamic> data = {
       'nombre': nombre,
       'descripcion': descripcion,
-      'ultimo_mantenimiento': ultimoMantenimiento.toIso8601String(),
+      'ultimo_mantenimiento': ultimoMantenimiento.toUtc().toIso8601String(),
       'tiempo_para_mantenimiento': tiempoParaMantenimiento,
     };
 

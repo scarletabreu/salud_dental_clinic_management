@@ -1155,7 +1155,11 @@ Future<void> _mostrarDialogoAjustarStock(
                   labelText: 'Motivo *',
                   border: OutlineInputBorder(),
                 ),
-                items: MotivoAjusteStock.values
+                // Sólo los motivos que `ajustar_stock_consumible` admite. El
+                // desplegable ofrecía además «Compra recibida» y «Consumo
+                // clínico», que la base rechaza porque los escribe ella misma
+                // al recibir una compra o al cerrar una consulta.
+                items: MotivoAjusteStock.ajustables
                     .map(
                       (item) => DropdownMenuItem(
                         value: item,

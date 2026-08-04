@@ -9,8 +9,8 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
   @override
   Future<void> crearDocumento(Map<String, dynamic> data) async {
     data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['created_at'] = DateTime.now().toUtc().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('documentos_clinicos').insert(data);
   }
 
@@ -38,8 +38,8 @@ class DocumentoClinicoDatasourceImpl implements DocumentoClinicoDatasource {
     await supabaseClient
         .from('documentos_clinicos')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

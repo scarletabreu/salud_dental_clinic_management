@@ -8,7 +8,6 @@ typedef CrearConsultaRpc =
 class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   final SupabaseClient supabaseClient;
   final CrearConsultaRpc _crearConsultaRpc;
-  bool? _soportaFlujoClinicoSeparado;
 
   ConsultaRemoteDatasourceImpl({
     required this.supabaseClient,
@@ -19,11 +18,25 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
                supabaseClient.rpc('crear_consulta_completa', params: params));
 
   static const _selectConsulta =
+      // Contrato de la reanudación: todo lo que `_payloadClinico` declara se
+      // vuelve a leer aquí. Es la regla, no una lista de campos sueltos —el
+      // payload anula lo que no viene, así que un campo escrito y no releído se
+      // borra solo al reanudar (F1-02, F1-03 y F1-04 del audit del 2 ago 2026)—.
+      //
       // Los insumos declarados se recuperan con la consulta: si no volvieran,
       // reanudarla los daría por retirados y el siguiente guardado los
       // anularía sin que nadie lo pidiera.
       '*, recetas(*), documentos_clinicos(*), '
       'consumos:consumos_consulta(consumible_id, nombre, cantidad), '
+      // Condiciones detectadas hoy: alimentan contraindicaciones y alertas.
+      'condiciones:condiciones_consulta(*, condicion:condiciones(*)), '
+      // Las alertas las decide el servidor; sin releerlas, el botón «Terminar
+      // consulta» se ofrecía habilitado y el servidor rechazaba el cierre.
+      'alertas:alertas_clinicas(*), '
+      // La verdad de los signos vitales es la tabla, no el resumen plano de
+      // `consultas.signos_vitales`: ahí no viajan origen, hora, quién midió ni
+      // la observación, y reguardar los reescribía con los valores por defecto.
+      'signos_medidos:signos_vitales_consulta(*), '
       'odontograma:odontogramas(id, consulta_id, evaluacion_clinica, '
       'dientes(id, odontograma_id, fdi_code, observaciones, esta_ausente, '
       'tratamientos_aplicados_ids, diagnosis:diagnosticos_aplicados!diagnosticos_aplicados_diente_id_fkey(*, '
@@ -33,46 +46,16 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
       'diagnosis:diagnosticos(*)), tratamientos:tratamientos_aplicados(*, '
       'tratamiento:tratamientos(*))))';
 
+  /// La firma con `p_tipo_atencion` es la única viva.
+  ///
+  /// Convivía con la anterior de ocho argumentos, y ambas tenían EXECUTE para
+  /// `authenticated`: una evaluación registrada por la vieja perdía su tipo y
+  /// falseaba el expediente. `audit_006` la retiró de la base y con ella se va
+  /// el camino de compatibilidad que la mantenía viva (F5-03).
   @override
   Future<String> crearConsultaCompleta(Map<String, dynamic> params) async {
-    if (_soportaFlujoClinicoSeparado == false) {
-      return _crearConsultaConFirmaAnterior(params);
-    }
-    try {
-      final id = await _crearConsultaRpc(params) as String;
-      _soportaFlujoClinicoSeparado = true;
-      return id;
-    } on PostgrestException catch (error) {
-      if (!_esFirmaNuevaAusente(error)) rethrow;
-      _soportaFlujoClinicoSeparado = false;
-      return _crearConsultaConFirmaAnterior(params);
-    }
+    return await _crearConsultaRpc(params) as String;
   }
-
-  Future<String> _crearConsultaConFirmaAnterior(
-    Map<String, dynamic> params,
-  ) async {
-    // La firma anterior representa siempre una consulta de ejecución. Usarla
-    // para una evaluación perdería su tipo y falsearía el expediente.
-    if (params['p_tipo_atencion'] != 'consulta') {
-      throw const PostgrestException(
-        message:
-            'La base de datos clínica aún no permite separar evaluaciones '
-            'de tratamientos. Aplica las migraciones pendientes antes de '
-            'registrar una evaluación.',
-        code: 'PGRST202',
-      );
-    }
-
-    final paramsCompatibles = Map<String, dynamic>.from(params)
-      ..remove('p_tipo_atencion');
-    return await _crearConsultaRpc(paramsCompatibles) as String;
-  }
-
-  bool _esFirmaNuevaAusente(PostgrestException error) =>
-      error.code == 'PGRST202' &&
-      error.message.contains('crear_consulta_completa') &&
-      error.message.contains('p_tipo_atencion');
 
   @override
   Future<Map<String, dynamic>> iniciarConsultaDeCita(
@@ -300,8 +283,11 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
         .from('tratamientos_aplicados')
         .select(
           // La clave del catálogo es lo que decide cómo se dibuja la pieza:
-          // sin ella todo tratamiento previo caía en «Otro».
-          '*, tratamiento:tratamientos(nombre, clave_odontograma), '
+          // sin ella todo tratamiento previo caía en «Otro». El alcance decide
+          // si la fila pertenece a la pieza o al canal de «generales»: sin
+          // pedirlo, una ejecución de arcada pegada a una pieza se contaba en
+          // los dos sitios (F4-02).
+          '*, tratamiento:tratamientos(nombre, clave_odontograma, alcance), '
           'diente:dientes!tratamientos_aplicados_diente_id_fkey!inner(fdi_code), '
           'consulta:consultas!inner(paciente_id, fecha)',
         )
@@ -328,7 +314,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     var query = supabaseClient
         .from('diagnosticos_aplicados')
         .select(
-          '*, diagnosis:diagnosticos(nombre, clave_odontograma), '
+          '*, diagnosis:diagnosticos(nombre, clave_odontograma, alcance), '
           'evaluacion:evaluaciones_clinicas(doctor_id), '
           'diente:dientes!diagnosticos_aplicados_diente_id_fkey!inner(fdi_code), '
           // `doctor_id` de la consulta es el respaldo para las filas anteriores
@@ -407,32 +393,9 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
   Future<List<Map<String, dynamic>>> fetchReferenciasConsultasPaciente(
     String pacienteId,
   ) async {
-    if (_soportaFlujoClinicoSeparado == false) {
-      return _fetchReferenciasConsultasAnteriores(pacienteId);
-    }
-    try {
-      final filas = await supabaseClient
-          .from('consultas')
-          .select('id, fecha, motivo_consulta, tipo_atencion, doctor_id')
-          .eq('paciente_id', pacienteId)
-          .order('fecha', ascending: false);
-      _soportaFlujoClinicoSeparado = true;
-      return List<Map<String, dynamic>>.from(filas as List);
-    } on PostgrestException catch (error) {
-      if (!error.message.contains('tipo_atencion')) rethrow;
-      _soportaFlujoClinicoSeparado = false;
-      return _fetchReferenciasConsultasAnteriores(pacienteId);
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchReferenciasConsultasAnteriores(
-    String pacienteId,
-  ) async {
-    // Antes de SD-138 todas las atenciones eran consultas. El modelo ya
-    // interpreta la ausencia del campo con ese mismo valor por defecto.
     final filas = await supabaseClient
         .from('consultas')
-        .select('id, fecha, motivo_consulta, doctor_id')
+        .select('id, fecha, motivo_consulta, tipo_atencion, doctor_id')
         .eq('paciente_id', pacienteId)
         .order('fecha', ascending: false);
     return List<Map<String, dynamic>>.from(filas as List);
@@ -456,7 +419,7 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     Map<String, dynamic> consultaData,
   ) async {
     consultaData.remove('id');
-    consultaData['updated_at'] = DateTime.now().toIso8601String();
+    consultaData['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('consultas').update(consultaData).eq('id', id);
   }
 
@@ -465,8 +428,8 @@ class ConsultaRemoteDatasourceImpl implements ConsultaRemoteDatasource {
     await supabaseClient
         .from('consultas')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

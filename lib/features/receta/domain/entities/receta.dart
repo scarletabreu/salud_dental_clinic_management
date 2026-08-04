@@ -23,6 +23,12 @@ class Receta {
   final String? motivoAnulacion;
   final String? recetaReemplazadaId;
 
+  /// Versión confirmada por el servidor. Viaja en cada guardado para que dos
+  /// pestañas editando la misma receta no se pisen en silencio (F1-09): sin
+  /// ella, `hfx_clin_002_aplicar_borrador` ni siquiera comprobaba el conflicto,
+  /// porque sólo compara cuando la clave está presente.
+  final int? version;
+
   const Receta({
     this.id,
     required this.codigoReceta,
@@ -37,6 +43,7 @@ class Receta {
     this.estado = EstadoReceta.borrador,
     this.motivoAnulacion,
     this.recetaReemplazadaId,
+    this.version,
   });
 
   Receta copyWith({
@@ -53,9 +60,14 @@ class Receta {
     EstadoReceta? estado,
     String? motivoAnulacion,
     String? recetaReemplazadaId,
+    int? version,
   }) {
     return Receta(
-      id: null,
+      // Antes esto era `id: null` con el parámetro `id` declarado y sin usar,
+      // así que `_sellarRecetas` no sellaba nada: cada autoguardado volvía a
+      // mandar la receta sin id, el servidor anulaba la anterior e insertaba
+      // otra, y el bloqueo optimista de la receta nunca podía funcionar.
+      id: id ?? this.id,
       codigoReceta: codigoReceta ?? this.codigoReceta,
       consultaId: consultaId ?? this.consultaId,
       pacienteId: pacienteId ?? this.pacienteId,
@@ -71,6 +83,7 @@ class Receta {
       estado: estado ?? this.estado,
       motivoAnulacion: motivoAnulacion ?? this.motivoAnulacion,
       recetaReemplazadaId: recetaReemplazadaId ?? this.recetaReemplazadaId,
+      version: version ?? this.version,
     );
   }
 }

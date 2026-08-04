@@ -16,6 +16,55 @@ class CitaCubit extends Cubit<CitaCubitState> {
   List<String>? _doctorIdsPermitidos;
   String? _restringidoADoctorId;
 
+  /// Meses cargados a cada lado del día enfocado.
+  ///
+  /// Traer toda la historia de la clínica en cada apertura de la agenda es la
+  /// bomba de tiempo del §1.3: hoy no se nota y con dos años de operación
+  /// degrada linealmente. La ventana sigue a la navegación, así que moverse por
+  /// el calendario nunca deja huecos.
+  static const _mesesDeMargen = 3;
+
+  DateTime? _ventanaDesde;
+  DateTime? _ventanaHasta;
+
+  void _fijarVentana(DateTime centro) {
+    _ventanaDesde = DateTime(centro.year, centro.month - _mesesDeMargen, 1);
+    _ventanaHasta = DateTime(centro.year, centro.month + _mesesDeMargen + 1, 1);
+  }
+
+  /// `true` si [dia] cae fuera del mes central de la ventana cargada: es el
+  /// momento de traer la siguiente tanda, antes de que el usuario llegue al
+  /// borde y vea días vacíos.
+  bool _fueraDeVentana(DateTime dia) {
+    final desde = _ventanaDesde;
+    final hasta = _ventanaHasta;
+    if (desde == null || hasta == null) return true;
+    return dia.isBefore(desde.add(const Duration(days: 31))) ||
+        !dia.isBefore(hasta.subtract(const Duration(days: 31)));
+  }
+
+  Future<void> _asegurarVentana(DateTime dia) async {
+    if (!_fueraDeVentana(dia)) return;
+    _fijarVentana(dia);
+    final current = state;
+    if (current is! CitaCubitLoaded) return;
+    try {
+      final citas = _aplicarFiltroDoctor(await _cargarSegunAlcance());
+      if (isClosed) return;
+      final vigente = state;
+      if (vigente is! CitaCubitLoaded) return;
+      emit(
+        vigente.copyWith(
+          citas: _aplicarFiltroDeVista(citas),
+          todas: citas,
+          consultasPorCitaId: await _consultasDe(citas),
+        ),
+      );
+    } catch (e) {
+      AppLog.error('ampliar la ventana de la agenda', e);
+    }
+  }
+
   CitaCubit(this._repository, [this._consultas])
     : super(const CitaCubitLoading());
 
@@ -35,6 +84,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
     }
 
     emit(const CitaCubitLoading());
+    _fijarVentana(DateTime.now());
     try {
       // La agenda es lo primero que se abre cada mañana: si va lenta, se nota
       // aquí antes que en ningún otro sitio. La medición no lleva ni el doctor
@@ -77,8 +127,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
   /// equivalente, así que ahí sí se recorta en memoria.
   Future<List<Cita>> _cargarSegunAlcance() {
     final soloDoctor = _restringidoADoctorId;
-    if (soloDoctor != null) return _repository.getCitasByDoctor(soloDoctor);
-    return _repository.getCitas();
+    if (soloDoctor != null) {
+      return _repository.getCitasByDoctor(
+        soloDoctor,
+        desde: _ventanaDesde,
+        hasta: _ventanaHasta,
+      );
+    }
+    return _repository.getCitas(desde: _ventanaDesde, hasta: _ventanaHasta);
   }
 
   /// Consulta de cada cita, para que la agenda pueda enlazarla (SD-160). Es
@@ -294,6 +350,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
     final current = state;
     if (current is! CitaCubitLoaded) return;
     emit(current.copyWith(focusedDay: focusedDay));
+    _asegurarVentana(focusedDay);
   }
 
   void changeViewMode(CalendarioViewMode mode) {
@@ -315,12 +372,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
     if (current.viewMode == CalendarioViewMode.diaria) {
       final next = current.selectedDay.add(const Duration(days: 1));
       emit(current.copyWith(focusedDay: next, selectedDay: next));
+      _asegurarVentana(next);
       return;
     }
     final next = current.viewMode == CalendarioViewMode.mensual
         ? DateTime(current.focusedDay.year, current.focusedDay.month + 1, 1)
         : current.focusedDay.add(const Duration(days: 7));
     emit(current.copyWith(focusedDay: next));
+    _asegurarVentana(next);
   }
 
   void goPrevious() {
@@ -329,12 +388,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
     if (current.viewMode == CalendarioViewMode.diaria) {
       final prev = current.selectedDay.subtract(const Duration(days: 1));
       emit(current.copyWith(focusedDay: prev, selectedDay: prev));
+      _asegurarVentana(prev);
       return;
     }
     final prev = current.viewMode == CalendarioViewMode.mensual
         ? DateTime(current.focusedDay.year, current.focusedDay.month - 1, 1)
         : current.focusedDay.subtract(const Duration(days: 7));
     emit(current.copyWith(focusedDay: prev));
+    _asegurarVentana(prev);
   }
 
   List<Cita> eventLoader(DateTime day) {

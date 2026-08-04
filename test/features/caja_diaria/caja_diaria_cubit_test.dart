@@ -20,6 +20,9 @@ class _MovimientoRepositoryFake implements MovimientoCajaRepository {
 }
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
+  @override
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+
   CajaDiaria? caja;
   final movimientos = StreamController<List<MovimientoCaja>>.broadcast();
   double? montoAbierto;

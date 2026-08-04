@@ -22,6 +22,9 @@ class _MovimientoRepositoryFake implements MovimientoCajaRepository {
 }
 
 class _CajaRepositoryFake implements CajaDiariaRepository {
+  @override
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+
   _CajaRepositoryFake({this.caja});
 
   CajaDiaria? caja;

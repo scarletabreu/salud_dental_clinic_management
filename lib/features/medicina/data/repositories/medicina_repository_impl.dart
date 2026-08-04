@@ -49,7 +49,7 @@ class MedicinaRepositoryImpl implements IMedicinaRepository {
           medicina.id!.isNotEmpty &&
           medicina.id!.length == 36 &&
           medicina.id!.contains('-')) {
-        data['updated_at'] = DateTime.now().toIso8601String();
+        data['updated_at'] = DateTime.now().toUtc().toIso8601String();
         await remoteDataSource.upsertMedicina(data);
         medicinaIdFinal = medicina.id!;
       } else {

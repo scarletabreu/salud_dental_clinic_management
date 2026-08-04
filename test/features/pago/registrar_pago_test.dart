@@ -37,13 +37,8 @@ class _FakePagoRepository implements PagoRepository {
   }
 
   @override
-  Future<void> procesarPago(Pago pago) => throw UnimplementedError();
-
-  @override
-  Future<void> editarPago(Pago pago) => throw UnimplementedError();
-
-  @override
-  Future<void> cancelarPago(String id) => throw UnimplementedError();
+  Future<void> cancelarPago(String id, {String? motivo}) =>
+      throw UnimplementedError();
 
   @override
   Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) =>

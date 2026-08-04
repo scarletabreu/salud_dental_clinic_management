@@ -81,6 +81,7 @@ Widget _app(PlanTratamientoState estado, {List<Diente>? dientes}) {
             doctorId: 'doc-1',
             consultaId: 'consulta-1',
             onElegirTratamiento: () async => null,
+            onEjecutarActividad: (_, _, _, _) async {},
           ),
         ),
       ),

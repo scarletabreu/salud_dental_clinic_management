@@ -20,7 +20,7 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
   Future<void> createRecord(Map<String, dynamic> data) async {
     data.remove('id');
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -30,7 +30,7 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
   @override
   Future<void> upsertRecord(Map<String, dynamic> data) async {
     data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('records').upsert(data);
   }
 
@@ -39,8 +39,8 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
     await supabaseClient
         .from('records')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }
@@ -61,7 +61,7 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
     final existente = await fetchRecordId(pacienteId);
     if (existente != null) return existente;
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     final creado = await supabaseClient
         .from('records')
         .insert({
@@ -99,7 +99,7 @@ class RecordRemoteDatasourceImpl implements RecordRemoteDatasource {
     await supabaseClient.from('record_condicion').insert({
       'record_id': recordId,
       'condicion_id': condicionId,
-      'fecha_deteccion': DateTime.now().toIso8601String(),
+      'fecha_deteccion': DateTime.now().toUtc().toIso8601String(),
       'activo': true,
     });
   }

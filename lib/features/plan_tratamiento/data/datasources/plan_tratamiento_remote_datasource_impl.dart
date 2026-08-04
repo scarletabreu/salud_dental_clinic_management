@@ -44,13 +44,6 @@ class PlanTratamientoRemoteDatasourceImpl
   }
 
   @override
-  Future<void> insertEjecucion(Map<String, dynamic> data) async {
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('tratamientos_aplicados').insert(data);
-  }
-
-  @override
   Future<void> updatePlan(String id, Map<String, dynamic> data) async {
     await supabaseClient
         .from('planes_tratamiento')

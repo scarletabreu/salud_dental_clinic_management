@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
@@ -8,6 +9,7 @@ import 'package:salud_dental_clinic_management/features/consulta/domain/entities
 import 'package:salud_dental_clinic_management/features/consulta/domain/enums/tipo_atencion_clinica.dart';
 import 'package:salud_dental_clinic_management/features/diente/domain/entities/diente.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/historial_pieza.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/marca_clinica_pieza.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/paciente/domain/entities/paciente.dart';
@@ -818,7 +820,7 @@ class ExpedientePdfBuilder {
         // describe el estado actual de la boca: no debe teñir la cara.
         if (marca.anulada || !marca.vigente) continue;
         _procesarMarca(
-          nombre: marca.titulo,
+          clave: marca.clave,
           superficie: marca.superficie?.name,
           esDiagnostico: marca.tipo == TipoMarcaClinica.hallazgo,
           res: res,
@@ -851,7 +853,7 @@ class ExpedientePdfBuilder {
     ]) {
       if (diagnostico.anuladoEn != null) continue;
       _procesarMarca(
-        nombre: diagnostico.nombreDiagnostico ?? '',
+        clave: EstadoClinicoDentalX.fromDb(diagnostico.claveOdontograma),
         superficie: diagnostico.superficie?.name,
         esDiagnostico: true,
         res: res,
@@ -864,7 +866,7 @@ class ExpedientePdfBuilder {
     ]) {
       if (tratamiento.anuladoEn != null) continue;
       _procesarMarca(
-        nombre: tratamiento.nombreTratamiento ?? '',
+        clave: EstadoClinicoDentalX.fromDb(tratamiento.claveOdontograma),
         superficie: tratamiento.superficie?.name,
         esDiagnostico: false,
         res: res,
@@ -872,42 +874,48 @@ class ExpedientePdfBuilder {
     }
   }
 
+  /// Traduce una marca al vocabulario cerrado del papel.
+  ///
+  /// Antes decidía el color por **coincidencia de subcadena sobre el nombre
+  /// libre del catálogo**: rojo sólo si el texto contenía «caries», «cariada» o
+  /// «rojo»; azul si contenía «resina», «amalgama», «restaura»… Cualquier otro
+  /// hallazgo caía en blanco y **desaparecía del diagrama**. Verificado por
+  /// imagen: con seis piezas marcadas se pintaron las tres caries y quedaron en
+  /// blanco Periodontitis, Fractura coronaria y Absceso periapical, mientras la
+  /// hoja siguiente sí los listaba en texto. El documento se contradecía a sí
+  /// mismo, y quien mira el dibujo —que es para lo que existe— concluía que la
+  /// boca estaba sana (P1).
+  ///
+  /// El resto de la aplicación decide las marcas con `clave_odontograma`
+  /// (SD-142, `proyeccion_odontograma.dart`). Eran dos motores distintos sobre
+  /// el mismo dato: la boca de la pantalla y la del papel podían no coincidir.
+  /// Ahora es el mismo vocabulario y la misma tinta.
   static void _procesarMarca({
-    required String nombre,
+    required EstadoClinicoDental? clave,
     required String? superficie,
     required bool esDiagnostico,
     required _EstadoPiezaResultado res,
   }) {
-    final titulo = nombre.trim().isEmpty
-        ? (esDiagnostico ? 'caries' : 'restauración')
-        : nombre;
-
-    final estadoStr = titulo.toLowerCase();
-
-    if (estadoStr.contains('pulp') ||
-        estadoStr.contains('endo') ||
-        estadoStr.contains('conducto')) {
-      res.simbolo = '⊙';
-      res.colorSimbolo = PdfColors.red600;
-    } else if (estadoStr.contains('erupcion') ||
-        estadoStr.contains('no_erupcionado')) {
-      res.simbolo = '=';
-      res.colorSimbolo = PdfColors.blue700;
-    } else if (estadoStr.contains('perdid') ||
-        estadoStr.contains('extracc') ||
-        estadoStr.contains('extraer')) {
-      res.simbolo = 'X';
-      res.colorSimbolo = PdfColors.red800;
+    switch (clave) {
+      case EstadoClinicoDental.pulpectomiaPulpotomia:
+        res.simbolo = '⊙';
+        res.colorSimbolo = PdfColors.red600;
+      case EstadoClinicoDental.noErupcionado:
+        res.simbolo = '=';
+        res.colorSimbolo = PdfColors.blue700;
+      case EstadoClinicoDental.perdida:
+      case EstadoClinicoDental.extraccionIndicada:
+        res.simbolo = 'X';
+        res.colorSimbolo = PdfColors.red800;
+      case _:
+        break;
     }
 
-    // Un procedimiento ejecutado siempre tiene tinta azul, aunque su nombre
-    // no coincida con las pocas palabras que conocía el formulario antiguo.
-    // Los diagnósticos conservan su semántica clínica (por ejemplo, caries en
-    // rojo) y no se inventa una marca para un hallazgo desconocido.
-    final tinta = esDiagnostico ? estadoStr : 'procedimiento ejecutado';
+    final color = _tinta(clave, esDiagnostico: esDiagnostico);
+    if (color == null) return;
 
     if (superficie != null && superficie.isNotEmpty) {
-      _aplicarColorSuperficie(superficie, tinta, res);
+      _aplicarColorSuperficie(superficie, color, res);
       return;
     }
 
@@ -920,51 +928,53 @@ class ExpedientePdfBuilder {
       'distal',
       'oclusal',
     ]) {
-      _aplicarColorSuperficie(cara, tinta, res);
+      _aplicarColorSuperficie(cara, color, res);
     }
+  }
+
+  /// Tinta de la marca, con la misma semántica que en pantalla.
+  ///
+  /// Un procedimiento ejecutado siempre lleva azul aunque su nombre no esté en
+  /// el vocabulario: las claves del papel son un conjunto cerrado y la mayoría
+  /// del catálogo no cabe en ellas. Un hallazgo sin clave no se inventa una
+  /// marca —igual que en pantalla— y se lee en el texto de la hoja.
+  static PdfColor? _tinta(
+    EstadoClinicoDental? clave, {
+    required bool esDiagnostico,
+  }) {
+    if (clave == null) return esDiagnostico ? null : PdfColors.blue;
+    return switch (clave.tintaClinica) {
+      TintaClinica.roja => PdfColors.red,
+      TintaClinica.azul => PdfColors.blue,
+      TintaClinica.negra => PdfColors.grey800,
+    };
   }
 
   static void _aplicarColorSuperficie(
     String keyStr,
-    String vStr,
+    PdfColor col,
     _EstadoPiezaResultado res,
   ) {
     final k = keyStr.toLowerCase();
-    final v = vStr.toLowerCase();
-    PdfColor col = PdfColors.white;
 
-    if (v.contains('caries') || v.contains('cariada') || v.contains('rojo')) {
-      col = PdfColors.red;
-    } else if (v.contains('procedimiento ejecutado') ||
-        v.contains('restaurad') ||
-        v.contains('restaura') ||
-        v.contains('azul') ||
-        v.contains('resina') ||
-        v.contains('amalgama') ||
-        v.contains('restauración')) {
-      col = PdfColors.blue;
-    }
-
-    if (col != PdfColors.white) {
-      if (k.contains('vest') || k == 'v' || k == 'top') {
-        res.superficies['vestibular'] = col;
-      } else if (k.contains('ling') ||
-          k.contains('palat') ||
-          k == 'l' ||
-          k == 'p' ||
-          k == 'bottom') {
-        res.superficies['lingual'] = col;
-      } else if (k.contains('mes') || k == 'm' || k == 'left') {
-        res.superficies['mesial'] = col;
-      } else if (k.contains('dist') || k == 'd' || k == 'right') {
-        res.superficies['distal'] = col;
-      } else if (k.contains('ocl') ||
-          k.contains('inc') ||
-          k == 'o' ||
-          k == 'i' ||
-          k == 'center') {
-        res.superficies['oclusal'] = col;
-      }
+    if (k.contains('vest') || k == 'v' || k == 'top') {
+      res.superficies['vestibular'] = col;
+    } else if (k.contains('ling') ||
+        k.contains('palat') ||
+        k == 'l' ||
+        k == 'p' ||
+        k == 'bottom') {
+      res.superficies['lingual'] = col;
+    } else if (k.contains('mes') || k == 'm' || k == 'left') {
+      res.superficies['mesial'] = col;
+    } else if (k.contains('dist') || k == 'd' || k == 'right') {
+      res.superficies['distal'] = col;
+    } else if (k.contains('ocl') ||
+        k.contains('inc') ||
+        k == 'o' ||
+        k == 'i' ||
+        k == 'center') {
+      res.superficies['oclusal'] = col;
     }
   }
 
@@ -978,10 +988,14 @@ class ExpedientePdfBuilder {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.center,
       children: [
+        // `q1` es el hemicampo izquierdo del papel: la línea media —y con ella
+        // la cara mesial— queda a su derecha. En `q2` pasa lo contrario. Sin
+        // esto, mesial y distal salían intercambiadas en media boca.
         ...q1.map(
           (fdi) => _buildPiezaGlifoCuadrado(
             fdi,
             esSuperior: esSuperior,
+            mesialALaDerecha: true,
             lista: lista,
             hp: hp,
           ),
@@ -996,6 +1010,7 @@ class ExpedientePdfBuilder {
           (fdi) => _buildPiezaGlifoCuadrado(
             fdi,
             esSuperior: esSuperior,
+            mesialALaDerecha: false,
             lista: lista,
             hp: hp,
           ),
@@ -1014,10 +1029,14 @@ class ExpedientePdfBuilder {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.center,
       children: [
+        // `q1` es el hemicampo izquierdo del papel: la línea media —y con ella
+        // la cara mesial— queda a su derecha. En `q2` pasa lo contrario. Sin
+        // esto, mesial y distal salían intercambiadas en media boca.
         ...q1.map(
           (fdi) => _buildPiezaGlifoCirculo(
             fdi,
             esSuperior: esSuperior,
+            mesialALaDerecha: true,
             lista: lista,
             hp: hp,
           ),
@@ -1032,6 +1051,7 @@ class ExpedientePdfBuilder {
           (fdi) => _buildPiezaGlifoCirculo(
             fdi,
             esSuperior: esSuperior,
+            mesialALaDerecha: false,
             lista: lista,
             hp: hp,
           ),
@@ -1043,6 +1063,7 @@ class ExpedientePdfBuilder {
   static pw.Widget _buildPiezaGlifoCuadrado(
     int fdi, {
     required bool esSuperior,
+    required bool mesialALaDerecha,
     required List<Odontograma> lista,
     HistorialPiezas? hp,
   }) {
@@ -1067,13 +1088,27 @@ class ExpedientePdfBuilder {
           canvas.setLineWidth(0.5);
 
           final sup = estado.superficies;
+
+          // La vestibular mira hacia fuera de la arcada: hacia ARRIBA del papel
+          // en el maxilar y hacia ABAJO en la mandíbula. El glifo de pantalla ya
+          // lo invierte (`glifo_pieza.dart`); éste no, y sólo usaba `esSuperior`
+          // para colocar el número, así que una lesión vestibular de un molar
+          // inferior se dibujaba del lado lingual (P4).
+          //
+          // En el lienzo del PDF el origen está abajo: la banda inferior del
+          // dibujo es `y = 0`.
+          final caraArriba = esSuperior ? 'vestibular' : 'lingual';
+          final caraAbajo = esSuperior ? 'lingual' : 'vestibular';
+          final caraIzquierda = mesialALaDerecha ? 'distal' : 'mesial';
+          final caraDerecha = mesialALaDerecha ? 'mesial' : 'distal';
+
           if (sup['oclusal'] != PdfColors.white) {
             canvas.setFillColor(sup['oclusal']!);
             canvas.drawRect(5, 5, 8, 8);
             canvas.fillPath();
           }
-          if (sup['vestibular'] != PdfColors.white) {
-            canvas.setFillColor(sup['vestibular']!);
+          if (sup[caraAbajo] != PdfColors.white) {
+            canvas.setFillColor(sup[caraAbajo]!);
             canvas.moveTo(0, 0);
             canvas.lineTo(size.x, 0);
             canvas.lineTo(13, 5);
@@ -1081,8 +1116,8 @@ class ExpedientePdfBuilder {
             canvas.closePath();
             canvas.fillPath();
           }
-          if (sup['lingual'] != PdfColors.white) {
-            canvas.setFillColor(sup['lingual']!);
+          if (sup[caraArriba] != PdfColors.white) {
+            canvas.setFillColor(sup[caraArriba]!);
             canvas.moveTo(0, size.y);
             canvas.lineTo(size.x, size.y);
             canvas.lineTo(13, 13);
@@ -1090,8 +1125,8 @@ class ExpedientePdfBuilder {
             canvas.closePath();
             canvas.fillPath();
           }
-          if (sup['mesial'] != PdfColors.white) {
-            canvas.setFillColor(sup['mesial']!);
+          if (sup[caraIzquierda] != PdfColors.white) {
+            canvas.setFillColor(sup[caraIzquierda]!);
             canvas.moveTo(0, 0);
             canvas.lineTo(5, 5);
             canvas.lineTo(5, 13);
@@ -1099,8 +1134,8 @@ class ExpedientePdfBuilder {
             canvas.closePath();
             canvas.fillPath();
           }
-          if (sup['distal'] != PdfColors.white) {
-            canvas.setFillColor(sup['distal']!);
+          if (sup[caraDerecha] != PdfColors.white) {
+            canvas.setFillColor(sup[caraDerecha]!);
             canvas.moveTo(size.x, 0);
             canvas.lineTo(13, 5);
             canvas.lineTo(13, 13);
@@ -1154,6 +1189,7 @@ class ExpedientePdfBuilder {
   static pw.Widget _buildPiezaGlifoCirculo(
     int fdi, {
     required bool esSuperior,
+    required bool mesialALaDerecha,
     required List<Odontograma> lista,
     HistorialPiezas? hp,
   }) {
@@ -1178,9 +1214,51 @@ class ExpedientePdfBuilder {
           canvas.setLineWidth(0.5);
 
           final r = size.x / 2;
+          final sup = estado.superficies;
 
-          if (estado.superficies['oclusal'] != PdfColors.white) {
-            canvas.setFillColor(estado.superficies['oclusal']!);
+          // Las cuatro caras axiales del glifo temporal se calculaban y se
+          // tiraban: sólo se pintaba la oclusal. De cinco piezas temporales
+          // marcadas se veían dos (las oclusales) y quedaban en blanco la caries
+          // mesial, la vestibular y la resina distal — cuatro de cada cinco
+          // marcas por pieza, justo en la población donde el odontograma en
+          // papel más se usa (P2).
+          //
+          // Cada cuadrante del anillo es el sector entre el núcleo y el borde.
+          // Igual que en el glifo cuadrado, la vestibular mira hacia fuera de la
+          // arcada.
+          final caraArriba = esSuperior ? 'vestibular' : 'lingual';
+          final caraAbajo = esSuperior ? 'lingual' : 'vestibular';
+
+          void pintarSector(String cara, double desde, double hasta) {
+            final color = sup[cara];
+            if (color == null || color == PdfColors.white) return;
+            canvas.setFillColor(color);
+            canvas.moveTo(r, r);
+            const pasos = 12;
+            for (var i = 0; i <= pasos; i++) {
+              final a = desde + (hasta - desde) * i / pasos;
+              canvas.lineTo(r + r * math.cos(a), r + r * math.sin(a));
+            }
+            canvas.closePath();
+            canvas.fillPath();
+          }
+
+          final caraIzquierda = mesialALaDerecha ? 'distal' : 'mesial';
+          final caraDerecha = mesialALaDerecha ? 'mesial' : 'distal';
+
+          const cuarto = math.pi / 2;
+          pintarSector(caraArriba, cuarto / 2, cuarto / 2 + cuarto);
+          pintarSector(caraIzquierda, cuarto / 2 + cuarto, cuarto / 2 + 2 * cuarto);
+          pintarSector(caraAbajo, cuarto / 2 + 2 * cuarto, cuarto / 2 + 3 * cuarto);
+          pintarSector(caraDerecha, -cuarto / 2, cuarto / 2);
+
+          // El núcleo (oclusal) se pinta encima para que quede limpio.
+          if (sup['oclusal'] != PdfColors.white) {
+            canvas.setFillColor(sup['oclusal']!);
+            canvas.drawEllipse(r, r, r / 2, r / 2);
+            canvas.fillPath();
+          } else {
+            canvas.setFillColor(PdfColors.white);
             canvas.drawEllipse(r, r, r / 2, r / 2);
             canvas.fillPath();
           }
@@ -1648,32 +1726,49 @@ class ExpedientePdfBuilder {
     ];
   }
 
+  /// Tarjetas clínicas que **no se parten** entre páginas.
+  ///
+  /// En el render revisado, la página 2 terminaba con el encabezado
+  /// «21 de julio de 2026 · Paracetamol» y una tarjeta vacía, y la posología
+  /// aparecía sola al principio de la página 3 —«Dosis: 500 mg / Frecuencia:
+  /// cada 8 horas / Duración: 5 días»— sin decir de qué medicamento era. Una
+  /// hoja suelta de una receta impresa así es ilegible en el mejor caso y
+  /// peligrosa en el peor (P3).
+  ///
+  /// `Inseparable` es el mecanismo del propio paquete para esto: con
+  /// `canSpan: false` la tarjeta se mueve entera a la página siguiente en vez
+  /// de repartirse. Los trozos se acortan además a un tamaño que siempre cabe
+  /// en una hoja, y cada uno repite su encabezado: aunque alguna vez se
+  /// separaran, ningún fragmento queda sin identificar.
   static List<pw.Widget> _clinicalCards(String titulo, String cuerpo) {
-    final partes = _partirTexto(cuerpo, 1200);
+    final partes = _partirTexto(cuerpo, 900);
     return [
       for (var i = 0; i < partes.length; i++)
-        pw.Container(
-          width: double.infinity,
-          margin: const pw.EdgeInsets.only(bottom: 4),
-          padding: const pw.EdgeInsets.all(8),
-          decoration: _cardDecoration(),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                i == 0 ? titulo : '$titulo (continuación)',
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                  color: _Brand.primaryDark,
+        pw.Inseparable(
+          canSpan: false,
+          child: pw.Container(
+            width: double.infinity,
+            margin: const pw.EdgeInsets.only(bottom: 4),
+            padding: const pw.EdgeInsets.all(8),
+            decoration: _cardDecoration(),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  i == 0 ? titulo : '$titulo (continuación)',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _Brand.primaryDark,
+                  ),
                 ),
-              ),
-              pw.SizedBox(height: 3),
-              pw.Text(
-                partes[i],
-                style: const pw.TextStyle(fontSize: 7.5, height: 1.3),
-              ),
-            ],
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  partes[i],
+                  style: const pw.TextStyle(fontSize: 7.5, height: 1.3),
+                ),
+              ],
+            ),
           ),
         ),
     ];

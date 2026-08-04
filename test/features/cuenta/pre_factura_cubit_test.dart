@@ -50,13 +50,14 @@ class _FakeCuentaRepository implements CuentaRepository {
   }
 
   @override
-  Future<void> crearFactura(Cuenta cuenta) => throw UnimplementedError();
-
-  @override
   Future<void> eliminarCuenta(String id) => throw UnimplementedError();
 
+  final List<(String, MetodoPago)> modosFijados = [];
+
   @override
-  Future<void> actualizarCuenta(Cuenta cuenta) => throw UnimplementedError();
+  Future<void> fijarModoPago(String cuentaId, MetodoPago modo) async {
+    modosFijados.add((cuentaId, modo));
+  }
 
   @override
   Future<Cuenta?> getCuentaByConsultaId(String consultaId) =>
@@ -95,13 +96,8 @@ class _FakePagoRepository implements PagoRepository {
   }
 
   @override
-  Future<void> procesarPago(Pago pago) => throw UnimplementedError();
-
-  @override
-  Future<void> editarPago(Pago pago) => throw UnimplementedError();
-
-  @override
-  Future<void> cancelarPago(String id) => throw UnimplementedError();
+  Future<void> cancelarPago(String id, {String? motivo}) =>
+      throw UnimplementedError();
 
   @override
   Future<List<Pago>> getHistorialPagosCuenta(String cuentaId) =>
@@ -189,6 +185,7 @@ void main() {
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
         consultaRepository: _FakeConsultaRepository(),
         pacienteRepository: _FakePacienteRepository(),
+        cuentaRepository: _FakeCuentaRepository(resultado: cuenta),
       );
 
       final futuro = expectLater(
@@ -220,6 +217,7 @@ void main() {
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
         consultaRepository: _FakeConsultaRepository(),
         pacienteRepository: _FakePacienteRepository(),
+        cuentaRepository: _FakeCuentaRepository(error: Exception('boom')),
       );
 
       final futuro = expectLater(
@@ -248,6 +246,7 @@ void main() {
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
         consultaRepository: _FakeConsultaRepository(),
         pacienteRepository: _FakePacienteRepository(),
+        cuentaRepository: _FakeCuentaRepository(resultado: inicial),
       );
 
       await cubit.cargar('c1');
@@ -278,6 +277,7 @@ void main() {
         generarPlan: GenerarPlanDeCuotas(cuotaRepository),
         consultaRepository: _FakeConsultaRepository(),
         pacienteRepository: _FakePacienteRepository(),
+        cuentaRepository: _FakeCuentaRepository(resultado: cuenta),
       );
 
       await cubit.cargar('c1');

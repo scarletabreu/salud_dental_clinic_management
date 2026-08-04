@@ -80,7 +80,10 @@ select set_config(
 do $$
 declare
   v_cita  uuid;
-  v_base  timestamptz := date_trunc('hour', now()) + interval '1 day';
+  -- La cita es de HOY: desde `audit_005` `registrar_llegada_cita` rechaza la
+  -- llegada de una cita de otro día, porque adelanta o retrasa el expediente y
+  -- descuadra cualquier recuento de la jornada (§1.5 del audit).
+  v_base  timestamptz := date_trunc('hour', now()) + interval '1 hour';
 begin
   insert into public.citas (persona_id, doctor_id, fecha_hora, duracion_minutos, motivo)
   values (current_setting('hfx005.paciente')::uuid,
@@ -206,6 +209,15 @@ begin
     raise exception 'retirar el diagnóstico no dejó rastro';
   end if;
 
+  -- La ejecución la escriben las RPC clínicas, que corren como el dueño de la
+  -- función: desde `audit_003` el cliente no puede escribir
+  -- `tratamientos_aplicados` de una consulta abierta, porque el siguiente
+  -- autoguardado anulaba la fila y el procedimiento no llegaba ni al
+  -- expediente ni a la factura (F1-01). Se cambia el rol de la sesión, no las
+  -- claims: la auditoría sigue leyendo al doctor del JWT, que es lo que este
+  -- caso comprueba.
+  perform set_config('role', 'postgres', true);
+
   insert into public.tratamientos_aplicados (
     tratamiento_id, consulta_id, diente_id, superficie, estado,
     precio_aplicado, doctor_ejecuta_id, fecha_ejecucion
@@ -213,6 +225,8 @@ begin
     current_setting('hfx005.tratamiento')::uuid, v_consulta, v_diente,
     'oclusal', 'aplicado', 1500, current_setting('hfx005.doc')::uuid, now()
   );
+
+  perform set_config('role', 'authenticated', true);
 
   if not exists (
     select 1 from public.auditoria_clinica

@@ -10,5 +10,6 @@ abstract class CompraRepository {
   Future<void> recibirCompra({
     required String compraId,
     required String usuarioId,
+    String metodoPago,
   });
 }

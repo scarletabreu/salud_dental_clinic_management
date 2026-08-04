@@ -4,8 +4,14 @@ import 'package:salud_dental_clinic_management/features/cita/domain/enums/estado
 void main() {
   group('EstadoCita.transicionesPermitidas', () {
     test('grafo de transiciones del ticket SD-81', () {
+      // `programada → en_espera` la permite `hfx_clin_004_validar_transicion_cita`
+      // desde HFX-CLIN-004. Sin ella aquí, el desplegable no ofrecía «En Espera»
+      // y no se podía iniciar la consulta de una cita programada sin pasar
+      // antes por Confirmada, con el paciente ya delante (F3-03 del audit del
+      // 2 ago 2026). El grafo del cliente y el de la base son el mismo.
       expect(EstadoCita.programada.transicionesPermitidas, const [
         EstadoCita.confirmada,
+        EstadoCita.enEspera,
         EstadoCita.cancelada,
         EstadoCita.noAsistio,
       ]);

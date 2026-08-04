@@ -49,6 +49,10 @@ MovimientoCaja _entidad(Map<String, dynamic> json) => MovimientoCaja(
 );
 
 class _FakeDatasource implements CajaDiariaDatasource {
+  @override
+  Future<List<Map<String, dynamic>>> fetchCajasSinCerrarDeOtrosDias() async =>
+      const [];
+
   _FakeDatasource({
     List<Map<String, dynamic>>? movimientos,
     this.hayCajaAbierta = true,
@@ -109,6 +113,9 @@ class _FakeDatasource implements CajaDiariaDatasource {
 }
 
 class _FakeCajaRepository implements CajaDiariaRepository {
+  @override
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+
   _FakeCajaRepository({this.caja});
 
   CajaDiaria? caja;

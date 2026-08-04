@@ -14,6 +14,10 @@ import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/r
 /// grabadora de llamadas. Así el test comprueba la regla de negocio (no puede
 /// haber dos cajas abiertas) y no el orden en que se invocaron los métodos.
 class _FakeDatasource implements CajaDiariaDatasource {
+  @override
+  Future<List<Map<String, dynamic>>> fetchCajasSinCerrarDeOtrosDias() async =>
+      const [];
+
   _FakeDatasource({this.cajaAbierta});
 
   Map<String, dynamic>? cajaAbierta;
@@ -64,6 +68,9 @@ class _FakeDatasource implements CajaDiariaDatasource {
 }
 
 class _FakeCajaRepository implements CajaDiariaRepository {
+  @override
+  Future<List<CajaDiaria>> getCajasSinCerrarDeOtrosDias() async => const [];
+
   CajaDiaria? caja;
   final movimientos = StreamController<List<MovimientoCaja>>.broadcast();
   final List<double> aperturas = [];

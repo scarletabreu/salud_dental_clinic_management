@@ -14,11 +14,13 @@ class CompraRepositoryImpl implements CompraRepository {
   Future<void> recibirCompra({
     required String compraId,
     required String usuarioId,
+    String metodoPago = 'efectivo',
   }) {
     return runGuarded(
       () => remoteDataSource.recibirCompra(
         compraId: compraId,
         usuarioId: usuarioId,
+        metodoPago: metodoPago,
       ),
       context: 'recibir la compra y registrar el egreso en caja',
     );
@@ -56,7 +58,7 @@ class CompraRepositoryImpl implements CompraRepository {
   @override
   Future<void> actualizarEstadoCompra(String id, EstadoCompra nuevoEstado) {
     return runGuarded(
-      () => remoteDataSource.updateCompraEstado(id, nuevoEstado.name),
+      () => remoteDataSource.updateCompraEstado(id, nuevoEstado.dbValue),
       context: 'actualizar el estado de la compra',
     );
   }

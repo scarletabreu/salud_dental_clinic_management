@@ -68,6 +68,7 @@ Map<String, dynamic> _fila({
   'consulta_id': consultaId,
   'superficie': superficie,
   'diagnosis': {'nombre': clave, 'clave_odontograma': clave},
+  'diente_id': 'diente-$fdi',
   'diente': {'fdi_code': fdi},
 };
 
@@ -214,6 +215,7 @@ void main() {
               'notas': '',
               'consulta_id': 'c-vieja',
               'diagnosis': {'nombre': 'Sensibilidad'},
+              'diente_id': 'diente-48',
               'diente': {'fdi_code': 48},
             },
             _fila(consultaId: 'c-vieja', fdi: 48, clave: 'extraccion_indicada'),

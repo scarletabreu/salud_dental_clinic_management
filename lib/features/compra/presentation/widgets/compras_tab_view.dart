@@ -138,8 +138,8 @@ class _ComprasTabViewState extends State<ComprasTabView> {
                     itemBuilder: (context, index) {
                       final compra = items[index];
                       final esPendiente =
-                          compra.estado != EstadoCompra.recibido &&
-                          compra.estado != EstadoCompra.cancelado;
+                          compra.estado != EstadoCompra.recibida &&
+                          compra.estado != EstadoCompra.cancelada;
 
                       return Container(
                         padding: const EdgeInsets.all(16),
@@ -219,17 +219,17 @@ class _ComprasTabViewState extends State<ComprasTabView> {
                                 ),
                                 decoration: BoxDecoration(
                                   color:
-                                      (compra.estado == EstadoCompra.recibido
+                                      (compra.estado == EstadoCompra.recibida
                                               ? ac.green
                                               : ac.red)
                                           .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  compra.estado.name.toUpperCase(),
+                                  compra.estado.etiqueta.toUpperCase(),
                                   style: TextStyle(
                                     color:
-                                        compra.estado == EstadoCompra.recibido
+                                        compra.estado == EstadoCompra.recibida
                                         ? ac.green
                                         : ac.red,
                                     fontWeight: FontWeight.bold,

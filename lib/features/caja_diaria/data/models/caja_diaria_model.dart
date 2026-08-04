@@ -36,7 +36,7 @@ class CajaDiariaModel extends CajaDiaria {
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
-      'fecha': fecha.toIso8601String(),
+      'fecha': fecha.toUtc().toIso8601String(),
       'monto_apertura': montoApertura,
       'monto_cierre': montoCierre,
       'monto_esperado': montoEsperado,

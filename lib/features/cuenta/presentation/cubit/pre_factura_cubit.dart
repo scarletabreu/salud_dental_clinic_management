@@ -2,6 +2,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/repositories/consulta_repository.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart'
+    as cuenta_enums;
+import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/usecases/get_cuenta_by_id_usecase.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/enums/frecuencia_cuota.dart';
@@ -21,6 +24,7 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
   final GenerarPlanDeCuotas _generarPlan;
   final ConsultaRepository _consultaRepository;
   final IPacienteRepository _pacienteRepository;
+  final CuentaRepository _cuentaRepository;
   String? _ultimoPagoId;
 
   PreFacturaCubit({
@@ -30,12 +34,14 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
     required GenerarPlanDeCuotas generarPlan,
     required ConsultaRepository consultaRepository,
     required IPacienteRepository pacienteRepository,
+    required CuentaRepository cuentaRepository,
   }) : _getCuenta = getCuenta,
        _registrarPago = registrarPago,
        _cuotaRepository = cuotaRepository,
        _generarPlan = generarPlan,
        _consultaRepository = consultaRepository,
        _pacienteRepository = pacienteRepository,
+       _cuentaRepository = cuentaRepository,
        super(const PreFacturaInicial());
 
   Pago? get ultimoPagoRegistrado {
@@ -125,6 +131,29 @@ class PreFacturaCubit extends Cubit<PreFacturaState> {
       return e.message;
     } catch (_) {
       return 'No se pudo registrar el pago. Inténtalo de nuevo.';
+    }
+  }
+
+  /// Persiste el modo de pago pactado con el paciente.
+  ///
+  /// La pantalla ofrecía elegir entre contado y crédito desde siempre, pero la
+  /// elección vivía en el estado del widget: `cuentas.metodo_pago` se quedaba en
+  /// `contado` aunque se configurara un plan de cuotas.
+  Future<String?> fijarModoPago(cuenta_enums.MetodoPago modo) async {
+    final actual = state;
+    if (actual is! PreFacturaCargada) return 'La cuenta aún no está cargada.';
+    if (actual.cuenta.metodoPago == modo) return null;
+    final cuentaId = actual.cuenta.id;
+    if (cuentaId == null) return 'La cuenta aún no está creada.';
+
+    try {
+      await _cuentaRepository.fijarModoPago(cuentaId, modo);
+      await cargar(cuentaId);
+      return null;
+    } on Failure catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'No se pudo guardar el modo de pago. Inténtalo de nuevo.';
     }
   }
 

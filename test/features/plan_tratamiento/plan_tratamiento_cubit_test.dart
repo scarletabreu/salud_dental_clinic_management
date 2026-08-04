@@ -7,7 +7,6 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/errors/transicion_plan_invalida.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/presentation/cubit/plan_tratamiento_state.dart';
 
@@ -131,17 +130,6 @@ class _RepoFake implements PlanTratamientoRepository {
     return const [];
   }
 
-  @override
-  Future<void> registrarEjecucionItem({
-    required ItemPlanTratamiento item,
-    required String consultaId,
-    required String doctorId,
-    required double cantidadRealizada,
-    required EstadoTratamientoAplicado estadoTratamientoAplicado,
-    String? notas,
-  }) async {
-    llamadas.add('registrarEjecucionItem');
-  }
 
   @override
   Future<void> eliminarItem(String id) async => llamadas.add('eliminarItem');

@@ -15,8 +15,22 @@ class RecepcionCompraPage extends StatefulWidget {
   State<RecepcionCompraPage> createState() => _RecepcionCompraPageState();
 }
 
+/// Formas de pago que admite el egreso de caja. El movimiento se registraba
+/// siempre como efectivo, así que el arqueo no distinguía una compra pagada por
+/// transferencia de una pagada en billetes.
+enum _FormaPagoCompra {
+  efectivo('efectivo', 'Efectivo'),
+  transferencia('transferencia_bancaria', 'Transferencia'),
+  tarjeta('tarjeta_credito', 'Tarjeta');
+
+  const _FormaPagoCompra(this.dbValue, this.etiqueta);
+  final String dbValue;
+  final String etiqueta;
+}
+
 class _RecepcionCompraPageState extends State<RecepcionCompraPage> {
   bool _procesando = false;
+  _FormaPagoCompra _formaPago = _FormaPagoCompra.efectivo;
 
   Future<void> _confirmarRecepcion() async {
     setState(() => _procesando = true);
@@ -35,6 +49,7 @@ class _RecepcionCompraPageState extends State<RecepcionCompraPage> {
     final error = await context.read<CompraCubit>().recibirCompra(
       compraId: widget.compra.id!,
       usuarioId: usuarioId,
+      metodoPago: _formaPago.dbValue,
     );
 
     if (!mounted) return;
@@ -112,7 +127,7 @@ class _RecepcionCompraPageState extends State<RecepcionCompraPage> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Al procesar la recepción, se debitará RD\$ ${widget.compra.precioTotal.toStringAsFixed(2)} de la caja abierta y se incrementará el stock de cada consumible.',
+                            'Al procesar la recepción, se debitará RD\$ ${widget.compra.precioTotal.toStringAsFixed(2)} de la caja de hoy y se incrementará el stock de cada consumible.',
                             style: TextStyle(
                               fontSize: 12,
                               color: ac.textSecondary,
@@ -175,6 +190,27 @@ class _RecepcionCompraPageState extends State<RecepcionCompraPage> {
                     );
                   },
                 ),
+              ),
+              const SizedBox(height: 24),
+
+              Text(
+                'Forma de pago del egreso',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<_FormaPagoCompra>(
+                segments: [
+                  for (final forma in _FormaPagoCompra.values)
+                    ButtonSegment(value: forma, label: Text(forma.etiqueta)),
+                ],
+                selected: {_formaPago},
+                onSelectionChanged: _procesando
+                    ? null
+                    : (seleccion) =>
+                          setState(() => _formaPago = seleccion.first),
               ),
               const SizedBox(height: 24),
 

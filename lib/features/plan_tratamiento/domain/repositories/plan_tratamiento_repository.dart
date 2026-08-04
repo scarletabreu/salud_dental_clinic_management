@@ -4,7 +4,6 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_item_plan.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/enums/estado_plan_tratamiento.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 abstract class PlanTratamientoRepository {
   /// Registra la decisión del paciente sobre el plan y la aplica.
@@ -56,12 +55,4 @@ abstract class PlanTratamientoRepository {
   /// `tratamientos_aplicados`, vinculada por `item_plan_id`. Cada llamada crea
   /// una fila nueva — consistente con `resumen_actividad_plan`, que suma
   /// `cantidad_realizada` agrupando por `item_plan_id`.
-  Future<void> registrarEjecucionItem({
-    required ItemPlanTratamiento item,
-    required String consultaId,
-    required String doctorId,
-    required double cantidadRealizada,
-    required EstadoTratamientoAplicado estadoTratamientoAplicado,
-    String? notas,
-  });
 }

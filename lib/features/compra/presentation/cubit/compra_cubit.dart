@@ -44,9 +44,14 @@ class CompraCubit extends Cubit<CompraState> {
   Future<String?> recibirCompra({
     required String compraId,
     required String usuarioId,
+    String metodoPago = 'efectivo',
   }) async {
     try {
-      await _recibirCompraUseCase(compraId: compraId, usuarioId: usuarioId);
+      await _recibirCompraUseCase(
+        compraId: compraId,
+        usuarioId: usuarioId,
+        metodoPago: metodoPago,
+      );
       await cargar();
       return null;
     } catch (e) {

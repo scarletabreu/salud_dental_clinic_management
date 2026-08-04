@@ -1,5 +1,6 @@
 {
+  "_comentario": "Plantilla del stack LOCAL. Cópiala a dart_define.json, que git ignora. Apuntar a la instancia real de la clínica exige cambiar SUPABASE_URL y APP_ENVIRONMENT a mano: correr la app 'para probar algo' contra datos reales nunca debe salir de copiar esta plantilla (§1.1 del audit del 2 ago 2026).",
   "APP_ENVIRONMENT": "development",
-  "SUPABASE_URL": "https://xcuvywvltttephakzmwu.supabase.co",
-  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_3VHcOI-RR6w4_E8GFSkj6A_w2qa5PBG"
+  "SUPABASE_URL": "http://127.0.0.1:54321",
+  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
 }

@@ -7,29 +7,11 @@ class PagoRemoteDatasourceImpl implements PagoRemoteDatasource {
   PagoRemoteDatasourceImpl({required this.supabaseClient});
 
   @override
-  Future<void> registrarPago(Map<String, dynamic> data) async {
-    data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('pagos').insert(data);
-  }
-
-  @override
-  Future<void> actualizarPago(Map<String, dynamic> data) async {
-    data.remove('id');
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('pagos').upsert(data);
-  }
-
-  @override
-  Future<void> anularPago(String id) async {
-    await supabaseClient
-        .from('pagos')
-        .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+  Future<void> anularPago(String id, {String? motivo}) async {
+    await supabaseClient.rpc(
+      'anular_pago',
+      params: {'p_pago_id': id, 'p_motivo': motivo},
+    );
   }
 
   @override

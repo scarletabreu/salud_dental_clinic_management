@@ -3,6 +3,7 @@ import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/data/models/cuenta_model.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
 
 class CuentaRepositoryImpl implements CuentaRepository {
@@ -17,34 +18,6 @@ class CuentaRepositoryImpl implements CuentaRepository {
       return data.map((json) => CuentaModel.fromJson(json)).toList();
     }, context: 'obtener las cuentas por cobrar');
   }
-
-@override
-Future<void> actualizarCuenta(Cuenta cuenta) async {
-  if (cuenta.id == null) {
-    throw Exception(
-      'No se puede actualizar una cuenta sin id (¿aún no se ha creado?)',
-    );
-  }
-  try {
-    final model = CuentaModel(
-      id: cuenta.id,
-      consultaId: cuenta.consultaId,
-      fechaCreacion: cuenta.fechaCreacion,
-      fechaPago: cuenta.fechaPago,
-      metodoPago: cuenta.metodoPago,
-      estado: cuenta.estado,
-      itemCuentas: cuenta.itemCuentas,
-      nota: cuenta.nota,
-    );
-    // toJson() incluye 'id' solo si es un uuid válido; para update lo
-    // necesitamos en el WHERE del datasource, no en el body, así que
-    // lo removemos del payload explícitamente.
-    final data = model.toJson()..remove('id');
-    await remoteDataSource.updateCuenta(cuenta.id!, data);
-  } catch (e) {
-    throw Exception('Error en el repositorio al actualizar cuenta: $e');
-  }
-}
 
   @override
   Future<List<Cuenta>> getHistorialFinanciero(String pacienteId) {
@@ -81,19 +54,11 @@ Future<void> actualizarCuenta(Cuenta cuenta) async {
   }
 
   @override
-  Future<void> crearFactura(Cuenta cuenta) {
-    return runGuarded(() async {
-      final model = CuentaModel(
-        id: cuenta.id,
-        consultaId: cuenta.consultaId,
-        fechaCreacion: cuenta.fechaCreacion,
-        metodoPago: cuenta.metodoPago,
-        itemCuentas: cuenta.itemCuentas,
-        estado: cuenta.estado,
-        nota: cuenta.nota,
-      );
-      await remoteDataSource.registrarCuenta(model.toJson());
-    }, context: 'crear la factura');
+  Future<void> fijarModoPago(String cuentaId, MetodoPago modo) {
+    return runGuarded(
+      () => remoteDataSource.fijarModoPago(cuentaId, modo),
+      context: 'guardar el modo de pago de la cuenta',
+    );
   }
 
   @override

@@ -21,7 +21,7 @@ class EquipoRemoteDatasourceImpl implements EquipoRemoteDatasource {
   Future<void> createEquipo(Map<String, dynamic> data) async {
     data.remove('id');
 
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     data['created_at'] = now;
     data['updated_at'] = now;
 
@@ -32,10 +32,10 @@ class EquipoRemoteDatasourceImpl implements EquipoRemoteDatasource {
   Future<void> upsertEquipo(Map<String, dynamic> data) async {
     if (!(_isValidUuid(data['id']))) {
       data.remove('id');
-      data['created_at'] = DateTime.now().toIso8601String();
+      data['created_at'] = DateTime.now().toUtc().toIso8601String();
     }
 
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabaseClient.from('equipos').upsert(data);
   }
@@ -49,8 +49,8 @@ class EquipoRemoteDatasourceImpl implements EquipoRemoteDatasource {
     await supabaseClient
         .from('equipos')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

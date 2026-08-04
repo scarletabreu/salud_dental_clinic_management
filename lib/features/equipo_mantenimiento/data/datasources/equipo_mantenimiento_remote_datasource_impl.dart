@@ -42,7 +42,7 @@ class EquipoMantenimientoRemoteDatasourceImpl
   Future<void> updateMantenimiento(String id, Map<String, dynamic> data) async {
     data.remove('id');
 
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     await supabaseClient
         .from('equipos_mantenimientos')
@@ -55,8 +55,8 @@ class EquipoMantenimientoRemoteDatasourceImpl
     await supabaseClient
         .from('equipos_mantenimientos')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

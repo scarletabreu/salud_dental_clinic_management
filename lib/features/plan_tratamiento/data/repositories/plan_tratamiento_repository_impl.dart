@@ -11,8 +11,6 @@ import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/repositories/plan_tratamiento_repository.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/data/models/resumen_actividad_plan_model.dart';
 import 'package:salud_dental_clinic_management/features/plan_tratamiento/domain/entities/resumen_actividad_plan.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/data/models/tratamiento_aplicado_model.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 class PlanTratamientoRepositoryImpl implements PlanTratamientoRepository {
   final PlanTratamientoRemoteDatasource remoteDataSource;
@@ -29,63 +27,6 @@ class PlanTratamientoRepositoryImpl implements PlanTratamientoRepository {
       final items = await _insertarItems(planId, plan.items);
       return plan.copyWith(id: planId, items: items);
     }, context: 'crear el plan de tratamiento');
-  }
-
-  @override
-  Future<void> registrarEjecucionItem({
-    required ItemPlanTratamiento item,
-    required String consultaId,
-    required String doctorId,
-    required double cantidadRealizada,
-    required EstadoTratamientoAplicado estadoTratamientoAplicado,
-    String? notas,
-  }) {
-    return runGuarded(() async {
-      final itemId = item.id;
-      if (itemId == null) {
-        throw Exception(
-          'La actividad no está persistida: no se puede registrar su ejecución.',
-        );
-      }
-
-      final ejecucion = TratamientoAplicado(
-        tratamientoId: item.tratamientoId,
-        esContinuo: false,
-        estaTerminado:
-            estadoTratamientoAplicado == EstadoTratamientoAplicado.completado,
-        consultaId: consultaId,
-        dienteId: item.dienteId,
-        superficie: item.superficie,
-        precioAplicado: item.precioEstimado,
-        notas: notas,
-        estado: estadoTratamientoAplicado,
-        nombreTratamiento: item.nombreTratamiento,
-        fechaAplicacion: DateTime.now(),
-        itemPlanId: itemId,
-        doctorEjecutaId: doctorId,
-        fechaEjecucion: DateTime.now(),
-        cantidadRealizada: cantidadRealizada,
-      );
-
-      await remoteDataSource.insertEjecucion(
-        TratamientoAplicadoModel(
-          tratamientoId: ejecucion.tratamientoId,
-          esContinuo: ejecucion.esContinuo,
-          estaTerminado: ejecucion.estaTerminado,
-          consultaId: ejecucion.consultaId,
-          dienteId: ejecucion.dienteId,
-          superficie: ejecucion.superficie,
-          precioAplicado: ejecucion.precioAplicado,
-          notas: ejecucion.notas,
-          estado: ejecucion.estado,
-          nombreTratamiento: ejecucion.nombreTratamiento,
-          itemPlanId: ejecucion.itemPlanId,
-          doctorEjecutaId: ejecucion.doctorEjecutaId,
-          fechaEjecucion: ejecucion.fechaEjecucion,
-          cantidadRealizada: ejecucion.cantidadRealizada,
-        ).toJson(),
-      );
-    }, context: 'registrar la ejecución de la actividad planificada');
   }
 
   @override

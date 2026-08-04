@@ -20,6 +20,11 @@ class ResultadoBorradorConsulta {
   /// Ids de receta en el mismo orden en que se enviaron.
   final List<String> recetaIds;
 
+  /// Versión de cada receta después del guardado, en el mismo orden. Sin
+  /// sellarla, la siguiente escritura viajaría con la versión anterior y el
+  /// servidor la rechazaría como si otra pestaña hubiera escrito (F1-09).
+  final List<int?> recetaVersiones;
+
   /// Alertas vigentes que devolvió el motor tras aplicar el borrador
   /// (HFX-CLIN-003). Vienen del servidor porque las reglas viven allí.
   final List<AlertaClinica> alertas;
@@ -44,6 +49,7 @@ class ResultadoBorradorConsulta {
     this.tratamientosPorFdi = const {},
     this.diagnosticosPorFdi = const {},
     this.recetaIds = const [],
+    this.recetaVersiones = const [],
     this.alertas = const [],
     this.tratamientosGenerales = const [],
     this.diagnosticosGenerales = const [],
@@ -59,6 +65,7 @@ class ResultadoBorradorConsulta {
     tratamientosPorFdi: tratamientosPorFdi,
     diagnosticosPorFdi: diagnosticosPorFdi,
     recetaIds: recetaIds,
+    recetaVersiones: recetaVersiones,
     alertas: alertas,
     tratamientosGenerales: tratamientos,
     diagnosticosGenerales: diagnosticos,
@@ -92,6 +99,11 @@ class ResultadoBorradorConsulta {
       recetaIds: [
         for (final receta in (json['recetas'] as List? ?? const []))
           if (receta is Map && receta['id'] != null) receta['id'].toString(),
+      ],
+      recetaVersiones: [
+        for (final receta in (json['recetas'] as List? ?? const []))
+          if (receta is Map && receta['id'] != null)
+            (receta['version'] as num?)?.toInt(),
       ],
       alertas: AlertaClinica.listaFromJson(json['alertas']),
     );

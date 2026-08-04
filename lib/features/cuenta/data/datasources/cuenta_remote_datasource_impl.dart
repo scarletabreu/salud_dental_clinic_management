@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/cuenta/data/datasources/cuenta_remote_datasource.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
@@ -65,43 +66,31 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
   }
 }
 
-Future<void> updateCuenta(String id, Map<String, dynamic> data) async {
-  try {
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('cuentas').update(data).eq('id', id);
-  } on PostgrestException catch (e) {
-    throw Exception('Error al actualizar cuenta: ${e.message}');
-  }
-}
-
+  /// Lo único editable de una pre-factura desde el cliente. La pantalla ya
+  /// ofrecía elegir entre contado y crédito, pero la elección se quedaba en el
+  /// estado del widget: `cuentas.metodo_pago` seguía siendo `contado` para
+  /// siempre, incluso con un plan de cuotas configurado.
   @override
-  Future<void> registrarCuenta(Map<String, dynamic> data) async {
-    data.remove('id');
-    data['created_at'] = DateTime.now().toIso8601String();
-    data['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('cuentas').insert(data);
-  }
-
-  @override
-  Future<void> registrarPago(
-    String cuentaId,
-    Map<String, dynamic> pagoData,
-  ) async {
-    pagoData['cuenta_id'] = cuentaId;
-    pagoData.remove('id');
-    pagoData['created_at'] = DateTime.now().toIso8601String();
-    pagoData['updated_at'] = DateTime.now().toIso8601String();
-    await supabaseClient.from('pagos').insert(pagoData);
+  Future<void> fijarModoPago(String id, MetodoPago modo) async {
+    try {
+      await supabaseClient
+          .from('cuentas')
+          .update({
+            'metodo_pago': modo.dbValue,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', id);
+    } on PostgrestException catch (e) {
+      throw Exception('Error al actualizar el modo de pago: ${e.message}');
+    }
   }
 
   @override
   Future<void> deleteCuenta(String id) async {
+    final ahora = DateTime.now().toUtc().toIso8601String();
     await supabaseClient
         .from('cuentas')
-        .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        })
+        .update({'deleted_at': ahora, 'updated_at': ahora})
         .eq('id', id);
   }
 }

@@ -55,7 +55,7 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
     if (!(_isValidUuid(data['id']))) {
       data.remove('id');
     }
-    data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
     await supabaseClient.from('medicinas').upsert(data);
   }
 
@@ -68,8 +68,8 @@ class MedicinaRemoteDatasourceImpl implements MedicinaRemoteDatasource {
     await supabaseClient
         .from('medicinas')
         .update({
-          'deleted_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', id);
   }

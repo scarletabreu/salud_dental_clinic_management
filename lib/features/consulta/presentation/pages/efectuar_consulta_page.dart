@@ -151,6 +151,31 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
           // and the record moves into a drawer reachable from the header.
           final panelInline = innerContext.appLayout.isDesktop;
 
+          return PopScope(
+            // Salir de la pantalla cerraba el `BlocProvider` y con él el cubit,
+            // y `close()` cancelaba el temporizador del autoguardado sin
+            // vaciarlo: hasta tres segundos de trabajo clínico se perdían sin
+            // aviso, justo después de que el aviso de fallo prometiera un
+            // reintento que tampoco existía (F1-07).
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) async {
+              if (didPop) return;
+              final navigator = Navigator.of(innerContext);
+              await innerContext.read<ConsultaCubit>().guardarPendiente();
+              if (navigator.mounted) navigator.pop();
+            },
+            child: _buildScaffold(innerContext, ac, panelInline),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildScaffold(
+    BuildContext innerContext,
+    AppColors ac,
+    bool panelInline,
+  ) {
           return Scaffold(
             backgroundColor: ac.bgPage,
             endDrawer: panelInline
@@ -223,9 +248,6 @@ class _EfectuarConsultaPageState extends State<EfectuarConsultaPage> {
               ),
             ),
           );
-        },
-      ),
-    );
   }
 
   Widget _buildPanel(AppColors ac, {bool asSidebar = true}) {

@@ -35,7 +35,7 @@ class TratamientoRepositoryImpl implements TratamientoRepository {
         data['deleted_at'] = null;
         await remoteDataSource.createTratamiento(data);
       } else {
-        data['updated_at'] = DateTime.now().toIso8601String();
+        data['updated_at'] = DateTime.now().toUtc().toIso8601String();
         await remoteDataSource.updateTratamiento(tratamiento.id!, data);
       }
     }, context: 'guardar el tratamiento');

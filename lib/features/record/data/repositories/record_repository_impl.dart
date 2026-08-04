@@ -31,7 +31,7 @@ class RecordRepositoryImpl implements RecordRepository {
       final data = RecordModel.fromEntity(record).toJson();
 
       data['deleted_at'] = null;
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
       await remoteDataSource.upsertRecord(data);
     }, context: 'actualizar el expediente');

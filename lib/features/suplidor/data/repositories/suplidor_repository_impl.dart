@@ -23,7 +23,7 @@ class SuplidorRepositoryImpl implements SuplidorRepository {
     return runGuarded(() async {
       final data = SuplidorModel.fromEntity(suplidor).toJson();
       data['deleted_at'] = null;
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
       await remoteDataSource.upsertSuplidor(data);
     }, context: 'guardar el suplidor');
   }

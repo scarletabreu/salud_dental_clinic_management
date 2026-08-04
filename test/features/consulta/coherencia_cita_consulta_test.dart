@@ -451,13 +451,17 @@ class _CitaRepoFalso extends Fake implements CitaRepository {
   }
 
   @override
-  Future<List<Cita>> getCitas() async {
+  Future<List<Cita>> getCitas({DateTime? desde, DateTime? hasta}) async {
     llamadas.add('getCitas');
     return citas;
   }
 
   @override
-  Future<List<Cita>> getCitasByDoctor(String doctorId) async {
+  Future<List<Cita>> getCitasByDoctor(
+    String doctorId, {
+    DateTime? desde,
+    DateTime? hasta,
+  }) async {
     llamadas.add('getCitasByDoctor:$doctorId');
     return citas.where((c) => c.doctor.id == doctorId).toList();
   }

@@ -61,8 +61,8 @@ class CuentaModel extends Cuenta {
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{
       'consulta_id': consultaId,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_pago': fechaPago?.toIso8601String(),
+      'fecha_creacion': fechaCreacion.toUtc().toIso8601String(),
+      'fecha_pago': fechaPago?.toUtc().toIso8601String(),
       'metodo_pago': metodoPago.dbValue,
       'estado': estado.name,
       'nota': nota,

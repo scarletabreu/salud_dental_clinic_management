@@ -1,13 +1,52 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/regla_clinica/domain/entities/regla_clinica.dart';
 import 'package:salud_dental_clinic_management/features/regla_clinica/domain/repositories/regla_clinica_repository.dart';
 import 'package:salud_dental_clinic_management/features/regla_clinica/presentation/cubit/reglas_clinicas_state.dart';
 
 class ReglasClinicasCubit extends Cubit<ReglasClinicasState> {
   final ReglaClinicaRepository _repository;
+  StreamSubscription<void>? _senalReglas;
 
-  ReglasClinicasCubit(this._repository) : super(const ReglasClinicasInicial());
+  ReglasClinicasCubit(this._repository, {SenalesRealtime? senales})
+    : super(const ReglasClinicasInicial()) {
+    // La versión publicada por otro admin llega sola a esta pantalla (MU-5).
+    // Los umbrales que la BD impone en cada escritura no necesitan esto: los
+    // triggers leen `reglas_clinicas` en el momento del guardado, así que un
+    // cambio ya aplica a la siguiente consulta de todas las sesiones.
+    _senalReglas = senales
+        ?.de(DominioSenal.reglasClinicas)
+        .listen((_) => _refrescarEnSilencio());
+  }
+
+  Future<void> _refrescarEnSilencio() async {
+    final actual = state;
+    // Con una publicación en vuelo no se pisa el estado: `publicar` ya
+    // recarga desde la base al terminar.
+    if (actual is! ReglasClinicasCargadas || actual.publicando != null) return;
+    try {
+      final reglas = await _repository.getReglasVigentes();
+      final vigente = state;
+      if (isClosed ||
+          vigente is! ReglasClinicasCargadas ||
+          vigente.publicando != null) {
+        return;
+      }
+      emit(vigente.copyWith(reglas: reglas));
+    } catch (e) {
+      AppLog.error('refrescar las reglas clínicas', e);
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _senalReglas?.cancel();
+    return super.close();
+  }
 
   Future<void> cargar() async {
     if (isClosed) return;

@@ -277,13 +277,23 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
 
     final planCubit = context.read<PlanTratamientoCubit>();
     unawaited(planCubit.cargarDeConsulta(consultaId));
+    await _cargarItemsEjecutables(consulta.pacienteId);
+
+    await _registrarEvaluacion(consulta, consultaId);
+  }
+
+  /// Los tratamientos aceptados pendientes del plan. Se leía una sola vez por
+  /// consulta y lo que el asistente aceptaba o agendaba durante ella no
+  /// existía del lado del doctor (MU-5): ahora se puede releer a demanda
+  /// desde la propia tarjeta, sin recargar el resto del workspace.
+  Future<void> _cargarItemsEjecutables(String pacienteId) async {
     setState(() {
       _cargandoPlanDelDia = true;
       _errorPlanDelDia = null;
     });
     try {
       final items = await sl<PlanTratamientoRepository>().getItemsEjecutables(
-        consulta.pacienteId,
+        pacienteId,
       );
       if (mounted) setState(() => _itemsEjecutables = items);
     } catch (_) {
@@ -298,7 +308,9 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
     } finally {
       if (mounted) setState(() => _cargandoPlanDelDia = false);
     }
+  }
 
+  Future<void> _registrarEvaluacion(Consulta consulta, String consultaId) async {
     try {
       final id = await sl<EvaluacionClinicaRepository>()
           .registrarEvaluacionDeConsulta(
@@ -1012,6 +1024,13 @@ class _WorkspaceConsultaState extends State<WorkspaceConsulta> {
               subtitulo:
                   'Puedes registrarlos aquí o agregar cualquier tratamiento '
                   'directamente desde una pieza',
+              accion: IconButton(
+                tooltip: 'Actualizar con lo aceptado o agendado ahora mismo',
+                onPressed: _cargandoPlanDelDia
+                    ? null
+                    : () => _cargarItemsEjecutables(consulta.pacienteId),
+                icon: Icon(Icons.refresh_rounded, color: ac.teal, size: 20),
+              ),
               child: _cargandoPlanDelDia
                   ? const LinearProgressIndicator()
                   : _errorPlanDelDia != null

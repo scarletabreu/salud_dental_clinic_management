@@ -388,7 +388,9 @@ Future<void> init() async {
   sl.registerLazySingleton<ReglaClinicaRepository>(
     () => ReglaClinicaRepositoryImpl(remoteDataSource: sl()),
   );
-  sl.registerFactory<ReglasClinicasCubit>(() => ReglasClinicasCubit(sl()));
+  sl.registerFactory<ReglasClinicasCubit>(
+    () => ReglasClinicasCubit(sl(), senales: sl<SenalesRealtime>()),
+  );
   sl.registerLazySingleton<PlanTratamientoRepository>(
     () => PlanTratamientoRepositoryImpl(remoteDataSource: sl()),
   );

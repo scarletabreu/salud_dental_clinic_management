@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
@@ -459,11 +462,22 @@ class _CitasDelDiaDestination extends StatefulWidget {
 
 class _CitasDelDiaDestinationState extends State<_CitasDelDiaDestination> {
   late final CitaCubit _citaCubit = sl<CitaCubit>();
+  StreamSubscription<void>? _senalAsignaciones;
 
   @override
   void initState() {
     super.initState();
     _cargarSegunRol();
+    // El alcance del asistente sale de `doctor_asistentes` y se leía una sola
+    // vez por jornada: un doctor asignado a media mañana no aparecía hasta el
+    // relogin. La señal re-ejecuta el cálculo del alcance y recarga la agenda
+    // (MU-5). Sólo aplica al asistente; los demás roles no dependen de esa
+    // tabla.
+    if (context.read<AuthCubit>().state.rol == RolUsuario.asistente) {
+      _senalAsignaciones = sl<SenalesRealtime>()
+          .de(DominioSenal.asignaciones)
+          .listen((_) => _cargarSegunRol());
+    }
   }
 
   Future<void> _cargarSegunRol() async {
@@ -492,6 +506,7 @@ class _CitasDelDiaDestinationState extends State<_CitasDelDiaDestination> {
 
   @override
   void dispose() {
+    _senalAsignaciones?.cancel();
     _citaCubit.close();
     super.dispose();
   }

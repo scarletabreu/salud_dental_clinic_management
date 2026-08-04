@@ -28,4 +28,9 @@ Got dependencies!
 24 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
 Launching integration_test/verif_admin_test.dart on Web Server in debug mode...
-Waiting for connection from debug service on Web Server...      
+Waiting for connection from debug service on Web Server...         27.8s
+integration_test/verif_admin_test.dart is being served at http://localhost:39465
+The web-server device requires the Dart Debug Chrome extension for debugging. Consider using the Chrome or Edge devices for an improved development workflow.
+Debug service listening on ws://127.0.0.1:43761/u6ifght8jq4=/ws
+A Dart VM Service on Web Server is available at: http://127.0.0.1:43761/u6ifght8jq4=
+The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:43761/u6ifght8jq4=/devtools/?uri=ws://127.0.0.1:43761/u6ifght8jq4=/ws

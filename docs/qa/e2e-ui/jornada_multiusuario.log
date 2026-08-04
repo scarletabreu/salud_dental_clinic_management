@@ -1,0 +1,12 @@
+✓ Tres sesiones suscritas a citas, cajas, cuentas, doctor_asistentes, personas (RLS activo)
+✓ la asignación de la doctora llega a la sesión del asistente (255 ms)
+✓ la llegada marcada por el asistente aparece en la sesión de la doctora (458 ms)
+✓ …y también en la del admin (0 ms)
+✓ la reagenda hecha por el admin llega a la agenda de la doctora (459 ms)
+✓ la apertura de caja del asistente llega a la sesión del admin (510 ms)
+✓ la cuenta de la consulta finalizada aparece en el mostrador del asistente (458 ms)
+✓ a la doctora NO le llega la cuenta de un paciente que no es suyo (RLS)
+✓ la persona recién creada llega al directorio del asistente (0 ms)
+✓ el cobro del asistente actualiza la cuenta en la sesión del admin (510 ms)
+✓ el cierre de caja se propaga a la sesión del admin (510 ms)
+✓ Jornada multiusuario completa: cada sesión vio lo suyo y nada ajeno

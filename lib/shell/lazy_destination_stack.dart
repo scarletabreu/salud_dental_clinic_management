@@ -25,6 +25,13 @@ import 'package:salud_dental_clinic_management/shell/shell_destination.dart';
 /// Las pantallas retenidas pero no visibles quedan con [TickerMode] apagado:
 /// sin eso, cada `AnimatedContainer` o spinner de una pantalla oculta seguiría
 /// pidiendo frames y gastando CPU sin que nadie lo vea.
+///
+/// Frescura de las retenidas (MU-6): las pantallas ocultas no quedan viejas
+/// porque sus cubits escuchan las señales realtime y recargan con debounce
+/// cuando su dominio cambia de verdad —nunca por navegar, que es lo que
+/// SD-132 prohibió—. Por eso aquí no hay marcado de «sucia» ni recarga en la
+/// reentrada: al volver, la pantalla ya está al día, y con TickerMode apagado
+/// la recarga oculta no pinta ni un frame.
 class LazyDestinationStack extends StatefulWidget {
   const LazyDestinationStack({
     super.key,

@@ -73,7 +73,8 @@ class _DashboardShellView extends StatefulWidget {
   State<_DashboardShellView> createState() => _DashboardShellViewState();
 }
 
-class _DashboardShellViewState extends State<_DashboardShellView> {
+class _DashboardShellViewState extends State<_DashboardShellView>
+    with WidgetsBindingObserver {
   ShellDestinationId _selectedId = ShellDestinationId.inicio;
 
   final ConsultasListCubit _consultasListCubit = sl<ConsultasListCubit>();
@@ -89,10 +90,24 @@ class _DashboardShellViewState extends State<_DashboardShellView> {
         .state
         .doctorIdParaFiltrarAgenda;
     _consultasListCubit.cargar(restringidoADoctorId: restringidoA);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Una consulta dura 30-45 minutos con la pantalla apagada o la app al
+  /// fondo; el websocket se cae en silencio y nadie sabe qué se perdió. Al
+  /// volver del background se pide recarga en todos los dominios suscritos
+  /// (MU-6): el mismo mecanismo que la reconexión de MU-0. Los cubits vivos
+  /// recargan con debounce; lo no suscrito se queda como estaba.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado == AppLifecycleState.resumed) {
+      sl<SenalesRealtime>().recargarTodo();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _consultasListCubit.close();
     super.dispose();
   }

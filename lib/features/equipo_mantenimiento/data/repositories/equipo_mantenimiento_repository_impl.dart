@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/equipo_mantenimiento/domain/entities/equipo_mantenimiento.dart';
 import 'package:salud_dental_clinic_management/features/equipo_mantenimiento/domain/repositories/equipo_mantenimiento_repository.dart';
 import '../datasources/equipo_mantenimiento_remote_datasource.dart';
@@ -12,22 +13,18 @@ class EquipoMantenimientoRepositoryImpl
   @override
   Future<List<EquipoMantenimientoModel>> getHistorialMantenimientos(
     String equipoId,
-  ) async {
-    try {
+  ) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchMantenimientosByEquipo(equipoId);
       return data
           .map((json) => EquipoMantenimientoModel.fromJson(json))
           .toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener historial de mantenimientos: $e',
-      );
-    }
+    }, context: 'obtener el historial de mantenimientos');
   }
 
   @override
-  Future<void> registrarMantenimiento(EquipoMantenimiento mantenimiento) async {
-    try {
+  Future<void> registrarMantenimiento(EquipoMantenimiento mantenimiento) {
+    return runGuarded(() async {
       final model = EquipoMantenimientoModel(
         id: mantenimiento.id,
         equipoId: mantenimiento.equipoId,
@@ -35,25 +32,21 @@ class EquipoMantenimientoRepositoryImpl
         descripcion: mantenimiento.descripcion,
         suplidorId: mantenimiento.suplidorId,
         costo: mantenimiento.costo,
+        fechaMantenimiento: mantenimiento.fechaMantenimiento,
       );
 
       final data = model.toJson();
       data['deleted_at'] = null;
 
       await remoteDataSource.insertMantenimiento(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al registrar mantenimiento: $e');
-    }
+    }, context: 'registrar el mantenimiento');
   }
 
   @override
-  Future<void> eliminarRegistroMantenimiento(String id) async {
-    try {
-      await remoteDataSource.softDeleteMantenimiento(id);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al eliminar registro de mantenimiento: $e',
-      );
-    }
+  Future<void> eliminarRegistroMantenimiento(String id) {
+    return runGuarded(
+      () => remoteDataSource.softDeleteMantenimiento(id),
+      context: 'eliminar el registro de mantenimiento',
+    );
   }
 }

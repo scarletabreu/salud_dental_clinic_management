@@ -1,27 +1,69 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'core/config/app_config.dart';
 import 'core/di/service_locator.dart' as di;
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/pages/login_page.dart';
+import 'package:salud_dental_clinic_management/features/configuracion/presentation/cubit/settings_cubit.dart';
 import 'core/presentation/app_theme.dart';
+import 'core/presentation/bootstrap_error_screen.dart';
+import 'core/presentation/connectivity_cubit.dart';
+import 'core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/shell/dashboard_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: 'https://xcuvywvltttephakzmwu.supabase.co',
-    anonKey: 'sb_publishable_3VHcOI-RR6w4_E8GFSkj6A_w2qa5PBG',
-    authOptions: FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit),
-  );
+  final AppConfig config;
+  try {
+    config = AppConfig.fromEnvironment();
+  } catch (error, stackTrace) {
+    _mostrarFalloDeArranque(
+      error,
+      stackTrace,
+      AppConfig.sinConfiguracionInyectada
+          ? BootstrapErrorKind.configuracionAusente
+          : BootstrapErrorKind.configuracionInvalida,
+    );
+    return;
+  }
 
-  await di.init();
-  runApp(const ProviderScope(child: MyApp()));
+  try {
+    await Supabase.initialize(
+      url: config.supabaseUrl,
+      anonKey: config.supabasePublishableKey,
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+      ),
+    );
+
+    await di.init();
+  } catch (error, stackTrace) {
+    _mostrarFalloDeArranque(
+      error,
+      stackTrace,
+      BootstrapErrorKind.inicializacion,
+    );
+    return;
+  }
+
+  runApp(const MyApp());
+}
+
+void _mostrarFalloDeArranque(
+  Object error,
+  StackTrace stackTrace,
+  BootstrapErrorKind tipo,
+) {
+  AppLog.error('fallo de arranque: $tipo', error, stackTrace);
+  runApp(
+    BootstrapErrorScreen(
+      detalle: 'Revise la configuración del ambiente e intente nuevamente.',
+      tipo: tipo,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -29,23 +71,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<AuthCubit>(
-      // AuthCubit ya está registrado como Factory en el service_locator.
-      // Al crearse aquí suscribe automáticamente el stream de onAuthStateChange.
-      create: (_) => di.sl<AuthCubit>(),
-      child: MaterialApp(
-        title: 'Salud Dental',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.system,
-        home: const _AppRouter(),
-      ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthCubit>(create: (_) => di.sl<AuthCubit>()),
+        BlocProvider<SettingsCubit>(create: (_) => di.sl<SettingsCubit>()),
+        BlocProvider<ConnectivityCubit>(
+          create: (_) => di.sl<ConnectivityCubit>(),
+        ),
+      ],
+      child: const _RaizConTema(),
     );
   }
 }
 
-/// Enruta reactivamente según el estado del AuthCubit existente.
+class _RaizConTema extends StatelessWidget {
+  const _RaizConTema();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeMode = context.select(
+      (SettingsCubit cubit) => cubit.state.themeMode,
+    );
+
+    return MaterialApp(
+      title: 'Clínica Salud Dental Integral',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
+      home: const _AppRouter(),
+    );
+  }
+}
+
 class _AppRouter extends StatelessWidget {
   const _AppRouter();
 

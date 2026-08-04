@@ -2,6 +2,7 @@ import 'package:salud_dental_clinic_management/features/odontograma/domain/entit
 import 'package:salud_dental_clinic_management/features/diente/data/models/diente_model.dart';
 import 'package:salud_dental_clinic_management/features/diagnosis/data/models/diagnosis_model.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/data/models/tratamiento_model.dart';
+import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/evaluacion_odontologica.dart';
 
 class OdontogramaModel extends Odontograma {
   OdontogramaModel({
@@ -10,12 +11,13 @@ class OdontogramaModel extends Odontograma {
     required super.dientes,
     super.tratamientos = const [],
     super.diagnosis = const [],
+    super.evaluacion = EvaluacionOdontologica.vacia,
   });
 
   factory OdontogramaModel.fromJson(Map<String, dynamic> json) {
     return OdontogramaModel(
       id: json['id'] as String?,
-      consultaId: json['consulta_id'] ?? json['consultaId'],
+      consultaId: (json['consulta_id'] ?? json['consultaId'] ?? '') as String,
       dientes: json['dientes'] != null
           ? (json['dientes'] as List)
                 .map((e) => DienteModel.fromJson(e))
@@ -31,11 +33,15 @@ class OdontogramaModel extends Odontograma {
                 .map((e) => DiagnosisModel.fromJson(e))
                 .toList()
           : [],
+      evaluacion: EvaluacionOdontologica.fromJson(json['evaluacion_clinica']),
     );
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = {'consulta_id': consultaId};
+    final Map<String, dynamic> data = {
+      'consulta_id': consultaId,
+      'evaluacion_clinica': evaluacionToJson(),
+    };
 
     if (id != null && id!.contains('-') && id!.length == 36) {
       data['id'] = id;

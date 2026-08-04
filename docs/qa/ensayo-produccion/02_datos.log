@@ -1,0 +1,31 @@
+ set_config 
+------------
+ 
+(1 row)
+
+psql:/home/decruce/dev/backups/salud_dental/20260731-190728-premigracion/02_datos.sql:289: ERROR:  duplicate key value violates unique constraint "mfa_amr_claims_session_id_authentication_method_pkey"
+DETAIL:  Key (session_id, authentication_method)=(99c837a8-e09c-42ec-b36b-9b10687abdd8, password) already exists.
+psql:/home/decruce/dev/backups/salud_dental/20260731-190728-premigracion/02_datos.sql:16025: ERROR:  duplicate key value violates unique constraint "buckets_pkey"
+DETAIL:  Key (id)=(documentos-clinicos) already exists.
+psql:/home/decruce/dev/backups/salud_dental/20260731-190728-premigracion/02_datos.sql:16051: ERROR:  duplicate key value violates unique constraint "objects_pkey"
+DETAIL:  Key (id)=(fac4416e-0c17-47c0-9095-5d5c841bbb0a) already exists.
+ setval 
+--------
+    499
+(1 row)
+
+ setval 
+--------
+    169
+(1 row)
+
+ setval 
+--------
+     30
+(1 row)
+
+ setval 
+--------
+     17
+(1 row)
+

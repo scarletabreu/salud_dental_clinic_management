@@ -1,0 +1,945 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
+import 'package:salud_dental_clinic_management/features/auth/domain/entities/usuario.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_cubit.dart';
+import 'package:salud_dental_clinic_management/features/personal/presentation/cubit/personal_perfiles_state.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+
+class _CedulaInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < digits.length && i < 11; i++) {
+      if (i == 3) buffer.write('-');
+      if (i == 10) buffer.write('-');
+      buffer.write(digits[i]);
+    }
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class CrearUsuarioPage extends StatefulWidget {
+  final Usuario? usuario;
+  const CrearUsuarioPage({super.key, this.usuario});
+
+  @override
+  State<CrearUsuarioPage> createState() => _CrearUsuarioPageState();
+}
+
+class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _nombreController;
+  late final TextEditingController _apellidoController;
+  late DateTime _birthDate;
+  late final TextEditingController _telefonoController;
+  late final TextEditingController _cedulaController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+
+  // Campos específicos por subtipo
+  late final TextEditingController _specialtyController;
+  late final TextEditingController _departamentoController;
+  late final TextEditingController _turnoController;
+  bool _isAvailable = true;
+
+  RolUsuario _rolUsuario = RolUsuario.asistente;
+  bool _obscurePassword = true;
+
+  // Asignación de asistentes (solo Doctor/Admin)
+  List<Usuario> _asistentesDisponibles = [];
+  final Set<String> _asistentesSeleccionadosIds = {};
+  bool _cargandoAsistentes = false;
+
+  bool get _isEditing => widget.usuario != null;
+
+  // Doctor y admin comparten identidad clínica: los dos nacen con fila en
+  // `doctores`, así que los dos necesitan especialidad.
+  bool get _requiereSpecialty => _rolUsuario.tiene(Capacidad.ejercerClinica);
+  bool get _requiereDepartamento => _rolUsuario == RolUsuario.admin;
+  bool get _requiereTurno => _rolUsuario == RolUsuario.asistente;
+  bool get _puedeAsignarAsistentes => _requiereSpecialty;
+
+  @override
+  void initState() {
+    super.initState();
+    final u = widget.usuario;
+    _nombreController = TextEditingController(text: u?.nombre ?? '');
+    _apellidoController = TextEditingController(text: u?.apellido ?? '');
+    _birthDate = u?.birthDate ?? DateTime(2000, 1, 1);
+    _cedulaController = TextEditingController(text: u?.govID ?? '');
+    _telefonoController = TextEditingController(
+      text: (u != null && u.contactos.isNotEmpty)
+          ? u.contactos.first.numeroTelefono
+          : '',
+    );
+    _usernameController = TextEditingController(text: u?.username ?? '');
+    _passwordController = TextEditingController();
+
+    _specialtyController = TextEditingController();
+    _departamentoController = TextEditingController();
+    _turnoController = TextEditingController();
+
+    if (u != null) {
+      _rolUsuario = u.rol;
+    }
+
+    // Campos específicos y asignación de asistentes solo aplican
+    // cuando ya existe el usuario (necesitamos su id) o al crear
+    // (se resuelve después de crear, en _save).
+    if (_isEditing) {
+      _cargarDatosEspecificosIniciales();
+    }
+  }
+
+  Future<void> _cargarDatosEspecificosIniciales() async {
+    final u = widget.usuario!;
+
+    // Los valores de specialty/departamento/turno vienen embebidos en la
+    // entidad Usuario si es Doctor/Admin/Asistente (según su subtipo real).
+    // Como el form trabaja con la interfaz genérica Usuario, se leen los
+    // campos disponibles vía un patrón dinámico simple.
+    try {
+      final dynamic usuarioDinamico = u;
+      _specialtyController.text =
+          (usuarioDinamico.specialty as String?) ?? '';
+      _isAvailable = (usuarioDinamico.isAvailable as bool?) ?? true;
+    } catch (_) {
+      // El usuario no es Doctor/Admin, no tiene estos campos.
+    }
+    try {
+      final dynamic usuarioDinamico = u;
+      _departamentoController.text =
+          (usuarioDinamico.departamento as String?) ?? '';
+    } catch (_) {}
+    try {
+      final dynamic usuarioDinamico = u;
+      _turnoController.text = (usuarioDinamico.shift as String?) ?? '';
+    } catch (_) {}
+
+    if (_puedeAsignarAsistentes && u.id != null) {
+      await _cargarAsistentes(doctorIdExistente: u.id);
+    }
+  }
+
+  Future<void> _cargarAsistentes({String? doctorIdExistente}) async {
+    setState(() => _cargandoAsistentes = true);
+    try {
+      final cubit = context.read<PersonalPerfilesCubit>();
+      final disponibles = await cubit.cargarAsistentesDisponibles();
+
+      List<String> asignadosIds = [];
+      if (doctorIdExistente != null) {
+        asignadosIds = await cubit.cargarAsistentesAsignados(
+          doctorIdExistente,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _asistentesDisponibles = disponibles;
+        _asistentesSeleccionadosIds
+          ..clear()
+          ..addAll(asignadosIds);
+        _cargandoAsistentes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cargandoAsistentes = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _cedulaController.dispose();
+    _telefonoController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _specialtyController.dispose();
+    _departamentoController.dispose();
+    _turnoController.dispose();
+    super.dispose();
+  }
+
+  void _onRolCambiado(RolUsuario rol) {
+    setState(() => _rolUsuario = rol);
+    if (_puedeAsignarAsistentes && _asistentesDisponibles.isEmpty) {
+      _cargarAsistentes(doctorIdExistente: widget.usuario?.id);
+    }
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    context.read<PersonalPerfilesCubit>().guardarUsuario(
+      existente: widget.usuario,
+      nombre: _nombreController.text.trim(),
+      apellido: _apellidoController.text.trim(),
+      birthDate: _birthDate,
+      govID: _cedulaController.text.trim(),
+      username: _usernameController.text.trim(),
+      telefono: _telefonoController.text.trim(),
+      nuevaPassword: _passwordController.text.trim().isEmpty
+          ? null
+          : _passwordController.text.trim(),
+      email: _isEditing
+          ? null
+          : '${_usernameController.text.trim()}@saluddental.com',
+      rol: _isEditing ? null : _rolUsuario,
+      especialidad: _requiereSpecialty
+          ? _specialtyController.text.trim()
+          : null,
+      departamento: _requiereDepartamento
+          ? _departamentoController.text.trim()
+          : null,
+      turno: _requiereTurno ? _turnoController.text.trim() : null,
+      asistenteIdsAsignados: _puedeAsignarAsistentes
+          ? _asistentesSeleccionadosIds.toList()
+          : null,
+    );
+
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    return BlocConsumer<PersonalPerfilesCubit, PersonalPerfilesState>(
+      listener: (context, state) {
+        if (state is PerfilError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(backgroundColor: ac.red, content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        final isSaving = state is PerfilLoading;
+
+        return Scaffold(
+          backgroundColor: ac.bgPage,
+          appBar: _buildAppBar(ac, isSaving),
+          body: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildDatosPersonalesCard(ac),
+                  const SizedBox(height: 16),
+                  _buildCredencialesCard(ac),
+                  const SizedBox(height: 16),
+                  _buildDatosEspecificosCard(ac),
+                  if (_puedeAsignarAsistentes) ...[
+                    const SizedBox(height: 16),
+                    _buildAsistentesAsignadosCard(ac),
+                  ],
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(AppColors ac, bool isSaving) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(72),
+      child: Container(
+        color: ac.cardBg,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: isSaving ? null : () => Navigator.pop(context),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: ac.divider),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18,
+                    color: ac.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!context.appLayout.isCompact) ...[
+                      Row(
+                        children: [
+                          Text(
+                            'Usuarios',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: ac.primaryGreen,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 13,
+                            color: ac.textMuted,
+                          ),
+                          Flexible(
+                            child: Text(
+                              _isEditing ? 'Editar usuario' : 'Nuevo usuario',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: ac.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                    ],
+                    Text(
+                      _isEditing ? 'Editar usuario' : 'Registro de usuario',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: ac.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!context.appLayout.isCompact) ...[
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ac.textSecondary,
+                    side: BorderSide(color: ac.divider),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+              ],
+              FilledButton.icon(
+                onPressed: isSaving ? null : _save,
+                icon: isSaving
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined, size: 16),
+                label: Text(isSaving ? 'Guardando...' : 'Guardar'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: ac.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatosPersonalesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.primaryGreen,
+      iconBg: ac.primaryGreen.withOpacity(0.10),
+      icon: Icons.person_outline_rounded,
+      title: 'Datos personales del usuario',
+      child: Column(
+        children: [
+          AppFormRow(
+            children: [
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Nombre *',
+                child: TextFormField(
+                  controller: _nombreController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Carlos'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El nombre es obligatorio'
+                      : null,
+                ),
+              ),
+              _FormField(
+                ac: ac,
+                icon: Icons.badge_outlined,
+                label: 'Apellido *',
+                child: TextFormField(
+                  controller: _apellidoController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDeco(ac, hint: 'Ej. Mendoza'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'El apellido es obligatorio'
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.credit_card_outlined,
+            label: 'Cédula *',
+            child: TextFormField(
+              controller: _cedulaController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [_CedulaInputFormatter()],
+              decoration: _inputDeco(ac, hint: '000-0000000-0'),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'La cédula es obligatoria';
+                }
+                final demasked = v.replaceAll('-', '');
+                if (demasked.length != 11) {
+                  return 'La cédula debe contener exactamente 11 dígitos';
+                }
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.phone_android_rounded,
+            label: 'Teléfono *',
+            child: TextFormField(
+              controller: _telefonoController,
+              keyboardType: TextInputType.phone,
+              decoration: _inputDeco(ac, hint: 'Ej. 809-555-0199'),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'El teléfono es obligatorio'
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.cake_outlined,
+            label: 'Fecha de nacimiento *',
+            child: InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _birthDate,
+                  firstDate: DateTime(1930),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _birthDate = picked);
+              },
+              child: InputDecorator(
+                decoration: _inputDeco(ac),
+                child: Text(
+                  '${_birthDate.day.toString().padLeft(2, '0')}/'
+                  '${_birthDate.month.toString().padLeft(2, '0')}/'
+                  '${_birthDate.year}',
+                  style: TextStyle(fontSize: 14, color: ac.textPrimary),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCredencialesCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.teal,
+      iconBg: ac.teal.withOpacity(0.10),
+      icon: Icons.lock_outline_rounded,
+      title: 'Credenciales y accesos',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FormField(
+            ac: ac,
+            icon: Icons.admin_panel_settings_outlined,
+            label: 'Rol de sistema *',
+            child: AbsorbPointer(
+              absorbing: _isEditing,
+              child: Opacity(
+                opacity: _isEditing ? 0.5 : 1.0,
+                child: _ChipSelector<RolUsuario>(
+                  ac: ac,
+                  options: RolUsuario.values,
+                  selected: _rolUsuario,
+                  labelOf: (rol) => rol.name.toUpperCase(),
+                  activeColor: ac.primaryGreen,
+                  onSelected: _onRolCambiado,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.alternate_email_rounded,
+            label: 'Nombre de usuario *',
+            child: TextFormField(
+              controller: _usernameController,
+              decoration: _inputDeco(ac, hint: 'Ej. cmendoza'),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'El usuario es obligatorio'
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _FormField(
+            ac: ac,
+            icon: Icons.password_rounded,
+            label: _isEditing
+                ? 'Nueva Contraseña (Dejar vacío para mantener)'
+                : 'Contraseña *',
+            child: TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              decoration: _inputDeco(ac, hint: '••••••••').copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    size: 18,
+                    color: ac.textMuted,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+              validator: (v) {
+                if (!_isEditing && (v == null || v.trim().isEmpty)) {
+                  return 'La contraseña es obligatoria';
+                }
+                if (v != null && v.isNotEmpty && v.length < 6) {
+                  return 'Debe contener al menos 6 caracteres';
+                }
+                return null;
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatosEspecificosCard(AppColors ac) {
+    if (!_requiereSpecialty && !_requiereDepartamento && !_requiereTurno) {
+      return const SizedBox.shrink();
+    }
+
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.teal,
+      iconBg: ac.teal.withOpacity(0.10),
+      icon: Icons.work_outline_rounded,
+      title: 'Datos específicos del rol',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_requiereSpecialty) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.medical_services_outlined,
+              label: 'Especialidad *',
+              child: TextFormField(
+                controller: _specialtyController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Ortodoncia, General'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'La especialidad es obligatoria'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _FormField(
+              ac: ac,
+              icon: Icons.event_available_outlined,
+              label: 'Disponibilidad',
+              child: Row(
+                children: [
+                  Switch(
+                    value: _isAvailable,
+                    activeColor: ac.primaryGreen,
+                    onChanged: (v) => setState(() => _isAvailable = v),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isAvailable ? 'Disponible' : 'No disponible',
+                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (_requiereDepartamento) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.apartment_outlined,
+              label: 'Departamento *',
+              child: TextFormField(
+                controller: _departamentoController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Administración general'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'El departamento es obligatorio'
+                    : null,
+              ),
+            ),
+          ],
+          if (_requiereTurno) ...[
+            _FormField(
+              ac: ac,
+              icon: Icons.schedule_outlined,
+              label: 'Turno *',
+              child: TextFormField(
+                controller: _turnoController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDeco(ac, hint: 'Ej. Matutino, Vespertino'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'El turno es obligatorio'
+                    : null,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAsistentesAsignadosCard(AppColors ac) {
+    return _FormCard(
+      ac: ac,
+      iconColor: ac.indigo,
+      iconBg: ac.indigo.withOpacity(0.10),
+      icon: Icons.groups_outlined,
+      title: 'Asistentes asignados',
+      child: _cargandoAsistentes
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          : _asistentesDisponibles.isEmpty
+          ? Text(
+              'No hay asistentes activos disponibles para asignar.',
+              style: TextStyle(fontSize: 13, color: ac.textMuted),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selecciona los asistentes que apoyarán a este ${_rolUsuario == RolUsuario.admin ? 'administrador' : 'doctor'}.',
+                  style: TextStyle(fontSize: 12, color: ac.textMuted),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _asistentesDisponibles.map((asistente) {
+                    final id = asistente.id;
+                    if (id == null) return const SizedBox.shrink();
+                    final isSelected = _asistentesSeleccionadosIds.contains(
+                      id,
+                    );
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _asistentesSeleccionadosIds.remove(id);
+                          } else {
+                            _asistentesSeleccionadosIds.add(id);
+                          }
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? ac.indigo.withOpacity(0.10)
+                              : ac.bgPage,
+                          borderRadius: BorderRadius.circular(100),
+                          border: Border.all(
+                            color: isSelected
+                                ? ac.indigo.withOpacity(0.50)
+                                : ac.divider,
+                            width: isSelected ? 1.0 : 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.person_outline_rounded,
+                              size: 15,
+                              color: isSelected
+                                  ? ac.indigo
+                                  : ac.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${asistente.nombre} ${asistente.apellido}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                    ? ac.indigo
+                                    : ac.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+    );
+  }
+
+  InputDecoration _inputDeco(AppColors ac, {String? hint}) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(fontSize: 13, color: ac.textMuted),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+    filled: true,
+    fillColor: ac.bgPage,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.divider),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.divider, width: 0.5),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.primaryGreen, width: 1.0),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: ac.red, width: 0.5),
+    ),
+  );
+}
+
+class _FormCard extends StatelessWidget {
+  final AppColors ac;
+  final Color iconColor;
+  final Color iconBg;
+  final IconData icon;
+  final String title;
+  final Widget child;
+
+  const _FormCard({
+    required this.ac,
+    required this.iconColor,
+    required this.iconBg,
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ac.divider, width: 0.5),
+        boxShadow: [ac.cardShadow],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 17, color: iconColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _FormField extends StatelessWidget {
+  final AppColors ac;
+  final IconData icon;
+  final String label;
+  final Widget child;
+
+  const _FormField({
+    required this.ac,
+    required this.icon,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 13, color: ac.primaryGreen),
+            const SizedBox(width: 5),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: ac.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        child,
+      ],
+    );
+  }
+}
+
+class _ChipSelector<T> extends StatelessWidget {
+  final AppColors ac;
+  final List<T> options;
+  final T selected;
+  final String Function(T) labelOf;
+  final Color activeColor;
+  final void Function(T) onSelected;
+
+  const _ChipSelector({
+    required this.ac,
+    required this.options,
+    required this.selected,
+    required this.labelOf,
+    required this.activeColor,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((opt) {
+        final isActive = opt == selected;
+        return GestureDetector(
+          onTap: () => onSelected(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isActive ? activeColor.withOpacity(0.10) : ac.bgPage,
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(
+                color: isActive ? activeColor.withOpacity(0.50) : ac.divider,
+                width: isActive ? 1.0 : 0.5,
+              ),
+            ),
+            child: Text(
+              labelOf(opt),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? activeColor : ac.textSecondary,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}

@@ -1,0 +1,9 @@
+OK   · anon no ejecuta mutaciones clínicas
+OK   · token inválido/expirado se rechaza antes de RLS
+OK   · asistente no receta mediante REST
+OK   · doctor no modifica consulta ajena mediante REST
+OK   · funciones de trigger no son endpoints utilizables
+OK   · documentos clínicos no son accesibles por URL pública
+OK   · corrección administrativa REST conserva autor y registra actor
+OK   · ninguna fila de usuarios expone password_hash
+SMOKE HFX-CLIN-001 COMPLETO · REST ofensivo por rol.

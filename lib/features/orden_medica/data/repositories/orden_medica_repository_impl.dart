@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/orden_medica/domain/entities/orden_medica.dart';
 import 'package:salud_dental_clinic_management/features/orden_medica/domain/repositories/orden_medica_repository.dart';
 import 'package:salud_dental_clinic_management/features/orden_medica/data/datasources/orden_medica_remote_datasource.dart';
@@ -9,47 +10,36 @@ class OrdenMedicaRepositoryImpl implements OrdenMedicaRepository {
   OrdenMedicaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<void> emitirOrden(OrdenMedica orden) async {
-    try {
-      final model = OrdenMedicaModel.fromEntity(orden);
-      final data = model.toJson();
+  Future<void> emitirOrden(OrdenMedica orden) {
+    return runGuarded(() async {
+      final data = OrdenMedicaModel.fromEntity(orden).toJson();
       data['deleted_at'] = null;
       await remoteDataSource.insertarOrden(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al emitir orden médica: $e');
-    }
+    }, context: 'emitir la orden médica');
   }
 
   @override
-  Future<void> editarOrden(OrdenMedica orden) async {
-    try {
-      final model = OrdenMedicaModel.fromEntity(orden);
-      final data = model.toJson();
-      data['updated_at'] = DateTime.now().toIso8601String();
+  Future<void> editarOrden(OrdenMedica orden) {
+    return runGuarded(() async {
+      final data = OrdenMedicaModel.fromEntity(orden).toJson();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
       await remoteDataSource.actualizarOrden(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al editar orden médica: $e');
-    }
+    }, context: 'editar la orden médica');
   }
 
   @override
-  Future<void> anularOrden(String id) async {
-    try {
-      await remoteDataSource.eliminarOrden(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al anular orden médica: $e');
-    }
+  Future<void> anularOrden(String id) {
+    return runGuarded(
+      () => remoteDataSource.eliminarOrden(id),
+      context: 'anular la orden médica',
+    );
   }
 
   @override
-  Future<List<OrdenMedica>> getHistorialDeOrdenes(String pacienteId) async {
-    try {
+  Future<List<OrdenMedica>> getHistorialDeOrdenes(String pacienteId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchOrdenesPorPaciente(pacienteId);
       return data.map((json) => OrdenMedicaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener historial de órdenes: $e',
-      );
-    }
+    }, context: 'obtener el historial de órdenes');
   }
 }

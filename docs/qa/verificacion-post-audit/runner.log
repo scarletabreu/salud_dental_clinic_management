@@ -1,0 +1,28 @@
+▶ Preparando la base
+  ✓ base lista (seed + login + agenda de hoy)
+▶ Arrancando chromedriver
+  ✓ chromedriver en :4444 (pid 590047)
+▶ Jornada: doctora punta a punta
+  ✗ FALLÓ → /home/decruce/dev/projects/salud_dental_clinic_management/docs/qa/verificacion-post-audit/doctora.log
+Original error: Expected: not null
+  Actual: <null>
+
+Original stack trace:
+#0      fail (package:matcher/src/expect/expect.dart:187:31)
+#1      _matcherExpect (package:webdriver/support/async.dart:103:5)
+#2      Clock.waitFor (package:webdriver/support/async.dart:66:11)
+<asynchronous suspension>
+#3      FlutterWebConnection.sendCommand (package:flutter_driver/src/driver/web_driver.dart:339:30)
+<asynchronous suspension>
+#4      WebFlutterDriver.sendCommand (package:flutter_driver/src/driver/web_driver.dart:126:14)
+<asynchronous suspension>
+#5      FlutterDriver.requestData (package:flutter_driver/src/driver/driver.dart:585:7)
+<asynchronous suspension>
+#6      integrationDriver (package:integration_test/integration_test_driver.dart:71:29)
+<asynchronous suspension>
+
+
+#0      FlutterWebConnection.sendCommand (package:flutter_driver/src/driver/web_driver.dart:350:7)
+<asynchronous suspension>
+#1      WebFlutterDriver.sendCommand (package:flutter_driver/src/driver/web_driver.dart:126:14)
+▶ Jornada: asistente de recepción

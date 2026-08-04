@@ -8,54 +8,36 @@ class EquipoRemoteDatasourceImpl implements EquipoRemoteDatasource {
 
   @override
   Future<List<Map<String, dynamic>>> fetchEquipos() async {
-    try {
-      final response = await supabaseClient
-          .from('equipos')
-          .select()
-          .filter('deleted_at', 'is', null)
-          .order('nombre', ascending: true);
+    final response = await supabaseClient
+        .from('equipos')
+        .select()
+        .filter('deleted_at', 'is', null)
+        .order('nombre', ascending: true);
 
-      return List<Map<String, dynamic>>.from(response as List);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al recuperar catálogo de equipos: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al cargar equipos: $e');
-    }
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   @override
   Future<void> createEquipo(Map<String, dynamic> data) async {
-    try {
-      data.remove('id');
+    data.remove('id');
 
-      final now = DateTime.now().toIso8601String();
-      data['created_at'] = now;
-      data['updated_at'] = now;
+    final now = DateTime.now().toUtc().toIso8601String();
+    data['created_at'] = now;
+    data['updated_at'] = now;
 
-      await supabaseClient.from('equipos').insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al registrar nuevo equipo: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al registrar equipo: $e');
-    }
+    await supabaseClient.from('equipos').insert(data);
   }
 
   @override
   Future<void> upsertEquipo(Map<String, dynamic> data) async {
-    try {
-      if (!(_isValidUuid(data['id']))) {
-        data.remove('id');
-        data['created_at'] = DateTime.now().toIso8601String();
-      }
-
-      data['updated_at'] = DateTime.now().toIso8601String();
-
-      await supabaseClient.from('equipos').upsert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al guardar/actualizar equipo: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al persistir equipo: $e');
+    if (!(_isValidUuid(data['id']))) {
+      data.remove('id');
+      data['created_at'] = DateTime.now().toUtc().toIso8601String();
     }
+
+    data['updated_at'] = DateTime.now().toUtc().toIso8601String();
+
+    await supabaseClient.from('equipos').upsert(data);
   }
 
   bool _isValidUuid(dynamic id) {
@@ -64,18 +46,12 @@ class EquipoRemoteDatasourceImpl implements EquipoRemoteDatasource {
 
   @override
   Future<void> softDeleteEquipo(String id) async {
-    try {
-      await supabaseClient
-          .from('equipos')
-          .update({
-            'deleted_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      throw Exception('Error al eliminar equipo: ${e.message}');
-    } catch (e) {
-      throw Exception('Error inesperado al eliminar equipo: $e');
-    }
+    await supabaseClient
+        .from('equipos')
+        .update({
+          'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', id);
   }
 }

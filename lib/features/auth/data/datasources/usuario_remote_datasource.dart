@@ -6,12 +6,49 @@ abstract class UsuarioRemoteDataSource {
   Future<void> signOut();
   bool isSessionActive();
   Stream<AuthState> get authStateChanges;
-  Future<AuthResponse> signInWithPassword({required String email, required String password});
+  Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  });
+  Future<List<dynamic>?> getPerfilesPorTabla({
+    required String tabla,
+    required String selectColumns,
+  });
+
+  /// Perfil de la sesión actual vía la RPC `perfil_actual()`.
+  Future<Map<String, dynamic>?> getPerfilActual();
 
   Future<Map<String, dynamic>?> getPerfilPorTabla({
-    required String tabla, 
-    required String uuid, 
+    required String tabla,
+    required String uuid,
     String selectColumns = '*',
   });
+  Future<String> crearUsuarioCompleto(Map<String, dynamic> payload);
+  Future<void> resetearPassword({
+    required String targetUuid,
+    required String nuevaPassword,
+  });
+  Future<void> actualizarPersona(String personaId, Map<String, dynamic> data);
+  Future<void> actualizarUsuarioBasico(
+    String usuarioId,
+    Map<String, dynamic> data,
+  );
+
+  Future<void> actualizarTelefonoPersona({
+    required String personaId,
+    required String telefono,
+  });
+  Future<void> desactivarUsuarioRemoto(String usuarioId);
+  Future<int> contarConsultasPendientes(String doctorId);
+  Future<int> contarCitasPendientes(String doctorId);
+
+  Future<List<dynamic>?> getTodosAsistentes();
+
+  Future<List<String>> getAsistenteIdsAsignados(String doctorId);
+
+  Future<void> reemplazarAsistentesDoctor(
+    String doctorId,
+    List<String> asistenteIds,
+  );
 
 }

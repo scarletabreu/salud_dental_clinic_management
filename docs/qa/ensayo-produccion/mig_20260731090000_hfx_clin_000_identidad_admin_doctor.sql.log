@@ -1,0 +1,2 @@
+psql:supabase/migrations/20260731090000_hfx_clin_000_identidad_admin_doctor.sql:65: NOTICE:  constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+psql:supabase/migrations/20260731090000_hfx_clin_000_identidad_admin_doctor.sql:194: NOTICE:  trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping

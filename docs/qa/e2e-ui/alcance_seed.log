@@ -1,0 +1,12 @@
+psql:supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: los actores ya existen, no se reinserta nada.
+psql:supabase/tests/e2e_ui_login_overlay.sql:50: NOTICE:  E2E overlay: 0 actores alcanzables desde el login.
+    username     |              email              
+-----------------+---------------------------------
+ cert_admin      | cert_admin@saluddental.com
+ cert_asistente  | cert_asistente@saluddental.com
+ cert_doctora    | cert_doctora@saluddental.com
+ pruebaadmin     | pruebaadmin@saluddental.com
+ pruebaasistente | pruebaasistente@saluddental.com
+ pruebadoctor    | pruebadoctor@saluddental.com
+(6 rows)
+

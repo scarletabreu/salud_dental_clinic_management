@@ -1,0 +1,35 @@
+# Migraciones aplicadas y su hash
+
+4be5049289584d4f  20260725000000_linea_base.sql
+be73c7aee4dc910e  20260725000100_linea_base_objetos_no_public.sql
+cd8039160e741978  20260731090000_hfx_clin_000_identidad_admin_doctor.sql
+01362c36b29b42f8  20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql
+945e2a4468995b50  20260731090200_hfx_clin_000_recetas_formato_sd153.sql
+5be5c7b41acdd13c  20260731120000_hfx_clin_001_seguridad_rpc_rls.sql
+962b4ffb446aecb8  20260801090000_hfx_clin_002_persistencia_transaccional.sql
+15119221c8e1c50a  20260802090000_hfx_clin_003_barreras_clinicas.sql
+780d1cae7d5c1f4f  20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql
+d9fcc8c59d360d8a  20260804090000_hfx_clin_005_auditoria_ux.sql
+d3793b500a006a9b  20260805090000_hfx_clin_006_reglas_clinicas_editables.sql
+5ff12ef511f2b537  20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql
+a4d04d57972cf642  20260807090000_hfx_clin_008_odontograma_sin_piezas.sql
+423bf0303fd29b85  20260808090000_hfx_clin_009_rls_tablas_derivadas.sql
+
+# Reglas clínicas en vigor
+codigo | version | estado | severidad | accion | parametros
+COMB_DIABETES_SIGNOS | 1 | aprobada | critica | documentar | {"signos": [{"max": 110, "codigo": "pulso"}, {"max": 160, "codigo": "presion_sistolica"}], "condicion": "diabetes"}
+COMB_EMBARAZO_SIGNOS | 1 | aprobada | critica | documentar | {"signos": [{"max": 140, "codigo": "presion_sistolica"}, {"max": 90, "codigo": "presion_diastolica"}], "condicion": "embarazo"}
+COMB_HIPERTENSION_SIGNOS | 1 | aprobada | critica | documentar | {"signos": [{"max": 160, "codigo": "presion_sistolica"}, {"max": 100, "codigo": "presion_diastolica"}], "condicion": "hipertensión"}
+PED_PESO_REQUERIDO | 1 | aprobada | critica | documentar | {"codigo": "peso", "edad_max_anios": 12}
+SV_DIASTOLICA_MAYOR_SISTOLICA | 1 | aprobada | absoluta | bloquear_electivo | {"mayor": "presion_sistolica", "menor": "presion_diastolica"}
+SV_DOLOR_SEVERO | 1 | aprobada | advertencia | documentar | {"max": 7, "codigo": "dolor"}
+SV_PRESION_CRITICA | 1 | aprobada | critica | documentar | {"max": 180, "min": 90, "codigo": "presion_sistolica"}
+SV_PULSO_CRITICO | 1 | aprobada | critica | documentar | {"max": 120, "min": 50, "codigo": "pulso"}
+SV_RANGO_IMPOSIBLE | 1 | aprobada | absoluta | bloquear_electivo | {"origen": "catalogo_signos_vitales"}
+SV_SATURACION_CRITICA | 1 | aprobada | critica | referir | {"min": 92, "codigo": "saturacion_o2"}
+SV_TEMPERATURA_CRITICA | 1 | aprobada | critica | documentar | {"max": 38.5, "min": 35.0, "codigo": "temperatura"}
+(11 rows)
+
+# Tablas sin RLS o sin políticas (debe estar vacío)
+relname
+(0 rows)

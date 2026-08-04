@@ -1,0 +1,1 @@
+enum PacienteFormModo { editar, completarRegistro }

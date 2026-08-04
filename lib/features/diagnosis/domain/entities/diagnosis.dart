@@ -9,6 +9,7 @@ class Diagnosis {
   final SeveridadDiagnosis severidadDefault;
   final Alcance alcance;
   final CategoriaDiagnosis categoria;
+  final String? claveOdontograma;
 
   Diagnosis({
     this.id,
@@ -17,6 +18,7 @@ class Diagnosis {
     required this.severidadDefault,
     required this.alcance,
     required this.categoria,
+    this.claveOdontograma,
   });
 
   Diagnosis copyWith({
@@ -25,6 +27,7 @@ class Diagnosis {
     SeveridadDiagnosis? severidadDefault,
     Alcance? alcance,
     CategoriaDiagnosis? categoria,
+    String? claveOdontograma,
   }) {
     return Diagnosis(
       id: id,
@@ -33,6 +36,7 @@ class Diagnosis {
       severidadDefault: severidadDefault ?? this.severidadDefault,
       alcance: alcance ?? this.alcance,
       categoria: categoria ?? this.categoria,
+      claveOdontograma: claveOdontograma ?? this.claveOdontograma,
     );
   }
 
@@ -48,7 +52,8 @@ class Diagnosis {
 
       alcance: Alcance.values.byName(json['alcance'] as String),
 
-      categoria: CategoriaDiagnosis.values.byName(json['categoria'] as String),
+      categoria: CategoriaDiagnosis.fromDb(json['categoria'] as String),
+      claveOdontograma: json['claveOdontograma'] as String?,
     );
   }
 }

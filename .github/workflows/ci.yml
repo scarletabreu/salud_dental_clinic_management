@@ -1,0 +1,87 @@
+name: CI
+
+# SD-132. Tres puertas, todas verdes hoy y todas capaces de ponerse rojas
+# mañana. La lógica está en `tool/`, no aquí: así se puede reproducir en local
+# exactamente lo que falla en CI, sin leer YAML ni esperar a un runner.
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+# Un push nuevo sobre la misma rama cancela el análisis anterior: no tiene
+# sentido gastar un runner en un commit que ya quedó atrás.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.44.1
+
+jobs:
+  analisis:
+    name: Análisis estático
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # Se gatea sobre `lib/` y no sobre todo el repo a propósito: `test/`
+      # arrastra 4 errores heredados de dev —suites que no compilan— y
+      # bloquear por ellos dejaría CI rojo desde el primer día. `lib/` está
+      # limpio, así que ahí sí se exige cero errores.
+      - name: Sin errores en lib/
+        run: |
+          flutter analyze lib | tee analisis.txt
+          if grep -q "error •" analisis.txt; then
+            echo "::error::Hay errores de análisis en lib/"
+            grep "error •" analisis.txt
+            exit 1
+          fi
+
+  pruebas:
+    name: Suite (trinquete de fallos conocidos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # Falla si aparece un fallo nuevo, y también si uno conocido empieza a
+      # pasar sin quitarlo de la lista. Ver tool/ci/pruebas_conocidas_rojas.txt.
+      - name: Comparar con los fallos conocidos
+        run: dart run tool/ci/verificar_pruebas.dart
+
+  presupuestos:
+    name: Presupuestos de artefactos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # Solo web: construir el APK son ~4 min de Gradle y su tamaño no cambia
+      # en un PR normal. El APK se vigila en el workflow semanal.
+      - name: Tamaño del build web
+        run: tool/perf/medir_artefactos.sh web
+
+      - name: Guardar el build para inspección
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-web
+          path: build/web
+          retention-days: 5

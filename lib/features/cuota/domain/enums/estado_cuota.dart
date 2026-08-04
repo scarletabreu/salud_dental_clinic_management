@@ -2,7 +2,7 @@ enum EstadoCuota {
   pendiente,
   pagada,
   atrasada,
-  venciada,
+  vencida,
   cancelada;
 
   String get name => toString().split('.').last;

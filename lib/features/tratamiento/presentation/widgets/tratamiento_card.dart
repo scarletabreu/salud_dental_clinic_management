@@ -1,182 +1,313 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/domain/entities/tratamiento.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/presentation/providers/tratamiento_provider.dart';
+import 'package:salud_dental_clinic_management/features/tratamiento/presentation/cubit/tratamiento_cubit.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento/presentation/widgets/tratamiento_form_dialog.dart';
 
 class TratamientoCard extends StatelessWidget {
   final Tratamiento tratamiento;
-  final WidgetRef ref;
+  final VoidCallback? onEdit;
 
-  const TratamientoCard({
-    super.key,
-    required this.tratamiento,
-    required this.ref,
-  });
+  const TratamientoCard({super.key, required this.tratamiento, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final ac = context.appColors;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
-        color: context.appColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
+        color: ac.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ac.divider.withOpacity(0.4), width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.03),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.01),
+            blurRadius: 4,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: () => _abrirEdicion(context),
-          hoverColor: colorScheme.primaryContainer.withValues(alpha: 0.15),
+      child: InkWell(
+        onTap: () => _abrirEdicion(context),
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: ac.primaryGreen.withOpacity(0.02),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          // Badge, price and the two actions need roughly 260 px of fixed
+          // width. Below that the name would be squeezed to zero and wrap one
+          // character per line, so they move to a second row instead.
+          child: LayoutBuilder(
+            builder: (context, constraints) => constraints.maxWidth < 420
+                ? _buildStacked(context, ac)
+                : _buildInline(context, ac),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInline(BuildContext context, AppColors ac) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _leadingIcon(ac),
+        const SizedBox(width: 16),
+        Expanded(flex: 3, child: _nameAndDescription(ac)),
+        const SizedBox(width: 16),
+        _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
+        const SizedBox(width: 20),
+        if (_puedeVerPrecios(context)) ...[
+          _price(ac, CrossAxisAlignment.end),
+          const SizedBox(width: 16),
+        ],
+        ..._actions(context, ac),
+      ],
+    );
+  }
+
+  Widget _buildStacked(BuildContext context, AppColors ac) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _leadingIcon(ac),
+            const SizedBox(width: 14),
+            Expanded(child: _nameAndDescription(ac)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _AlcanceBadge(ac: ac, alcance: tratamiento.alcance.name),
+            const SizedBox(width: 12),
+            if (_puedeVerPrecios(context))
+              Expanded(child: _price(ac, CrossAxisAlignment.start))
+            else
+              const Spacer(),
+            ..._actions(context, ac),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _leadingIcon(AppColors ac) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: ac.primaryGreen.withOpacity(0.08),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.medical_services_outlined,
+        size: 20,
+        color: ac.primaryGreen,
+      ),
+    );
+  }
+
+  Widget _nameAndDescription(AppColors ac) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          tratamiento.nombre,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: ac.textPrimary,
+          ),
+        ),
+        if (tratamiento.descripcion.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            tratamiento.descripcion,
+            style: TextStyle(fontSize: 13, color: ac.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _price(AppColors ac, CrossAxisAlignment alignment) {
+    return Column(
+      crossAxisAlignment: alignment,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'PRECIO BASE',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+            color: ac.textMuted,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '\$${tratamiento.costo.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: ac.green,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// El precio es de quien factura, no de quien trata (defecto D8 de la
+  /// jornada de QA del 1 ago 2026).
+  static bool _puedeVerPrecios(BuildContext context) => context.select(
+    (AuthCubit cubit) => cubit.state.puedeVerPreciosTratamiento,
+  );
+
+  /// El catálogo es de sólo lectura para el doctor: lo consulta para trabajar,
+  /// pero crearlo y retirarlo es administración. La RLS lo impone además en la
+  /// base, así que ocultar los botones no es la única defensa.
+  List<Widget> _actions(BuildContext context, AppColors ac) {
+    final puedeEditar = context.select(
+      (AuthCubit cubit) => cubit.state.puedeEditarCatalogosClinicos,
+    );
+    if (!puedeEditar) return const [];
+    return [
+      _ActionIcon(
+        icon: Icons.edit_outlined,
+        tooltip: 'Editar',
+        color: ac.textSecondary.withOpacity(0.6),
+        onTap: () => onEdit != null ? onEdit!() : _abrirEdicion(context),
+      ),
+      const SizedBox(width: 2),
+      _ActionIcon(
+        icon: Icons.delete_outline_rounded,
+        tooltip: 'Eliminar',
+        color: ac.red.withOpacity(0.70),
+        onTap: () => _confirmarEliminacion(context),
+      ),
+    ];
+  }
+
+  void _abrirEdicion(BuildContext context) {
+    if (onEdit != null) {
+      onEdit!();
+    } else {
+      final cubit = context.read<TratamientoCubit>();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: TratamientoFormDialog(tratamiento: tratamiento),
+        ),
+      );
+    }
+  }
+
+  void _confirmarEliminacion(BuildContext context) {
+    final cubit = context.read<TratamientoCubit>();
+    final ac = context.appColors;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: ac.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
           child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.medical_services_rounded,
-                    color: colorScheme.primary,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 20),
-
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        tratamiento.nombre,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        tratamiento.descripcion.isEmpty
-                            ? 'Sin descripción clínica disponible.'
-                            : tratamiento.descripcion,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-
-                Expanded(
-                  flex: 1,
-                  child: Center(
-                    child: _buildAlcanceBadge(
-                      context,
-                      tratamiento.alcance.name,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Precio Base',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '\$${tratamiento.costo.toStringAsFixed(2)}',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: context.appColors.green,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ],
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: ac.red.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 17,
+                        color: ac.red,
+                      ),
                     ),
-                    const SizedBox(width: 16),
-                    PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.more_vert_rounded,
-                        color: colorScheme.onSurfaceVariant,
+                    const SizedBox(width: 10),
+                    Text(
+                      'Eliminar tratamiento',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: ac.textPrimary,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Esta acción deshabilitará permanentemente "${tratamiento.nombre}" del catálogo clínico.',
+                  style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ac.textSecondary,
+                        side: BorderSide(color: ac.divider),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      elevation: 3,
-                      onSelected: (val) {
-                        if (val == 'editar') {
-                          _abrirEdicion(context);
-                        } else if (val == 'eliminar') {
-                          _confirmarEliminacion(context);
-                        }
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () {
+                        cubit.eliminarTratamiento(tratamiento.id!);
+                        Navigator.pop(ctx);
                       },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'editar',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.edit_outlined,
-                                size: 18,
-                                color: colorScheme.onSurface,
-                              ),
-                              const SizedBox(width: 10),
-                              const Text('Editar'),
-                            ],
-                          ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: const Text('Eliminar'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ac.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
                         ),
-                        PopupMenuItem(
-                          value: 'eliminar',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.delete_outline_rounded,
-                                size: 18,
-                                color: colorScheme.error,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Eliminar',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -187,79 +318,58 @@ class TratamientoCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildAlcanceBadge(BuildContext context, String alcance) {
-    final colorScheme = Theme.of(context).colorScheme;
+class _AlcanceBadge extends StatelessWidget {
+  final AppColors ac;
+  final String alcance;
+  const _AlcanceBadge({required this.ac, required this.alcance});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+        color: ac.primaryGreen.withOpacity(0.07),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ac.primaryGreen.withOpacity(0.20)),
       ),
       child: Text(
         alcance.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: colorScheme.onSecondaryContainer,
-          fontWeight: FontWeight.bold,
+        style: TextStyle(
           fontSize: 10,
-          letterSpacing: 0.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          color: ac.primaryGreen,
         ),
       ),
     );
   }
+}
 
-  void _abrirEdicion(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => TratamientoFormDialog(tratamiento: tratamiento),
-    );
-  }
+class _ActionIcon extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+  const _ActionIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+  });
 
-  void _confirmarEliminacion(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: colorScheme.error),
-            SizedBox(width: 10),
-            Text('¿Eliminar tratamiento?'),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 18, color: color),
         ),
-        content: Text(
-          'Esta acción deshabilitará permanentemente "${tratamiento.nombre}" del catálogo clínico.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              ref
-                  .read(tratamientoProvider.notifier)
-                  .eliminarTratamiento(tratamiento.id!);
-              Navigator.pop(dialogContext);
-            },
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
     );
   }

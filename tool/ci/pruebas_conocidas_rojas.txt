@@ -1,0 +1,5 @@
+# Pruebas rojas heredadas, no rotas por el cambio en curso.
+# Las comprueba tool/ci/verificar_pruebas.dart: CI falla si aparece una
+# nueva o si alguna de estas empieza a pasar sin quitarla de aquí.
+#
+# Regenerar:  dart run tool/ci/verificar_pruebas.dart --actualizar

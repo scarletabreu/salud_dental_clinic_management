@@ -1,9 +1,8 @@
 import 'package:salud_dental_clinic_management/core/domain/entities/persona.dart';
-import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart'; // Importa el enum
+import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 
-abstract class Usuario extends Persona { // La hacemos abstracta ya que siempre se instanciará un tipo específico
+abstract class Usuario extends Persona {
   final String username;
-  final String passwordHash;
 
   RolUsuario get rol;
 
@@ -16,6 +15,5 @@ abstract class Usuario extends Persona { // La hacemos abstracta ya que siempre 
     required super.contactos,
     required super.estatus,
     required this.username,
-    required this.passwordHash,
   });
 }

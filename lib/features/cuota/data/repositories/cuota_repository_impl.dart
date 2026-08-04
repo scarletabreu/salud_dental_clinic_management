@@ -1,8 +1,9 @@
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/entities/cuota.dart';
 import 'package:salud_dental_clinic_management/features/cuota/domain/repositories/cuota_repository.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/datasources/cuota_remote_datasource.dart';
 import 'package:salud_dental_clinic_management/features/cuota/data/models/cuota_model.dart';
-import 'package:salud_dental_clinic_management/features/cuota/domain/enums/estado_cuota.dart';
 
 class CuotaRepositoryImpl implements CuotaRepository {
   final CuotaRemoteDatasource remoteDataSource;
@@ -10,52 +11,45 @@ class CuotaRepositoryImpl implements CuotaRepository {
   CuotaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) async {
-    try {
+  Future<List<Cuota>> getCuotasDeCuenta(String cuentaId) {
+    return runGuarded(() async {
       final data = await remoteDataSource.fetchCuotasByCuenta(cuentaId);
       return data.map((json) => CuotaModel.fromJson(json)).toList();
-    } catch (e) {
-      throw Exception('Error en el repositorio al obtener cuotas: $e');
-    }
+    }, context: 'obtener las cuotas');
   }
 
+  /// Un `42501` aquí no es un fallo de la operación en curso: significa que
+  /// quien la ejecuta no tiene capacidad de caja. La consolidación del estado
+  /// «vencida» ocurrirá la próxima vez que cobre alguien que sí la tenga, y
+  /// mientras tanto la interfaz ya deriva el vencimiento por fecha
+  /// (`Cuota.estaVencida`). Los demás errores sí se propagan.
   @override
-  Future<void> pagarCuota(String cuotaId) async {
+  Future<void> marcarCuotasVencidas(String cuentaId) async {
     try {
-      await remoteDataSource.actualizarEstadoCuota(
-        cuotaId,
-        EstadoCuota.pagada.name,
+      await runGuarded(
+        () => remoteDataSource.marcarCuotasVencidas(cuentaId),
+        context: 'actualizar las cuotas vencidas',
       );
-    } catch (e) {
-      throw Exception('Error en el repositorio al registrar pago de cuota: $e');
+    } on PermisoDenegadoFailure {
+      // Sin capacidad de caja: se deja como está. Nada más que hacer.
     }
   }
 
   @override
-  Future<void> generarPlanDePagos(List<Cuota> cuotas) async {
-    try {
+  Future<void> generarPlanDePagos(List<Cuota> cuotas) {
+    return runGuarded(() async {
       final cuotasData = cuotas.map((c) {
         return CuotaModel(
           id: c.id,
           cuentaId: c.cuentaId,
           monto: c.monto,
+          montoPagado: c.montoPagado,
           fechaVencimiento: c.fechaVencimiento,
           estado: c.estado,
         ).toJson();
       }).toList();
 
       await remoteDataSource.crearCuotas(cuotasData);
-    } catch (e) {
-      throw Exception('Error en el repositorio al generar plan de pagos: $e');
-    }
-  }
-
-  @override
-  Future<void> eliminarCuota(String id) async {
-    try {
-      await remoteDataSource.deleteCuota(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar cuota: $e');
-    }
+    }, context: 'generar el plan de pagos');
   }
 }

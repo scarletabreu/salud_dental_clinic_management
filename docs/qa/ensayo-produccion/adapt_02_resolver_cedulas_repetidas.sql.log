@@ -1,0 +1,3 @@
+psql:supabase/produccion/02_resolver_cedulas_repetidas.sql:58: NOTICE:  Alberto Garcia: 1 fila(s) actualizada(s).
+psql:supabase/produccion/02_resolver_cedulas_repetidas.sql:58: NOTICE:  Leonardo Abreu: 1 fila(s) actualizada(s).
+psql:supabase/produccion/02_resolver_cedulas_repetidas.sql:88: NOTICE:  Sin cédulas repetidas entre personas vivas.

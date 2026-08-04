@@ -1,174 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:salud_dental_clinic_management/features/personal/domain/entities/doctor.dart';
-import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
-
-enum DoctorAvailability { disponible, ocupado }
 
 class ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String sectionTitle;
-  final DoctorAvailability availability;
-  final ValueChanged<DoctorAvailability> onAvailabilityChanged;
   final bool compact;
 
   const ShellAppBar({
     super.key,
     required this.sectionTitle,
-    required this.availability,
-    required this.onAvailabilityChanged,
     this.compact = false,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(68);
+  Size get preferredSize => Size.fromHeight(compact ? 60 : 72);
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final ac = context.appColors;
 
-    return Material(
-      color: ac.cardBg,
-      elevation: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: ac.divider, width: 1)),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          compact ? 8 : 16,
+          compact ? 4 : 8,
+          compact ? 8 : 16,
+          0,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          children: [
-            Text(
-              sectionTitle,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: colorScheme.primary,
+        child: Material(
+          color: ac.cardBg,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: ac.divider.withValues(alpha: 0.5),
+                width: 0.5,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 16),
-            if (!compact) _AvailabilityToggle(
-              value: availability,
-              onChanged: onAvailabilityChanged,
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 12 : 16,
+              vertical: compact ? 8 : 10,
             ),
-            const Spacer(),
-            if (!compact) const _DoctorChip(),
-            if (compact)
-              PopupMenuButton<DoctorAvailability>(
-                tooltip: 'Disponibilidad',
-                icon: Icon(
-                  availability == DoctorAvailability.disponible
-                      ? Icons.check_circle_rounded
-                      : Icons.do_not_disturb_on_rounded,
-                  color: availability == DoctorAvailability.disponible
-                      ? context.appColors.green
-                      : colorScheme.error,
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: compact ? 28 : 34,
+                  height: compact ? 28 : 34,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.local_hospital_rounded,
+                      color: ac.primaryGreen,
+                      size: compact ? 24 : 28,
+                    );
+                  },
                 ),
-                onSelected: onAvailabilityChanged,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: DoctorAvailability.disponible,
-                    child: Text('Disponible'),
-                  ),
-                  PopupMenuItem(
-                    value: DoctorAvailability.ocupado,
-                    child: Text('Ocupado'),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+                SizedBox(width: compact ? 10 : 12),
 
-class _AvailabilityToggle extends StatelessWidget {
-  final DoctorAvailability value;
-  final ValueChanged<DoctorAvailability> onChanged;
-
-  const _AvailabilityToggle({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final ac = context.appColors;
-
-    Widget pill({
-      required DoctorAvailability target,
-      required String label,
-      required Color dotColor,
-    }) {
-      final selected = value == target;
-      return InkWell(
-        borderRadius: BorderRadius.circular(100),
-        onTap: () => onChanged(target),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: selected ? ac.cardBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(100),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: colorScheme.shadow.withValues(alpha: 0.08),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
+                Expanded(
+                  child: Text(
+                    sectionTitle,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: ac.textPrimary,
+                      letterSpacing: -0.4,
                     ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: selected ? dotColor : colorScheme.outline,
-                  shape: BoxShape.circle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: textTheme.labelMedium?.copyWith(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+                if (!compact) ...[
+                  const SizedBox(width: 12),
+                  const _DoctorChip(),
+                ],
+              ],
+            ),
           ),
         ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: ac.chipBg,
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          pill(
-            target: DoctorAvailability.disponible,
-            label: 'Disponible',
-            dotColor: ac.green,
-          ),
-          pill(
-            target: DoctorAvailability.ocupado,
-            label: 'Ocupado',
-            dotColor: colorScheme.error,
-          ),
-        ],
       ),
     );
   }
@@ -179,9 +93,7 @@ class _DoctorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
+    final ac = context.appColors;
     final usuario = context.select((AuthCubit c) => c.state.usuario);
 
     String initials() {
@@ -194,46 +106,81 @@ class _DoctorChip extends StatelessWidget {
 
     final displayName = usuario != null
         ? (usuario is Doctor
-            ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
-            : '${usuario.nombre} ${usuario.apellido}')
-        : 'Doctor';
+              ? 'Dr. ${usuario.nombre} ${usuario.apellido}'
+              : '${usuario.nombre} ${usuario.apellido}')
+        : 'Usuario Clínico';
 
-    final subtitle = usuario is Doctor ? usuario.specialty : '';
+    final subtitle = usuario is Doctor
+        ? usuario.specialty
+        : 'Personal Operativo';
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              displayName,
-              style: textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 220),
+      padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+      decoration: BoxDecoration(
+        color: ac.textPrimary.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(
+          color: ac.divider.withValues(alpha: 0.4),
+          width: 0.5,
         ),
-        const SizedBox(width: 10),
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: colorScheme.primary,
-          child: Text(
-            initials(),
-            style: textTheme.labelMedium?.copyWith(
-              color: colorScheme.onPrimary,
-              fontWeight: FontWeight.w700,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: ac.textPrimary,
+                    letterSpacing: -0.2,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: ac.textMuted,
+                    height: 1.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: ac.primaryGreen.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials(),
+              style: TextStyle(
+                color: ac.primaryGreen,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

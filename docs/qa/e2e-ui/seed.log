@@ -1,0 +1,2 @@
+psql:supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: 3 actores, 8 pacientes, 7 citas y catálogo clínico completo.
+psql:supabase/tests/hfx_clin_006_seed_certificacion.sql:258: NOTICE:  HFX-CLIN-006 seed: contraseña de los actores = Cert-2026!

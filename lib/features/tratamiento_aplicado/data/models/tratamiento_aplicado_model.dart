@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/features/superficie/domain/enums/tipo_superficie.dart';
 import 'package:salud_dental_clinic_management/features/tratamiento_aplicado/domain/entities/tratamiento_aplicado.dart';
 
 class TratamientoAplicadoModel extends TratamientoAplicado {
@@ -7,9 +8,27 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
     super.tratamientoPadreId,
     required super.esContinuo,
     required super.estaTerminado,
+    super.consultaId,
+    super.dienteId,
+    super.superficie,
+    super.precioAplicado,
+    super.notas,
+    super.estado,
+    super.nombreTratamiento,
+    super.claveOdontograma,
+    super.itemPlanId,
+    super.justificacionNoPlanificada,
+    super.doctorEjecutaId,
+    super.fechaEjecucion,
+    super.cantidadRealizada,
+    super.anuladoEn,
   });
 
   factory TratamientoAplicadoModel.fromJson(Map<String, dynamic> json) {
+    final tratamiento = json['tratamiento'];
+    final catalogo = tratamiento is Map
+        ? Map<String, dynamic>.from(tratamiento)
+        : json;
     return TratamientoAplicadoModel(
       id: json['id'] as String?,
       tratamientoId: json['tratamiento_id'] ?? json['tratamientoId'],
@@ -17,7 +36,45 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
           json['tratamiento_padre_id'] ?? json['tratamientoPadreId'],
       esContinuo: json['es_continuo'] ?? json['esContinuo'] ?? false,
       estaTerminado: json['esta_terminado'] ?? json['estaTerminado'] ?? false,
+      consultaId: json['consulta_id'] ?? json['consultaId'],
+      dienteId: json['diente_id'] ?? json['dienteId'],
+      superficie: _parseSuperficie(json['superficie']),
+      precioAplicado: _toDouble(
+        json['precio_aplicado'] ?? json['precioAplicado'],
+      ),
+      notas: json['notas'],
+      estado: EstadoTratamientoAplicado.fromDb(json['estado'] as String?),
+      nombreTratamiento: catalogo['nombre'] as String?,
+      claveOdontograma:
+          catalogo['clave_odontograma'] as String? ??
+          catalogo['claveOdontograma'] as String?,
+      itemPlanId: json['item_plan_id'] as String?,
+      justificacionNoPlanificada:
+          json['justificacion_no_planificada'] as String?,
+      doctorEjecutaId: json['doctor_ejecuta_id'] as String?,
+      cantidadRealizada: _toDouble(json['cantidad_realizada']) ?? 1,
+      fechaEjecucion: _parseFecha(json['fecha_ejecucion']),
+      anuladoEn: _parseFecha(json['deleted_at']),
     );
+  }
+
+  static double? _toDouble(dynamic raw) {
+    if (raw == null) return null;
+    return (raw as num).toDouble();
+  }
+
+  static DateTime? _parseFecha(dynamic raw) =>
+      raw == null ? null : DateTime.tryParse(raw.toString());
+
+  /// El enum `tipo_superficie` en BD es minúscula; el getter `name` del enum
+  /// devuelve capitalizado, por eso comparamos sin distinguir mayúsculas.
+  static TipoSuperficie? _parseSuperficie(dynamic raw) {
+    if (raw == null) return null;
+    final valor = raw.toString().toLowerCase();
+    for (final tipo in TipoSuperficie.values) {
+      if (tipo.name.toLowerCase() == valor) return tipo;
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -26,6 +83,18 @@ class TratamientoAplicadoModel extends TratamientoAplicado {
       'tratamiento_padre_id': tratamientoPadreId,
       'es_continuo': esContinuo,
       'esta_terminado': estaTerminado,
+      'consulta_id': consultaId,
+      'diente_id': dienteId,
+      // El enum de BD es minúscula.
+      'superficie': superficie?.name.toLowerCase(),
+      'precio_aplicado': precioAplicado,
+      'notas': notas,
+      'estado': estado.dbValue,
+      'item_plan_id': itemPlanId,
+      'justificacion_no_planificada': justificacionNoPlanificada,
+      'doctor_ejecuta_id': doctorEjecutaId,
+      'fecha_ejecucion': fechaEjecucion?.toUtc().toIso8601String(),
+      'cantidad_realizada': cantidadRealizada,
     };
 
     if (id != null && id!.contains('-') && id!.length == 36) {

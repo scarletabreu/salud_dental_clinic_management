@@ -6,17 +6,23 @@ class ContactoModel extends Contacto {
     required super.email,
     required super.numeroTelefono,
     required super.direccion,
+    super.esEmergencia = false,
   });
 
   factory ContactoModel.fromJson(Map<String, dynamic> json) {
     return ContactoModel(
-      id: json['id'],
-      email: json['email'],
-      numeroTelefono: json['numero_telefono'],
-      direccion: json['direccion'],
+      id: json['id'] as String?,
+      email: json['email'] as String? ?? '',
+      numeroTelefono: (json['numero_telefono'] ?? json['telefono'] ?? '')
+          .toString(),
+      direccion: json['direccion'] as String? ?? '',
+      esEmergencia: json['es_emergencia'] as bool? ?? false,
     );
   }
 
+  /// Solo columnas de `contactos`. `es_emergencia` vive en la tabla puente
+  /// `persona_contactos`, no aquí: enviarlo hacía que PostgREST rechazara el
+  /// insert completo (PGRST204) y no se pudiera registrar un paciente nuevo.
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'email': email,
@@ -37,6 +43,17 @@ class ContactoModel extends Contacto {
       email: '',
       numeroTelefono: '',
       direccion: '',
+      esEmergencia: false,
+    );
+  }
+
+  factory ContactoModel.fromEntity(Contacto contacto) {
+    return ContactoModel(
+      id: contacto.id,
+      email: contacto.email,
+      numeroTelefono: contacto.numeroTelefono,
+      direccion: contacto.direccion,
+      esEmergencia: contacto.esEmergencia,
     );
   }
 }

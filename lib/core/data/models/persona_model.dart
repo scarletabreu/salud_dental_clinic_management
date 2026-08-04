@@ -14,26 +14,41 @@ class PersonaModel extends Persona {
   });
 
   factory PersonaModel.fromJson(Map<String, dynamic> json) {
-    final List<dynamic> relaciones = json['persona_contacto'] ?? [];
-
-    final contactoData = relaciones.isNotEmpty
-        ? relaciones.first['contactos']
-        : null;
-
     return PersonaModel(
       id: json['id'],
       nombre: json['nombre'],
       apellido: json['apellido'],
       birthDate: DateTime.parse(json['fecha_nacimiento']),
       govID: json['cedula'],
-      contactos: contactoData != null
-          ? (contactoData as List).map((i) => ContactoModel.fromJson(i)).toList()
-          : [],
+      contactos: _parseContactos(json),
       estatus: EstatusPersona.values.firstWhere(
         (e) => e.name == json['estatus'],
         orElse: () => EstatusPersona.activo,
       ),
     );
+  }
+
+  /// Acepta tanto una lista plana en `contactos` como el embed vía la tabla
+  /// puente (`persona_contacto:persona_contactos(*, contactos(*))`), donde
+  /// cada relación trae UN contacto (objeto, no lista).
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
+    final directos = json['contactos'];
+    if (directos is List) {
+      return directos
+          .whereType<Map<String, dynamic>>()
+          .map(ContactoModel.fromJson)
+          .toList();
+    }
+
+    final relaciones = json['persona_contacto'];
+    if (relaciones is List) {
+      return relaciones
+          .map((rel) => rel is Map ? rel['contactos'] : null)
+          .whereType<Map<String, dynamic>>()
+          .map(ContactoModel.fromJson)
+          .toList();
+    }
+    return [];
   }
 
   Map<String, dynamic> toJson() {

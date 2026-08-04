@@ -1,0 +1,121 @@
+import 'package:equatable/equatable.dart';
+import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
+
+sealed class ConsultaState extends Equatable {
+  const ConsultaState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+/// Estado inicial, antes de iniciar o cargar la consulta clínica.
+class ConsultaInactiva extends ConsultaState {
+  const ConsultaInactiva();
+}
+
+/// En qué punto está el autoguardado del trabajo clínico. Se muestra en la
+/// pantalla: el doctor tiene que poder saber, sin preguntar, si lo que acaba
+/// de anotar ya está a salvo.
+enum EstadoGuardado {
+  /// No hay nada sin guardar.
+  alDia,
+
+  /// Hay cambios en memoria esperando al autoguardado.
+  pendiente,
+
+  /// Escribiendo en el servidor.
+  guardando,
+
+  /// El último intento falló; los cambios siguen en memoria.
+  fallido,
+
+  /// Otra sesión guardó primero: hay que recargar el estado confirmado antes
+  /// de volver a escribir. Los cambios locales siguen en memoria.
+  conflicto,
+}
+
+/// La consulta está activa en memoria. Contiene el odontograma, recetas, notas y signos vitales.
+class ConsultaIniciada extends ConsultaState {
+  final Consulta consulta;
+
+  /// Estado del autoguardado de [consulta].
+  final EstadoGuardado guardado;
+
+  /// Qué falló en el último intento, cuando el motivo es accionable (conflicto
+  /// de versión, stock insuficiente, red). Nulo si no hay nada que explicar.
+  final String? detalleFallo;
+
+  const ConsultaIniciada({
+    required this.consulta,
+    this.guardado = EstadoGuardado.alDia,
+    this.detalleFallo,
+  });
+
+  ConsultaIniciada copyWith({
+    Consulta? consulta,
+    EstadoGuardado? guardado,
+    String? detalleFallo,
+  }) => ConsultaIniciada(
+    consulta: consulta ?? this.consulta,
+    guardado: guardado ?? this.guardado,
+    detalleFallo: detalleFallo ?? this.detalleFallo,
+  );
+
+  @override
+  List<Object?> get props => [consulta, guardado, detalleFallo];
+}
+
+/// Guardando la consulta (parcial o finalización).
+class ConsultaGuardando extends ConsultaState {
+  final Consulta? consulta;
+
+  const ConsultaGuardando({this.consulta});
+
+  @override
+  List<Object?> get props => [consulta];
+}
+
+/// La consulta se finalizó con éxito. Lleva el id de la cuenta (pre-factura)
+/// generada, para poder navegar hacia el detalle financiero.
+class ConsultaTerminada extends ConsultaState {
+  final String? consultaId;
+  final String? cuentaId;
+  final double montoTotal;
+
+  const ConsultaTerminada({
+    this.consultaId,
+    this.cuentaId,
+    this.montoTotal = 0,
+  });
+
+  @override
+  List<Object?> get props => [consultaId, cuentaId, montoTotal];
+}
+
+/// El servidor rechazó seguir editando porque la consulta ya está cerrada.
+///
+/// Es distinto de [ConsultaError]: no hay nada que reintentar ni cambios que
+/// rescatar. El expediente cerró —aquí o en otra sesión— y la pantalla debe
+/// dejar de ofrecer un borrador que ya no existe.
+class ConsultaCerradaEnServidor extends ConsultaState {
+  final String? consultaId;
+  final String mensaje;
+
+  const ConsultaCerradaEnServidor({
+    required this.mensaje,
+    this.consultaId,
+  });
+
+  @override
+  List<Object?> get props => [consultaId, mensaje];
+}
+
+/// Falló la operación u ocurrió un error.
+class ConsultaError extends ConsultaState {
+  final String message;
+
+  const ConsultaError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}

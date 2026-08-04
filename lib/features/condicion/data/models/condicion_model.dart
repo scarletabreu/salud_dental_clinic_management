@@ -25,6 +25,15 @@ class CondicionModel extends Condicion {
     );
   }
 
+  factory CondicionModel.fromEntity(Condicion condicion) {
+    return CondicionModel(
+      id: condicion.id,
+      nombre: condicion.nombre,
+      tipo: condicion.tipo,
+      categoria: condicion.categoria,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'nombre': nombre,

@@ -13,70 +13,87 @@ class DoctorModel extends Doctor {
     required super.govID,
     required super.estatus,
     required super.username,
-    required super.passwordHash,
     required super.specialty,
     required super.assistants,
     super.isAvailable = true,
   });
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
-    // 1. Entramos al primer nivel (usuarios)
     final usuarioData = json['usuarios'] as Map<String, dynamic>? ?? {};
-    
-    // 2. Entramos al segundo nivel (personas) desde usuarios
     final personaData = usuarioData['personas'] as Map<String, dynamic>? ?? {};
 
     return DoctorModel(
       id: json['id'] as String?,
-      
-      // Datos que vienen del fondo: de la tabla 'personas'
-      nombre: personaData['nombre'] as String? ?? '',
-      apellido: personaData['apellido'] as String? ?? '',
+
+      nombre: personaData['nombre'] as String? ?? 'nombre',
+      apellido: personaData['apellido'] as String? ?? 'apellido',
       birthDate: personaData['fecha_nacimiento'] != null
           ? DateTime.parse(personaData['fecha_nacimiento'])
           : DateTime.now(),
       govID: personaData['cedula'] as String? ?? '',
       contactos: _parseContactos(personaData),
-      
-      // Datos que vienen del medio: de la tabla 'usuarios'
-      estatus: _parseEstatus(personaData['estatus'] as String?),
+
+      estatus: _calcularEstatus(usuarioData['deleted_at'] as String?),
       username: usuarioData['username'] as String? ?? '',
-      passwordHash: usuarioData['password_hash'] as String? ?? '',
-      
-      // Datos de la raíz: de la tabla 'doctores'
+
       specialty: json['especialidad'] as String? ?? '',
       isAvailable: json['esta_disponible'] as bool? ?? true,
-      
-      assistants: (json['assistants'] as List?)
+
+      assistants:
+          (json['assistants'] as List?)
               ?.map((e) => AsistenteModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );
   }
 
-  static EstatusPersona _parseEstatus(String? estatusStr) {
-    if (estatusStr == null) return EstatusPersona.activo; // Fallback por defecto
-    
-    return EstatusPersona.values.firstWhere(
-      (e) => e.name.toLowerCase() == estatusStr.toLowerCase(),
-      orElse: () => EstatusPersona.activo, // Por si en DB guardas algo raro
+  factory DoctorModel.fromJsonFn(Map<String, dynamic> json) {
+    return DoctorModel(
+      id: json['doctor_id'] as String?,
+
+      nombre: json['nombre'] as String? ?? 'nombre',
+      apellido: json['apellido'] as String? ?? 'apellido',
+      birthDate: json['fecha_nacimiento'] != null
+          ? DateTime.parse(json['fecha_nacimiento'])
+          : DateTime.now(),
+      govID: json['cedula'] as String? ?? '',
+      contactos: [],
+      estatus: _calcularEstatus(json['deleted_at'] as String?),
+      username: json['username'] as String? ?? '',
+
+      specialty: json['especialidad'] as String? ?? '',
+      isAvailable: json['esta_disponible'] as bool? ?? true,
+
+      assistants: [],
     );
   }
 
-  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
-    final raw = json['contactos'];
+  static EstatusPersona _calcularEstatus(String? deletedAtStr) {
+    return deletedAtStr == null
+        ? EstatusPersona.activo
+        : EstatusPersona.inactivo;
+  }
 
-    if (raw is List) {
-      return raw
+  static List<ContactoModel> _parseContactos(Map<String, dynamic> json) {
+    final directos = json['contactos'];
+    if (directos is List) {
+      return directos
           .whereType<Map<String, dynamic>>()
           .map((item) => ContactoModel.fromJson(item))
           .toList();
     }
-
-    if (raw is Map<String, dynamic>) {
-      return [ContactoModel.fromJson(raw)];
+    if (directos is Map<String, dynamic>) {
+      return [ContactoModel.fromJson(directos)];
     }
 
+    final relaciones = json['persona_contactos'];
+    if (relaciones is List) {
+      return relaciones
+          .map((rel) => rel is Map ? rel['contactos'] : null)
+          .whereType<Map<String, dynamic>>()
+          .map(ContactoModel.fromJson)
+          .toList();
+    }
     return [];
   }
 

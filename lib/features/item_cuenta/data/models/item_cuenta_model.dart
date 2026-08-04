@@ -1,5 +1,4 @@
 import 'package:salud_dental_clinic_management/features/item_cuenta/domain/entities/item_cuenta.dart';
-import 'package:salud_dental_clinic_management/features/tratamiento/data/models/tratamiento_model.dart';
 
 class ItemCuentaModel extends ItemCuenta {
   ItemCuentaModel({

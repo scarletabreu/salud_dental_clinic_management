@@ -1,0 +1,375 @@
+Resetting local database...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Recreating database...
+Initialising schema...
+Seeding globals from roles.sql...
+Applying migration 20260725000000_linea_base.sql...
+Applying migration 20260725000100_linea_base_objetos_no_public.sql...
+NOTICE (00000): policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_update" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_delete" for relation "storage.objects" does not exist, skipping
+Applying migration 20260731090000_hfx_clin_000_identidad_admin_doctor.sql...
+NOTICE (00000): constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql...
+NOTICE (00000): function public.perfil_actual() does not exist, skipping
+NOTICE (00000): function public.get_active_doctors() does not exist, skipping
+Applying migration 20260731090200_hfx_clin_000_recetas_formato_sd153.sql...
+NOTICE (00000): constraint "recetas_doctor_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_receta_reemplazada_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_estado_check" of relation "recetas" does not exist, skipping
+Applying migration 20260731120000_hfx_clin_001_seguridad_rpc_rls.sql...
+Applying migration 20260801090000_hfx_clin_002_persistencia_transaccional.sql...
+NOTICE (00000): policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping
+Applying migration 20260802090000_hfx_clin_003_barreras_clinicas.sql...
+NOTICE (00000): policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+NOTICE (00000): policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+NOTICE (00000): policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping
+Applying migration 20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql...
+NOTICE (00000): constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+NOTICE (00000): constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping
+Applying migration 20260804090000_hfx_clin_005_auditoria_ux.sql...
+NOTICE (00000): constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping
+Applying migration 20260805090000_hfx_clin_006_reglas_clinicas_editables.sql...
+NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
+Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
+Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
+Seeding data from supabase/seed.sql...
+NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
+NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaadmin creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuario).
+Restarting containers...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
+{"target":"local","version":"","message":"Reset local database."}
+Resetting local database...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Recreating database...
+Initialising schema...
+Seeding globals from roles.sql...
+Applying migration 20260725000000_linea_base.sql...
+Applying migration 20260725000100_linea_base_objetos_no_public.sql...
+NOTICE (00000): policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_update" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_delete" for relation "storage.objects" does not exist, skipping
+Applying migration 20260731090000_hfx_clin_000_identidad_admin_doctor.sql...
+NOTICE (00000): constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql...
+NOTICE (00000): function public.perfil_actual() does not exist, skipping
+NOTICE (00000): function public.get_active_doctors() does not exist, skipping
+Applying migration 20260731090200_hfx_clin_000_recetas_formato_sd153.sql...
+NOTICE (00000): constraint "recetas_doctor_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_receta_reemplazada_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_estado_check" of relation "recetas" does not exist, skipping
+Applying migration 20260731120000_hfx_clin_001_seguridad_rpc_rls.sql...
+Applying migration 20260801090000_hfx_clin_002_persistencia_transaccional.sql...
+NOTICE (00000): policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping
+Applying migration 20260802090000_hfx_clin_003_barreras_clinicas.sql...
+NOTICE (00000): policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+NOTICE (00000): policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+NOTICE (00000): policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping
+Applying migration 20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql...
+NOTICE (00000): constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+NOTICE (00000): constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping
+Applying migration 20260804090000_hfx_clin_005_auditoria_ux.sql...
+NOTICE (00000): constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping
+Applying migration 20260805090000_hfx_clin_006_reglas_clinicas_editables.sql...
+NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
+Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
+Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
+Seeding data from supabase/seed.sql...
+NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
+NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaadmin creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuario).
+Restarting containers...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
+{"target":"local","version":"","message":"Reset local database."}
+Resetting local database...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Recreating database...
+Initialising schema...
+Seeding globals from roles.sql...
+Applying migration 20260725000000_linea_base.sql...
+Applying migration 20260725000100_linea_base_objetos_no_public.sql...
+NOTICE (00000): policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_update" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_delete" for relation "storage.objects" does not exist, skipping
+Applying migration 20260731090000_hfx_clin_000_identidad_admin_doctor.sql...
+NOTICE (00000): constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql...
+NOTICE (00000): function public.perfil_actual() does not exist, skipping
+NOTICE (00000): function public.get_active_doctors() does not exist, skipping
+Applying migration 20260731090200_hfx_clin_000_recetas_formato_sd153.sql...
+NOTICE (00000): constraint "recetas_doctor_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_receta_reemplazada_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_estado_check" of relation "recetas" does not exist, skipping
+Applying migration 20260731120000_hfx_clin_001_seguridad_rpc_rls.sql...
+Applying migration 20260801090000_hfx_clin_002_persistencia_transaccional.sql...
+NOTICE (00000): policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping
+Applying migration 20260802090000_hfx_clin_003_barreras_clinicas.sql...
+NOTICE (00000): policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+NOTICE (00000): policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+NOTICE (00000): policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping
+Applying migration 20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql...
+NOTICE (00000): constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+NOTICE (00000): constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping
+Applying migration 20260804090000_hfx_clin_005_auditoria_ux.sql...
+NOTICE (00000): constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping
+Applying migration 20260805090000_hfx_clin_006_reglas_clinicas_editables.sql...
+NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
+Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
+Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
+Seeding data from supabase/seed.sql...
+NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
+NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaadmin creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuario).
+Restarting containers...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
+{"target":"local","version":"","message":"Reset local database."}
+Resetting local database...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Recreating database...
+Initialising schema...
+Seeding globals from roles.sql...
+Applying migration 20260725000000_linea_base.sql...
+Applying migration 20260725000100_linea_base_objetos_no_public.sql...
+NOTICE (00000): policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_update" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_delete" for relation "storage.objects" does not exist, skipping
+Applying migration 20260731090000_hfx_clin_000_identidad_admin_doctor.sql...
+NOTICE (00000): constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql...
+NOTICE (00000): function public.perfil_actual() does not exist, skipping
+NOTICE (00000): function public.get_active_doctors() does not exist, skipping
+Applying migration 20260731090200_hfx_clin_000_recetas_formato_sd153.sql...
+NOTICE (00000): constraint "recetas_doctor_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_receta_reemplazada_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_estado_check" of relation "recetas" does not exist, skipping
+Applying migration 20260731120000_hfx_clin_001_seguridad_rpc_rls.sql...
+Applying migration 20260801090000_hfx_clin_002_persistencia_transaccional.sql...
+NOTICE (00000): policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping
+Applying migration 20260802090000_hfx_clin_003_barreras_clinicas.sql...
+NOTICE (00000): policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+NOTICE (00000): policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+NOTICE (00000): policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping
+Applying migration 20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql...
+NOTICE (00000): constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+NOTICE (00000): constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping
+Applying migration 20260804090000_hfx_clin_005_auditoria_ux.sql...
+NOTICE (00000): constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping
+Applying migration 20260805090000_hfx_clin_006_reglas_clinicas_editables.sql...
+NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
+Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
+Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
+Seeding data from supabase/seed.sql...
+NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
+NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaadmin creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuario).
+Restarting containers...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
+{"target":"local","version":"","message":"Reset local database."}
+Resetting local database...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Recreating database...
+Initialising schema...
+Seeding globals from roles.sql...
+Applying migration 20260725000000_linea_base.sql...
+Applying migration 20260725000100_linea_base_objetos_no_public.sql...
+NOTICE (00000): policy "documentos_clinicos_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "documentos_clinicos_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_select" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_insert" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_update" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "fotos_pacientes_delete" for relation "storage.objects" does not exist, skipping
+Applying migration 20260731090000_hfx_clin_000_identidad_admin_doctor.sql...
+NOTICE (00000): constraint "admins_id_doctores_fkey" of relation "admins" does not exist, skipping
+NOTICE (00000): trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying migration 20260731090100_hfx_clin_000_perfil_y_catalogo_doctores.sql...
+NOTICE (00000): function public.perfil_actual() does not exist, skipping
+NOTICE (00000): function public.get_active_doctors() does not exist, skipping
+Applying migration 20260731090200_hfx_clin_000_recetas_formato_sd153.sql...
+NOTICE (00000): constraint "recetas_doctor_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_receta_reemplazada_id_fkey" of relation "recetas" does not exist, skipping
+NOTICE (00000): constraint "recetas_estado_check" of relation "recetas" does not exist, skipping
+Applying migration 20260731120000_hfx_clin_001_seguridad_rpc_rls.sql...
+Applying migration 20260801090000_hfx_clin_002_persistencia_transaccional.sql...
+NOTICE (00000): policy "consumos_consulta_select" for relation "public.consumos_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_proteger_receta_emitida" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): policy "auditoria_clinica_select" for relation "public.auditoria_clinica" does not exist, skipping
+Applying migration 20260802090000_hfx_clin_003_barreras_clinicas.sql...
+NOTICE (00000): policy "signos_vitales_consulta_select" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_signo_vital" for relation "public.signos_vitales_consulta" does not exist, skipping
+NOTICE (00000): policy "reglas_clinicas_select" for relation "public.reglas_clinicas" does not exist, skipping
+NOTICE (00000): policy "alertas_clinicas_select" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): policy "condiciones_consulta_select" for relation "public.condiciones_consulta" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_validar_alcance_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_coherencia_ejecucion" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "trg_versionar_plan" for relation "public.items_plan_tratamiento" does not exist, skipping
+NOTICE (00000): policy "consentimientos_plan_select" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "trg_exigir_consentimiento_plan" for relation "public.planes_tratamiento" does not exist, skipping
+Applying migration 20260803090000_hfx_clin_004_agenda_pacientes_continuidad.sql...
+NOTICE (00000): constraint "citas_duracion_posible" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_fin" for relation "public.citas" does not exist, skipping
+NOTICE (00000): constraint "citas_sin_solape" of relation "citas" does not exist, skipping
+NOTICE (00000): trigger "trg_citas_transicion" for relation "public.citas" does not exist, skipping
+Applying migration 20260804090000_hfx_clin_005_auditoria_ux.sql...
+NOTICE (00000): constraint "auditoria_clinica_ancla" of relation "auditoria_clinica" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consulta" for relation "public.consultas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_cita" for relation "public.citas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_diagnostico" for relation "public.diagnosticos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_tratamiento" for relation "public.tratamientos_aplicados" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_receta" for relation "public.recetas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_plan" for relation "public.planes_tratamiento" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_consentimiento" for relation "public.consentimientos_plan" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_alerta" for relation "public.alertas_clinicas" does not exist, skipping
+NOTICE (00000): trigger "hfx_clin_005_auditar_correccion" for relation "public.auditoria_correcciones_clinicas" does not exist, skipping
+Applying migration 20260805090000_hfx_clin_006_reglas_clinicas_editables.sql...
+NOTICE (00000): policy "catalogo_signos_vitales_select" for relation "public.catalogo_signos_vitales" does not exist, skipping
+NOTICE (00000): policy "auditoria_reglas_clinicas_select" for relation "public.auditoria_reglas_clinicas" does not exist, skipping
+Applying migration 20260806090000_hfx_clin_007_cerrar_escrituras_directas.sql...
+Applying migration 20260807090000_hfx_clin_008_odontograma_sin_piezas.sql...
+Applying migration 20260808090000_hfx_clin_009_rls_tablas_derivadas.sql...
+NOTICE (00000): HFX-CLIN-009: auditoria_log no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: items_receta no existe aquí; nada que hacer.
+NOTICE (00000): HFX-CLIN-009: ninguna tabla de public queda legible sin política.
+Seeding data from supabase/seed.sql...
+NOTICE (00000): SD-119 seed: caja de ayer cerrada (faltante 120.00) y caja de hoy abierta (esperado 27349.75).
+NOTICE (00000): seed: usuario pruebadoctor creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaadmin creado (contraseña igual al usuario).
+NOTICE (00000): seed: usuario pruebaasistente creado (contraseña igual al usuario).
+Restarting containers...
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+WARN: config section [inbucket] is deprecated. Please use [local_smtp] instead.
+Finished [36msupabase db reset[39m on branch [36mhotfix-produccion-migracion[39m.
+{"target":"local","version":"","message":"Reset local database."}

@@ -1,3 +1,4 @@
+import 'package:salud_dental_clinic_management/core/errors/guard.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/entities/odontograma.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/domain/repositories/odontograma_repository.dart';
 import 'package:salud_dental_clinic_management/features/odontograma/data/datasources/odontograma_remote_datasource.dart';
@@ -9,22 +10,16 @@ class OdontogramaRepositoryImpl implements OdontogramaRepository {
   OdontogramaRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<Odontograma?> getOdontogramaDeConsulta(String consultaId) async {
-    try {
-      final data = await remoteDataSource.fetchOdontogramaByConsulta(
-        consultaId,
-      );
+  Future<Odontograma?> getOdontogramaDeConsulta(String consultaId) {
+    return runGuarded(() async {
+      final data = await remoteDataSource.fetchOdontogramaByConsulta(consultaId);
       return data != null ? OdontogramaModel.fromJson(data) : null;
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al obtener odontograma de la consulta: $e',
-      );
-    }
+    }, context: 'obtener el odontograma de la consulta');
   }
 
   @override
-  Future<void> inicializarOdontograma(Odontograma odontograma) async {
-    try {
+  Future<void> inicializarOdontograma(Odontograma odontograma) {
+    return runGuarded(() async {
       final model = OdontogramaModel(
         id: odontograma.id,
         consultaId: odontograma.consultaId,
@@ -33,14 +28,12 @@ class OdontogramaRepositoryImpl implements OdontogramaRepository {
       final data = model.toJson();
       data['deleted_at'] = null;
       await remoteDataSource.crearOdontograma(data);
-    } catch (e) {
-      throw Exception('Error en el repositorio al inicializar odontograma: $e');
-    }
+    }, context: 'inicializar el odontograma');
   }
 
   @override
-  Future<void> guardarCambiosOdontograma(Odontograma odontograma) async {
-    try {
+  Future<void> guardarCambiosOdontograma(Odontograma odontograma) {
+    return runGuarded(() async {
       final model = OdontogramaModel(
         id: odontograma.id,
         consultaId: odontograma.consultaId,
@@ -50,22 +43,17 @@ class OdontogramaRepositoryImpl implements OdontogramaRepository {
       );
 
       final data = model.toJson();
-      data['updated_at'] = DateTime.now().toIso8601String();
+      data['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
       await remoteDataSource.actualizarOdontograma(data);
-    } catch (e) {
-      throw Exception(
-        'Error en el repositorio al guardar cambios del odontograma: $e',
-      );
-    }
+    }, context: 'guardar los cambios del odontograma');
   }
 
   @override
-  Future<void> eliminarOdontograma(String id) async {
-    try {
-      await remoteDataSource.eliminarOdontograma(id);
-    } catch (e) {
-      throw Exception('Error en el repositorio al eliminar odontograma: $e');
-    }
+  Future<void> eliminarOdontograma(String id) {
+    return runGuarded(
+      () => remoteDataSource.eliminarOdontograma(id),
+      context: 'eliminar el odontograma',
+    );
   }
 }

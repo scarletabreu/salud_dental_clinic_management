@@ -253,28 +253,35 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  'Consultas',
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.6,
-                  ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Consultas',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                              letterSpacing: -0.6,
+                            ),
+                      ),
+                    ),
+                    if (state is ConsultasLoaded) ...[
+                      const SizedBox(width: 14),
+                      _CountBadge(count: total),
+                    ],
+                  ],
                 ),
               ),
-              if (state is ConsultasLoaded) ...[
-                const SizedBox(width: 14),
-                _CountBadge(count: total),
-                const Spacer(),
+              if (state is ConsultasLoaded)
                 IconButton(
                   tooltip: 'Actualizar listado',
                   icon: const Icon(Icons.refresh_rounded, size: 20),
                   onPressed: () =>
                       context.read<ConsultasListCubit>().recargar(),
                 ),
-              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -865,137 +872,148 @@ class _ConsultaCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Flexible(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 2,
-                    runSpacing: 2,
-                    children: [
-                      if (!consulta.finalizada)
-                        Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ac.amber.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.play_circle_outline_rounded,
-                                size: 13,
-                                color: ac.amber,
-                              ),
-                              if (MediaQuery.textScalerOf(context).scale(1) <=
-                                  1.3) ...[
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    'En curso',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: ac.amber,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      // Una consulta sin cita no es un error, pero explica por
-                      // qué no aparece en la agenda (SD-160): marcarla evita
-                      // buscarla ahí en vano.
-                      if (consulta.citaId == null || consulta.citaId!.isEmpty)
-                        _IndicadorIcono(
-                          icon: Icons.event_busy_rounded,
-                          color: ac.textMuted,
-                          tooltip: 'Consulta sin cita (no está en la agenda)',
-                        ),
-                      if (tieneTratamientos)
-                        _IndicadorIcono(
-                          icon: Icons.healing_rounded,
-                          color: ac.teal,
-                          tooltip: 'Tratamientos aplicados',
-                        ),
-                      if (consulta.tieneRecetas)
-                        _IndicadorIcono(
-                          icon: Icons.receipt_long_rounded,
-                          color: ac.primaryGreen,
-                          tooltip: 'Tiene receta',
-                        ),
-                      if (esEliminable)
-                        Tooltip(
-                          message: 'Eliminar consulta',
-                          child: InkWell(
-                            onTap: () => _mostrarDialogoEliminar(context),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.delete_outline_rounded,
-                                size: 18,
-                                color: colorScheme.error.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (!consulta.finalizada && puedeContinuar)
-                        TextButton.icon(
-                          onPressed: () async {
-                            final resultado = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => MultiBlocProvider(
-                                  providers: [
-                                    BlocProvider(
-                                      create: (_) => sl<PacienteCubit>()
-                                        ..loadParaConsulta(consulta.pacienteId),
-                                    ),
-                                    BlocProvider(
-                                      create: (_) => sl<ConsultaCubit>(),
-                                    ),
-                                  ],
-                                  child: EfectuarConsultaPage(
-                                    citaId: consulta.citaId ?? '',
-                                    pacienteId: consulta.pacienteId,
-                                    doctorId: consulta.doctorId,
-                                    consultaId: consulta.id,
-                                  ),
-                                ),
-                              ),
-                            );
-                            if (resultado == true && context.mounted) {
-                              context.read<ConsultasListCubit>().recargar();
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.navigate_next_rounded,
-                            size: 16,
-                          ),
-                          label: const Text('Continuar'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: ac.primaryGreen,
+                // Expanded + Align y no Flexible: con Flexible el Wrap se
+                // encoge a su contenido y la mitad no usada queda como hueco
+                // muerto al final de la fila, dejando los iconos a mitad de
+                // tarjeta en pantallas anchas.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 2,
+                      runSpacing: 2,
+                      children: [
+                        if (!consulta.finalizada)
+                          Container(
+                            margin: const EdgeInsets.only(right: 6),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
-                              vertical: 0,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ac.amber.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.play_circle_outline_rounded,
+                                  size: 13,
+                                  color: ac.amber,
+                                ),
+                                if (MediaQuery.textScalerOf(context).scale(1) <=
+                                    1.3) ...[
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'En curso',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: ac.amber,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        )
-                      else
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.5,
+                        // Una consulta sin cita no es un error, pero explica por
+                        // qué no aparece en la agenda (SD-160): marcarla evita
+                        // buscarla ahí en vano.
+                        if (consulta.citaId == null || consulta.citaId!.isEmpty)
+                          _IndicadorIcono(
+                            icon: Icons.event_busy_rounded,
+                            color: ac.textMuted,
+                            tooltip: 'Consulta sin cita (no está en la agenda)',
                           ),
-                        ),
-                    ],
+                        if (tieneTratamientos)
+                          _IndicadorIcono(
+                            icon: Icons.healing_rounded,
+                            color: ac.teal,
+                            tooltip: 'Tratamientos aplicados',
+                          ),
+                        if (consulta.tieneRecetas)
+                          _IndicadorIcono(
+                            icon: Icons.receipt_long_rounded,
+                            color: ac.primaryGreen,
+                            tooltip: 'Tiene receta',
+                          ),
+                        if (esEliminable)
+                          Tooltip(
+                            message: 'Eliminar consulta',
+                            child: InkWell(
+                              onTap: () => _mostrarDialogoEliminar(context),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18,
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (!consulta.finalizada && puedeContinuar)
+                          TextButton.icon(
+                            onPressed: () async {
+                              final resultado = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MultiBlocProvider(
+                                    providers: [
+                                      BlocProvider(
+                                        create: (_) => sl<PacienteCubit>()
+                                          ..loadParaConsulta(
+                                            consulta.pacienteId,
+                                          ),
+                                      ),
+                                      BlocProvider(
+                                        create: (_) => sl<ConsultaCubit>(),
+                                      ),
+                                    ],
+                                    child: EfectuarConsultaPage(
+                                      citaId: consulta.citaId ?? '',
+                                      pacienteId: consulta.pacienteId,
+                                      doctorId: consulta.doctorId,
+                                      consultaId: consulta.id,
+                                    ),
+                                  ),
+                                ),
+                              );
+                              if (resultado == true && context.mounted) {
+                                context.read<ConsultasListCubit>().recargar();
+                              }
+                            },
+                            icon: const Icon(
+                              Icons.navigate_next_rounded,
+                              size: 16,
+                            ),
+                            label: const Text('Continuar'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: ac.primaryGreen,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 0,
+                              ),
+                            ),
+                          )
+                        else
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ],

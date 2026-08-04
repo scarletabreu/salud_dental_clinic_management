@@ -107,7 +107,7 @@ ruta que falta.
 
 | Hallazgo | Estado |
 |---|---|
-| V-01 · doctor no admin no puede abrir la consulta de un paciente nuevo | **abierto** — sin migración que relaje `puede_ver_paciente`; el overlay del arnés sigue tapándolo |
+| V-01 · doctor no admin no puede abrir la consulta de un paciente nuevo | **corregido** — `20260820090000_v01_doctor_ve_al_paciente_citado.sql`: un doctor ve a los pacientes que tiene citados. La regla queda fijada en `supabase/tests/v01_doctor_ve_al_paciente_citado_test.sql` |
 | V-02 · «Cuentas por Cobrar» sin ruta al cobro | **corregido** (`7b54c47`, `cadfdf3`) |
 
 Precisión sobre `runner.log`: los `✗` que quedaron registrados **no** son V-01

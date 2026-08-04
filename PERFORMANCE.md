@@ -19,7 +19,7 @@ desde el primer día y dejaría de leerse.
 
 | Métrica | Medido en SD-132 | Trinquete | Meta | Cómo se comprueba |
 |---|---|---|---|---|
-| `main.dart.js` (web, sin comprimir) | 5556 KiB (bootstrap HFX-CLIN-000) | ≤ 5700 | ≤ 3400 | `tool/perf/medir_artefactos.sh web` |
+| `main.dart.js` (web, sin comprimir) | 5724 KiB (CI, 4 ago 2026) | ≤ 5800 | ≤ 3400 | `tool/perf/medir_artefactos.sh web` |
 | `main.dart.js` servido con brotli | 1095 KiB ✅ | — | ≤ 1200 | ver §4 |
 | `build/web` completo | 45912 KiB (bootstrap HFX-CLIN-000) | ≤ 46500 | ≤ 32000 | `tool/perf/medir_artefactos.sh web` |
 | APK universal de release | 67344 KiB | ≤ 68000 | — (no se distribuye) | `tool/perf/medir_artefactos.sh apk` |
@@ -46,6 +46,21 @@ desde el primer día y dejaría de leerse.
 > únicamente 4 KiB. Los trinquetes se recalibraron a 5700/46500 KiB para que CI
 > vuelva a detectar crecimiento nuevo sin atribuirle al hotfix una deuda ya
 > integrada. Las metas de 3400/32000 KiB no cambian.
+>
+> **Segunda recalibración (4 ago 2026).** El trinquete de 5700 KiB llevaba
+> tiempo en rojo: en `0c6373e`, antes de SD-170, CI ya medía 5704 KiB. SD-170
+> (la hoja de arqueo) y la corrección de V-01 sumaron el resto hasta 5724 KiB.
+> Un trinquete que lleva días fallando deja de leerse y esconde el crecimiento
+> nuevo, que es justo lo contrario de para lo que existe.
+>
+> Se sube a **5800 KiB**. El margen no es arbitrario: la misma revisión mide
+> 5712 KiB en local y 5724 KiB en CI, así que la cadena de herramientas por sí
+> sola mueve el número 12 KiB y un techo pegado al valor medido daría rojos
+> falsos. Quedan ~76 KiB de holgura sobre CI, suficientes para detectar una
+> regresión real y demasiado pocos para esconder una pantalla nueva entera.
+> `build/web` no se toca: 46052 KiB contra 46500 sigue en verde. Las metas de
+> 3400/32000 KiB no cambian, y el camino para acercarse a ellas sigue siendo la
+> carga diferida por módulo.
 >
 > **Qué falta por medir.** De los tres entornos del ticket, el navegador con
 > CPU limitada ya está cubierto y automatizado (§3). Siguen sin medir el

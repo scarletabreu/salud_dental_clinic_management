@@ -28,9 +28,38 @@ Got dependencies!
 24 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
 Launching integration_test/verif_doctor_test.dart on Web Server in debug mode...
-Waiting for connection from debug service on Web Server...         30.1s
-integration_test/verif_doctor_test.dart is being served at http://localhost:44601
+Waiting for connection from debug service on Web Server...         26.0s
+integration_test/verif_doctor_test.dart is being served at http://localhost:36107
 The web-server device requires the Dart Debug Chrome extension for debugging. Consider using the Chrome or Edge devices for an improved development workflow.
-Debug service listening on ws://127.0.0.1:35439/EKqNARm4lfg=/ws
-A Dart VM Service on Web Server is available at: http://127.0.0.1:35439/EKqNARm4lfg=
-The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:35439/EKqNARm4lfg=/devtools/?uri=ws://127.0.0.1:35439/EKqNARm4lfg=/ws
+Debug service listening on ws://127.0.0.1:36431/1iM0KwBRHfI=/ws
+A Dart VM Service on Web Server is available at: http://127.0.0.1:36431/1iM0KwBRHfI=
+The Flutter DevTools debugger and profiler on Web Server is available at: http://127.0.0.1:36431/1iM0KwBRHfI=/devtools/?uri=ws://127.0.0.1:36431/1iM0KwBRHfI=/ws
+Unhandled exception:
+DriverError: Error while reading FlutterDriver result for command: window.$flutterDriver('{"command":"request_data","timeout":"1200000"}')
+Original error: Expected: not null
+  Actual: <null>
+
+Original stack trace:
+#0      fail (package:matcher/src/expect/expect.dart:187:31)
+#1      _matcherExpect (package:webdriver/support/async.dart:103:5)
+#2      Clock.waitFor (package:webdriver/support/async.dart:66:11)
+<asynchronous suspension>
+#3      FlutterWebConnection.sendCommand (package:flutter_driver/src/driver/web_driver.dart:339:30)
+<asynchronous suspension>
+#4      WebFlutterDriver.sendCommand (package:flutter_driver/src/driver/web_driver.dart:126:14)
+<asynchronous suspension>
+#5      FlutterDriver.requestData (package:flutter_driver/src/driver/driver.dart:585:7)
+<asynchronous suspension>
+#6      integrationDriver (package:integration_test/integration_test_driver.dart:71:29)
+<asynchronous suspension>
+
+
+#0      FlutterWebConnection.sendCommand (package:flutter_driver/src/driver/web_driver.dart:350:7)
+<asynchronous suspension>
+#1      WebFlutterDriver.sendCommand (package:flutter_driver/src/driver/web_driver.dart:126:14)
+<asynchronous suspension>
+#2      FlutterDriver.requestData (package:flutter_driver/src/driver/driver.dart:585:7)
+<asynchronous suspension>
+#3      integrationDriver (package:integration_test/integration_test_driver.dart:71:29)
+<asynchronous suspension>
+Application finished.

@@ -10,4 +10,8 @@ psql:supabase/tests/e2e_ui_login_overlay.sql:50: NOTICE:  E2E overlay: 0 actores
  pruebadoctor    | pruebadoctor@saluddental.com
 (6 rows)
 
+ERROR:  update or delete on table "pacientes" violates foreign key constraint "doctor_paciente_paciente_id_fkey" on table "doctor_paciente"
+DETAIL:  Key (id)=(f9b5a33e-dfd9-4a3d-9bef-d9ad51307204) is still referenced from table "doctor_paciente".
+CONTEXT:  SQL statement "delete from public.pacientes where id = v_id"
+PL/pgSQL function inline_code_block line 11 at SQL statement
 psql:supabase/tests/e2e_agenda_hoy_overlay.sql:173: NOTICE:  overlay: agenda de hoy sembrada (5 citas de la doctora, 2 del admin) y asistente enlazada

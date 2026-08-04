@@ -9,8 +9,8 @@
 #   2 · asistente → agenda de los doctores que apoya, llegada, alta de
 #                   paciente, nueva cita, cuentas y caja; y las dos ausencias
 #                   que la separan de la clínica.
-#   3 · admin     → expediente, PDF, cobro de la pre-factura, arqueo de caja y
-#                   compra registrada + recibida.
+#   3 · admin     → expediente, PDF y cobro de la pre-factura.
+#   4 · admin     → arqueo de caja y compra registrada + recibida.
 #
 # El orden importa: el admin cobra la cuenta que dejó la consulta de la doctora.
 #
@@ -106,7 +106,11 @@ jornada() {
 FALLOS=()
 jornada 'doctora punta a punta'  integration_test/verif_doctor_test.dart    doctora.log   || FALLOS+=('doctora')
 jornada 'asistente de recepción' integration_test/verif_asistente_test.dart asistente.log || FALLOS+=('asistente')
-jornada 'admin-doctor'           integration_test/verif_admin_test.dart     admin.log     || FALLOS+=('admin')
+# El admin va en dos invocaciones: juntas superaban los 20 minutos que
+# `integration_test` le da al driver para devolver el resultado, y la corrida
+# moría en un `DriverError: request_data` con todo el trabajo ya hecho.
+jornada 'admin · expediente y cobro' integration_test/verif_admin_test.dart         admin.log         || FALLOS+=('admin')
+jornada 'admin · caja y compras'     integration_test/verif_admin_compras_test.dart admin_compras.log || FALLOS+=('admin-compras')
 
 echo '▶ Lo que quedó escrito en la base'
 psql "$DB_URL" -qAt -f tool/e2e/verificacion_post_audit.sql | tee "$EVIDENCIA/estado_base.txt"

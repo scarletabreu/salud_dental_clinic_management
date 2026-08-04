@@ -77,6 +77,18 @@ void main() {
           'debe existir para quien gestiona la agenda completa (D15)',
     );
 
+    // ------------------------------------------------- el listado de consultas
+    // Misma regla en la otra pantalla que lista trabajo clínico: al doctor no
+    // se le ofrece elegir doctor, porque sólo existe el suyo.
+    await abrirDestino(tester, 'Consultas');
+    expect(
+      find.text('Todos los doctores'),
+      findsNothing,
+      reason:
+          'el filtro por doctores aparece en el listado de consultas de un '
+          'doctor; es de quien gestiona la agenda completa',
+    );
+
     expect(
       _erroresDeUi.map((e) => e.exceptionAsString()).toList(),
       isEmpty,

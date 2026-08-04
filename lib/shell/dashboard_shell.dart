@@ -47,11 +47,17 @@ class DashboardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<AuthCubit>(create: (_) => sl<AuthCubit>()),
-        BlocProvider<PacienteCubit>(create: (_) => sl<PacienteCubit>()..load()),
-      ],
+    // El `AuthCubit` es el de `main.dart` y no uno propio: `sl<AuthCubit>()`
+    // está registrado como *factory*, así que crear otro aquí devolvía un cubit
+    // recién nacido —sin usuario— mientras la sesión real vivía en el de
+    // arriba. Todo lo que se decidiera en el `initState` de la shell miraba ese
+    // estado vacío: por eso el listado de consultas se cargaba sin recortar por
+    // doctor y ofrecía el filtro de doctores a quien sólo ejerce. La pantalla
+    // parecía correcta un instante después, cuando el cubit duplicado
+    // restauraba la sesión por su cuenta y repintaba lo que sí depende del
+    // estado; lo decidido en el arranque, no.
+    return BlocProvider<PacienteCubit>(
+      create: (_) => sl<PacienteCubit>()..load(),
       child: const _DashboardShellView(),
     );
   }

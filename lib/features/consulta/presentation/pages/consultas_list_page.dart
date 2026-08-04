@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/capacidades_sesion.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/entities/consulta.dart';
 import 'package:salud_dental_clinic_management/features/consulta/domain/helpers/consulta_helper.dart';
 import 'package:salud_dental_clinic_management/features/consulta/presentation/cubit/consulta_cubit.dart';
@@ -427,7 +428,12 @@ class _ConsultasListPageState extends State<ConsultasListPage> {
       runSpacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (state.puedeFiltrarPorDoctor)
+        // Doble llave: el cubit dice si su carga abarcaba a varios doctores, y
+        // la sesión dice si este rol tiene algo que elegir. Con una sola —la
+        // del cubit— bastaba que la carga hubiera salido sin recortar para
+        // ofrecerle a un doctor la plantilla de la clínica.
+        if (state.puedeFiltrarPorDoctor &&
+            context.watch<AuthCubit>().state.puedeGestionarAgendaCompleta)
           SizedBox(width: 300, child: doctorChips),
         rangeButton,
         btnFiltrosAvanzados,

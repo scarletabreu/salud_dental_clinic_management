@@ -443,6 +443,9 @@ class _CitaRepoFalso extends Fake implements CitaRepository {
   _CitaRepoFalso({this.referencias = const {}, this.citas = const []});
 
   @override
+  Stream<List<Cita>> watchCitasDeHoy() => const Stream.empty();
+
+  @override
   Future<ReferenciaCita?> getReferenciaCita(String id) async => referencias[id];
 
   @override

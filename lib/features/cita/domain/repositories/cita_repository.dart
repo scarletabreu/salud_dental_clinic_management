@@ -18,6 +18,11 @@ abstract class CitaRepository {
     DateTime? hasta,
   });
 
+  /// Citas de hoy en vivo (MU-1). Cada emisión es el conjunto completo de
+  /// citas del día que esta sesión puede ver: RLS recorta en el servidor y el
+  /// cubit re-aplica sus propios filtros de alcance y de vista.
+  Stream<List<Cita>> watchCitasDeHoy();
+
   /// Datos programados de una cita (fecha, estado, doctor) sin ensamblar sus
   /// relaciones. `null` si la cita no existe o fue eliminada.
   Future<ReferenciaCita?> getReferenciaCita(String id);

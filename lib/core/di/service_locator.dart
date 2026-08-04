@@ -509,6 +509,7 @@ Future<void> init() async {
       consumibleRepository: sl(),
       cajaDiariaRepository: sl(),
       equipoRepository: sl(),
+      senales: sl<SenalesRealtime>(),
     ),
   );
   sl.registerFactory<PersonalPerfilesCubit>(

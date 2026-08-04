@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:salud_dental_clinic_management/core/realtime/senales_realtime.dart';
+import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/capacidades_usuario.dart';
 import 'package:salud_dental_clinic_management/features/auth/domain/enums/rol_usuario.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
@@ -23,6 +27,8 @@ class DashboardCubit extends Cubit<DashboardState> {
   final CajaDiariaRepository _cajaDiariaRepository;
   final EquipoRepository _equipoRepository;
   final AlertaOperativaGenerator _alertaGenerator;
+  final SenalesRealtime? _senales;
+  StreamSubscription<void>? _senalAgenda;
 
   List<RolUsuario> _roles = const [];
   String? _doctorId;
@@ -44,7 +50,9 @@ class DashboardCubit extends Cubit<DashboardState> {
     required CajaDiariaRepository cajaDiariaRepository,
     required EquipoRepository equipoRepository,
     AlertaOperativaGenerator alertaGenerator = const AlertaOperativaGenerator(),
-  }) : _citaRepository = citaRepository,
+    SenalesRealtime? senales,
+  }) : _senales = senales,
+       _citaRepository = citaRepository,
        _pacienteRepository = pacienteRepository,
        _medicinaRepository = medicinaRepository,
        _consumibleRepository = consumibleRepository,
@@ -84,13 +92,13 @@ class DashboardCubit extends Cubit<DashboardState> {
           : inicioMes;
       final hasta = DateTime(ahora.year, ahora.month + 1, 1);
 
-      final citas = (esClinico && !gestionaAgendaCompleta && doctorId != null)
-          ? await _citaRepository.getCitasByDoctor(
-              doctorId,
-              desde: desde,
-              hasta: hasta,
-            )
-          : await _citaRepository.getCitas(desde: desde, hasta: hasta);
+      final citas = await _cargarCitas(
+        esClinico: esClinico,
+        gestionaAgendaCompleta: gestionaAgendaCompleta,
+        doctorId: doctorId,
+        desde: desde,
+        hasta: hasta,
+      );
 
       final pacientesResult = await _pacienteRepository.getPacientes();
       final totalPacientes = pacientesResult.fold(
@@ -129,9 +137,79 @@ class DashboardCubit extends Cubit<DashboardState> {
           totalMedicinas: medicinas.length,
         ),
       );
+      _escucharAgenda();
     } catch (e) {
       emit(DashboardError(e.toString()));
     }
+  }
+
+  Future<List<Cita>> _cargarCitas({
+    required bool esClinico,
+    required bool gestionaAgendaCompleta,
+    required String? doctorId,
+    required DateTime desde,
+    required DateTime hasta,
+  }) {
+    return (esClinico && !gestionaAgendaCompleta && doctorId != null)
+        ? _citaRepository.getCitasByDoctor(doctorId, desde: desde, hasta: hasta)
+        : _citaRepository.getCitas(desde: desde, hasta: hasta);
+  }
+
+  /// El Inicio se entera de la jornada ajena (MU-1): la señal de agenda avisa
+  /// que las citas cambiaron —llegada marcada por recepción, consulta iniciada
+  /// por el doctor— y las tarjetas de hoy y el «siguiente paciente» se
+  /// recalculan sin que nadie navegue. Sólo se repide la ventana de citas; el
+  /// resto del tablero conserva su caché.
+  void _escucharAgenda() {
+    final senales = _senales;
+    if (senales == null || _senalAgenda != null) return;
+    _senalAgenda = senales
+        .de(DominioSenal.agenda)
+        .listen((_) => _refrescarCitas());
+  }
+
+  Future<void> _refrescarCitas() async {
+    final current = state;
+    if (current is! DashboardLoaded) return;
+    try {
+      final ahora = DateTime.now();
+      final inicioMes = DateTime(ahora.year, ahora.month, 1);
+      final inicioDeSemana = _inicioSemana(ahora);
+      final desde = inicioDeSemana.isBefore(inicioMes)
+          ? inicioDeSemana
+          : inicioMes;
+      final citas = await _cargarCitas(
+        esClinico: _roles.puedeEjercerClinica,
+        gestionaAgendaCompleta: _roles.puedeGestionarAgendaCompleta,
+        doctorId: _doctorId,
+        desde: desde,
+        hasta: DateTime(ahora.year, ahora.month + 1, 1),
+      );
+      final vigente = state;
+      if (isClosed || vigente is! DashboardLoaded) return;
+      _citasCache = citas;
+      emit(
+        _construirEstado(
+          roles: vigente.roles,
+          nombreDoctor: vigente.nombreDoctor,
+          citas: citas,
+          consumibles: _consumiblesCache,
+          cajaActual: _cajaActualCache,
+          equipos: _equiposCache,
+          totalPacientes: vigente.totalPacientes,
+          totalMedicinas: vigente.totalMedicinas,
+        ),
+      );
+    } catch (e) {
+      // Señal sin recarga: el tablero se queda con lo último que sí cargó.
+      AppLog.error('refrescar la agenda del inicio', e);
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _senalAgenda?.cancel();
+    return super.close();
   }
 
   Future<void> updateEstado(String citaId, EstadoCita nuevoEstado) async {

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:salud_dental_clinic_management/core/errors/failures.dart';
 import 'package:salud_dental_clinic_management/core/util/app_log.dart';
 import 'package:salud_dental_clinic_management/core/util/metricas_clinicas.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,6 +18,7 @@ class CitaCubit extends Cubit<CitaCubitState> {
   final ConsultaAbiertaLookup? _consultas;
   List<String>? _doctorIdsPermitidos;
   String? _restringidoADoctorId;
+  StreamSubscription<List<Cita>>? _citasDeHoyEnVivo;
 
   /// Meses cargados a cada lado del día enfocado.
   ///
@@ -113,10 +117,71 @@ class CitaCubit extends Cubit<CitaCubitState> {
               (_doctorIdsPermitidos?.isEmpty ?? false),
         ),
       );
+      _escucharCitasDeHoy();
     } catch (e) {
       if (isClosed) return;
       emit(CitaCubitError(e.toString()));
     }
+  }
+
+  /// La jornada del día se mantiene sola (MU-1): llegada marcada por el
+  /// asistente, consulta iniciada por el doctor, reagendas y cancelaciones
+  /// aparecen sin refrescar. Si el stream falla, la agenda se queda como
+  /// estaba —el comportamiento previo— y los botones de refresh siguen ahí.
+  void _escucharCitasDeHoy() {
+    if (_citasDeHoyEnVivo != null) return;
+    try {
+      _citasDeHoyEnVivo = _repository.watchCitasDeHoy().listen(
+        _integrarCitasDeHoy,
+        onError: (Object e) => AppLog.error('citas de hoy en vivo', e),
+      );
+    } catch (e) {
+      // Sin stream no hay agenda viva, pero la carga ya salió bien: se queda
+      // el comportamiento de siempre (datos del load + refresh manual).
+      AppLog.error('suscribirse a las citas de hoy', e);
+    }
+  }
+
+  Future<void> _integrarCitasDeHoy(List<Cita> deHoy) async {
+    if (state is! CitaCubitLoaded) return;
+    // El techo de seguridad se re-aplica a lo que llega por el stream: RLS ya
+    // recortó en el servidor, pero el asistente filtra su lista de doctores
+    // en memoria y ese recorte también vale para los eventos.
+    final visibles = _aplicarFiltroDoctor(deHoy);
+    final consultasDeHoy = await _consultasDe(visibles);
+    if (isClosed) return;
+    final vigente = state;
+    if (vigente is! CitaCubitLoaded) return;
+
+    final hoy = DateTime.now();
+    final resto = vigente.citasSinFiltrar
+        .where((c) => !_esMismoDia(c.date, hoy))
+        .toList();
+    final todas = [...resto, ...visibles];
+    emit(
+      vigente.copyWith(
+        citas: _aplicarFiltroDeVista(todas),
+        todas: todas,
+        consultasPorCitaId: {
+          ...vigente.consultasPorCitaId,
+          ...consultasDeHoy,
+        },
+      ),
+    );
+  }
+
+  bool _esMismoDia(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Mensaje apto para pantalla: los [Failure] ya vienen redactados para una
+  /// persona (solape, permisos, red); el resto conserva su contexto.
+  String _mensajeDe(Object e, String contexto) =>
+      e is Failure ? e.message : '$contexto: $e';
+
+  @override
+  Future<void> close() async {
+    await _citasDeHoyEnVivo?.cancel();
+    return super.close();
   }
 
   /// Un doctor pide al servidor solo sus citas, igual que la lista de consultas
@@ -231,11 +296,14 @@ class CitaCubit extends Cubit<CitaCubitState> {
       await load();
     } catch (e) {
       AppLog.error('crearCita', e);
+      // El caso típico es que otro usuario ocupó el hueco mientras se llenaba
+      // el formulario: el mapper ya lo redacta («Ese horario ya está
+      // ocupado…») y la cita que lo tomó llega sola por el stream del día.
       if (!isClosed) {
         emit(
           current.copyWith(
             isSubmitting: false,
-            errorMessage: () => 'Error 400: Revisa los campos enviados. $e',
+            errorMessage: () => _mensajeDe(e, 'No se pudo crear la cita'),
           ),
         );
       }
@@ -251,21 +319,21 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
     try {
       await _repository.registrarLlegada(citaId);
+      final todas = [
+        for (final cita in current.citasSinFiltrar)
+          cita.id == citaId
+              ? cita.copyWith(estado: EstadoCita.enEspera)
+              : cita,
+      ];
       emit(
-        current.copyWith(
-          citas: [
-            for (final cita in current.citas)
-              cita.id == citaId
-                  ? cita.copyWith(estado: EstadoCita.enEspera)
-                  : cita,
-          ],
-        ),
+        current.copyWith(citas: _aplicarFiltroDeVista(todas), todas: todas),
       );
     } catch (e) {
       AppLog.error('registrarLlegada', e);
       emit(
         current.copyWith(
-          errorMessage: () => 'No se pudo registrar la llegada: $e',
+          errorMessage: () =>
+              _mensajeDe(e, 'No se pudo registrar la llegada'),
         ),
       );
     }
@@ -296,7 +364,8 @@ class CitaCubit extends Cubit<CitaCubitState> {
       if (!isClosed) {
         emit(
           current.copyWith(
-            errorMessage: () => 'No se pudo registrar la emergencia: $e',
+            errorMessage: () =>
+                _mensajeDe(e, 'No se pudo registrar la emergencia'),
           ),
         );
       }
@@ -311,24 +380,37 @@ class CitaCubit extends Cubit<CitaCubitState> {
     try {
       await _repository.updateCitaEstado(id, nuevoEstado);
 
-      final citasActualizadas = current.citas.map((cita) {
-        if (cita.id == id) {
-          return cita.copyWith(estado: nuevoEstado);
-        }
-        return cita;
-      }).toList();
-
-      emit(current.copyWith(citas: citasActualizadas));
+      final todas = [
+        for (final cita in current.citasSinFiltrar)
+          cita.id == id ? cita.copyWith(estado: nuevoEstado) : cita,
+      ];
+      emit(
+        current.copyWith(citas: _aplicarFiltroDeVista(todas), todas: todas),
+      );
     } on CancelacionConConsultaAbierta catch (e) {
       // Motivo accionable: el usuario tiene que cerrar la consulta primero. Un
       // "no se pudo actualizar: <excepción>" no le diría qué hacer.
       emit(current.copyWith(errorMessage: e.toString));
     } on TransicionEstadoInvalida catch (e) {
-      emit(current.copyWith(errorMessage: e.toString));
+      // Otro usuario movió la cita primero. El mensaje ya nombra el estado
+      // real («No se puede pasar de "Cancelada" a…») y la tarjeta se corrige
+      // a lo que hay en la base, no a lo que esta sesión creía.
+      final todas = [
+        for (final cita in current.citasSinFiltrar)
+          cita.id == id ? cita.copyWith(estado: e.actual) : cita,
+      ];
+      emit(
+        current.copyWith(
+          errorMessage: e.toString,
+          citas: _aplicarFiltroDeVista(todas),
+          todas: todas,
+        ),
+      );
     } catch (e) {
       emit(
         current.copyWith(
-          errorMessage: () => 'No se pudo actualizar el estado de la cita: $e',
+          errorMessage: () =>
+              _mensajeDe(e, 'No se pudo actualizar el estado de la cita'),
         ),
       );
     }
@@ -438,7 +520,8 @@ class CitaCubit extends Cubit<CitaCubitState> {
 
       emit(
         current.copyWith(
-          citas: citasActualizadas,
+          citas: _aplicarFiltroDeVista(citasActualizadas),
+          todas: citasActualizadas,
           isSubmitting: false,
           errorMessage: () => null,
           consultasPorCitaId: await _consultasDe(citasActualizadas),
@@ -449,7 +532,8 @@ class CitaCubit extends Cubit<CitaCubitState> {
       emit(
         current.copyWith(
           isSubmitting: false,
-          errorMessage: () => 'Error al guardar cambios en el servidor: $e',
+          errorMessage: () =>
+              _mensajeDe(e, 'No se pudieron guardar los cambios de la cita'),
         ),
       );
     }

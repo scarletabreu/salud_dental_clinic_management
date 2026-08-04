@@ -65,6 +65,35 @@ class CitaRemoteDataSource {
     return _assembleCitas(citasRes as List);
   }
 
+  /// Citas de hoy en vivo (MU-1): emite el conjunto completo de citas del día
+  /// visibles para esta sesión cada vez que la tabla cambia. El recorte por
+  /// rol lo hace RLS en el servidor antes de emitir cada evento.
+  ///
+  /// `.stream()` sólo admite un filtro de servidor, así que el corte superior
+  /// del día y los borrados suaves se aplican aquí sobre cada emisión. Cada
+  /// emisión pasa por el mismo ensamblado que la carga normal para que las
+  /// citas lleguen con su doctor y su paciente resueltos.
+  Stream<List<CitaModel>> watchCitasDeHoy() {
+    final ahora = DateTime.now();
+    final inicioDia = DateTime(ahora.year, ahora.month, ahora.day);
+    final finDia = inicioDia.add(const Duration(days: 1));
+
+    return supabase
+        .from('citas')
+        .stream(primaryKey: ['id'])
+        .gte('fecha_hora', inicioDia.toUtc().toIso8601String())
+        .asyncMap((rows) {
+          final deHoy = rows.where((row) {
+            if (row['deleted_at'] != null) return false;
+            final fecha = DateTime.parse(
+              row['fecha_hora'] as String,
+            ).toLocal();
+            return fecha.isBefore(finDia);
+          }).toList();
+          return _assembleCitas(deHoy);
+        });
+  }
+
   Future<dynamic> _enRango(
     PostgrestFilterBuilder<dynamic> consulta,
     DateTime? desde,

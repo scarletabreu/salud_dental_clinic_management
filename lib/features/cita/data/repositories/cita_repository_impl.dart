@@ -110,6 +110,12 @@ class CitaRepositoryImpl implements CitaRepository {
     );
   }
 
+  /// Sin guard: un stream no es una llamada puntual con timeout. Los errores
+  /// viajan por el propio stream y quien escucha decide; la degradación es
+  /// quedarse con el último load, que es el comportamiento previo a MU-1.
+  @override
+  Stream<List<Cita>> watchCitasDeHoy() => remoteDataSource.watchCitasDeHoy();
+
   @override
   Future<ReferenciaCita?> getReferenciaCita(String id) {
     return runGuarded(

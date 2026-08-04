@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_colors.dart';
 import 'package:salud_dental_clinic_management/core/presentation/responsive.dart';
+import 'package:salud_dental_clinic_management/core/presentation/responsive_widgets.dart';
 import 'package:salud_dental_clinic_management/core/util/fecha_es.dart';
 import 'package:salud_dental_clinic_management/core/util/moneda.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
-import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_cubit.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/cubit/caja_diaria_state.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/presentation/pages/resumen_cierre_page.dart';
@@ -83,6 +85,64 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
     }
   }
 
+  /// Cierra el arqueo de un día anterior.
+  ///
+  /// Es una operación distinta del cierre del día: el dinero se cuenta ahora
+  /// pero pertenece a una jornada que ya pasó, así que la hoja muestra los
+  /// movimientos de esa caja antes de pedir el conteo. Cerrar a ciegas un
+  /// arqueo de hace días es fabricar el descuadre.
+  Future<void> _cerrarArqueoPendiente(ArqueoPendiente arqueo) async {
+    final cierre = await showDialog<_ConteoArqueo>(
+      context: context,
+      builder: (_) => _HojaArqueoPendiente(arqueo: arqueo),
+    );
+    if (cierre == null || !mounted) return;
+
+    final cubit = context.read<CajaDiariaCubit>();
+    final error = await cubit.cerrarArqueoPendiente(
+      cajaId: arqueo.id,
+      montoReal: cierre.montoContado,
+      observaciones: cierre.nota,
+    );
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: context.appColors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // El reporte se fecha en el día de la caja, no en hoy: es el arqueo de esa
+    // jornada, aunque se haya cuadrado tarde.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReporteCierrePage(
+          resumen: ResumenCierre(
+            totalesPorMetodoPago: {'Efectivo / General': arqueo.ingresos},
+            totalIngresos: arqueo.ingresos,
+            totalEgresos: arqueo.egresos,
+            montoEsperado: arqueo.esperado,
+            movimientos: arqueo.movimientos,
+          ),
+          montoContado: cierre.montoContado,
+          diferencia: BalanceCaja.diferencia(
+            montoReal: cierre.montoContado,
+            montoEsperado: arqueo.esperado,
+          ),
+          fechaCierre: arqueo.fecha,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ac = context.appColors;
@@ -98,6 +158,7 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
                   CajaDiariaAbierta() => state.pendientes,
                   _ => const [],
                 },
+                onCerrar: _cerrarArqueoPendiente,
               ),
               Expanded(
                 child: switch (state) {
@@ -133,17 +194,18 @@ class _CajaDiariaPageState extends State<CajaDiariaPage> {
 /// Antes la pantalla mostraba directamente el saldo de esa caja como si fuera
 /// la de hoy, y al cobrar la base respondía que no había caja abierta.
 class _AvisoCajasPendientes extends StatelessWidget {
-  const _AvisoCajasPendientes({required this.pendientes});
+  const _AvisoCajasPendientes({
+    required this.pendientes,
+    required this.onCerrar,
+  });
 
-  final List<CajaDiaria> pendientes;
+  final List<ArqueoPendiente> pendientes;
+  final ValueChanged<ArqueoPendiente> onCerrar;
 
   @override
   Widget build(BuildContext context) {
     if (pendientes.isEmpty) return const SizedBox.shrink();
     final ac = context.appColors;
-    final fechas = pendientes
-        .map((caja) => fechaCortaEs(caja.fecha))
-        .join(', ');
 
     return Container(
       width: double.infinity,
@@ -154,21 +216,329 @@ class _AvisoCajasPendientes extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: ac.amber.withValues(alpha: 0.35)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.history_toggle_off_rounded, color: ac.amber, size: 22),
-          const SizedBox(width: 12),
+          Row(
+            children: [
+              Icon(Icons.history_toggle_off_rounded, color: ac.amber, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  pendientes.length == 1
+                      ? 'Hay un arqueo sin cerrar. Puedes trabajar normalmente '
+                            'hoy, pero ese dinero sigue sin cuadrar.'
+                      : 'Hay ${pendientes.length} arqueos sin cerrar. Puedes '
+                            'trabajar normalmente hoy, pero ese dinero sigue '
+                            'sin cuadrar.',
+                  style: TextStyle(color: ac.textSecondary, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+          for (final arqueo in pendientes)
+            _FilaArqueoPendiente(arqueo: arqueo, onCerrar: () => onCerrar(arqueo)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un arqueo pendiente en el aviso: qué día es, cuánto lleva sin cuadrar y
+/// cuánto debería tener la gaveta.
+class _FilaArqueoPendiente extends StatelessWidget {
+  const _FilaArqueoPendiente({required this.arqueo, required this.onCerrar});
+
+  final ArqueoPendiente arqueo;
+  final VoidCallback onCerrar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final dias = arqueo.diasDeRetraso(DateTime.now());
+    final retraso = dias <= 1 ? 'de ayer' : 'hace $dias días';
+
+    final descripcion = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${fechaCortaEs(arqueo.fecha)} · $retraso',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Debería tener ${formatMoneda(arqueo.esperado)}',
+          style: TextStyle(color: ac.textSecondary, fontSize: 13),
+        ),
+      ],
+    );
+
+    final boton = FilledButton.tonalIcon(
+      onPressed: onCerrar,
+      icon: const Icon(Icons.fact_check_outlined, size: 18),
+      label: const Text('Cerrar arqueo'),
+      style: FilledButton.styleFrom(
+        backgroundColor: ac.amber.withValues(alpha: 0.22),
+        foregroundColor: ac.textPrimary,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: context.isCompactLayout
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                descripcion,
+                const SizedBox(height: 10),
+                boton,
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: descripcion),
+                const SizedBox(width: 12),
+                boton,
+              ],
+            ),
+    );
+  }
+}
+
+/// Lo que el cajero decide en la hoja de arqueo: cuánto contó y por qué no
+/// cuadra, si no cuadra.
+class _ConteoArqueo {
+  const _ConteoArqueo({required this.montoContado, this.nota});
+
+  final double montoContado;
+  final String? nota;
+}
+
+/// Hoja de arqueo de una caja de un día anterior.
+///
+/// Muestra el desglose completo antes de pedir el conteo, porque quien cuadra
+/// un arqueo de hace tres días no tiene la jornada en la cabeza. La nota es
+/// obligatoria cuando el conteo no coincide: días después es el único registro
+/// de por qué faltó o sobró dinero.
+class _HojaArqueoPendiente extends StatefulWidget {
+  const _HojaArqueoPendiente({required this.arqueo});
+
+  final ArqueoPendiente arqueo;
+
+  @override
+  State<_HojaArqueoPendiente> createState() => _HojaArqueoPendienteState();
+}
+
+class _HojaArqueoPendienteState extends State<_HojaArqueoPendiente> {
+  late final TextEditingController _montoController = TextEditingController(
+    text: widget.arqueo.esperado.toStringAsFixed(2),
+  );
+  final _notaController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _montoController.dispose();
+    _notaController.dispose();
+    super.dispose();
+  }
+
+  double? get _contado =>
+      double.tryParse(_montoController.text.replaceAll(',', '.'));
+
+  double get _diferencia => BalanceCaja.diferencia(
+    montoReal: _contado ?? widget.arqueo.esperado,
+    montoEsperado: widget.arqueo.esperado,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = context.appColors;
+    final arqueo = widget.arqueo;
+    final cuadra = _diferencia == 0;
+
+    return AppDialog(
+      title: Text('Arqueo del ${fechaCortaEs(arqueo.fecha)}'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _LineaArqueo(
+              etiqueta: 'Fondo de apertura',
+              valor: formatMoneda(arqueo.montoApertura),
+            ),
+            _LineaArqueo(
+              etiqueta: 'Ingresos',
+              valor: '+${formatMoneda(arqueo.ingresos)}',
+              color: ac.green,
+            ),
+            _LineaArqueo(
+              etiqueta: 'Egresos',
+              valor: '-${formatMoneda(arqueo.egresos)}',
+              color: ac.orange,
+            ),
+            const Divider(height: 22),
+            _LineaArqueo(
+              etiqueta: 'Debería haber en caja',
+              valor: formatMoneda(arqueo.esperado),
+              destacado: true,
+            ),
+            const SizedBox(height: 8),
+            if (arqueo.movimientos.isEmpty)
+              Text(
+                'Esta caja se abrió y no registró ningún movimiento.',
+                style: TextStyle(color: ac.textSecondary, fontSize: 13),
+              )
+            else
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: Text(
+                  'Ver los ${arqueo.movimientos.length} movimientos',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                children: [
+                  for (final movimiento in arqueo.movimientos)
+                    _MovementRow(movimiento: movimiento),
+                ],
+              ),
+            const SizedBox(height: 16),
+            const Text('Monto contado físicamente en la caja:'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _montoController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*[,.]?\d{0,2}')),
+              ],
+              decoration: const InputDecoration(
+                prefixText: 'RD\$ ',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+              validator: (value) {
+                final parsed = double.tryParse(
+                  (value ?? '').replaceAll(',', '.'),
+                );
+                if (parsed == null || parsed < 0) {
+                  return 'Ingresa un monto válido.';
+                }
+                return null;
+              },
+            ),
+            if (!cuadra) ...[
+              const SizedBox(height: 12),
+              Text(
+                _diferencia < 0
+                    ? 'Faltan ${formatMoneda(_diferencia.abs())}'
+                    : 'Sobran ${formatMoneda(_diferencia)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: _diferencia < 0 ? ac.red : ac.amber,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _notaController,
+                minLines: 2,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: '¿Por qué no cuadra?',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if ((value ?? '').trim().isEmpty) {
+                    return 'Explica la diferencia: días después, esta nota es '
+                        'el único registro.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ac.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Al cerrarlo, ese día queda congelado: no se le podrán agregar '
+                'movimientos ni reabrirlo. Cualquier corrección posterior entra '
+                'como movimiento en la caja de hoy.',
+                style: TextStyle(color: ac.textSecondary, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!_formKey.currentState!.validate()) return;
+            final nota = _notaController.text.trim();
+            Navigator.pop(
+              context,
+              _ConteoArqueo(
+                montoContado: _contado!,
+                nota: nota.isEmpty ? null : nota,
+              ),
+            );
+          },
+          style: FilledButton.styleFrom(backgroundColor: ac.red),
+          child: const Text('Confirmar cierre'),
+        ),
+      ],
+    );
+  }
+}
+
+class _LineaArqueo extends StatelessWidget {
+  const _LineaArqueo({
+    required this.etiqueta,
+    required this.valor,
+    this.color,
+    this.destacado = false,
+  });
+
+  final String etiqueta;
+  final String valor;
+  final Color? color;
+  final bool destacado;
+
+  @override
+  Widget build(BuildContext context) {
+    final estilo = TextStyle(
+      fontWeight: destacado ? FontWeight.w800 : FontWeight.w600,
+      color: color,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           Expanded(
             child: Text(
-              pendientes.length == 1
-                  ? 'La caja del $fechas quedó sin cerrar. Puedes trabajar '
-                        'normalmente hoy, pero ese arqueo sigue pendiente.'
-                  : 'Hay ${pendientes.length} cajas sin cerrar ($fechas). '
-                        'Puedes trabajar normalmente hoy, pero esos arqueos '
-                        'siguen pendientes.',
-              style: TextStyle(color: ac.textSecondary, height: 1.4),
+              etiqueta,
+              style: TextStyle(
+                color: destacado ? null : context.appColors.textSecondary,
+                fontWeight: destacado ? FontWeight.w800 : null,
+              ),
             ),
           ),
+          Text(valor, style: estilo),
         ],
       ),
     );

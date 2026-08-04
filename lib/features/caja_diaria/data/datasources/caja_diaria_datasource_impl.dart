@@ -49,10 +49,17 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     final caja = await _getCajaAbiertaActual();
     if (caja == null) return [];
 
+    return fetchMovimientosDeCaja(caja['id'] as String);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMovimientosDeCaja(
+    String cajaId,
+  ) async {
     final response = await supabase
         .from('movimientos_caja')
         .select()
-        .eq('caja_diaria_id', caja['id'])
+        .eq('caja_diaria_id', cajaId)
         .filter('deleted_at', 'is', null)
         .order('created_at', ascending: false);
 
@@ -60,14 +67,41 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchMovimientosDeCajas(
+    List<String> cajaIds,
+  ) async {
+    if (cajaIds.isEmpty) return [];
+
+    final response = await supabase
+        .from('movimientos_caja')
+        .select()
+        .inFilter('caja_diaria_id', cajaIds)
+        .filter('deleted_at', 'is', null)
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  /// Cierre de la caja de hoy. Es el mismo cierre que el de un arqueo
+  /// atrasado —quién, cuándo y con cuánto— sólo que resolviendo la caja por
+  /// fecha en vez de por id.
+  @override
   Future<void> cerrarCaja(Map<String, dynamic> datosCierre) async {
     final caja = await _getCajaAbiertaActual();
     if (caja == null) throw Exception('No hay caja abierta para cerrar.');
 
+    await cerrarCajaPorId(caja['id'] as String, datosCierre);
+  }
+
+  @override
+  Future<void> cerrarCajaPorId(
+    String cajaId,
+    Map<String, dynamic> datosCierre,
+  ) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) throw Exception('Usuario no autenticado.');
 
-    final balanceCalculado = await getBalanceActual();
+    final balanceCalculado = await getBalanceDeCaja(cajaId);
     final esperado = (datosCierre['monto_esperado'] as num).toDouble();
     // Comparar dos `double` con `!=` hacía que un céntimo de error de
     // redondeo —el que aparece en cuanto hay un pago fraccionado— abortara el
@@ -81,17 +115,37 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
       );
     }
 
-    await supabase
+    final ahora = DateTime.now().toUtc().toIso8601String();
+    final observaciones = datosCierre['observaciones'];
+
+    // `cerrada = false` en el filtro, no sólo en la pantalla: dos sesiones
+    // viendo el mismo arqueo pendiente podían cerrarlo las dos y la segunda
+    // pisaba el conteo de la primera. `.select()` delata ese caso, porque un
+    // UPDATE que no tocó ninguna fila no devuelve ninguna.
+    final filas = await supabase
         .from('cajas')
         .update({
           'monto_cierre': datosCierre['monto_cierre'],
           'monto_real': datosCierre['monto_real'],
           'monto_esperado': datosCierre['monto_esperado'],
+          // La observación del cajero se armaba en el repositorio y se perdía
+          // aquí: la columna existe y nunca se llenaba.
+          if (observaciones != null) 'observaciones': observaciones,
           'cerrada': true,
           'cerrada_por': userId,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
+          'cerrada_at': ahora,
+          'updated_at': ahora,
         })
-        .eq('id', caja['id']);
+        .eq('id', cajaId)
+        .eq('cerrada', false)
+        .select('id');
+
+    if ((filas as List).isEmpty) {
+      throw Exception(
+        'Esa caja ya fue cerrada por otra persona. Actualiza la pantalla para '
+        'ver el arqueo definitivo.',
+      );
+    }
   }
 
   @override
@@ -99,11 +153,17 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
     final caja = await _getCajaAbiertaActual();
     if (caja == null) return 0.0;
 
-    final movimientos = await fetchMovimientosDelDia();
-    return BalanceCaja.esperado(
-      montoApertura: (caja['monto_apertura'] as num).toDouble(),
-      movimientos: movimientos.map(MovimientoCajaModel.fromJson),
-    );
+    return _balanceDe(caja);
+  }
+
+  @override
+  Future<double> getBalanceDeCaja(String cajaId) async {
+    final caja = await _fetchCaja(cajaId);
+    if (caja == null) {
+      throw Exception('La caja indicada ya no existe.');
+    }
+
+    return _balanceDe(caja);
   }
 
   @override
@@ -153,6 +213,26 @@ class CajaDiariaDatasourceImpl implements CajaDiariaDatasource {
         .order('fecha_civil', ascending: true);
 
     return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  Future<double> _balanceDe(Map<String, dynamic> caja) async {
+    final movimientos = await fetchMovimientosDeCaja(caja['id'] as String);
+    return BalanceCaja.esperado(
+      montoApertura: (caja['monto_apertura'] as num).toDouble(),
+      movimientos: movimientos.map(MovimientoCajaModel.fromJson),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _fetchCaja(String cajaId) async {
+    final response = await supabase
+        .from('cajas')
+        .select()
+        .eq('id', cajaId)
+        .limit(1);
+
+    final list = response as List;
+    if (list.isEmpty) return null;
+    return Map<String, dynamic>.from(list.first as Map);
   }
 
   /// La caja abierta **de hoy**, con la misma definición de «hoy» que usa la

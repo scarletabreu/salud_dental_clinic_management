@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/core/errors/failures.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/resumen_cierre.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/repositories/caja_diaria_repository.dart';
@@ -17,13 +19,13 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
   final MovimientoCajaRepository _movimientoCajaRepository;
   StreamSubscription<List<MovimientoCaja>>? _movimientosSubscription;
   CajaDiaria? _cajaActual;
-  List<CajaDiaria> _pendientes = const [];
+  List<ArqueoPendiente> _pendientes = const [];
 
   /// Un fallo consultando los pendientes no puede impedir trabajar con la caja
   /// de hoy: es información complementaria, no un requisito.
-  Future<List<CajaDiaria>> _cajasPendientes() async {
+  Future<List<ArqueoPendiente>> _cajasPendientes() async {
     try {
-      return await _repository.getCajasSinCerrarDeOtrosDias();
+      return await _repository.getArqueosPendientes();
     } catch (_) {
       return const [];
     }
@@ -196,6 +198,57 @@ class CajaDiariaCubit extends Cubit<CajaDiariaState> {
       return null;
     } catch (e) {
       return 'Error al cerrar la caja: ${e.toString().replaceAll('Exception: ', '')}';
+    }
+  }
+
+  /// Arqueo pendiente por su id, o `null` si ya no está en la lista.
+  ArqueoPendiente? arqueoPendiente(String cajaId) {
+    for (final arqueo in _pendientes) {
+      if (arqueo.id == cajaId) return arqueo;
+    }
+    return null;
+  }
+
+  /// Cierra el arqueo de un día anterior que nadie cuadró.
+  ///
+  /// El descuadre se queda en su día: no genera ningún ajuste en la caja de
+  /// hoy. Corregir el pasado tocando el presente es lo que convierte un
+  /// faltante en dos cajas descuadradas.
+  Future<String?> cerrarArqueoPendiente({
+    required String cajaId,
+    required double montoReal,
+    String? observaciones,
+  }) async {
+    if (montoReal < 0) {
+      return 'El monto contado no puede ser negativo.';
+    }
+
+    final arqueo = arqueoPendiente(cajaId);
+    if (arqueo == null) {
+      return 'Ese arqueo ya no está pendiente. Actualiza la pantalla.';
+    }
+
+    // Días después, la nota es el único registro de por qué el dinero no
+    // cuadró. Sin ella el descuadre queda como un número sin historia.
+    final nota = observaciones?.trim();
+    final diferencia = BalanceCaja.diferencia(
+      montoReal: montoReal,
+      montoEsperado: arqueo.esperado,
+    );
+    if (diferencia != 0 && (nota == null || nota.isEmpty)) {
+      return 'Un arqueo que no cuadra necesita una nota que explique la diferencia.';
+    }
+
+    try {
+      await _repository.cerrarArqueoPendiente(
+        cajaId: cajaId,
+        montoReal: montoReal,
+        observaciones: nota,
+      );
+      await cargar();
+      return null;
+    } catch (e) {
+      return _mensaje(e, 'No se pudo cerrar el arqueo pendiente.');
     }
   }
 

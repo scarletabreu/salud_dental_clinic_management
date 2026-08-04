@@ -1,4 +1,5 @@
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/balance_caja.dart';
+import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/arqueo_pendiente.dart';
 import 'package:salud_dental_clinic_management/features/caja_diaria/domain/entities/caja_diaria.dart';
 import 'package:salud_dental_clinic_management/features/movimiento_caja/domain/entities/movimiento_caja.dart';
 
@@ -15,8 +16,8 @@ class CajaDiariaSinAbrir extends CajaDiariaState {
 
   final String? error;
 
-  /// Cajas de días anteriores que quedaron sin cerrar.
-  final List<CajaDiaria> pendientes;
+  /// Arqueos de días anteriores que quedaron sin cerrar.
+  final List<ArqueoPendiente> pendientes;
 }
 
 class CajaDiariaAbierta extends CajaDiariaState {
@@ -29,10 +30,10 @@ class CajaDiariaAbierta extends CajaDiariaState {
   final CajaDiaria caja;
   final List<MovimientoCaja> movimientos;
 
-  /// Cajas de días anteriores que quedaron sin cerrar. Ya no impiden cobrar
+  /// Arqueos de días anteriores que quedaron sin cerrar. Ya no impiden cobrar
   /// —la unicidad pasó a ser por día civil—, pero siguen siendo un arqueo
   /// pendiente que alguien debe cerrar.
-  final List<CajaDiaria> pendientes;
+  final List<ArqueoPendiente> pendientes;
 
   double get ingresos => BalanceCaja.ingresos(movimientos);
 

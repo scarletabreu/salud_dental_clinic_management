@@ -1,0 +1,64 @@
+▶ Preparando la base
+  ✓ base lista (seed + login + agenda de hoy)
+▶ Arrancando chromedriver
+  ✓ chromedriver en :4444 (pid 445313)
+▶ Jornada: doctora punta a punta
+  ✗ FALLÓ → /home/decruce/dev/projects/salud_dental_clinic_management/docs/qa/verificacion-post-audit/doctora.log
+▶ Jornada: asistente de recepción
+  ✓ superada → /home/decruce/dev/projects/salud_dental_clinic_management/docs/qa/verificacion-post-audit/asistente.log
+▶ Jornada: admin-doctor
+  ✗ FALLÓ → /home/decruce/dev/projects/salud_dental_clinic_management/docs/qa/verificacion-post-audit/admin.log
+Expected: empty
+  Actual: [
+            '[confirmar la recepción] Multiple exceptions (3)
+were detected during the running of the current test, and at
+least one was unexpected.'
+          ]
+la interfaz lanzó excepciones durante la jornada del admin.
+Detalle:  · por etapa: [confirmar la recepción] Multiple
+exceptions (3) were detected during the running of the current
+test, and at least one was unexpected.
+
+When the exception was thrown, this was the stack:
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/errors.dart 274:3       throw_
+package:matcher/src/expect/expect.dart 187:31                                     fail
+package:matcher/src/expect/expect.dart 182:3                                      _expect
+package:matcher/src/expect/expect.dart 65:3                                       expect$
+package:flutter_test/src/widget_tester.dart 473:18                                expect$
+verif_admin_test.dart 503:5                                                       <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 618:19               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 643:23               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 589:19               <fn>
+▶ Lo que quedó escrito en la base
+consulta.Hugo.finalizada|false
+consulta.Sara.finalizada|true
+consulta.Hugo.es_de_hoy|true
+consulta.Sara.es_de_hoy|true
+vitales.Hugo.filas|8
+vitales.Sara.filas|8
+tratamiento.Sara.b529789d-a969-4266-8b6d-6ddae9b9da9d|3200.00
+receta.Sara.renglones|1
+receta.tabla_normalizada|0
+cuenta.Sara.total|3200.00
+cuenta.Sara.estado|saldada
+pago.Sara.completado|3200.00 via tarjeta_debito
+caja.movimiento.ingreso|3200.00 · Cobro a cuenta
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #1ca1693a
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #0255541a
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #5b390f04
+caja.movimiento.ingreso|3200.00 · Cobro a cuenta
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #916e23b6
+compra.estado|recibida
+stock.Gutapercha punta F2|60
+movimiento_stock.compra_recibida|50 → 60
+movimiento_stock.compra_recibida|40 → 50
+movimiento_stock.compra_recibida|30 → 40
+cita.Ana.estado|confirmada
+cita.Diana.estado|cancelada
+cita.Elena.estado|en_espera
+cita.Hugo.estado|en_consulta
+cita.Nuria.estado|confirmada
+cita.Pablo.estado|confirmada
+cita.Sara.estado|completada
+alta.Rosa Recepción E2E|o_positivo
+✗ Jornadas fallidas: doctora admin

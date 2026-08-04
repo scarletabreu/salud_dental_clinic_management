@@ -1,0 +1,31 @@
+consulta.Hugo.finalizada|false
+consulta.Sara.finalizada|true
+consulta.Hugo.es_de_hoy|true
+consulta.Sara.es_de_hoy|true
+vitales.Hugo.filas|8
+vitales.Sara.filas|8
+tratamiento.Sara.b529789d-a969-4266-8b6d-6ddae9b9da9d|3200.00
+receta.Sara.renglones|1
+receta.tabla_normalizada|0
+cuenta.Sara.total|3200.00
+cuenta.Sara.estado|saldada
+pago.Sara.completado|3200.00 via tarjeta_debito
+caja.movimiento.ingreso|3200.00 · Cobro a cuenta
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #1ca1693a
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #0255541a
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #5b390f04
+caja.movimiento.ingreso|3200.00 · Cobro a cuenta
+caja.movimiento.egreso|1900.00 · Pago por recepción de compra #916e23b6
+compra.estado|recibida
+stock.Gutapercha punta F2|60
+movimiento_stock.compra_recibida|50 → 60
+movimiento_stock.compra_recibida|40 → 50
+movimiento_stock.compra_recibida|30 → 40
+cita.Ana.estado|confirmada
+cita.Diana.estado|cancelada
+cita.Elena.estado|en_espera
+cita.Hugo.estado|en_consulta
+cita.Nuria.estado|confirmada
+cita.Pablo.estado|confirmada
+cita.Sara.estado|completada
+alta.Rosa Recepción E2E|o_positivo

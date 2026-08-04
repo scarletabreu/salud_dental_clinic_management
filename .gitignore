@@ -39,3 +39,7 @@ dart_define.json
 # Supabase CLI cache/temp (no deben versionarse)
 supabase/.temp/
 supabase/.branches/
+
+# Reportes de crash que `flutter drive` deja en la raíz al caerse un arnés.
+# La evidencia de las corridas vive en docs/qa/, no aquí.
+flutter_*.log

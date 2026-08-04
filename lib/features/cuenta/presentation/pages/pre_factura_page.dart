@@ -996,66 +996,104 @@ class _Acciones extends StatelessWidget {
         break;
       }
     }
+    // Cobrar y pactar un plan de cuotas son operaciones de caja: las hace la
+    // administración o la asistente, nunca quien sólo ejerce. La base ya lo
+    // imponía —`registrar_pago` responde «Capacidad de caja requerida»—, pero
+    // la pantalla ofrecía el botón igual y el doctor se topaba con el rechazo
+    // después de teclear el monto. Ajustar sí se queda: toca el resultado
+    // clínico facturado y es de quien lo firmó.
+    final puedeCobrar = context.watch<AuthCubit>().state.puedeGestionarCaja;
+
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: FilledButton.icon(
-            onPressed: saldada
-                ? null
-                : () =>
-                      _mostrarDialogoPago(context, cuenta, cuota: proximaCuota),
-            icon: Icon(
-              saldada ? Icons.check_circle_rounded : Icons.payments_rounded,
-              size: 20,
+        if (!puedeCobrar) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: ac.bgPage,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ac.divider),
             ),
-            label: Text(
-              saldada
-                  ? 'Cuenta Saldada Completamente'
-                  : proximaCuota != null
-                  ? 'Pagar Próxima Cuota'
-                  : 'Registrar Cobro / Pago',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5,
+            child: Row(
+              children: [
+                Icon(Icons.point_of_sale_rounded, size: 18, color: ac.amber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'El cobro lo registra caja. Esta cuenta queda pendiente '
+                    'para administración o recepción.',
+                    style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (puedeCobrar)
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: saldada
+                  ? null
+                  : () => _mostrarDialogoPago(
+                      context,
+                      cuenta,
+                      cuota: proximaCuota,
+                    ),
+              icon: Icon(
+                saldada ? Icons.check_circle_rounded : Icons.payments_rounded,
+                size: 20,
               ),
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: ac.primaryGreen,
-              disabledBackgroundColor: ac.green.withValues(alpha: 0.15),
-              disabledForegroundColor: ac.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              label: Text(
+                saldada
+                    ? 'Cuenta Saldada Completamente'
+                    : proximaCuota != null
+                    ? 'Pagar Próxima Cuota'
+                    : 'Registrar Cobro / Pago',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5,
+                ),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: ac.primaryGreen,
+                disabledBackgroundColor: ac.green.withValues(alpha: 0.15),
+                disabledForegroundColor: ac.green,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
+        if (puedeCobrar) const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(
-              child: SizedBox(
-                height: 44,
-                child: OutlinedButton.icon(
-                  onPressed: cuotas.isEmpty
-                      ? () => _mostrarDialogoPlan(context, cuenta)
-                      : null,
-                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                  label: Text(
-                    cuotas.isEmpty ? 'Plan de cuotas' : 'Plan configurado',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: ac.textSecondary,
-                    side: BorderSide(color: ac.divider),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            if (puedeCobrar)
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: cuotas.isEmpty
+                        ? () => _mostrarDialogoPlan(context, cuenta)
+                        : null,
+                    icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                    label: Text(
+                      cuotas.isEmpty ? 'Plan de cuotas' : 'Plan configurado',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ac.textSecondary,
+                      side: BorderSide(color: ac.divider),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
+            if (puedeCobrar) const SizedBox(width: 10),
             Expanded(
               child: SizedBox(
                 height: 44,

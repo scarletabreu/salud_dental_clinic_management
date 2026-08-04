@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salud_dental_clinic_management/core/di/service_locator.dart';
+import 'package:salud_dental_clinic_management/core/domain/entities/contacto.dart';
+import 'package:salud_dental_clinic_management/core/domain/enums/estatus_persona.dart';
 import 'package:salud_dental_clinic_management/core/presentation/app_theme.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:salud_dental_clinic_management/features/auth/presentation/cubit/auth_state.dart';
+import 'package:salud_dental_clinic_management/features/personal/domain/entities/admin.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/metodo_pago.dart';
@@ -80,6 +85,27 @@ List<Cuota> _cuotas() => [
     ),
 ];
 
+class _AuthCubitDoble extends Cubit<AuthState> implements AuthCubit {
+  _AuthCubitDoble(super.initialState);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+final _admin = Admin(
+  id: 'admin-1',
+  nombre: 'Alma',
+  apellido: 'Dirección',
+  birthDate: DateTime(1978, 4, 12),
+  govID: '402-7654321-9',
+  contactos: const <Contacto>[],
+  estatus: EstatusPersona.activo,
+  username: 'alma',
+  specialty: 'General',
+  assistants: const [],
+  departamento: 'Dirección',
+);
+
 Widget _app(PreFacturaState estado, {double textScale = 1}) {
   if (sl.isRegistered<PreFacturaCubit>()) {
     sl.unregister<PreFacturaCubit>();
@@ -94,7 +120,14 @@ Widget _app(PreFacturaState estado, {double textScale = 1}) {
       ).copyWith(textScaler: TextScaler.linear(textScale)),
       child: inner!,
     ),
-    home: const PreFacturaPage(cuentaId: 'cuenta-1'),
+    // La pantalla decide por capacidad de rol qué acciones ofrece, así que
+    // necesita una sesión: aquí la del admin, que las tiene todas.
+    home: BlocProvider<AuthCubit>(
+      create: (_) => _AuthCubitDoble(
+        AuthState(isAuthenticated: true, usuario: _admin),
+      ),
+      child: const PreFacturaPage(cuentaId: 'cuenta-1'),
+    ),
   );
 }
 

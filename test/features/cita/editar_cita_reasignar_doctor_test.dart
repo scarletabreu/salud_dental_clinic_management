@@ -126,7 +126,7 @@ class _DoctorRepositorioDoble implements DoctorRepository {
 
 class _CitaRepositorioDoble implements CitaRepository {
   @override
-  Future<List<ActividadPlanificada>> actividadesAgendables(
+  Future<List<ActividadPlanificada>> getActividadesAgendables(
     String pacienteId,
   ) async => const [];
 

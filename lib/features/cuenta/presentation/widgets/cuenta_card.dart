@@ -9,7 +9,25 @@ class CuentaCard extends StatelessWidget {
   final Cuenta cuenta;
   final VoidCallback? onEliminar;
 
-  const CuentaCard({super.key, required this.cuenta, this.onEliminar});
+  /// Nombre del paciente. Cuando no se pudo resolver, la tarjeta se titula con
+  /// la referencia de la consulta, que es lo que hacía siempre: identificaba la
+  /// deuda por un uuid recortado y no por quien la debe.
+  final String? nombrePaciente;
+
+  /// Abrir el detalle de la cuenta. Sin esto la lista era un tablero de sólo
+  /// lectura: se veía el balance pendiente y no había forma de cobrarlo.
+  final VoidCallback? onAbrir;
+
+  const CuentaCard({
+    super.key,
+    required this.cuenta,
+    this.onEliminar,
+    this.nombrePaciente,
+    this.onAbrir,
+  });
+
+  String get _referenciaConsulta =>
+      'Consulta #${cuenta.consultaId.length > 8 ? cuenta.consultaId.substring(0, 8) : cuenta.consultaId}';
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +40,7 @@ class CuentaCard extends StatelessWidget {
       ac,
     );
 
-    return Container(
+    final contenido = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: ac.cardBg,
@@ -53,7 +71,8 @@ class CuentaCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Consulta #${cuenta.consultaId.length > 8 ? cuenta.consultaId.substring(0, 8) : cuenta.consultaId}',
+                      nombrePaciente ?? _referenciaConsulta,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: colorScheme.onSurface,
@@ -62,7 +81,11 @@ class CuentaCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      dateFmt.format(cuenta.fechaCreacion),
+                      nombrePaciente == null
+                          ? dateFmt.format(cuenta.fechaCreacion)
+                          : '$_referenciaConsulta · '
+                                '${dateFmt.format(cuenta.fechaCreacion)}',
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: ac.textSecondary),
@@ -188,6 +211,16 @@ class CuentaCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+
+    if (onAbrir == null) return contenido;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onAbrir,
+        borderRadius: BorderRadius.circular(16),
+        child: contenido,
       ),
     );
   }

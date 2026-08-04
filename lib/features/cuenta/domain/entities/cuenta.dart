@@ -8,6 +8,12 @@ import 'package:salud_dental_clinic_management/features/cuenta/domain/exceptions
 class Cuenta {
   final String? id;
   final String consultaId;
+
+  /// Paciente al que se le factura. La columna existe en `cuentas` desde la
+  /// reconciliación con producción, pero el modelo no la leía: por eso el
+  /// listado de Cuentas por Cobrar sólo podía titularse con el id de la
+  /// consulta.
+  final String? pacienteId;
   final DateTime fechaCreacion;
   final DateTime? fechaPago;
   final MetodoPago metodoPago;
@@ -19,6 +25,7 @@ class Cuenta {
   Cuenta({
     this.id,
     required this.consultaId,
+    this.pacienteId,
     required this.fechaCreacion,
     this.fechaPago,
     required this.metodoPago,
@@ -96,7 +103,8 @@ class Cuenta {
     }
     final notaActualizada =
         '${nota ?? ''}\n[Ajuste ${monto >= 0 ? '+' : ''}$monto por '
-        '$doctorAutorizaId] $motivo'.trim();
+                '$doctorAutorizaId] $motivo'
+            .trim();
     return copyWith(nota: notaActualizada);
   }
 

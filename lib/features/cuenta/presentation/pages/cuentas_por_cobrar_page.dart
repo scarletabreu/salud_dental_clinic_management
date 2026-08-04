@@ -8,6 +8,7 @@ import 'package:salud_dental_clinic_management/core/presentation/responsive.dart
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_cubit.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/cubit/cuentas_por_cobrar_state.dart';
+import 'package:salud_dental_clinic_management/features/cuenta/presentation/pages/pre_factura_page.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/presentation/widgets/cuenta_card.dart';
 
 class CuentasPorCobrarPage extends StatefulWidget {
@@ -178,6 +179,20 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
         ),
       ),
     );
+  }
+
+  /// Abre el detalle de la cuenta, que es donde se cobra.
+  ///
+  /// Al volver se recarga: si se registró un pago, el balance de la lista y los
+  /// totales de la cabecera quedarían mintiendo hasta el siguiente refresco.
+  Future<void> _abrirCuenta(String cuentaId) async {
+    final cubit = context.read<CuentasPorCobrarCubit>();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PreFacturaPage(cuentaId: cuentaId),
+      ),
+    );
+    await cubit.cargarCuentas();
   }
 
   Future<void> _confirmarEliminacion(String id, String etiqueta) async {
@@ -529,12 +544,18 @@ class _CuentasPorCobrarPageState extends State<CuentasPorCobrarPage> {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final cuenta = state.filtradas[index];
+                final nombre = state.nombrePaciente(cuenta);
                 return CuentaCard(
                   cuenta: cuenta,
+                  nombrePaciente: nombre,
+                  onAbrir: cuenta.id != null
+                      ? () => _abrirCuenta(cuenta.id!)
+                      : null,
                   onEliminar: cuenta.id != null
                       ? () => _confirmarEliminacion(
                           cuenta.id!,
-                          'Consulta #${cuenta.consultaId.length > 8 ? cuenta.consultaId.substring(0, 8) : cuenta.consultaId}',
+                          nombre ??
+                              'Consulta #${cuenta.consultaId.length > 8 ? cuenta.consultaId.substring(0, 8) : cuenta.consultaId}',
                         )
                       : null,
                 );

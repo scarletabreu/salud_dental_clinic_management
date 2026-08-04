@@ -9,20 +9,20 @@ sealed class CuentaException implements Exception {
 
 class TransicionInvalidaException extends CuentaException {
   TransicionInvalidaException(EstadoCuenta desde, EstadoCuenta hacia)
-      : super('No se puede pasar de $desde a $hacia');
+    : super('No se puede pasar de $desde a $hacia');
 }
 
 class ModoPagoNoPermitidoException extends CuentaException {
   ModoPagoNoPermitidoException()
-      : super('Pacientes de EMERGENCIA solo pueden pagar AL_CONTADO');
+    : super('Pacientes de EMERGENCIA solo pueden pagar AL_CONTADO');
 }
 
 class AjusteRequiereAutorizacionException extends CuentaException {
   AjusteRequiereAutorizacionException()
-      : super('El ajuste requiere autorización de un doctor');
+    : super('El ajuste requiere autorización de un doctor');
 }
 
 class SaldoInsuficienteException extends CuentaException {
   SaldoInsuficienteException()
-      : super('No se puede saldar: monto pagado menor al monto total');
+    : super('No se puede saldar: monto pagado menor al monto total');
 }

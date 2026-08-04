@@ -12,6 +12,7 @@ class CuentaModel extends Cuenta {
   CuentaModel({
     super.id,
     required super.consultaId,
+    super.pacienteId,
     required super.fechaCreacion,
     super.fechaPago,
     required super.metodoPago,
@@ -40,6 +41,7 @@ class CuentaModel extends Cuenta {
     return CuentaModel(
       id: json['id'] as String?,
       consultaId: json['consulta_id'] as String? ?? '',
+      pacienteId: json['paciente_id'] as String?,
       fechaCreacion:
           _parseDate(json['fecha_creacion']) ??
           _parseDate(json['created_at']) ??
@@ -52,7 +54,7 @@ class CuentaModel extends Cuenta {
             e.name.toLowerCase() ==
             (json['estado'] as String? ?? '').toLowerCase(),
         orElse: () => EstadoCuenta.abierta,
-      ),               
+      ),
       itemCuentas: items,
       nota: json['nota'] as String?,
     );

@@ -35,9 +35,15 @@ class CuentasPorCobrarLoaded extends CuentasPorCobrarState {
   final double totalPorCobrar;
   final double totalCobrado;
 
+  /// Nombre por `paciente_id`, resuelto contra el directorio de pacientes. Las
+  /// cuentas viajan con el id y sin él la lista sólo sabía decir «Consulta
+  /// #c16563b9», que no le sirve a quien cobra.
+  final Map<String, String> nombresPacientes;
+
   const CuentasPorCobrarLoaded({
     required this.todas,
     required this.filtradas,
+    this.nombresPacientes = const {},
     this.searchQuery = '',
     this.filtroEstado,
     this.orden = OrdenCuenta.mayorBalance,
@@ -48,6 +54,13 @@ class CuentasPorCobrarLoaded extends CuentasPorCobrarState {
     required this.totalPorCobrar,
     required this.totalCobrado,
   });
+
+  /// Nombre del paciente de una cuenta, o `null` si no se pudo resolver.
+  String? nombrePaciente(Cuenta cuenta) {
+    final id = cuenta.pacienteId;
+    if (id == null) return null;
+    return nombresPacientes[id];
+  }
 
   bool get hayFiltrosActivos =>
       searchQuery.isNotEmpty ||
@@ -60,6 +73,7 @@ class CuentasPorCobrarLoaded extends CuentasPorCobrarState {
   CuentasPorCobrarLoaded copyWith({
     List<Cuenta>? todas,
     List<Cuenta>? filtradas,
+    Map<String, String>? nombresPacientes,
     String? searchQuery,
     EstadoCuenta? Function()? filtroEstado,
     OrdenCuenta? orden,
@@ -73,6 +87,7 @@ class CuentasPorCobrarLoaded extends CuentasPorCobrarState {
     return CuentasPorCobrarLoaded(
       todas: todas ?? this.todas,
       filtradas: filtradas ?? this.filtradas,
+      nombresPacientes: nombresPacientes ?? this.nombresPacientes,
       searchQuery: searchQuery ?? this.searchQuery,
       filtroEstado: filtroEstado != null ? filtroEstado() : this.filtroEstado,
       orden: orden ?? this.orden,
@@ -101,6 +116,7 @@ class CuentasPorCobrarOperating extends CuentasPorCobrarLoaded {
   const CuentasPorCobrarOperating({
     required super.todas,
     required super.filtradas,
+    super.nombresPacientes,
     super.searchQuery,
     super.filtroEstado,
     super.orden,

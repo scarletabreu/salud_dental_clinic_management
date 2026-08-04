@@ -513,7 +513,10 @@ Future<void> init() async {
     () => GetCuentasPorCobrarUseCase(repository: sl()),
   );
   sl.registerFactory<CuentasPorCobrarCubit>(
-    () => CuentasPorCobrarCubit(sl<CuentaRepository>()),
+    () => CuentasPorCobrarCubit(
+      sl<CuentaRepository>(),
+      sl<IPacienteRepository>(),
+    ),
   );
 
   sl.registerFactory<GetCuentaByIdUseCase>(

@@ -38,33 +38,35 @@ class CuentaRemoteDatasourceImpl implements CuentaRemoteDatasource {
 
   @override
   Future<Map<String, dynamic>?> fetchCuentaById(String id) async {
-  try {
-    final response = await supabaseClient
-        .from('cuentas')
-        .select('*, pagos(*), items_cuenta(*)')
-        .eq('id', id)
-        .filter('deleted_at', 'is', null)
-        .maybeSingle();
-    return response;
-  } on PostgrestException catch (e) {
-    throw Exception('Error al obtener cuenta por consulta: ${e.message}');
+    try {
+      final response = await supabaseClient
+          .from('cuentas')
+          .select('*, pagos(*), items_cuenta(*)')
+          .eq('id', id)
+          .filter('deleted_at', 'is', null)
+          .maybeSingle();
+      return response;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener cuenta por consulta: ${e.message}');
+    }
   }
-}
 
   @override
-  Future<Map<String, dynamic>?> fetchCuentaByConsultaId(String consultaId) async {
-  try {
-    final response = await supabaseClient
-        .from('cuentas')
-        .select('*, pagos(*), items_cuenta(*)')
-        .eq('consulta_id', consultaId)
-        .filter('deleted_at', 'is', null)
-        .maybeSingle();
-    return response;
-  } on PostgrestException catch (e) {
-    throw Exception('Error al obtener cuenta por consulta: ${e.message}');
+  Future<Map<String, dynamic>?> fetchCuentaByConsultaId(
+    String consultaId,
+  ) async {
+    try {
+      final response = await supabaseClient
+          .from('cuentas')
+          .select('*, pagos(*), items_cuenta(*)')
+          .eq('consulta_id', consultaId)
+          .filter('deleted_at', 'is', null)
+          .maybeSingle();
+      return response;
+    } on PostgrestException catch (e) {
+      throw Exception('Error al obtener cuenta por consulta: ${e.message}');
+    }
   }
-}
 
   /// Lo único editable de una pre-factura desde el cliente. La pantalla ya
   /// ofrecía elegir entre contado y crédito, pero la elección se quedaba en el

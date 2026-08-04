@@ -3,22 +3,46 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/entities/cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/enums/estado_cuenta.dart';
 import 'package:salud_dental_clinic_management/features/cuenta/domain/repositories/cuenta_repository.dart';
+import 'package:salud_dental_clinic_management/features/paciente/domain/repositories/i_paciente_repository.dart';
 import 'cuentas_por_cobrar_state.dart';
 
 class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
   final CuentaRepository _repository;
+  final IPacienteRepository _pacienteRepository;
 
-  CuentasPorCobrarCubit(this._repository)
+  /// Nombre por `paciente_id`. Se resuelve una vez por carga y sobrevive a los
+  /// filtros, que sólo recortan la lista ya traída.
+  Map<String, String> _nombres = const {};
+
+  CuentasPorCobrarCubit(this._repository, this._pacienteRepository)
     : super(const CuentasPorCobrarInitial());
 
   Future<void> cargarCuentas() async {
     emit(const CuentasPorCobrarLoading());
     try {
       final cuentas = await _repository.getCuentasPorCobrar();
+      _nombres = await _cargarNombres(cuentas);
       _evaluarYEmitir(cuentas: cuentas);
     } catch (e) {
       emit(CuentasPorCobrarError('Error al cargar cuentas por cobrar: $e'));
     }
+  }
+
+  /// Los nombres salen del directorio de pacientes, igual que en el listado de
+  /// consultas: es la vista que atraviesa el recorte de `puede_ver_paciente`
+  /// para poder poner un nombre en una fila cuyo expediente el rol no abre.
+  /// Si falla, la lista se pinta igual con la referencia de la consulta.
+  Future<Map<String, String>> _cargarNombres(List<Cuenta> cuentas) async {
+    final ids = {
+      for (final cuenta in cuentas)
+        if (cuenta.pacienteId != null) cuenta.pacienteId!,
+    }.toList();
+    if (ids.isEmpty) return const {};
+    final resultado = await _pacienteRepository.getNombresPacientes(ids);
+    return resultado.fold(
+      (_) => const <String, String>{},
+      (nombres) => nombres,
+    );
   }
 
   void aplicarFiltros({
@@ -115,8 +139,11 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
         final idStr = c.id ?? '';
         final consultaId = c.consultaId;
         final notas = _getNotas(c).toLowerCase();
+        // El buscador prometía «por paciente» desde siempre y sólo miraba ids.
+        final paciente = (_nombres[c.pacienteId ?? ''] ?? '').toLowerCase();
 
-        return idStr.toLowerCase().contains(q) ||
+        return paciente.contains(q) ||
+            idStr.toLowerCase().contains(q) ||
             consultaId.toLowerCase().contains(q) ||
             notas.contains(q);
       }).toList();
@@ -172,6 +199,7 @@ class CuentasPorCobrarCubit extends Cubit<CuentasPorCobrarState> {
       CuentasPorCobrarLoaded(
         todas: cuentas,
         filtradas: resultado,
+        nombresPacientes: _nombres,
         searchQuery: query,
         filtroEstado: estado,
         orden: orden,

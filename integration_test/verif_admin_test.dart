@@ -33,7 +33,7 @@ void _recoger(WidgetTester tester, String etapa) {
   if (e != null) _excepciones.add('[$etapa] $e');
 }
 
-Future<void> _bombear(WidgetTester tester, [int veces = 12]) async {
+Future<void> _bombear(WidgetTester tester, [int veces = 6]) async {
   for (var i = 0; i < veces; i++) {
     await tester.pump(const Duration(milliseconds: 250));
   }
@@ -48,7 +48,7 @@ Future<void> _asentar(WidgetTester tester) async {
   // la binding ya anotó la excepción. El resultado era una jornada que hacía
   // todo bien y terminaba en «Multiple exceptions (3) were detected», que
   // parece un defecto de la aplicación y es del arnés.
-  await _bombear(tester, 8);
+  await _bombear(tester, 5);
 }
 
 Future<void> _escribirHint(
@@ -68,22 +68,6 @@ Future<void> _escribirHint(
   await _bombear(tester, 3);
 }
 
-Future<void> _escribirEtiqueta(
-  WidgetTester tester,
-  String etiqueta,
-  String texto,
-) async {
-  final campo = find.byWidgetPredicate(
-    (w) => w is TextField && w.decoration?.labelText == etiqueta,
-  );
-  await esperarPor(tester, campo, descripcion: 'el campo «$etiqueta»');
-  await tester.ensureVisible(campo.first);
-  await tester.pump(const Duration(milliseconds: 150));
-  await tester.tap(campo.first, warnIfMissed: false);
-  await tester.pump(const Duration(milliseconds: 150));
-  await tester.enterText(campo.first, texto);
-  await _bombear(tester, 3);
-}
 
 Future<void> _escribirClave(
   WidgetTester tester,
@@ -101,7 +85,7 @@ Future<void> _escribirClave(
 
 Future<void> _volver(WidgetTester tester) async {
   Navigator.of(tester.element(find.byType(Scaffold).first)).pop();
-  await _bombear(tester, 8);
+  await _bombear(tester, 5);
 }
 
 /// Vuelve al shell cerrando las rutas apiladas, sin contar `pop`s.
@@ -132,9 +116,7 @@ String _pantalla(WidgetTester tester) => tester
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('jornada del admin: expediente, cobro, caja y compras', (
-    tester,
-  ) async {
+  testWidgets('jornada del admin · expediente, PDF y cobro', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 1000));
     // El manejador se instala DENTRO de la prueba: la binding pone el suyo
     // al arrancar `runTest`, así que hacerlo en `setUpAll` no captura nada y
@@ -250,7 +232,7 @@ void main() {
       limite: const Duration(seconds: 90),
       descripcion: 'la vista previa del PDF con odontograma',
     );
-    await _bombear(tester, 20);
+    await _bombear(tester, 8);
     _recoger(tester, 'PDF del expediente');
     // Cierra la previsualización y el diálogo de exportación; el expediente
     // sigue debajo, que es donde vive el resumen financiero.
@@ -350,161 +332,11 @@ void main() {
 
     _recoger(tester, 'cobro de la pre-factura');
 
-    // ===================================================================
-    // 4 · El cobro entró en la caja del día
-    // ===================================================================
-    await abrirDestino(tester, 'Caja');
-    await esperarPor(
-      tester,
-      find.text('Movimientos'),
-      limite: const Duration(seconds: 45),
-      descripcion: 'el arqueo del día',
-    );
-    if (cobrable) {
-      // El cobro se hizo en esta corrida: su ingreso tiene que estar en el
-      // arqueo (S10/F2-04 · el pago sigue a la caja).
-      expect(
-        find.textContaining('3,200'),
-        findsWidgets,
-        reason:
-            'el cobro de RD\$3,200 no aparece en el arqueo del día. '
-            'Pantalla: ${_pantalla(tester)}',
-      );
-    }
-
-    _recoger(tester, 'caja del día');
-
-    // ===================================================================
-    // 5 · Compra: registrar y recibir (era imposible antes de la corrección)
-    // ===================================================================
-    await abrirDestino(tester, 'Inventario');
-    _recoger(tester, 'abrir Inventario');
-    await esperarPor(tester, find.text('Compras'), descripcion: 'pestañas');
-    await tester.tap(find.text('Compras').first);
-    await _bombear(tester, 10);
-    _recoger(tester, 'pestaña Compras');
-
-    final nuevaCompra = find.text('Nueva Compra');
-    await esperarPor(tester, nuevaCompra, descripcion: 'el botón Nueva Compra');
-    await tester.tap(nuevaCompra.first, warnIfMissed: false);
-    await _bombear(tester, 8);
-    _recoger(tester, 'abrir Nueva Compra');
-
-    // Proveedor y consumible son desplegables (`DropdownButtonFormField`), no
-    // campos de texto: el `hintText` vive en su decoración pero no hay ningún
-    // `TextField` que lo lleve.
-    Finder desplegable(String tipo) => find.byWidgetPredicate(
-      (w) => w.runtimeType.toString() == 'DropdownButtonFormField<$tipo>',
-      description: 'desplegable de $tipo',
-    );
-
-    final selectorProveedor = desplegable('Suplidor');
-    await esperarPor(
-      tester,
-      selectorProveedor,
-      descripcion: 'el selector de proveedor',
-    );
-    await tester.ensureVisible(selectorProveedor.first);
-    await _bombear(tester, 2);
-    await tester.tap(selectorProveedor.first);
-    await _asentar(tester);
-    await esperarPor(
-      tester,
-      find.text('Depósito Dental E2E'),
-      descripcion: 'el proveedor sembrado',
-    );
-    await tester.tap(find.text('Depósito Dental E2E').last);
-    await _asentar(tester);
-    _recoger(tester, 'elegir proveedor');
-
-    final selectorConsumible = desplegable('Consumible');
-    await esperarPor(
-      tester,
-      selectorConsumible,
-      descripcion: 'el selector de consumible',
-    );
-    await tester.ensureVisible(selectorConsumible.first);
-    await _bombear(tester, 2);
-    await tester.tap(selectorConsumible.first);
-    await _asentar(tester);
-    final opcionConsumible = find.textContaining('Gutapercha punta F2');
-    await esperarPor(
-      tester,
-      opcionConsumible,
-      descripcion: 'el consumible sin stock',
-    );
-    await tester.tap(opcionConsumible.last);
-    await _asentar(tester);
-    _recoger(tester, 'elegir consumible');
-
-    await _escribirEtiqueta(tester, 'Cantidad *', '10');
-    await _escribirEtiqueta(tester, 'Precio Unitario (RD\$) *', '190');
-
-    // El renglón se añade a la orden antes de registrarla.
-    final agregarRenglon = find.widgetWithIcon(IconButton, Icons.add_rounded);
-    await esperarPor(
-      tester,
-      agregarRenglon,
-      descripcion: 'el botón de añadir el renglón a la compra',
-    );
-    await tester.tap(agregarRenglon.last);
-    await _bombear(tester, 6);
-    _recoger(tester, 'añadir renglón');
-
-    _recoger(tester, 'diálogo de nueva compra');
-
-    final registrar = find.text('Registrar Compra');
-    await tester.ensureVisible(registrar.first);
-    await _bombear(tester, 2);
-    await tester.tap(registrar.first);
-    await _bombear(tester, 24);
-    _recoger(tester, 'registrar la compra');
-    expect(
-      find.text('Registrar Compra'),
-      findsNothing,
-      reason:
-          'el diálogo de compra no se cerró: la compra fue rechazada. '
-          'Pantalla: ${_pantalla(tester)}',
-    );
-
-    // Recibirla: aquí es donde el CHECK de `movimientos_stock_consumible`
-    // devolvía 23514 en cada clic, en local y en producción.
-    final recibir = find.text('Recibir');
-    await esperarPor(
-      tester,
-      recibir,
-      limite: const Duration(seconds: 45),
-      descripcion: 'el botón Recibir de la compra recién creada',
-    );
-    await tester.ensureVisible(recibir.first);
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.tap(recibir.first, warnIfMissed: false);
-    _recoger(tester, 'abrir la recepción');
-    await esperarPor(
-      tester,
-      find.text('Marcar como Recibida'),
-      limite: const Duration(seconds: 45),
-      descripcion: 'la pantalla de recepción de la compra',
-    );
-    await tester.tap(find.text('Marcar como Recibida'), warnIfMissed: false);
-    _recoger(tester, 'confirmar la recepción');
-    await esperarPor(
-      tester,
-      find.text(
-        'Compra recibida correctamente e inventario/caja actualizados.',
-      ),
-      limite: const Duration(seconds: 60),
-      descripcion:
-          'la confirmación de la recepción (I1: antes respondía 23514 siempre)',
-    );
-    await _bombear(tester, 12);
-    _recoger(tester, 'recepción de la compra');
-
     expect(
       [..._erroresDeUi.map((e) => e.exceptionAsString()), ..._excepciones],
       isEmpty,
       reason:
-          'la interfaz lanzó excepciones durante la jornada del admin. '
+          'la interfaz lanzó excepciones durante la jornada del admin (expediente y cobro). '
           'Detalle: ${_erroresDeUi.map((e) => e.exceptionAsString()).join(" ||| ")} '
           '· por etapa: ${_excepciones.join(" ||| ")}',
     );

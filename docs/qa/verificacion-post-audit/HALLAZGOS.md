@@ -110,5 +110,82 @@ ruta que falta.
 | V-01 · doctor no admin no puede abrir la consulta de un paciente nuevo | **abierto** — sin migración que relaje `puede_ver_paciente`; el overlay del arnés sigue tapándolo |
 | V-02 · «Cuentas por Cobrar» sin ruta al cobro | **corregido** (`7b54c47`, `cadfdf3`) |
 
-El `✗ Jornadas fallidas: doctora admin` del final de `runner.log` es el registro
-de V-01, no un fallo del arnés.
+Precisión sobre `runner.log`: los `✗` que quedaron registrados **no** son V-01
+—el overlay lo tapa con las filas de `doctor_paciente`, así que la jornada de la
+doctora lo atraviesa—. Fueron dos artefactos del propio arnés, ya corregidos:
+
+- `pumpAndSettle` agotaba su plazo (el workspace siempre tiene una animación o
+  una petición en vuelo). Aunque se capturase el `throw`, la binding ya había
+  anotado la excepción y la corrida moría en «Multiple exceptions (3) were
+  detected», que se lee como defecto de la aplicación y es del arnés.
+- La jornada del admin entera superaba los **20 minutos** que
+  `integration_test` le da al driver para devolver el resultado: terminaba todo
+  su trabajo —el cobro y la compra quedaban escritos en la base— y la corrida
+  moría igual, en un `DriverError: request_data`. Por eso va partida en
+  `verif_admin_test.dart` (expediente, PDF y cobro) y
+  `verif_admin_compras_test.dart` (arqueo y compras).
+
+---
+
+## Lo que quedó comprobado por la interfaz
+
+Cada línea se verificó pulsando los botones y se confirmó después en la base
+(`tool/e2e/verificacion_post_audit.sql`).
+
+**Consulta (frente 1 del audit)** — llegada → evaluación → odontograma →
+diagnóstico → tratamiento → receta → cierre, tres veces y con dos consultas
+abiertas a la vez:
+
+- Las tres consultas cierran (`finalizada = true`) y su fecha es la del día en
+  la zona de la clínica, no `now()` a ciegas.
+- Los signos vitales dejan **8 filas estructuradas** por consulta en
+  `signos_vitales_consulta`, no sólo el `jsonb` (F1-06).
+- El tratamiento se guarda con su precio congelado (RD$3,200.00) y el
+  diagnóstico de la pieza 16 sobrevive al cierre y al historial.
+- Reanudar la consulta de Hugo desde «Consultas» no filtra nada de Sara ni de
+  Ana: cada expediente conserva sólo sus piezas.
+- La amoxicilina en la paciente alérgica a la penicilina queda **bloqueada** por
+  contraindicación absoluta; la clindamicina pasa.
+
+**Facturación y caja (frente 2)**
+
+- La pre-factura cobra el tratamiento aplicado: `cuenta.total = 3,200.00`, no
+  cero (F2-02).
+- El método de pago elegido se persiste tal cual: `pago … via tarjeta_debito`
+  (F2-03).
+- El cobro entra en el arqueo del día: `movimientos_caja · ingreso 3,200.00 ·
+  Cobro a cuenta` (S10/F2-04).
+- Con la caja del día anterior **sin cerrar**, la pantalla lo avisa y deja abrir
+  la de hoy igualmente (F2-01).
+
+**Inventario y compras (audit_001)**
+
+- Registrar una compra y recibirla funciona de punta a punta: la compra queda
+  `recibida`, el stock sube por el libro de movimientos
+  (`movimiento_stock.compra_recibida 0 → 10`) y el egreso entra en caja
+  (`egreso 1,900.00 · Pago por recepción de compra #…`). Antes de la corrección
+  esto respondía `23514` en cada clic, también en producción (I1).
+
+**Agenda y roles (frente 3 + matriz de permisos)**
+
+- Una cita cancelada no ofrece «Registrar llegada».
+- El grafo de estados de la base rechaza `en_espera → confirmada`.
+- La asistente ve la agenda de los doctores que asiste, registra llegadas, da de
+  alta pacientes y agenda citas; **no** tiene «Consultas», «Inventario» ni
+  «Perfiles`, y ninguna cita le ofrece «Iniciar consulta».
+- El diálogo de nueva cita rechaza una fecha/hora ya pasada.
+
+**Expediente impreso**
+
+- El PDF del expediente con odontograma se genera y se pinta en la
+  previsualización.
+
+## Observaciones menores
+
+- `items_receta` (la tabla) sigue vacía: los renglones viven en el `jsonb`
+  `recetas.items_receta`. Es F4-04 del audit, aceptada («no hay pérdida para la
+  app»), pero cualquier reporte que lea la tabla concluirá que no hay
+  medicamentos recetados.
+- El inicio de sesión falló dos veces de ~15 con el mismo usuario y contraseña
+  correctos (el dashboard no llegó en 45 s; por REST el token se emitía sin
+  problema en el mismo momento). No pude caracterizarlo; queda anotado.
